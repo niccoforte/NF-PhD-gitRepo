@@ -3,7 +3,7 @@
 ## SHELL COMMANDS
 
 #Run Abaqus CAE py scrypt without calling GUI.
-abaquis cae noGUI=example.py
+abaqus cae noGUI=example.py
 
 #Run Abaqus Viewer py scrypt without calling GUI.
 abaqus viewer noGUI=example.py
