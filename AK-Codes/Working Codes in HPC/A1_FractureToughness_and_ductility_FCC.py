@@ -7,7 +7,7 @@ import math
 import os
 executeOnCaeStartup()
 
-#os.chdir(r"D:\Research\Paper\Paper4_fracturetoughness\ABAQUS\SizeStudy\brittle")
+os.chdir(r"G:\Documents\Research\Paper1-LatticeFractureToughness\Abaqus\CAEnogui")
 	
 def node_new(L, H, nnx, nny, fac, distribution):
 

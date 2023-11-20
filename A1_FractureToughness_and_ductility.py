@@ -7,7 +7,7 @@ import math
 import os
 executeOnCaeStartup()
 
-os.chdir(r"C:\Users\exy053\Documents\Research\Paper1-LatticeFractureToughness\Code\Abaqus")
+os.chdir(r"G:\Documents\Research\Paper1-LatticeFractureToughness\Abaqus\CAEnogui")
 	
 def node_new(L, H, nnx, nny, fac, distribution):
 
