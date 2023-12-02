@@ -5,3 +5,4 @@
 # Additional ignored files
 .idea/
 *.DS_Store
+/.ipynb_checkpoints/*
