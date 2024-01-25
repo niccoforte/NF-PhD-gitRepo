@@ -3,6 +3,6 @@
 /workspace.xml
 
 # Additional ignored files
-.idea/
+.idea
 *.DS_Store
 .ipynb_checkpoints
