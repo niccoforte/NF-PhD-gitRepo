@@ -1,27 +1,36 @@
-#!/bin/bash
+echo LAT:
+read LAT
+echo nnx: 
+read nnx
+echo DIS:          # per, disNodes, disStruts
+read DIS
+echo JOBn:
+read JOBn
+echo loc:          # transfer, zip
+read loc
 
-LAT="tri"
-nnx=30
-DIS="disNodes"
-num="4"
-JOB="3326037"
+# LAT=tri
+# nnx=30
+# DIS=disNodes
+# JOBn=4664261
+# loc=transfer
 
 cd C:/Users/exy053
 cd 'OneDrive - Queen Mary, University of London'
-cd Documents/Research/Paper1-LatticeFractureToughness/Lattice-Fracture-Toughness/PINN/data/$LAT-$nnx/$DIS$num
+cd Documents/Research/Paper1-LatticeFractureToughness/p1git-Lattices/code/data/Ti/$LAT/
 
-/bin/echo Running on host: `hostname`.
-/bin/echo Starting on: `date`, in `pwd`.
+echo Running on host: `hostname`.
+echo Starting on: `date`, in `pwd`.
 
-scp exy053@andrena.hpc.qmul.ac.uk:/data/home/exy053/Paper1-LatticeFractureToughness/sims/$LAT/C1_transfer-$LAT-$DIS-$JOB.tgz "`pwd`"
-tar -xvzf C1_transfer-$LAT-$DIS-$JOB.tgz
+if [[ $loc == "transfer" ]]; then
+	scp exy053@login.hpc.qmul.ac.uk:/data/home/exy053/Paper1-LatticeFractureToughness/Ti/$LAT/C1_$loc-$LAT-$DIS-$JOBn.tgz "`pwd`"
+elif [[ $loc == "zip" ]]; then
+	scp exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/C2_$loc-$LAT-$DIS-$JOBn.tgz "`pwd`"
+fi
 
-cp data/scratch/exy053/$LAT/$DIS-$JOB/transfer/* "`pwd`"
+tar -xvzf C*_$loc-$LAT-$DIS-$JOBn.tgz
+
+cp -r data/scratch/exy053/$JOBn/$loc/* "`pwd`"
 
 rm -rf data
-rm -rf C1_transfer-$LAT-$DIS-$JOB.tgz
-
-#scp exy053@andrena.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Al/C2_$LAT-$DIS-$JOB.tgz "`pwd`"
-#tar -xvzf C2_$LAT-$DIS-$JOB.tgz
-
-#read -p "Press any key to continue" x
+rm -rf C*_$loc-$LAT-$DIS-$JOBn.tgz
