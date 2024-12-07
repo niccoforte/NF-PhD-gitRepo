@@ -87,7 +87,7 @@ if len(cmdIN) > 0:
     else:
         pDir = str(path)
 
-if stiffMatrix == True:
+if stiffMatrix:
     MechanicalModel = 'ductile'
     pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
     finalRun = 'no'

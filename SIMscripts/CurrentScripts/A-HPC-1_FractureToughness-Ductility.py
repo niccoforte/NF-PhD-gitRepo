@@ -48,7 +48,7 @@ if len(cmdIN) > 0:
     finalRun = 'yes'
     MechanicalModel = 'both'
     stiffMatrix = False
-
+        
     if dis == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
@@ -61,7 +61,7 @@ if len(cmdIN) > 0:
     else:
         raise Exception("Invalid disorder input.")
 
-if stiffMatrix == True:
+if stiffMatrix:
     MechanicalModel = 'ductile'
     os.chdir("C:\\Users\\exy053\\Documents\\stiffMatrix")
     finalRun = 'no'

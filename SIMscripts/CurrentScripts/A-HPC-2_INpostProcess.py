@@ -18,7 +18,7 @@ if len(cmdIN) > 0:
     finalRun = 'yes'
     MechanicalModel = 'both'
     stiffMatrix = False
-    
+        
     if dis == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
@@ -306,7 +306,7 @@ if not os.path.exists("transfer"):
 
 for file in os.scandir():
     if 'per' in file.name or 'disNodes' in file.name:
-        if file.name.endswith('.inp') and 'Ductile' in file.name:
+        if file.name.endswith('.inp'):
             expFile = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
             export_nodes(file.name, expFile)
 

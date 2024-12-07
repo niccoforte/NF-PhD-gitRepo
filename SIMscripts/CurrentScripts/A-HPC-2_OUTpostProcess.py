@@ -43,6 +43,11 @@ if len(cmdIN) > 0:
     else:
         raise Exception("Invalid disorder input.")
 
+    LAT = latticeType
+    DIS = dis
+    initial = initialJob
+    numOfJobs = numberOfRuns
+
 def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
