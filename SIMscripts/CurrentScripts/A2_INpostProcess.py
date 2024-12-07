@@ -5,11 +5,57 @@ import sys
 
 stiffMatrix = False
 
-#os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv4\\10")
-#os.chdir("C:\\Users\\exy053\\Documents\\ModelChanges")
+#pDir = os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv4\\10")
+pDir = os.chdir("C:\\Users\\exy053\\Documents\\ModelChanges")
+
+cmdIN = sys.argv[2:]
+if len(cmdIN) > 0:
+    latticeType = str(cmdIN[0])
+    dis = str(cmdIN[1])
+    nnx = int(cmdIN[2])
+    unitCellSize = float(cmdIN[3])
+    MechanicalModel = str(cmdIN[4])
+    userMaterial = str(cmdIN[5])
+    relDensity = float(cmdIN[6])
+    initialJob = int(cmdIN[7])
+    numberOfRuns = int(cmdIN[8])
+    cpus = int(cmdIN[9])
+    FieldOut_frames = int(cmdIN[10])
+    HistOut_frames = int(cmdIN[11])
+    path = str(cmdIN[12])
+    stiffMatrix = bool(int(cmdIN[13]))
+    
+    finalRun = 'yes'
+    
+    if dis.lower() == 'per':
+        nodeVar = 'no'
+        sizeVar = 'no'
+    elif dis.lower() == 'disNodes':
+        nodeVar = 'yes'
+        sizeVar = 'no'
+    elif dis.lower() == 'disStruts':
+        nodeVar = 'no'
+        sizeVar = 'yes'
+    else:
+        raise Exception("Invalid disorder input.")
+    
+    if path.lower() == "val":
+        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
+    elif path.lower() == "size":
+        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
+    elif path.lower() == "sic":
+        pDir = "C:\\Users\\exy053\\Documents\\SiC"
+    elif path.lower() == "rd":
+        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
+    elif path.lower() == "mc":
+        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
+    else:
+        pDir = str(path)
 
 if stiffMatrix:
-    os.chdir("C:\\Users\\exy053\\Documents\\stiffMatrix")
+    pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
+
+os.chdir(pDir)
 
 def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, mode=None):
     if stiffMatrix or stiffCalc:
@@ -282,7 +328,7 @@ if not os.path.exists("transfer"):
 
 for file in os.scandir():
     if 'per' in file.name or 'disNodes' in file.name:
-        if file.name.endswith('.inp') and 'Ductile' in file.name:
+        if file.name.endswith('.inp'):
             expFile = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
             export_nodes(file.name, expFile)
 

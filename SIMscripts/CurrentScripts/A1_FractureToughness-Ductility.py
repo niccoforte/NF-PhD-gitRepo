@@ -14,9 +14,9 @@ executeOnCaeStartup()
 
 unitCellSize = 10.0                         # Strut length
 latticeType = 'tri'                         # 'FCC', 'tri', 'hex', 'kagome'
-MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
+MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-nnx = 30                                    # number of Unit cells in X direction
+nnx = 50                                   # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
 distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
@@ -35,12 +35,13 @@ beta = 0.2
 
 stiffMatrix = False
 
-#os.chdir("C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity))
-os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize)))
-#os.chdir("C:\\Users\\exy053\\Documents\\SiC")
-#os.chdir("C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity))
-#os.chdir("C:\\Users\\exy053\\Documents\\ridges\\w\\0.2")
-#os.chdir("C:\\Users\\exy053\\Documents\\sApp")
+#pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
+#pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
+#pDir = "C:\\Users\\exy053\\Documents\\SiC"
+#pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
+#pDir = "C:\\Users\\exy053\\Documents\\ridges\\w\\0.2"
+#pDir = "C:\\Users\\exy053\\Documents\\sApp"
+pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -57,6 +58,9 @@ if len(cmdIN) > 0:
     FieldOut_frames = int(cmdIN[10])
     HistOut_frames = int(cmdIN[11])
     path = str(cmdIN[12])
+    stiffMatrix = bool(int(cmdIN[13]))
+    
+    finalRun = 'yes'
     
     if dis.lower() == 'per':
         nodeVar = 'no'
@@ -71,25 +75,24 @@ if len(cmdIN) > 0:
         raise Exception("Invalid disorder input.")
     
     if path.lower() == "val":
-        os.chdir("C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity))
+        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
     elif path.lower() == "size":
-        os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize)))
+        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
     elif path.lower() == "sic":
-        os.chdir("C:\\Users\\exy053\\Documents\\SiC")
+        pDir = "C:\\Users\\exy053\\Documents\\SiC"
     elif path.lower() == "rd":
-        os.chdir("C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity))
-    elif path.lower() == "modelchanges":
-        os.chdir("C:\\Users\\exy053\\Documents\\ModelChanges")
+        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
+    elif path.lower() == "mc":
+        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
-        try:
-            os.chdir(str(path))
-        except:
-            os.chdir(str(input("Enter PATH: ")))
+        pDir = str(path)
 
 if stiffMatrix == True:
     MechanicalModel = 'ductile'
-    os.chdir("C:\\Users\\exy053\\Documents\\stiffMatrix")
+    pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
     finalRun = 'no'
+    
+os.chdir(pDir)
 
 STEP_TIME = 1E-1
 sm_amp = False
