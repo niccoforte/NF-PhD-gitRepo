@@ -15,7 +15,7 @@ nnx = 30
 initial = 1
 numOfJobs = 1
 
-pDir = r"C:\\Users\\exy053\\Documents\\analysis"
+pDir = r"C:\\Users\\exy053\\Documents\\ModelChanges"
 #pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
 #pDir = r"C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
 
@@ -33,21 +33,18 @@ if len(cmdIN) > 0:
     cpus = int(cmdIN[9])
     FieldOut_frames = int(cmdIN[10])
     HistOut_frames = int(cmdIN[11])
-    
     path = str(cmdIN[12])
-    
     stiffMatrix = bool(int(cmdIN[13]))
-    UTverification = False
     
     finalRun = 'yes'
     
     if dis.lower() == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
-    elif dis.lower() == 'disnodes':
+    elif dis.lower() == 'disNodes':
         nodeVar = 'yes'
         sizeVar = 'no'
-    elif dis.lower() == 'disstruts':
+    elif dis.lower() == 'disStruts':
         nodeVar = 'no'
         sizeVar = 'yes'
     else:
@@ -55,10 +52,8 @@ if len(cmdIN) > 0:
     
     if path.lower() == "val":
         pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "psc":
+    elif path.lower() == "size":
         pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
-    elif path.lower() == "dsc":
-        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
     elif path.lower() == "sic":
         pDir = "C:\\Users\\exy053\\Documents\\SiC"
     elif path.lower() == "rd":
@@ -66,7 +61,7 @@ if len(cmdIN) > 0:
     elif path.lower() == "mc":
         pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
-        pDir = "C:\\Users\\exy053\\Documents\\" + str(path)
+        pDir = str(path)
     
     
     LAT = latticeType
@@ -287,118 +282,137 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
                 totalNodes = ((2*nny) * (nnx+1)) + (((2*nny)+1) * nnx) + 50
     B = 0.5*W
 
-    return H, L
+    return totalNodes
 
 
-def get_DuctData(Job, data, H, L):
-    odb = openOdb(path=Job) 
-    step = "Step-1"
-    variables = ["U2", "RF2"]
+def export_Udata(job, totalNodes):
+    odb = openOdb(path=job)
+    step = odb.steps['Step-1']
 
-    reg_load = 'Node '
+    count = 0
+    for frame in step.frames:
+        utField = frame.fieldOutputs['UT']
+        nodes_Us = []
+        for val in utField.values:
+            if int(val.nodeLabel) > int(totalNodes):
+                continue
+            nodeU = [int(val.nodeLabel), val.data[0], val.data[1]]
+            nodes_Us.append(nodeU)
+        nodes_Us.sort()
+        with open(job.split('\\')[-1].split('.')[0]+"\\"+"frame"+str(count)+".csv", "w") as f:
+            f.write("Node Label, U1, U2\n")
+            for nodeU in nodes_Us:
+                f.write("{}, {}, {}\n".format(nodeU[0], nodeU[1], nodeU[2]))
+        count = count + 1
     
-    U2s = []
-    RF2s = []
-    for reg in odb.steps[step].historyRegions.keys():
-        if reg_load in reg:
-            U2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[0]].data]
-            RF2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[1]].data]
-            U2s.append(U2)
-            RF2s.append(RF2)
-    
-    U2s = np.transpose(U2s)
-    RF2s = np.transpose(RF2s)
-    
-    numNodes = len(U2s[0])
-    strain = []
-    stress = []
-    for Us_step, RFs_step in zip(U2s, RF2s):
-        Usum = 0.0
-        RFsum = 0.0
-        for U, RF in zip(Us_step, RFs_step):
-            Usum += U
-            RFsum += RF
-        e = Usum/numNodes/H
-        s = RFsum/(L*1)
-        strain.append(e)
-        stress.append(s)
-    STEPS_OUT = np.transpose([strain, stress])
     odb.close()
-    return STEPS_OUT
 
-def get_FracData(Job, data):
-    odb = openOdb(path=Job) 
-    step = "Step-1"
-    variables = ["U2", "RF2", "STATUS"]
+def export_nodes(job, totalNodes):
+    with open(job, 'r') as f:
+        lines = f.readlines()
+    
+    nodes_start = int([lines.index(line) for line in lines if "*Node" in line][0]) + 1
+    nodes_end = int(nodes_start + totalNodes)
+    nodes = [[float(i.strip().strip('\n')) for i in line.split(",")] for line in lines[nodes_start:nodes_end]]
+    
+    with open(job.split('\\')[-1].split('.')[0]+"\\"+"NodesElems.csv", 'w') as f:
+        f.write("*Nodes\n")
+        for node in nodes:
+            f.write("{}, {}, {}\n".format(int(node[0]), node[1], node[2]))
+    return np.array(nodes)
 
-    reg_load = 'Node ASSEMBLY.1'
-    reg_cracktip = 'Element '
-
-    U2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[0]].data]
-    RF2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[1]].data]
+def connectivity(job, latticeType, unitCellSize, nodes):
+    radius = unitCellSize + unitCellSize*1e-3
+    dummyElem = []
+    count = 0
+    for ii in range(len(nodes)):
+        if (latticeType.lower() == "fcc" and nodes[ii][1])%2 == 1.0 and (nodes[ii][2])%2 == 1.0:
+            continue
+        distance = np.sqrt(array(nodes[ii, 1] - nodes[:, 1])**2 + array(nodes[ii, 2] - nodes[:, 2])**2)
+        inside = np.argwhere(distance <= radius)
+        nearNodes = np.setdiff1d(inside.astype(int), [ii])
+        for jj in range(len(nearNodes)):
+            dummyElem.append([count,ii,nearNodes[jj]])
+            count = count + 1            
+    for i in range(len(dummyElem)):
+        for j in range(len(dummyElem)):
+            if (dummyElem[i][1] == dummyElem[j][2]):
+                if (dummyElem[i][2] == dummyElem[j][1]):
+                    dummyElem[j][:] = [0, 0, 0]
+                    break
+    indexRemove = []
+    for i in range(0,len(dummyElem)):
+        if (dummyElem[i][0] == 0 and dummyElem[i][1] == 0 and dummyElem[i][2] == 0):
+            indexRemove.append(i)
+    realElem = np.delete(dummyElem, [indexRemove], axis=0)
+    realElem = realElem + 1
+    for i in range(len(realElem)):
+        realElem[i][0] = i+1
     
-    ALL_STATUS = []
-    for reg in odb.steps[step].historyRegions.keys():
-        if reg_cracktip in reg:
-            STATUS = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[2]].data]
-            ALL_STATUS.append(STATUS)
-    
-    ALL_STATUS = np.transpose(ALL_STATUS)
-    
-    STEPS_OUT = []
-    for U, RF, STAT in zip(U2, RF2, ALL_STATUS):
-        OUT = [U, RF]
-        for el_STAT in STAT:
-            OUT.append(el_STAT)
-        STEPS_OUT.append(OUT)
-    odb.close()
-    return STEPS_OUT
+    with open(job.split('\\')[-1].split('.')[0]+"\\"+"NodesElems.csv", 'a') as f:
+        f.write("*Elems\n")
+        for elem in realElem:
+            f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
+    return realElem
 
 
 if mode.lower() == 'any':
     for curDirectory, folders, files in os.walk(pDir):
         odbs = [f for f in files if f.endswith('.odb')]
+        inps = [f for f in files if f.endswith('.inp')]
         for odb in odbs:
             odbPath = os.path.join(curDirectory, odb)
-            if not os.path.exists(curDirectory + "/transfer"):
-                os.makedirs(curDirectory + "/transfer")
+            if not os.path.exists(odb.split('.')[0]):
+                os.makedirs(odb.split('.')[0])
             
-            LAT = odb.split('-')[1]
-            unitCellSize = unitCellSize
-            nnx = int(odb.split('-')[2])
-            H, L = geometry(LAT, unitCellSize, nnx, brackets=True)
-            if 'Ductile' in odb:
-                Job = odbPath
-                data = curDirectory + "/transfer/OUT-" + odb.split('.')[0] + '.csv'
-                OUT = get_DuctData(Job, data, H, L)
-                np.savetxt(data, OUT, delimiter=",")
-            elif 'Fracture' in odb:
-                Job = odbPath
-                data = curDirectory + "/transfer/OUT-" + odb.split('.')[0] + '.csv'
-                OUT = get_FracData(Job, data)
-                np.savetxt(data, OUT, delimiter=",")
+            sim = odb.split('.')[0]
+            MechMode = sim.split('-')[0]
+            LAT = sim.split('-')[1]
+            nnx = int(sim.split('-')[2])
+            totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
             
+            export_Udata(odbPath, totalNodes)
+            
+        for inp in inps:
+            inpPath = os.path.join(curDirectory, inp)
+            if not os.path.exists(inp.split('.')[0]):
+                os.makedirs(inp.split('.')[0])
+                
+            sim = inp.split('.')[0]
+            MechMode = sim.split('-')[0]
+            LAT = sim.split('-')[1]
+            nnx = int(sim.split('-')[2])
+            totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+            
+            nodes = export_nodes(inpPath, totalNodes)
+            elems = connectivity(inpPath, LAT, unitCellSize, nodes)
 
 if (mode.lower() == 'ductile' or mode.lower() == 'both'):
-    if not os.path.exists("transfer"):
-        os.makedirs("transfer")
-    
-    H, L = geometry(LAT, unitCellSize, nnx, brackets=True)
     MechMode = 'Ductile'
     for kk in range(initial, initial+numOfJobs):
-        Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
-        data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
-        OUT = get_DuctData(Job, data, H, L)
-        np.savetxt(data, OUT, delimiter=",")
-
-
+        sim = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk)
+        if not os.path.exists(sim):
+            os.makedirs(sim)
+        
+        odbPath = sim + ".odb"
+        inpPath = sim + ".inp"
+        totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+        
+        export_Udata(odbPath, totalNodes)
+        nodes = export_nodes(inpPath, totalNodes)
+        elems = connectivity(inpPath, LAT, unitCellSize, nodes)
+        
 if (mode.lower() == 'fracture' or mode.lower() == 'both'):
-    if not os.path.exists("transfer"):
-        os.makedirs("transfer")
-    
     MechMode = 'Fracture'
-    for kk in range(initial, initial+numOfJobs):
-        Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
-        data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
-        OUT = get_FracData(Job, data)
-        np.savetxt(data, OUT, delimiter=",")
+    for kk in range(initial, initial+numOfJobs):    
+        sim = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk)    
+        if not os.path.exists(sim):
+            os.makedirs(sim)
+        
+        odbPath = sim + ".odb"
+        inpPath = sim + ".inp"
+        totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+        
+        export_Udata(odbPath, totalNodes)
+        nodes = export_nodes(inpPath, totalNodes)
+        elems = connectivity(inpPath, LAT, unitCellSize, nodes)
