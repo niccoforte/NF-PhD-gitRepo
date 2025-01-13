@@ -37,54 +37,31 @@ beta = 0.2
 stiffMatrix = False
 UTval = False
 
-cmdIN = sys.argv[8:]
+cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     dis = str(cmdIN[1])
     nnx = int(cmdIN[2])
     unitCellSize = float(cmdIN[3])
-    MechanicalModel = str(cmdIN[4])
-    userMaterial = str(cmdIN[5])
-    relDensity = float(cmdIN[6])
-    initialJob = int(cmdIN[7])
-    numberOfRuns = int(cmdIN[8])
-    cpus = int(cmdIN[9])
-    FieldOut_frames = int(cmdIN[10])
-    HistOut_frames = int(cmdIN[11])
-    
-    path = str(cmdIN[12])
-    
-    stiffMatrix = bool(int(cmdIN[13]))
-    UTval = False
-    
+    relDensity = float(cmdIN[4])
+    initialJob = int(cmdIN[5])
+    numberOfRuns = int(cmdIN[6])
+    cpus = int(cmdIN[7])
     finalRun = 'yes'
-    
-    if dis.lower() == 'per':
+    MechanicalModel = 'both'
+    stiffMatrix = False
+        
+    if dis == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
-    elif dis.lower() == 'disnodes':
+    elif dis == 'disNodes':
         nodeVar = 'yes'
         sizeVar = 'no'
-    elif dis.lower() == 'disstruts':
+    elif dis == 'disStruts':
         nodeVar = 'no'
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-    
-    if path.lower() == "val":
-        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "psc":
-        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
-    elif path.lower() == "dsc":
-        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
-    elif path.lower() == "sic":
-        pDir = "C:\\Users\\exy053\\Documents\\SiC"
-    elif path.lower() == "rd":
-        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
-    elif path.lower() == "mc":
-        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
-    else:
-        pDir = "C:\\Users\\exy053\\Documents\\" + str(path)
 
 if stiffMatrix:
     MechanicalModel = 'ductile'
@@ -103,8 +80,6 @@ if UTval:
     sizeVar = 'no'
     pDir = "C:\\Users\\exy053\\Documents\\al\\"
     stiffMatrix = False
-
-os.chdir(pDir)
 
 STEP_TIME = 1E-1
 sm_amp = False
