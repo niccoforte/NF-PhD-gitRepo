@@ -6,6 +6,9 @@ from numpy import *
 import math
 import os
 import sys
+if r"C:\\Users\\exy053\\OneDrive - Queen Mary, University of London\\Documents\\Research\\p1-LatticeFractureToughness\\p1git-Lattices\\code\\resources" not in sys.path:
+    sys.path.append(r"C:\\Users\\exy053\\OneDrive - Queen Mary, University of London\\Documents\\Research\\p1-LatticeFractureToughness\\p1git-Lattices\\code\\resources")
+from lattices import geometry
 executeOnCaeStartup()
 
 ############################################################################################
@@ -16,7 +19,7 @@ unitCellSize = 10.0                         # Strut length
 latticeType = 'tri'                         # 'FCC', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-nnx = 30                                   # number of Unit cells in X direction
+nnx = 10                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
 distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
@@ -34,7 +37,7 @@ sizeVar = 'no'
 beta = 0.2
 
 stiffMatrix = False
-UTval = True
+UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
@@ -931,9 +934,27 @@ def in_circle(center_x, center_y, radius, x, y):
     dist = math.sqrt((center_x - x) ** 2 + (center_y - y) ** 2)
     return dist <= radius
 
+def rDthickness(LAT, l, t=None, rD=None):
+    if LAT.lower() == "fcc":
+        A = 2*(1+np.sqrt(2))
+    elif LAT.lower() == "tri":
+        A = 2*np.sqrt(3)
+    elif LAT.lower() == "kagome":
+        A = np.sqrt(3)
+    elif LAT.lower() == "hex":
+        A = 2/np.sqrt(3)
+        
+    if t:
+        rD = A*(t/l)
+        return rD
+    elif rD:
+        t = (l*rD)/A
+        return t
+
 def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
+    t = rDthickness(LAT, l, rD=rD)
     
     if (LAT.lower() == 'fcc'):
         L = float(l * nnx)
@@ -1188,7 +1209,7 @@ for idNum in range(initial,numOfJobs):
     elif (distribution.lower() == 'exponential'):
         fac = exp(1)/(2*fac)
 
-    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval = UTval)
+    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval=UTval)
     nnx = geom[0]
     nny = geom[1]
     L = geom[2]

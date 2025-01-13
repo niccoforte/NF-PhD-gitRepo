@@ -4,6 +4,23 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+def rDthickness(LAT, l, t=None, rD=None):
+    if LAT.lower() == "fcc":
+        A = 2*(1+np.sqrt(2))
+    elif LAT.lower() == "tri":
+        A = 2*np.sqrt(3)
+    elif LAT.lower() == "kagome":
+        A = np.sqrt(3)
+    elif LAT.lower() == "hex":
+        A = 2/np.sqrt(3)
+        
+    if t:
+        rD = A*(t/l)
+        return rD
+    elif rD:
+        t = (l*rD)/A
+        return t
+
 def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
@@ -239,24 +256,6 @@ def effProperties(LAT, E_s, rD):
         E = E_s*(3/2)*(rD**(3))
         v = 0.25
     return E, v
-
-
-def rDthickness(LAT, l, t=None, rD=None):
-    if LAT.lower() == "fcc":
-        A = 2*(1+np.sqrt(2))
-    elif LAT.lower() == "tri":
-        A = 2*np.sqrt(3)
-    elif LAT.lower() == "kagome":
-        A = np.sqrt(3)
-    elif LAT.lower() == "hex":
-        A = 2/np.sqrt(3)
-        
-    if t:
-        rD = A*(t/l)
-        return rD
-    elif rD:
-        t = (l*rD)/A
-        return t
 
 
 def get_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/"):
