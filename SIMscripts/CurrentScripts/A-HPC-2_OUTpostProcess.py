@@ -48,7 +48,7 @@ if len(cmdIN) > 0:
     initial = initialJob
     numOfJobs = numberOfRuns
 
-def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, mode=None):
+def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
     
@@ -116,6 +116,9 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             elif H/L < 0.96:
                 H = H + l
                 nny = H/l
+        if UTval:
+            nny = 18
+            H = nny*l
         W = L/1.25
         a = [L/(nnx/2)*i for i in range(nnx+1)]
         a0 = min(a, key=lambda x:abs(x-(0.75*W)))
@@ -143,7 +146,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             H = l * nny
         nny = int(round(nny))
         totalNodes = int(round(((nnx / 1.99999) + 1) * (nny + 1)) + round((nnx / 1.99999) * nny))
-        totalBracketNodes = int(round(((nnx/1.99999) + 3) * 3 * 2) + round(((nnx/1.99999) + 2) * 3 * 2))
+        totalBracketNodes = int(round(((nnx/1.99999) + 3) * 3 * 2) + round(((nnx/1.99999) + 2) * 3 * 2) + 2*(nnx/2.0 + 2))
         if nodeCount:
             if mode.lower() == "fracture":
                 totalNodes = totalNodes - round(nnx/3.33333333)
