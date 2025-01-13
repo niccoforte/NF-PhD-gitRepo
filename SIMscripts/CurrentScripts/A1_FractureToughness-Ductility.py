@@ -34,10 +34,10 @@ sizeVar = 'no'
 beta = 0.2
 
 stiffMatrix = False
-UTverification = False
+UTval = True
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
+#pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
 #pDir = "C:\\Users\\exy053\\Documents\\SiC"
 #pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
 
@@ -59,7 +59,7 @@ if len(cmdIN) > 0:
     path = str(cmdIN[12])
     
     stiffMatrix = bool(int(cmdIN[13]))
-    UTverification = False
+    UTval = False
     
     finalRun = 'yes'
     
@@ -94,16 +94,19 @@ if stiffMatrix:
     MechanicalModel = 'ductile'
     pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
     finalRun = 'no'
+    UTval = False
 
-if UTverification:
+if UTval:
+    latticeType = "tri"
     nnx = 20
     unitCellSize = 10.0
     MechanicalModel = 'ductile'
-    #finalRun = 'yes'
+    finalRun = 'no'
     userMaterial = 'al'
     nodeVar = 'no'
     sizeVar = 'no'
-    pDir = "C:\\Users\\exy053\\Documents\\al\\new"
+    pDir = "C:\\Users\\exy053\\Documents\\al\\"
+    stiffMatrix = False
 
 os.chdir(pDir)
 
@@ -140,7 +143,7 @@ elif userMaterial.lower() == "al":
         strainAppUT = 0.035
         strainAppFT = 0.050
     elif latticeType.lower() == "tri":
-        strainAppUT = 0.025
+        strainAppUT = 0.021
         strainAppFT = 0.03
     elif latticeType.lower() == "kagome":
         strainAppUT = 0.072
@@ -156,7 +159,7 @@ if latticeType.lower() == "fcc":
     CoarseElemSizeFT = unitCellSize/5.0
     FineElemSizeFT   = unitCellSize/15.0
 elif latticeType.lower() == "tri":
-    BracketElemSize  = unitCellSize/1.0 
+    BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0
     FineElemSizeUT   = unitCellSize/5.0
     CoarseElemSizeFT = unitCellSize/2.0
@@ -414,23 +417,23 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             y = y - unitY
             x = -unitX
         
-        # x = -unitX
-        # y = H + (3.0*unitY)
-        # for j in range(1, int(round(nnx / 2.000001) + 3)):
-            # bracket_nodes[count - totalNodes][0] = count + 1
-            # bracket_nodes[count - totalNodes][1] = x
-            # bracket_nodes[count - totalNodes][2] = y
-            # x = x + 2.0*unitX
-            # count = count + 1
+        x = -unitX
+        y = H + (3.0*unitY)
+        for j in range(1, int(round(nnx / 2.000001) + 3)):
+            bracket_nodes[count - totalNodes][0] = count + 1
+            bracket_nodes[count - totalNodes][1] = x
+            bracket_nodes[count - totalNodes][2] = y
+            x = x + 2.0*unitX
+            count = count + 1
         
-        # x = -unitX
-        # y = -(3.0*unitY)
-        # for j in range(1, int(round(nnx / 2.000001) + 3)):
-            # bracket_nodes[count - totalNodes][0] = count + 1
-            # bracket_nodes[count - totalNodes][1] = x
-            # bracket_nodes[count - totalNodes][2] = y
-            # x = x + 2.0*unitX
-            # count = count + 1
+        x = -unitX
+        y = -(3.0*unitY)
+        for j in range(1, int(round(nnx / 2.000001) + 3)):
+            bracket_nodes[count - totalNodes][0] = count + 1
+            bracket_nodes[count - totalNodes][1] = x
+            bracket_nodes[count - totalNodes][2] = y
+            x = x + 2.0*unitX
+            count = count + 1
         
         Dnodes_brackets = []
         Dcoords = [round(-2.0*unitX,2), round(L+(2.0*unitX),2), round(-unitY,2), round(H+unitY,2)]
@@ -928,7 +931,7 @@ def in_circle(center_x, center_y, radius, x, y):
     dist = math.sqrt((center_x - x) ** 2 + (center_y - y) ** 2)
     return dist <= radius
 
-def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, mode=None):
+def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
     
@@ -996,6 +999,9 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             elif H/L < 0.96:
                 H = H + l
                 nny = H/l
+        if UTval:
+            nny = 18
+            H = nny*l
         W = L/1.25
         a = [L/(nnx/2)*i for i in range(nnx+1)]
         a0 = min(a, key=lambda x:abs(x-(0.75*W)))
@@ -1023,7 +1029,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             H = l * nny
         nny = int(round(nny))
         totalNodes = int(round(((nnx / 1.99999) + 1) * (nny + 1)) + round((nnx / 1.99999) * nny))
-        totalBracketNodes = int(round(((nnx/1.99999) + 3) * 3 * 2) + round(((nnx/1.99999) + 2) * 3 * 2)) #  + 2*(nnx/2.0 + 2))
+        totalBracketNodes = int(round(((nnx/1.99999) + 3) * 3 * 2) + round(((nnx/1.99999) + 2) * 3 * 2) + 2*(nnx/2.0 + 2))
         if nodeCount:
             if mode.lower() == "fracture":
                 totalNodes = totalNodes - round(nnx/3.33333333)
@@ -1182,7 +1188,7 @@ for idNum in range(initial,numOfJobs):
     elif (distribution.lower() == 'exponential'):
         fac = exp(1)/(2*fac)
 
-    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix)
+    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval = UTval)
     nnx = geom[0]
     nny = geom[1]
     L = geom[2]
@@ -1237,7 +1243,7 @@ for idNum in range(initial,numOfJobs):
         #############################################################################################
         
         outofPlaneThick = 1.0
-        if UTverification:
+        if UTval:
             outofPlaneThick = 2.0
         
         length = zeros(shape=(len(element),1))
@@ -1262,7 +1268,7 @@ for idNum in range(initial,numOfJobs):
             thick_est = relDensity * L * H * outofPlaneThick / (sum(length) * outofPlaneThick)
             
             thickness = thick_est
-            if UTverification:
+            if UTval:
                 thickness = 1.0
             Area = 1.0*thickness
 
@@ -1490,7 +1496,7 @@ for idNum in range(initial,numOfJobs):
         if (sizeVar.lower() == 'no'):
 #            if (crossSection.lower() == 'rect'):
             mdb.models[ModelName].RectangularProfile(name='RectBody', a=outofPlaneThick, b=thickness)
-            mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2.0*thickness)
+            mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2*thickness)
             
             mdb.models[ModelName].BeamSection(name='BeamSecBody', integration=DURING_ANALYSIS, 
                 poissonRatio=0.0, profile='RectBody', material=userMaterial, 
