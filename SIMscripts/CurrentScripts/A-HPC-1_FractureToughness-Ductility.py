@@ -2,6 +2,7 @@ from abaqus import *
 from abaqusConstants import *
 from caeModules import *
 from driverUtils import executeOnCaeStartup
+import numpy as np
 from numpy import *
 import math
 import os

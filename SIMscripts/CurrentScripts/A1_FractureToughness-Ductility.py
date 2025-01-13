@@ -2,13 +2,11 @@ from abaqus import *
 from abaqusConstants import *
 from caeModules import *
 from driverUtils import executeOnCaeStartup
+import numpy as np
 from numpy import *
 import math
 import os
 import sys
-if r"C:\\Users\\exy053\\OneDrive - Queen Mary, University of London\\Documents\\Research\\p1-LatticeFractureToughness\\p1git-Lattices\\code\\resources" not in sys.path:
-    sys.path.append(r"C:\\Users\\exy053\\OneDrive - Queen Mary, University of London\\Documents\\Research\\p1-LatticeFractureToughness\\p1git-Lattices\\code\\resources")
-from lattices import geometry
 executeOnCaeStartup()
 
 ############################################################################################
