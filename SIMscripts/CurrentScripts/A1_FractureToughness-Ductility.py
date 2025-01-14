@@ -121,7 +121,7 @@ if userMaterial.lower() == "ti":                # lower amp = higher Kjic
         strainAppUT = 0.100  #0.100  #30-0.1                                      # FINAL 30 - 0.100
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.080
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.072  #26-0.065 20-0.072                           # FINAL 20 - 0.072
+        strainAppUT = 0.070  #26-0.065 20-0.072                           # FINAL 20 - 0.072
         strainAppFT = 0.067  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
     elif latticeType.lower() == "hex":
         strainAppUT = 0.100  #14-0.15 24-0.1 34-0.045                     # FINAL 30 - 0.05
