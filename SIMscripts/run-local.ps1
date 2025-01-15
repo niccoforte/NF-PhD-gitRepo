@@ -1,16 +1,16 @@
 $LAT="tri"
 $DIS="per"
-$nnx=6
+$nnx=20
 $unitCellSize=10
-$mode="both"
-$material="ti"
+$mode="ductile"
+$material="al"
 $rD=0.2
 $initial=1
 $nJobs=1
 $CPUs=12
 $Fout=100
 $Hout=200
-$dir="mc"
+$dir="al"
 $stiff=0
 
 $strainApp=1
