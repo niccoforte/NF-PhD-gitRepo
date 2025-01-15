@@ -17,7 +17,7 @@ unitCellSize = 10.0                         # Strut length
 latticeType = 'tri'                         # 'FCC', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-nnx = 10                                    # number of Unit cells in X direction
+nnx = 30                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
 distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
@@ -29,8 +29,8 @@ cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'no'                               # distortion
-fac = 0.2
+nodeVar = 'yes'                               # distortion
+fac = 0.1
 sizeVar = 'no'
 beta = 0.2
 
@@ -40,7 +40,7 @@ UTval = False
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
 #pDir = "C:\\Users\\exy053\\Documents\\SiC"
-#pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
+pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -118,11 +118,11 @@ if userMaterial.lower() == "ti":                # lower amp = higher Kjic
         strainAppUT = 0.035                                               # FINAL 30 - 0.035
         strainAppFT = 0.050                                               # FINAL 30 - 0.05
     elif latticeType.lower() == "tri":
-        strainAppUT = 0.100  #0.100  #30-0.1                                      # FINAL 30 - 0.100
+        strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.100
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.080
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.070  #26-0.065 20-0.072                           # FINAL 20 - 0.072
-        strainAppFT = 0.067  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
+        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.072
+        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
     elif latticeType.lower() == "hex":
         strainAppUT = 0.100  #14-0.15 24-0.1 34-0.045                     # FINAL 30 - 0.05
         strainAppFT = 0.032  #20-0.05 50-0.032                            # FINAL 30 - 0.05
@@ -1788,6 +1788,8 @@ for idNum in range(initial,numOfJobs):
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+        mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+        
             
 # ######################################################################################################
 # ######################################################################################################
@@ -2343,3 +2345,4 @@ for idNum in range(initial,numOfJobs):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+        mdb.jobs[Job].writeInput(consistencyChecking=OFF)
