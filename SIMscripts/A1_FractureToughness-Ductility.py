@@ -14,23 +14,23 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'tri'                         # 'FCC', 'tri', 'hex', 'kagome'
+latticeType = 'kagome'      #'FCC2'                   # 'FCC', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-nnx = 30                                    # number of Unit cells in X direction
+nnx = 10                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
 distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
-finalRun = 'no'
+finalRun = 'yes'
 numberOfRuns = 1
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'yes'                               # distortion
-fac = 0.1
+nodeVar = 'no'                               # distortion
+fac = 0.2
 sizeVar = 'no'
 beta = 0.2
 
@@ -40,7 +40,7 @@ UTval = False
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
 #pDir = "C:\\Users\\exy053\\Documents\\SiC"
-pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
+pDir = "C:\\Users\\exy053\\Documents\\sApp"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -114,7 +114,7 @@ os.chdir(pDir)
 STEP_TIME = 1E-1
 sm_amp = False
 if userMaterial.lower() == "ti":                # lower amp = higher Kjic
-    if latticeType.lower() == "fcc":            # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
+    if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
         strainAppUT = 0.035                                               # FINAL 30 - 0.035
         strainAppFT = 0.050                                               # FINAL 30 - 0.05
     elif latticeType.lower() == "tri":
@@ -153,7 +153,7 @@ elif userMaterial.lower() == "al":
         strainAppUT = 0.100
         strainAppFT = 0.032
 
-if latticeType.lower() == "fcc":
+if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0          # minimum coarse element size
     FineElemSizeUT   = unitCellSize/5.0          # mimimum fine element size
@@ -183,7 +183,7 @@ elif latticeType.lower() == "hex":
 ############################################################################################
 	
 def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution):
-    if latticeType.lower() == "fcc":
+    if latticeType.lower() == "fcc" or latticeType.lower() == "fcc2":
         unitX = L / nnx
         unitY = H / nny
         
@@ -933,7 +933,7 @@ def in_circle(center_x, center_y, radius, x, y):
     return dist <= radius
 
 def rDthickness(LAT, l, t=None, rD=None):
-    if LAT.lower() == "fcc":
+    if LAT.lower() == "fcc" or LAT.lower() == 'fcc2':
         A = 2*(1+np.sqrt(2))
     elif LAT.lower() == "tri":
         A = 2*np.sqrt(3)
@@ -954,7 +954,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         nnx = 10
     t = rDthickness(LAT, l, rD=rD)
     
-    if (LAT.lower() == 'fcc'):
+    if (LAT.lower() == 'fcc' or LAT.lower() == 'fcc2'):
         L = float(l * nnx)
         H0 = 0.96 * L
         Hs = [l*i for i in range(100)]
@@ -1673,7 +1673,7 @@ for idNum in range(initial,numOfJobs):
                     topBody_nodes.append(n)
                 if ycoord > -tol and ycoord < tol and xcoord > -tol and xcoord < (L+tol):
                     bottomBody_nodes.append(n)
-        elif latticeType.lower() == 'fcc':
+        elif latticeType.lower() == 'fcc' or latticeType.lower() == 'fcc2':
             rfNodes = []
             val = -2.0*unitCellSize
             for kk in range(0,nnx+5):
@@ -1788,7 +1788,6 @@ for idNum in range(initial,numOfJobs):
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
-        mdb.jobs[Job].writeInput(consistencyChecking=OFF)
         
             
 # ######################################################################################################
@@ -2345,4 +2344,3 @@ for idNum in range(initial,numOfJobs):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
-        mdb.jobs[Job].writeInput(consistencyChecking=OFF)

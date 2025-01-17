@@ -6,7 +6,7 @@ import sys
 stiffMatrix = False
 
 #pDir = os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv4\\10")
-pDir = os.chdir("C:\\Users\\exy053\\Documents\\ModelChanges")
+pDir = os.chdir("C:\\Users\\exy053\\Documents\\disConv")
 
 cmdIN = sys.argv[2:]
 if len(cmdIN) > 0:

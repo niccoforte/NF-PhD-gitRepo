@@ -15,7 +15,7 @@ nnx = 30
 initial = 1
 numOfJobs = 1
 
-pDir = r"C:\\Users\\exy053\\Documents\\analysis"
+pDir = r"C:\\Users\\exy053\\Documents\\al"
 #pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
 #pDir = r"C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
 
