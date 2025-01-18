@@ -56,15 +56,15 @@ cd /data/scratch/exy053/$JOB_ID
 #abaqus job=Cantilever.inp cpus=${NSLOTS} user=vumat.for mp_mode=THREADS scratch=/data/scratch/exy053/ memory="90 %" interactive
 #abaqus job=Job-b cpus=16 user=USDFLDTest3.f mp_mode=THREADS scratch=/data/scratch/exy053/ memory="90 %" interactive
 
-abaqus cae noGUI=A1_FractureToughness-Ductility.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-1_FractureToughness-Ductility.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 /bin/echo Simulation completed at: `date`.
 /bin/echo Processing outputs...
 
-abaqus cae noGUI=A2_OUTpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 module load python
-python A2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+python A-HPC-2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 /bin/echo Inputs and outputs collected.
 

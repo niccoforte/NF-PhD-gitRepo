@@ -14,7 +14,7 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'FCC'                         # 'FCC', 'tri', 'hex', 'kagome'
+latticeType = 'FCC'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 10                                    # number of Unit cells in X direction
@@ -81,18 +81,20 @@ if UTval:
     pDir = "C:\\Users\\exy053\\Documents\\al\\"
     stiffMatrix = False
 
+os.chdir(pDir)
+
 STEP_TIME = 1E-1
 sm_amp = False
 if userMaterial.lower() == "ti":                # lower amp = higher Kjic
-    if latticeType.lower() == "fcc":            # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
+    if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
         strainAppUT = 0.035                                               # FINAL 30 - 0.035
         strainAppFT = 0.050                                               # FINAL 30 - 0.05
     elif latticeType.lower() == "tri":
         strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.100
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.080
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.070  #26-0.065 20-0.072                           # FINAL 20 - 0.072
-        strainAppFT = 0.067  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
+        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.072
+        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
     elif latticeType.lower() == "hex":
         strainAppUT = 0.100  #14-0.15 24-0.1 34-0.045                     # FINAL 30 - 0.05
         strainAppFT = 0.032  #20-0.05 50-0.032                            # FINAL 30 - 0.05
@@ -123,7 +125,7 @@ elif userMaterial.lower() == "al":
         strainAppUT = 0.100
         strainAppFT = 0.032
 
-if latticeType.lower() == "fcc":
+if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0          # minimum coarse element size
     FineElemSizeUT   = unitCellSize/5.0          # mimimum fine element size
@@ -153,7 +155,7 @@ elif latticeType.lower() == "hex":
 ############################################################################################
 	
 def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution):
-    if latticeType.lower() == "fcc":
+    if latticeType.lower() == "fcc" or latticeType.lower() == "fcc2":
         unitX = L / nnx
         unitY = H / nny
         
@@ -903,7 +905,7 @@ def in_circle(center_x, center_y, radius, x, y):
     return dist <= radius
 
 def rDthickness(LAT, l, t=None, rD=None):
-    if LAT.lower() == "fcc":
+    if LAT.lower() == "fcc" or LAT.lower() == 'fcc2':
         A = 2*(1+np.sqrt(2))
     elif LAT.lower() == "tri":
         A = 2*np.sqrt(3)
@@ -924,7 +926,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         nnx = 10
     t = rDthickness(LAT, l, rD=rD)
     
-    if (LAT.lower() == 'fcc'):
+    if (LAT.lower() == 'fcc' or LAT.lower() == 'fcc2'):
         L = float(l * nnx)
         H0 = 0.96 * L
         Hs = [l*i for i in range(100)]
@@ -1177,7 +1179,7 @@ for idNum in range(initial,numOfJobs):
     elif (distribution.lower() == 'exponential'):
         fac = exp(1)/(2*fac)
 
-    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval = UTval)
+    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval=UTval)
     nnx = geom[0]
     nny = geom[1]
     L = geom[2]
@@ -1643,7 +1645,7 @@ for idNum in range(initial,numOfJobs):
                     topBody_nodes.append(n)
                 if ycoord > -tol and ycoord < tol and xcoord > -tol and xcoord < (L+tol):
                     bottomBody_nodes.append(n)
-        elif latticeType.lower() == 'fcc':
+        elif latticeType.lower() == 'fcc' or latticeType.lower() == 'fcc2':
             rfNodes = []
             val = -2.0*unitCellSize
             for kk in range(0,nnx+5):
@@ -1758,6 +1760,7 @@ for idNum in range(initial,numOfJobs):
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+        
             
 # ######################################################################################################
 # ######################################################################################################
