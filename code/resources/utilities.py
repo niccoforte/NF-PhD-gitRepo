@@ -1,7 +1,7 @@
 import os
 
 
-def renameFiles():
+def addPredix():
     ## Add IN- / OUT- prefix to .txt file.
     path = 'FCC-21X21/disNodes2/'
     for file in os.scandir(path):
@@ -11,7 +11,7 @@ def renameFiles():
         else:
             pass
 
-
+def TXTtoCSV():
     ## Change .txt file to .csv file.
     path = 'FCC-21X21/disNodes2/'
     for file in os.scandir(path):
@@ -21,8 +21,8 @@ def renameFiles():
         else:
             pass
 
-
-    ## Change numbering.
+def renumber():
+    ## Change simulation numbering
     path = 'Ti/tri-old/'
     for file in os.scandir(path):
         if file.name.endswith('.csv') and 'IN-' not in file.name and 'OUT-' not in file.name:
