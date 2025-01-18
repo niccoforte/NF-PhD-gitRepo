@@ -23,6 +23,9 @@ initial=1
 nJobs=100
 CPUs=$NSLOTS
 
+zip = true
+delete_scratch = true
+
 
 # Load required modules
 module load abaqus/2020
@@ -81,16 +84,20 @@ rsync -av /data/scratch/exy053/$JOB_ID/transfer/* /data/scratch/exy053/$JOB_ID/z
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/zip/
 
-tar -czf C1_transfer-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/transfer/
-tar -czf C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/zip/
-
 mkdir $SGE_O_WORKDIR/$JOB_ID/
 mkdir $SGE_O_WORKDIR/$JOB_ID/zip/
 rsync -av /data/scratch/exy053/$JOB_ID/zip/* $SGE_O_WORKDIR/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
-rsync -av /data/scratch/exy053/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/
 
-rm -rf /data/scratch/exy053/$JOB_ID
+if [ "$zip" = true ] ; then
+	tar -czf C1_transfer-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/transfer/
+	tar -czf C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/zip/
+	rsync -av /data/scratch/exy053/$JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
+	rsync -av /data/scratch/exy053/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/
+fi
+
+if [ "$delete_scratch" = true ] ; then
+	rm -rf /data/scratch/exy053/$JOB_ID
+fi
 
 /bin/echo Job completed at: `date`.
 /bin/echo Final and compressed data saved in $SGE_O_WORKDIR and /data/SEMS-TaoLab/Niccolo-Forte/
