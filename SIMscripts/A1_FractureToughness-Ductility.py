@@ -14,7 +14,7 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'kagome'      #'FCC2'                   # 'FCC', 'tri', 'hex', 'kagome'
+latticeType = 'hex'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
@@ -35,7 +35,7 @@ sizeVar = 'no'
 beta = 0.2
 
 stiffMatrix = False
-UTval = False
+UTval = True
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
@@ -106,26 +106,26 @@ if UTval:
     userMaterial = 'al'
     nodeVar = 'no'
     sizeVar = 'no'
-    pDir = "C:\\Users\\exy053\\Documents\\al\\"
+    pDir = "C:\\Users\\exy053\\Documents\\al\\new\\18-1.1"
     stiffMatrix = False
 
 os.chdir(pDir)
 
 STEP_TIME = 1E-1
 sm_amp = False
-if userMaterial.lower() == "ti":                # lower amp = higher Kjic
+if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
         strainAppUT = 0.035                                               # FINAL 30 - 0.035
         strainAppFT = 0.050                                               # FINAL 30 - 0.05
     elif latticeType.lower() == "tri":
-        strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.100
-        strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.080
+        strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
+        strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.072
-        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
+        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.05
+        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.100  #14-0.15 24-0.1 34-0.045                     # FINAL 30 - 0.05
-        strainAppFT = 0.032  #20-0.05 50-0.032                            # FINAL 30 - 0.05
+        strainAppUT = 0.073  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.073
+        strainAppFT = 0.060  #20-0.05 50-0.032                            # FINAL 20 - 0.06
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
@@ -1288,7 +1288,7 @@ for idNum in range(initial,numOfJobs):
             
             thickness = thick_est
             if UTval:
-                thickness = 1.0
+                thickness = 1.1
             Area = 1.0*thickness
 
         if (units.lower() == 'millimeter'):
@@ -1515,7 +1515,7 @@ for idNum in range(initial,numOfJobs):
         if (sizeVar.lower() == 'no'):
 #            if (crossSection.lower() == 'rect'):
             mdb.models[ModelName].RectangularProfile(name='RectBody', a=outofPlaneThick, b=thickness)
-            mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2*thickness)
+            mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2.0*thickness)
             
             mdb.models[ModelName].BeamSection(name='BeamSecBody', integration=DURING_ANALYSIS, 
                 poissonRatio=0.0, profile='RectBody', material=userMaterial, 
@@ -1816,7 +1816,7 @@ for idNum in range(initial,numOfJobs):
         ridge1 = [-10000, -10000, -10000, -10000]#[0.2*W, (H/2)-(0.1*W), 0.35*W, (H/2)+(0.1*W)]
         ridge2 = [-10000, -10000, -10000, -10000]#[-0.1*W, (H/2)-(0.21*W), 0.25*W, (H/2)+(0.21*W)]
         
-        if latticeType.lower() == "fcc" or latticeType.lower() == "tri":
+        if latticeType.lower() == "fcc" or latticeType.lower() == "fcc2" or latticeType.lower() == "tri":
             CrRegSTAT = [xCrE[0]-(1.6*unitCellSize), xCrE[0]+(3.1*unitCellSize), (H/2)-(2.1*unitCellSize), (H/2)+(2.1*unitCellSize)]
             CrRegMESH = [xCrE[0]-(2.1*unitCellSize), xCrE[0]+(5.6*unitCellSize), (H/2)-(4.1*unitCellSize), (H/2)+(4.1*unitCellSize)]
         elif latticeType.lower() == "kagome" or latticeType.lower() == "hex":

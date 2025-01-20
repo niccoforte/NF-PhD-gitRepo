@@ -85,19 +85,19 @@ os.chdir(pDir)
 
 STEP_TIME = 1E-1
 sm_amp = False
-if userMaterial.lower() == "ti":                # lower amp = higher Kjic
+if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
         strainAppUT = 0.035                                               # FINAL 30 - 0.035
         strainAppFT = 0.050                                               # FINAL 30 - 0.05
     elif latticeType.lower() == "tri":
-        strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.100
-        strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.080
+        strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
+        strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.072
-        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.067
+        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.05
+        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.100  #14-0.15 24-0.1 34-0.045                     # FINAL 30 - 0.05
-        strainAppFT = 0.032  #20-0.05 50-0.032                            # FINAL 30 - 0.05
+        strainAppUT = 0.073  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.073
+        strainAppFT = 0.060  #20-0.05 50-0.032                            # FINAL 20 - 0.06
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
@@ -1487,7 +1487,7 @@ for idNum in range(initial,numOfJobs):
         if (sizeVar.lower() == 'no'):
 #            if (crossSection.lower() == 'rect'):
             mdb.models[ModelName].RectangularProfile(name='RectBody', a=outofPlaneThick, b=thickness)
-            mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2*thickness)
+            mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2.0*thickness)
             
             mdb.models[ModelName].BeamSection(name='BeamSecBody', integration=DURING_ANALYSIS, 
                 poissonRatio=0.0, profile='RectBody', material=userMaterial, 
