@@ -3,7 +3,7 @@ import numpy as np
 import math
 import sys
 
-stiffMatrix = False
+stiffMatrix = True
 
 #pDir = os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv4\\10")
 pDir = os.chdir("C:\\Users\\exy053\\Documents\\disConv")

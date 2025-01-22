@@ -14,7 +14,7 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'hex'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+latticeType = 'tri'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
@@ -23,24 +23,24 @@ distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
-numberOfRuns = 1
+numberOfRuns = 50
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'no'                               # distortion
+nodeVar = 'yes'                               # distortion
 fac = 0.2
 sizeVar = 'no'
 beta = 0.2
 
 stiffMatrix = False
-UTval = True
+UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-#pDir = "C:\\Users\\exy053\\Documents\\SiC"
-pDir = "C:\\Users\\exy053\\Documents\\sApp"
+#pDir = "C:\\Users\\exy053\\Documents\\ModelChanges # SiC" # sApp"
+pDir = "C:\\Users\\exy053\\Documents\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -1788,6 +1788,7 @@ for idNum in range(initial,numOfJobs):
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            mdb.jobs[Job].waitForCompletion()
         
             
 # ######################################################################################################
