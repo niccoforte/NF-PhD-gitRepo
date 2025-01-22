@@ -20,7 +20,7 @@ nnx=10
 unitCellSize=10
 rD=0.2
 initial=1
-nJobs=100
+nJobs=1
 CPUs=$NSLOTS
 
 zip = true
