@@ -258,7 +258,7 @@ def effProperties(LAT, E_s, rD):
     return E, v
 
 
-def get_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/"):
+def get_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/", sim=1):
     if mode.lower() == "unit":
         if LAT.lower() == "fcc":
             nodes = np.array([[0,0,0],
@@ -326,7 +326,7 @@ def get_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053
         Dnodes = nodes
       
         if dis.lower() == "dn":
-            DnodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom[0]) + "-disNodes-1.csv"
+            DnodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom[0]) + "-disNodes-" + str(sim) + ".csv"
             Dnodes_df = pd.read_csv(DnodeFile, header=None, usecols=[1, 2])
             Dnodes = Dnodes_df.to_numpy() / 1000
             if stiff:
