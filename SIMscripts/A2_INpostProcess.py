@@ -25,8 +25,8 @@ if len(cmdIN) > 0:
     
     path = str(cmdIN[12])
     
-    stiffMatrix = bool(int(cmdIN[13]))
-    UTverification = False
+    stiffMatrix = False
+    UTval = False
     
     finalRun = 'yes'
     

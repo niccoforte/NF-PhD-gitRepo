@@ -34,9 +34,6 @@ fac = 0.2
 sizeVar = 'no'
 beta = 0.2
 
-stiffMatrix = False
-UTval = False
-
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
@@ -50,6 +47,7 @@ if len(cmdIN) > 0:
     finalRun = 'yes'
     MechanicalModel = 'both'
     stiffMatrix = False
+    UTval = False
         
     if dis == 'per':
         nodeVar = 'no'
@@ -62,24 +60,6 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-
-if stiffMatrix:
-    MechanicalModel = 'ductile'
-    pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
-    finalRun = 'no'
-    UTval = False
-
-if UTval:
-    latticeType = "tri"
-    nnx = 20
-    unitCellSize = 10.0
-    MechanicalModel = 'ductile'
-    finalRun = 'no'
-    userMaterial = 'al'
-    nodeVar = 'no'
-    sizeVar = 'no'
-    pDir = "C:\\Users\\exy053\\Documents\\al\\"
-    stiffMatrix = False
 
 STEP_TIME = 1E-1
 sm_amp = False

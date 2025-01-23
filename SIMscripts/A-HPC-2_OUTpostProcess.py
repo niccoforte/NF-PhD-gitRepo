@@ -30,7 +30,8 @@ if len(cmdIN) > 0:
     finalRun = 'yes'
     MechanicalModel = 'both'
     stiffMatrix = False
-    
+    UTval = False
+        
     if dis == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
@@ -42,11 +43,6 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-
-    LAT = latticeType
-    DIS = dis
-    initial = initialJob
-    numOfJobs = numberOfRuns
 
 def rDthickness(LAT, l, t=None, rD=None):
     if LAT.lower() == "fcc":

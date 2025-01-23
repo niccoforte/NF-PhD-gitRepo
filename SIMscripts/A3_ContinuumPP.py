@@ -33,18 +33,21 @@ if len(cmdIN) > 0:
     cpus = int(cmdIN[9])
     FieldOut_frames = int(cmdIN[10])
     HistOut_frames = int(cmdIN[11])
+    
     path = str(cmdIN[12])
-    stiffMatrix = bool(int(cmdIN[13]))
+    
+    stiffMatrix = False
+    UTval = False
     
     finalRun = 'yes'
     
     if dis.lower() == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
-    elif dis.lower() == 'disNodes':
+    elif dis.lower() == 'disnodes':
         nodeVar = 'yes'
         sizeVar = 'no'
-    elif dis.lower() == 'disStruts':
+    elif dis.lower() == 'disstruts':
         nodeVar = 'no'
         sizeVar = 'yes'
     else:
@@ -52,8 +55,10 @@ if len(cmdIN) > 0:
     
     if path.lower() == "val":
         pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "size":
+    elif path.lower() == "psc":
         pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
+    elif path.lower() == "dsc":
+        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
     elif path.lower() == "sic":
         pDir = "C:\\Users\\exy053\\Documents\\SiC"
     elif path.lower() == "rd":
@@ -61,14 +66,8 @@ if len(cmdIN) > 0:
     elif path.lower() == "mc":
         pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
-        pDir = str(path)
-    
-    
-    LAT = latticeType
-    DIS = dis
-    initial = initialJob
-    numOfJobs = numberOfRuns
-        
+        pDir = "C:\\Users\\exy053\\Documents\\" + str(path)
+      
 os.chdir(pDir)
 
 def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, mode=None):

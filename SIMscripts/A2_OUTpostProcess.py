@@ -36,8 +36,8 @@ if len(cmdIN) > 0:
     
     path = str(cmdIN[12])
     
-    stiffMatrix = bool(int(cmdIN[13]))
-    UTverification = False
+    stiffMatrix = False
+    UTval = False
     
     finalRun = 'yes'
     
@@ -67,13 +67,7 @@ if len(cmdIN) > 0:
         pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
         pDir = "C:\\Users\\exy053\\Documents\\" + str(path)
-    
-    
-    LAT = latticeType
-    DIS = dis
-    initial = initialJob
-    numOfJobs = numberOfRuns
-        
+       
 os.chdir(pDir)
 
 def rDthickness(LAT, l, t=None, rD=None):

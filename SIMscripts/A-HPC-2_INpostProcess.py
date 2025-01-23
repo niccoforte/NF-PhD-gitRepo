@@ -3,8 +3,6 @@ import numpy as np
 import math
 import sys
 
-stiffMatrix = False
-
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
@@ -18,6 +16,7 @@ if len(cmdIN) > 0:
     finalRun = 'yes'
     MechanicalModel = 'both'
     stiffMatrix = False
+    UTval = False
         
     if dis == 'per':
         nodeVar = 'no'
@@ -30,10 +29,6 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-
-
-if stiffMatrix:
-    os.chdir("C:\\Users\\exy053\\Documents\\stiffMatrix")
 
 def rDthickness(LAT, l, t=None, rD=None):
     if LAT.lower() == "fcc":
