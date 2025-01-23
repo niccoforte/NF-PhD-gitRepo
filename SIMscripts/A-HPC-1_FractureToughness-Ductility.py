@@ -81,8 +81,6 @@ if UTval:
     pDir = "C:\\Users\\exy053\\Documents\\al\\"
     stiffMatrix = False
 
-os.chdir(pDir)
-
 STEP_TIME = 1E-1
 sm_amp = False
 if userMaterial.lower() == "ti":
