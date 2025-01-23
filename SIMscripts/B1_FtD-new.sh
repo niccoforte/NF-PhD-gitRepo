@@ -23,8 +23,8 @@ initial=1
 nJobs=1
 CPUs=$NSLOTS
 
-zip = true
-delete_scratch = true
+zip=true
+delete_scratch=true
 
 
 # Load required modules
