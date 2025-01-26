@@ -124,8 +124,8 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.05
         strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.072  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.073
-        strainAppFT = 0.055  #20-0.05 50-0.032                            # FINAL 20 - 0.06
+        strainAppUT = 0.070  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07
+        strainAppFT = 0.057  #20-0.05 50-0.032                            # FINAL 20 - 0.057
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
