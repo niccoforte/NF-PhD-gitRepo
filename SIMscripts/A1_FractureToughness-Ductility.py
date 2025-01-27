@@ -115,8 +115,8 @@ STEP_TIME = 1E-1
 sm_amp = False
 if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
-        strainAppUT = 0.035                                               # FINAL 30 - 0.035
-        strainAppFT = 0.050                                               # FINAL 30 - 0.05
+        strainAppUT = 0.045                                               # FINAL 20 - 0.045
+        strainAppFT = 0.050                                               # FINAL 20 - 0.05
     elif latticeType.lower() == "tri":
         strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
