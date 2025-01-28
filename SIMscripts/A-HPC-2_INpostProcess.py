@@ -3,7 +3,7 @@ import numpy as np
 import math
 import sys
 
-cmdIN = sys.argv[10:]
+cmdIN = sys.argv[2:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     dis = str(cmdIN[1])
