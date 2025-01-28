@@ -17,10 +17,12 @@ def smooth(y_old):
     return y_new
 
 
-def get_nodes(nodesCSV):
+def get_nodes(nodesCSV, lineStart=None, lineEnd=None):
     with open(nodesCSV, 'r') as f:
         lines = f.readlines()
-        
+    
+    if lineStart:   
+        lines = lines[lineStart:lineEnd]   
     node_lines = [line.split(',') for line in lines]
     
     nodes = [[float(elem.strip('\n').strip()) for elem in line] for line in node_lines]
@@ -38,8 +40,8 @@ def get_struts(thicksCSV):
     return thicks
 
 
-def get_ductileData(CSVout, crit=0.4):
-    output_df = pd.read_csv(CSVout, names=['x', 'y'], usecols=['x', 'y'])
+def get_ductileData(CSVout, crit=0.4, delimiter=','):
+    output_df = pd.read_csv(CSVout, names=['i', 'x', 'y'], usecols=['x', 'y'], delimiter=delimiter)
     e = [0] + output_df.x.tolist()[1:]
     s = [0] + output_df.y.tolist()[1:]
     s_sm = smooth(smooth(s))
