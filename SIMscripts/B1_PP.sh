@@ -52,10 +52,10 @@ cd /data/scratch/exy053/$JOB_ID
 
 
 # Replace the following line with abaqus command
-abaqus cae noGUI=A2_OUTpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 module load python
-python A2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+python A-HPC-2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 /bin/echo Inputs and outputs collected.
 
