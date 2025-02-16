@@ -14,7 +14,7 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'kagome'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+latticeType = 'hex'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
@@ -23,13 +23,13 @@ distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
-numberOfRuns = 50
+numberOfRuns = 1
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'yes'                               # distortion
+nodeVar = 'no'                               # distortion
 fac = 0.2
 sizeVar = 'no'
 beta = 0.2
@@ -39,8 +39,8 @@ UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-#pDir = "C:\\Users\\exy053\\Documents\\ModelChanges # SiC" # sApp"
-pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
+pDir = "C:\\Users\\exy053\\Documents\\sApp" # ModelChanges" # SiC" # sApp"
+#pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
