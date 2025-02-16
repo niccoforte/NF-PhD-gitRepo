@@ -23,7 +23,7 @@ initial=1
 nJobs=1
 CPUs=$NSLOTS
 
-zip=true
+zip=false
 delete_scratch=true
 
 ppJOB=5296707
@@ -68,14 +68,14 @@ mkdir $ppJOBparent/$ppJOB/zip/
 rsync -av /data/scratch/exy053/$ppJOB/zip/* $ppJOBparent/$ppJOB/zip/
 
 if [ "$zip" = true ] ; then
-	tar -czf C1_transfer-$LAT-$DIS-$ppJOB.tgz /data/scratch/exy053/$ppJOB/transfer/
-	tar -czf C2_zip-$LAT-$DIS-$ppJOB.tgz /data/scratch/exy053/$ppJOB/zip/
-	rsync -av /data/scratch/exy053/$ppJOB/C1_transfer-$LAT-$DIS-$ppJOB.tgz $ppJOBparent
-	rsync -av /data/scratch/exy053/$ppJOB/C2_zip-$LAT-$DIS-$ppJOB.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/
+    tar -czf C1_transfer-$LAT-$DIS-$ppJOB.tgz /data/scratch/exy053/$ppJOB/transfer/
+    tar -czf C2_zip-$LAT-$DIS-$ppJOB.tgz /data/scratch/exy053/$ppJOB/zip/
+    rsync -av /data/scratch/exy053/$ppJOB/C1_transfer-$LAT-$DIS-$ppJOB.tgz $ppJOBparent
+    rsync -av /data/scratch/exy053/$ppJOB/C2_zip-$LAT-$DIS-$ppJOB.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/
 fi
 
 if [ "$delete_scratch" = true ] ; then
-	rm -rf /data/scratch/exy053/$ppJOB
+    rm -rf /data/scratch/exy053/$ppJOB
 fi
 
 /bin/echo Job completed at: `date`.

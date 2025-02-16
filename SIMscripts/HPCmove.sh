@@ -11,17 +11,19 @@
 
 set -e
 
-LAT="FCC"
-DIS="per"
-JOB_ID="a"
+# INPUT
+LAT="tri-new"
+DIS="20dN"
+JOB_ID="4*"
 
 
 /bin/echo Running on host: `hostname`.
 /bin/echo Starting on: `date`, in `pwd`.
 
 
-
-rsync -av * /data/SEMS-TaoLab/Niccolo-Forte/Ti/
+#rsync -av /data/home/exy053/p1/Ti/$DIS/$LAT/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/
+#rm -rf /data/home/exy053/p1/Ti/$DIS/$LAT/$JOB_ID
+#rm -rf /data/home/exy053/p1/Ti/$DIS/$LAT/C1*
 
 
 # ==================================
@@ -37,8 +39,8 @@ rsync -av * /data/SEMS-TaoLab/Niccolo-Forte/Ti/
 
 #rm -rf /data/scratch/exy053/$JOB_ID
 
-/bin/echo Job completed at: `date`.
-/bin/echo Compressed data saved in /data/home/exy053/Paper1-LatticeFractureToughness/sims/$LAT/ and /data/SEMS-TaoLab/Niccolo-Forte/
+#/bin/echo Job completed at: `date`.
+#/bin/echo Compressed data saved in /data/home/exy053/Paper1-LatticeFractureToughness/sims/$LAT/ and /data/SEMS-TaoLab/Niccolo-Forte/
 
 
 # ===================================
