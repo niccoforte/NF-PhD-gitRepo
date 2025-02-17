@@ -16,7 +16,7 @@ set -e
 # ^^^ RENAME ^^^
 LAT=lat
 DIS=per
-fac=0.2
+fac=0.0
 nnx=10
 unitCellSize=10
 rD=0.2
@@ -83,13 +83,13 @@ rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/zip/
 
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/$JOB_ID/
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/$JOB_ID/zip/
+rsync -av /data/scratch/exy053/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
 
 if [ "$zip" = true ] ; then
     tar -czf C1_transfer-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/transfer/
     tar -czf C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/zip/
     rsync -av /data/scratch/exy053/$JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
-    rsync -av /data/scratch/exy053/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/
+    rsync -av /data/scratch/exy053/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/
 fi
 
 if [ "$delete_scratch" = true ] ; then
