@@ -23,14 +23,14 @@ distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
-numberOfRuns = 1
+numberOfRuns = 3
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'no'                               # distortion
-fac = 0.2
+nodeVar = 'yes'                               # distortion
+fac = 0.05
 sizeVar = 'no'
 beta = 0.2
 
@@ -39,7 +39,7 @@ UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-pDir = "C:\\Users\\exy053\\Documents\\sApp" # ModelChanges" # SiC" # sApp"
+pDir = "C:\\Users\\exy053\\Documents\\sApp\\5" # ModelChanges" # SiC" # sApp"
 #pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
@@ -121,11 +121,11 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.05
-        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
+        strainAppUT = 0.040  #26-0.065 20-0.072                           # FINAL 20 - 0.05
+        strainAppFT = 0.040  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.070  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07
-        strainAppFT = 0.057  #20-0.05 50-0.032                            # FINAL 20 - 0.057
+        strainAppUT = 0.065  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07
+        strainAppFT = 0.055  #20-0.05 50-0.032                            # FINAL 20 - 0.057
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
