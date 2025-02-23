@@ -11,3 +11,4 @@ git commit -m "Auto-commit."
 git push
 
 cd C:\Users\exy053\Documents\p1git-Lattices
+git pull

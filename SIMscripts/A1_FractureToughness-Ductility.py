@@ -15,7 +15,7 @@ executeOnCaeStartup()
 
 unitCellSize = 10.0                         # Strut length
 latticeType = 'hex'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
-MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
+MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
@@ -23,13 +23,13 @@ distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
-numberOfRuns = 3
+numberOfRuns = 1
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'yes'                               # distortion
+nodeVar = 'no'                               # distortion
 fac = 0.05
 sizeVar = 'no'
 beta = 0.2
@@ -39,7 +39,7 @@ UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-pDir = "C:\\Users\\exy053\\Documents\\sApp\\5" # ModelChanges" # SiC" # sApp"
+pDir = "C:\\Users\\exy053\\Documents\\ModelChanges\\ATS" # SiC" # sApp" # sApp\\5" # 
 #pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
@@ -113,6 +113,11 @@ os.chdir(pDir)
 
 STEP_TIME = 1E-1
 sm_amp = False
+AdaptiveTimeStepping = True
+RayleighDampling = False
+SevereDisplacementControl = False
+
+## AMPLITUDE
 if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
         strainAppUT = 0.045                                               # FINAL 20 - 0.045
@@ -121,11 +126,11 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.040  #26-0.065 20-0.072                           # FINAL 20 - 0.05
-        strainAppFT = 0.040  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
+        strainAppUT = 0.040  #26-0.065 20-0.072                           # FINAL 20 - 0.05  0.04
+        strainAppFT = 0.040  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05  0.04
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.065  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07
-        strainAppFT = 0.055  #20-0.05 50-0.032                            # FINAL 20 - 0.057
+        strainAppUT = 0.08  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07   0.065
+        strainAppFT = 0.055  #20-0.05 50-0.032                            # FINAL 20 - 0.057  0.055
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
@@ -153,6 +158,7 @@ elif userMaterial.lower() == "al":
         strainAppUT = 0.100
         strainAppFT = 0.032
 
+## MESH SIZING
 if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0          # minimum coarse element size
@@ -1564,10 +1570,22 @@ for idNum in range(initial,numOfJobs):
         ############################################################################################
         ######################################## Step ##############################################
         ############################################################################################
-
-        mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', 
-            timePeriod=STEP_TIME)
-            
+        
+        if AdaptiveTimeStepping:
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME, 
+                                                       improvedDtMethod=ON, scaleFactor=0.9)
+        
+        if RayleighDampling:
+            mdb.models[ModelName].materials[userMaterial].Damping(alpha=0.0, beta=1e-6)
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
+        
+        if SevereDisplacementControl:
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME,
+                                                       linearBulkViscosity=0.06, quadBulkViscosity=1.2)
+        
+        if AdaptiveTimeStepping == False and RayleighDampling == False and SevereDisplacementControl == False:
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
+        
         # ############################################################################################
         # ######################################## Mesh ##############################################
         # ############################################################################################
