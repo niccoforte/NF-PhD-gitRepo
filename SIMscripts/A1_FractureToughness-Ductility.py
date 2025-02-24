@@ -1573,7 +1573,7 @@ for idNum in range(initial,numOfJobs):
         
         if AdaptiveTimeStepping:
             mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME, 
-                                                       improvedDtMethod=ON, scaleFactor=0.9)
+                                                       improvedDtMethod=ON, scaleFactor=0.95)
         
         if RayleighDampling:
             mdb.models[ModelName].materials[userMaterial].Damping(alpha=0.0, beta=1e-6)
