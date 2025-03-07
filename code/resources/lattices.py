@@ -258,7 +258,7 @@ def effProperties(LAT, E_s, rD):
     return E, v
 
 
-def get_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/", sim=1):
+def get_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/", sim=1):  # TODO: Rename
     if mode.lower() == "unit":
         if LAT.lower() == "fcc":
             nodes = np.array([[0,0,0],
