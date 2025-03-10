@@ -173,7 +173,7 @@ def plot_Distribution(train_in1, test_outputs, dx_out1=None, typ="contour"):
         val_ = test_outputs
         title = "Output Distribution"
 
-    if typ.lower() == "contour" or typ.lower() == "both":
+    if typ.lower() == "contour" or typ.lower() == "cont" or typ.lower() == "both":
         fig1 = plt.figure(figsize=(10, 6))
         ax = fig1.add_subplot()
         ax.set_title(title)
