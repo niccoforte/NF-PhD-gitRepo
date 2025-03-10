@@ -11,7 +11,83 @@ from torch_geometric.utils import to_networkx
 import networkx as nx
 
 
-### Machine Learning Functions
+### GAUSSIAN PROCESS FUNCTIONS
+
+def plot_Kmatrix(gpr, x=None):
+    if x is not None:
+        K_pre = gpr.K(x)
+        K_post = gpr.GPR.kernel_(x)
+    else:
+        K_pre = gpr.K(gpr.x)
+        K_post = gpr.GPR.kernel_(gpr.x)
+    
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    im1 = ax1.imshow(K_pre, cmap='viridis', aspect='auto')
+    ax1.set_title("Covariance Matrix Before Training")
+    ax1.set_xlabel("Training Points")
+    ax1.set_ylabel("Training Points")
+
+    im2 = ax2.imshow(K_post, cmap='viridis', aspect='auto')
+    ax2.set_title("Covariance Matrix After Training")
+    ax2.set_xlabel("Training Points")
+    ax2.set_ylabel("Training Points")
+
+    fig.subplots_adjust(right=0.85)
+    cbar_ax = fig.add_axes([0.88, 0.15, 0.04, 0.7])
+    fig.colorbar(im2, cax=cbar_ax)
+
+    plt.show()
+
+def get_MeanStdCov(gpr, x, y):
+    X_input = np.array([[x, y]])
+    mean, std = gpr.GPR.predict(X_input, return_std=True)
+    mean, cov = gpr.GPR.predict(X_input, return_cov=True)
+    return mean[0][0], std[0], cov[0][0]
+
+def Fsurface(gpr, density=50):
+    x_values = np.linspace(-10, 130, density)
+    y_values = np.linspace(-10, 170, density)
+    X_grid, Y_grid = np.meshgrid(x_values, y_values)
+
+    means2, stds2, covs2 = [], [], []
+    for X_row, Y_row in zip(X_grid, Y_grid):
+        means1, stds1, covs1 = [], [], []
+        for x, y in zip(X_row, Y_row):
+            mean, std, cov = get_MeanStdCov(gpr, x, y)
+            means1.append(mean)
+            stds1.append(std)
+            covs1.append(cov)
+        means2.append(means1)
+        stds2.append(stds1)
+        covs2.append(covs1)
+    means2, stds2, covs2 = np.array(means2), np.array(stds2), np.array(covs2)
+    return x_values, y_values, means2, stds2, covs2
+
+def plot_Fsurface(x_values, y_values, val, typ="3d"):
+    X_grid, Y_grid = np.meshgrid(x_values, y_values)
+    if val.shape != X_grid.shape:
+        val.reshape(X_grid.shape)
+    
+    if typ.lower() == "3d" or typ.lower() == "both":
+        fig1 = plt.figure(figsize=(10, 6))
+        ax = fig1.add_subplot(111, projection='3d')
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        ax.set_zlabel('z')
+        ax.plot_surface(X_grid, Y_grid, val, cmap="viridis")
+        
+    if typ.lower() == "cont" or typ.lower() == "both":
+        fig2 = plt.figure(figsize=(10, 6))
+        ax = fig2.add_subplot(111)
+        ax.set_xlabel('x')
+        ax.set_ylabel('y')
+        c = ax.contourf(X_grid, Y_grid, val, 50, cmap="viridis", vmin=np.min(val), vmax=np.max(val))
+        fig2.colorbar(c)
+
+    plt.show()
+
+
+### NEURAL NETWORK FUNCTIONS
 
 def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10):
     train_lossLog = []
@@ -152,10 +228,10 @@ def plot_loss(epoch, train, val):
     plt.grid()
     plt.show()
 
-def plot_StressStrainOUT(perOUT, train_out, test_outputs):
+def plot_StressStrainOUT(perOUT, train_out, test_outputs, indx=0):
     fig = plt.figure(figsize=(10, 5))
-    plt.scatter(perOUT[0], train_out[10]+perOUT[1], s=5, label="Truth")
-    plt.scatter(perOUT[0], test_outputs[10]+perOUT[1], s=5, label="Prediction")
+    plt.scatter(perOUT[0], train_out[indx]+perOUT[1], s=5, label="Truth")
+    plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label="Prediction")
     plt.ylabel("Stress ($\sigma$) [MPa]")
     plt.xlabel("Strain ($\epsilon$)")
     plt.legend()
