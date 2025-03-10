@@ -50,11 +50,12 @@ class Dataset_(Dataset):
     
 
 class DATA:
-    def __init__(self, path=0, load=False, LAT="FCC", dis="dN", dN=20, DisDist=0):
+    def __init__(self, path=0, load=False, LAT="FCC", dis="dN", dN=20, model="MLP", format=0):
         self.path = path
         self.LAT = LAT
         self.dis = dis
         self.dN = dN
+        self.model = model
 
         self.get_DataPath()
 
@@ -62,9 +63,9 @@ class DATA:
             self.get_DataFiles()
             self.load_data()
 
-            if DisDist == 1:
+            if format == 1 and model.lower() == "mlp":
                 self.load_DisDist_v1()
-            elif DisDist == 2:
+            elif format == 2 and model.lower() == "mlp":
                 self.load_DisDist_v2()
 
 
@@ -87,7 +88,6 @@ class DATA:
             self.PATH  = pTiLAT
 
     def get_DataFiles(self):
-
         self.CSV_train_in  = self.PATH + f'NN-UT-{self.dis}-trainIN.csv'
         self.CSV_train_out = self.PATH + f'NN-UT-{self.dis}-trainOUT.csv'
         self.CSV_val_in  = self.PATH + f'NN-UT-{self.dis}-valIN.csv'
@@ -99,12 +99,23 @@ class DATA:
         self.OUTcsv = self.PATH + f'Ductile-disNodes-OUT.csv'
 
     def load_data(self):
-        self.train_in, self.train_out, self.val_in, self.val_out, self.test_in, self.test_out = load_TrainTestData(self.CSV_train_in, 
-                                                                                                                   self.CSV_train_out, 
-                                                                                                                   self.CSV_val_in, 
-                                                                                                                   self.CSV_val_out, 
-                                                                                                                   self.CSV_test_in, 
-                                                                                                                   self.CSV_test_out)
+        train_in, train_out, val_in, val_out, test_in, test_out = load_TrainTestData(self.CSV_train_in, 
+                                                                                     self.CSV_train_out, 
+                                                                                     self.CSV_val_in, 
+                                                                                     self.CSV_val_out, 
+                                                                                     self.CSV_test_in, 
+                                                                                     self.CSV_test_out)
+        if self.model.lower() == "mlp":
+            self.train_in, self.train_out = train_in, train_out
+            self.val_in, self.val_out = val_in, val_out
+            self.test_in, self.test_out = test_in, test_out
+        elif self.model.lower() == "gnn":
+            self.train_in = train_in.reshape(train_in.shape[:-1], train_in.shape[-1]//2, 2)
+            self.train_out = train_out.reshape(train_out.shape[:-1], train_out.shape[-1]//2, 2)
+            self.val_in = val_in.reshape(val_in.shape[:-1], val_in.shape[-1]//2, 2)
+            self.val_out = val_out.reshape(val_out.shape[:-1], val_out.shape[-1]//2, 2)
+            self.test_in = test_in.reshape(test_in.shape[:-1], test_in.shape[-1]//2, 2)
+            self.test_out = test_out.reshape(test_out.shape[:-1], test_out.shape[-1]//2, 2)
         self.perIN, self.perOUT = load_perData(self.INcsv, self.OUTcsv)
 
         self.inParams = dataParams(np.concatenate((self.train_in, self.val_in, self.test_in)))
@@ -125,13 +136,13 @@ class DATA:
         self.test_outNM = normalize(self.test_out, self.outParams[2], self.outParams[3])
     
     def load_DisDist_v1(self):
-        train_in1 = self.perIN.reshape(int(len(self.perIN)/2), 2)
+        train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
         self.train_in1 = np.array([i for i in train_in1 if max(train_in1[:,0]) != i[0] and min(train_in1[:,0]) != i[0] and 
                                                            max(train_in1[:,1]) != i[1] and min(train_in1[:,1]) != i[1]])
 
-        train_out1 = self.train_in.reshape(len(self.train_in),int(len(self.train_in[0])/2),2)
-        self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),int(len(self.train_in[0])/2),1)
-        self.dy_out1 = train_out1[:,:,1].reshape(len(self.train_in),int(len(self.train_in[0])/2),1)
+        train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
+        self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
+        self.dy_out1 = train_out1[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2,1)
 
         self.inParams1 = dataParams(self.train_in1)
         self.train_in1ST = standardize(self.train_in1, self.inParams1[0], self.inParams1[1])
@@ -145,15 +156,15 @@ class DATA:
         self.dy_out1NM = normalize(self.dy_out1, self.outParams1dy[2], self.outParams1dy[3])
     
     def load_DisDist_v2(self):
-        train_in1 = self.perIN.reshape(int(len(self.perIN)/2), 2)
+        train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
         self.train_in1 = np.array([i for i in train_in1 if max(train_in1[:,0]) != i[0] and min(train_in1[:,0]) != i[0] and 
                                                            max(train_in1[:,1]) != i[1] and min(train_in1[:,1]) != i[1]])
         self.train_in2 = np.array([self.train_in1.flatten()]*2)
 
-        train_out2 = self.train_in.reshape(len(self.train_in),int(len(self.train_in[0])/2),2)
-        dx_out2 = train_out2[:,:,0].reshape(len(self.train_in),int(len(self.train_in[0])/2))
+        train_out2 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
+        dx_out2 = train_out2[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2)
         self.dx_out2 = np.stack((dx_out2, dx_out2), axis=1)
-        dy_out2 = train_out2[:,:,1].reshape(len(self.train_in),int(len(self.train_in[0])/2))
+        dy_out2 = train_out2[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2)
         self.dy_out2 = np.stack((dy_out2, dy_out2), axis=1)
 
         self.inParams2 = dataParams(self.train_in2)
