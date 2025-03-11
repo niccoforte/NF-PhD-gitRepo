@@ -11,6 +11,18 @@ from torch_geometric.utils import to_networkx
 import networkx as nx
 
 
+def err(A, B, mean=False):
+    if mean:
+        return np.mean(np.abs(A - B))
+    else:
+        return np.abs(A - B)
+
+def mse(A, B, mean=False):
+    if mean:
+        return np.mean((A - B)**2)
+    else:
+        return (A - B)**2
+
 ### GAUSSIAN PROCESS FUNCTIONS
 
 def plot_Kmatrix(gpr, x=None):
@@ -240,6 +252,16 @@ def plot_StressStrainOUT(perOUT, train_out, test_outputs, indx=0):
 
 # TODO: ERROR PLOTTING 
 
+def plot_StressStrainERR(perOUT, train_out, test_outputs, indx=0):
+    fig = plt.figure(figsize=(10, 5))
+    plt.scatter(perOUT[0], train_out[indx], s=5, label="Truth")
+    plt.scatter(perOUT[0], test_outputs[indx], s=5, label="Prediction")
+    plt.ylabel("Stress ($\sigma$) [MPa]")
+    plt.xlabel("Strain ($\epsilon$)")
+    plt.legend()
+    plt.grid()
+    plt.show()
+
 def plot_Distribution(train_in1, test_outputs, dx_out1=None, typ="contour"):
     x_, y_ = train_in1[:,0], train_in1[:,1]
     if dx_out1 is not None:
@@ -271,23 +293,24 @@ def plot_Distribution(train_in1, test_outputs, dx_out1=None, typ="contour"):
 
 ### GNN Functions
 
-def visualize_graphNetwork(loader, colors=None, layout="kk"):
+def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
     for batch in loader:
         dat = batch.get_example(0)
         break
     G = to_networkx(dat, to_undirected=True)
     
     plt.figure(figsize=(7,7))
-    if layout.lower() == "kk":
-        pos = nx.kamada_kawai_layout(G)
-    elif layout.lower() == "spec":
-        pos = nx.spectral_layout(G)
-    elif layout.lower() == "spring":
-        pos = nx.spring_layout(G, seed=1)
-    elif layout.lower() == "planar":
-        pos = nx.planar_layout(G)
-    elif layout.lower() == "rand":
-        pos = nx.random_layout(G)
+    if pos is None:
+        if layout.lower() == "kk":
+            pos = nx.kamada_kawai_layout(G)
+        elif layout.lower() == "spec":
+            pos = nx.spectral_layout(G)
+        elif layout.lower() == "spring":
+            pos = nx.spring_layout(G, seed=1)
+        elif layout.lower() == "planar":
+            pos = nx.planar_layout(G)
+        elif layout.lower() == "rand":
+            pos = nx.random_layout(G)
     
     if colors is None:
         colors = dat.x[:, 0].detach().numpy()
