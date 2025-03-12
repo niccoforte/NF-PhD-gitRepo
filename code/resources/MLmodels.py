@@ -1,8 +1,7 @@
 import torch
+import torch.nn as nn
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
-
-import torch.nn as nn
 
 
 ### Gaussian Process Regression model
