@@ -173,7 +173,7 @@ def predict_model(typ, model, test_dataloader):
     test_outputs = []
     with torch.no_grad():
         for batch in test_dataloader:
-            if typ.lower() == "gcn":
+            if typ.lower() == "gnn":
                 x, y = batch.x.float(), batch.y.float()
                 y_predict = model(batch.x, batch.edge_index, batch.batch)
                 y = batch.y.view(batch.num_graphs, -1)
