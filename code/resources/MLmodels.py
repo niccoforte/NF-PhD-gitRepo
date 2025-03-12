@@ -52,10 +52,20 @@ class MLPhlayer(nn.Module):
 class MLP(nn.Module):
     def __init__(self, in_size, h_size, out_size, norm=None):
         super(MLP, self).__init__()
-        self.norm = norm
-        self.fcIN = nn.Linear(in_size, h_size[0])
+
+        if len(h_size) > 0:
+            self.fcIN = nn.Linear(in_size, h_size[0])
+            self.hlayers = nn.ModuleList([
+                MLPhlayer(i, j, norm) for i, j in zip(h_size[:-1], h_size[1:])])
+        else:
+            self.hlayers = None
+            self.fcIN = None
+            h_size = [in_size]
+        
         self.fcOUT = nn.Linear(h_size[-1], out_size)
         self.act = nn.ReLU()
+
+        self.norm = norm
         if norm == 'layer':
             self.normL = nn.LayerNorm(h_size[0])
         if norm == 'batch':
@@ -63,16 +73,19 @@ class MLP(nn.Module):
         if norm == 'instance':
             self.normL = nn.InstanceNorm1d(h_size[0])
         self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([
-            MLPhlayer(i, j, norm) for i, j in zip(h_size[:-1], h_size[1:])])
+        
 
     def forward(self, x):
-        x = self.fcIN(x)
+        if self.fcIN:
+            x = self.fcIN(x)
         if self.norm:
             x = self.normL(x)
-        x = self.act(x)
-        for layer in self.hlayers:
-            x = layer(x)
+        if self.fcIN:
+            x = self.act(x)
+        if self.hlayers:
+            for layer in self.hlayers:
+                print(layer)
+                x = layer(x)
         x = self.fcOUT(x)
         return x
 
