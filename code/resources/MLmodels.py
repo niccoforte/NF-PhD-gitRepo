@@ -1,5 +1,11 @@
-### Gaussian Process Regression model
+import torch
+from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
+from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 
+import torch.nn as nn
+
+
+### Gaussian Process Regression model
 class GPRmodel(GPR):
     def __init__(self, K, restarts, alpha, data=None):
         super(GPRmodel, self).__init__()
@@ -24,7 +30,6 @@ class GPRmodel(GPR):
 
 
 ### Multi-Layer Perceptron model
-
 class MLPhlayer(nn.Module):
     def __init__(self, in_size, out_size, norm=None):
         super(MLPhlayer, self).__init__()
@@ -74,7 +79,6 @@ class MLP(nn.Module):
 
 
 ### Graph Convolutional Network model
-
 class GCNhlayer(nn.Module):
     def __init__(self, in_size, out_size, norm=None):
         super(GCNhlayer, self).__init__()
@@ -127,7 +131,6 @@ class GCN(nn.Module):
 
 
 ### Graph Attetion Network model
-
 class GAThlayer(nn.Module):
     def __init__(self, in_size, out_size, heads=1, norm=None):
         super(GAThlayer, self).__init__()
