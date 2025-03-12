@@ -108,7 +108,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
     for epoch in range(1, n_epochs+1):
         train_lossSum = 0
         for batch in train_dataloader:
-            if typ.lower() == "gcn":
+            if typ.lower() == "gnn":
                 x, y = batch.x.float(), batch.y.float()
                 y_predict = model(batch.x, batch.edge_index, batch.batch)
                 y = batch.y.view(batch.num_graphs, -1)
@@ -130,7 +130,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
             with torch.no_grad():
                 val_lossSum = 0
                 for batch in val_dataloader:
-                    if typ.lower() == "gcn":
+                    if typ.lower() == "gnn":
                         x, y = batch.x.float(), batch.y.float()
                         y_predict = model(batch.x, batch.edge_index, batch.batch)
                         y = batch.y.view(batch.num_graphs, -1)
@@ -184,12 +184,10 @@ def predict_model(typ, model, test_dataloader):
     test_outputs = np.concatenate(test_outputs)
     return test_outputs
 
-def weights_init(m, dist="xavier"):
+def weights_init(m):
     if isinstance(m, nn.Linear):
-        if dist.lower() == "xavier":
-            nn.init.xavier_normal_(m.weight)
-        elif dist.lower() == "kaiming":
-            nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+        #nn.init.xavier_normal_(m.weight)
+        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
         nn.init.constant_(m.bias, 0.0)
 
 class EarlyStopping:
