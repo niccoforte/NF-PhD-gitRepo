@@ -84,7 +84,6 @@ class MLP(nn.Module):
             x = self.act(x)
         if self.hlayers:
             for layer in self.hlayers:
-                print(layer)
                 x = layer(x)
         x = self.fcOUT(x)
         return x
