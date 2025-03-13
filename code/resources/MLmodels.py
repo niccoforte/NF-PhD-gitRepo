@@ -30,10 +30,10 @@ class GPRmodel(GPR):
 
 ### Multi-Layer Perceptron model
 class MLPhlayer(nn.Module):
-    def __init__(self, in_size, out_size, norm=None):
+    def __init__(self, in_size, out_size, norm=None, bias=True):
         super(MLPhlayer, self).__init__()
         self.norm = norm
-        self.fc = nn.Linear(in_size, out_size)
+        self.fc = nn.Linear(in_size, out_size, bias=bias)
         self.act = nn.ReLU()
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size)
@@ -50,19 +50,19 @@ class MLPhlayer(nn.Module):
         return x
 
 class MLP(nn.Module):
-    def __init__(self, in_size, h_size, out_size, norm=None):
+    def __init__(self, in_size, h_size, out_size, norm=None, bias=True):
         super(MLP, self).__init__()
 
         if len(h_size) > 0:
-            self.fcIN = nn.Linear(in_size, h_size[0])
+            self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)
             self.hlayers = nn.ModuleList([
-                MLPhlayer(i, j, norm) for i, j in zip(h_size[:-1], h_size[1:])])
+                MLPhlayer(i, j, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
         else:
             self.hlayers = None
             self.fcIN = None
             h_size = [in_size]
         
-        self.fcOUT = nn.Linear(h_size[-1], out_size)
+        self.fcOUT = nn.Linear(h_size[-1], out_size, bias=bias)
         self.act = nn.ReLU()
 
         self.norm = norm
