@@ -188,7 +188,8 @@ def weights_init(m):
     if isinstance(m, nn.Linear):
         #nn.init.xavier_normal_(m.weight)
         nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
-        nn.init.constant_(m.bias, 0.0)
+        if m.bias is not None:
+            nn.init.constant_(m.bias, 0.01)
 
 class EarlyStopping:
     def __init__(self, patience=5, min_delta=0.0001, verbose=True):
