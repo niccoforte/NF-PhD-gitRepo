@@ -29,6 +29,33 @@ class GPRmodel(GPR):
 
 
 ### Multi-Layer Perceptron model
+class resBlock(nn.Module):
+    def __init__(self, size, norm=None, bias=True):
+        super(resBlock, self).__init__()
+        self.norm = norm
+        self.fc1 = nn.Linear(size, size*2, bias=bias)
+        self.fc2 = nn.Linear(size*2, size, bias=bias)
+        self.act = nn.ReLU()
+        if norm == 'layer':
+            self.normL1 = nn.LayerNorm(size*2)
+            self.normL2 = nn.LayerNorm(size)
+        elif norm == 'batch':
+            self.normL1 = nn.BatchNorm1d(size*2)
+            self.normL2 = nn.BatchNorm1d(size)
+
+    def forward(self, x):
+        skip = x
+        x = self.fc1(x)
+        if self.norm:
+            x = self.normL1(x)
+        x = self.act(x)
+        x = self.fc2(x)
+        if self.norm:
+            x = self.normL2(x)
+        x = x + skip
+        x = self.act(x)
+        return x #+ skip
+
 class MLPhlayer(nn.Module):
     def __init__(self, in_size, out_size, norm=None, bias=True):
         super(MLPhlayer, self).__init__()
@@ -39,8 +66,6 @@ class MLPhlayer(nn.Module):
             self.normL = nn.LayerNorm(out_size)
         elif norm == 'batch':
             self.normL = nn.BatchNorm1d(out_size)
-        elif norm == 'instance':
-            self.normL = nn.InstanceNorm1d(out_size)
     
     def forward(self, x):
         x = self.fc(x)
@@ -50,13 +75,17 @@ class MLPhlayer(nn.Module):
         return x
 
 class MLP(nn.Module):
-    def __init__(self, in_size, h_size, out_size, norm=None, bias=True):
+    def __init__(self, in_size, h_size, out_size, block="mlp", norm=None, bias=True):
         super(MLP, self).__init__()
 
         if len(h_size) > 0:
             self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)
-            self.hlayers = nn.ModuleList([
-                MLPhlayer(i, j, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
+            if block == "mlp":
+                self.hlayers = nn.ModuleList([
+                    MLPhlayer(i, j, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
+            elif block == "res":
+                self.hlayers = nn.ModuleList([
+                    resBlock(i, norm) for i in h_size])
         else:
             self.hlayers = None
             self.fcIN = None
@@ -70,8 +99,6 @@ class MLP(nn.Module):
             self.normL = nn.LayerNorm(h_size[0])
         if norm == 'batch':
             self.normL = nn.BatchNorm1d(h_size[0])
-        if norm == 'instance':
-            self.normL = nn.InstanceNorm1d(h_size[0])
         self.dropout = nn.Dropout(0.25)
         
 
@@ -195,3 +222,6 @@ class GAT(nn.Module):
         return x
 
 # TODO: Add Deep Ritz / ResNet models once finished.
+
+
+# TODO: Add macro model class with all hyperparameters and model selection.
