@@ -241,8 +241,8 @@ def plot_loss(epoch, train, val):
 
 def plot_StressStrainOUT(perOUT, train_out, test_outputs, indx=0):
     fig = plt.figure(figsize=(10, 5))
-    plt.scatter(perOUT[0], train_out[indx]+perOUT[1], s=5, label="Truth")
-    plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label="Prediction")
+    plt.scatter(perOUT[0], train_out[indx]+perOUT[1], s=5, label=f"Truth-{indx}")
+    plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label=f"Prediction-{indx}")
     plt.ylabel("Stress ($\sigma$) [MPa]")
     plt.xlabel("Strain ($\epsilon$)")
     plt.legend()
