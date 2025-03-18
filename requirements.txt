@@ -2,7 +2,11 @@ numpy
 scipy
 matplotlib
 pandas
-sympy
-networkx
+
 scikit-learn
-jupyter
+torch
+torchvision
+torchinfo
+
+optuna
+networkx
