@@ -14,7 +14,7 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'hex'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+latticeType = 'FCC'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
@@ -39,7 +39,7 @@ UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-pDir = "C:\\Users\\exy053\\Documents\\ModelChanges\\ATS" # SiC" # sApp" # sApp\\5" # 
+pDir = "C:\\Users\\exy053\\Documents\\test" # SiC" # sApp" # sApp\\5" # 
 #pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
@@ -113,7 +113,7 @@ os.chdir(pDir)
 
 STEP_TIME = 1E-1
 sm_amp = False
-AdaptiveTimeStepping = True
+AdaptiveTimeStepping = False
 RayleighDampling = False
 SevereDisplacementControl = False
 
