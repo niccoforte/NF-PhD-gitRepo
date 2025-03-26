@@ -19,7 +19,7 @@ MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
-distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
+distribution = 'lhs_uniform'                    # 'uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
@@ -116,6 +116,9 @@ sm_amp = False
 AdaptiveTimeStepping = False
 RayleighDampling = False
 SevereDisplacementControl = False
+
+if (latticeType.lower() == "kagome" or latticeType.lower() == "hex"):
+    AdaptiveTimeStepping = True
 
 ## AMPLITUDE
 if userMaterial.lower() == "ti":
@@ -292,50 +295,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
                 if round(node[2],2) in Dcoords[10:]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
         
-        #print(nodes)
-        #print(bracket_nodes)
-        
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere(yCoord == 0)
-        topNodes = argwhere(yCoord == H)
-        leftNodes = argwhere(xCoord == 0)
-        rightNodes = argwhere(xCoord == L)
-        
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        #boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-        
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
         delta = 0.5 * sqrt(unitX * unitX + unitY * unitY) * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            #delta = 2.5
-            randX = random.exponential(1/delta, len(nonboundaryNodes))
-            randY = random.exponential(1/delta, len(nonboundaryNodes))
-        
-
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
-        
-        nodesR[:,0] = nodes[:,0]
-        nodesR[:,1] = nodes[:,1]
-        nodesR[:,2] = nodes[:,2]
-        nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
     
     elif latticeType.lower() == "tri":
         unitX = 0.5 * sqrt(3) * unitCellSize
@@ -448,50 +408,8 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             if round(node[1],2) in Dcoords[:2]:
                 if round(node[2],2) in Dcoords[2:]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
-        
-        #print(nodes)
-        #print(bracket_nodes)
-        
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-        
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere(yCoord == 0)
-        topNodes = argwhere((yCoord < H + 1e-3) & (yCoord > H - 1e-3))
-        leftNodes = argwhere(xCoord == 0)
-        rightNodes = argwhere((xCoord < L + 1e-3) & (xCoord > L - 1e-3))
-
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        # boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes, return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int) - 1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int) - 1, 2]
 
         delta = unitCellSize * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            # delta = 2.5
-            randX = random.exponential(1 / delta, len(nonboundaryNodes))
-            randY = random.exponential(1 / delta, len(nonboundaryNodes))
-
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
-
-        nodesR[:, 0] = nodes[:, 0]
-        nodesR[:, 1] = nodes[:, 1]
-        nodesR[:, 2] = nodes[:, 2]
-        nodesR[nonboundaryNodes.astype(int) - 1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int) - 1, 2] = nonboundaryCoordY
 
     elif latticeType.lower() == "kagome":
         unitX = float(unitCellSize)
@@ -640,47 +558,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
                 if round(node[1],2) == DcoordsX[1] or node[1] == DcoordsX[5]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
         
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-        
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere(yCoord == 0)
-        topNodes = argwhere((yCoord < H+1e-3) & (yCoord > H-1e-3))
-        leftNodes = argwhere(xCoord == 0)
-        rightNodes = argwhere((xCoord < L+1e-3) & (xCoord > L-1e-3))
-        
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        #boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-        
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
         delta = unitCellSize * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            #delta = 2.5
-            randX = random.exponential(1/delta, len(nonboundaryNodes))
-            randY = random.exponential(1/delta, len(nonboundaryNodes))
-        
-
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
-        
-        nodesR[:,0] = nodes[:,0]
-        nodesR[:,1] = nodes[:,1]
-        nodesR[:,2] = nodes[:,2]
-        nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
     
     elif latticeType.lower() == "hex":
         unitX = sqrt(3)*unitCellSize
@@ -855,47 +733,49 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
                 if round(node[1],2) in DcoordsX:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
         
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-        
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere((yCoord>=-1e-3) & (yCoord<=+1e-3))
-        topNodes = argwhere((yCoord>=H-1e-3) & (yCoord<=H+1e-3))
-        leftNodes = argwhere((xCoord>=-1e-3) & (xCoord<=+1e-3))
-        rightNodes = argwhere((xCoord>=L-1e-3) & (xCoord<=L+1e-3))
-        
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        #boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-        
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
         delta = unitCellSize * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            #delta = 2.5
-            randX = random.exponential(1/delta, len(nonboundaryNodes))
-            randY = random.exponential(1/delta, len(nonboundaryNodes))
-        
+    
+    bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
 
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
+    xCoord = nodes[:, 1]
+    yCoord = nodes[:, 2]
+    bottomNodes = argwhere((yCoord >= -1e-3) & (yCoord <= 1e-3))
+    topNodes = argwhere((yCoord <= H + 1e-3) & (yCoord >= H - 1e-3))
+    leftNodes = argwhere((xCoord >= -1e-3) & (xCoord <= 1e-3))
+    rightNodes = argwhere((xCoord <= L + 1e-3) & (xCoord >= L - 1e-3))
+    
+    boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
+    boundaryNodes, inx = unique(boundaryNodes,return_index=True)
+    boundaryNodesInx = nodes[boundaryNodes, 0]
+    
+    nodeIndex = nodes[:, 0]
+    nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
+
+    nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
+    nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
         
-        nodesR[:,0] = nodes[:,0]
-        nodesR[:,1] = nodes[:,1]
-        nodesR[:,2] = nodes[:,2]
-        nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
+    if (distribution.lower() == 'uniform'):
+        randX = random.uniform(-delta, delta, len(nonboundaryNodes))
+        randY = random.uniform(-delta, delta, len(nonboundaryNodes))
+    elif (distribution.lower() == 'lhs_uniform'):
+        randX = LHS_uniform(var=len(nodes), strats=numberOfRuns, lim=0.2)
+        randY = LHS_uniform(var=len(nodes), strats=numberOfRuns, lim=0.2)
+    elif (distribution.lower() == 'normal'):
+        randX = random.normal(0.0, delta, len(nonboundaryNodes))
+        randY = random.normal(0.0, delta, len(nonboundaryNodes))
+    elif (distribution.lower() == 'exponential'):
+        randX = random.exponential(1/delta, len(nonboundaryNodes))
+        randY = random.exponential(1/delta, len(nonboundaryNodes))
+    
+
+    nonboundaryCoordX = nonboundaryCoordX + randX
+    nonboundaryCoordY = nonboundaryCoordY + randY
+    
+    nodesR[:,0] = nodes[:,0]
+    nodesR[:,1] = nodes[:,1]
+    nodesR[:,2] = nodes[:,2]
+    nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
+    nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
     
     return nodes, nodesR, bracket_nodes
 
@@ -1172,6 +1052,19 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
 
     return [nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, vol, l, LAT]
 
+def LHS_uniform(var, strats, lim, mean=0, plot=False):
+    lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
+    upper_limits = lower_limits + (lower_limits[1] - lower_limits[0])
+    ticks = np.append(lower_limits, upper_limits)
+    
+    points = np.zeros((strats, var))
+    for i in range(var):
+        points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
+        np.random.shuffle(points[:, i])
+    if plot:
+        plot_LHS(points, lim, ticks)
+    return points
+    
 ############################################################################################
 ############################################################################################
 ############################################################################################
