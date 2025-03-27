@@ -14,12 +14,12 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'FCC'                        # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+latticeType = 'FCC'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
-distribution = 'lhs_uniform'                    # 'uniform', 'normal', 'exponential'
+distribution = 'lhs_uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
@@ -735,6 +735,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
         
         delta = unitCellSize * fac
     
+    Dnodes_brackets = np.array(Dnodes_brackets, dtype=int)
     bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
 
     xCoord = nodes[:, 1]
@@ -758,8 +759,8 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
         randX = random.uniform(-delta, delta, len(nonboundaryNodes))
         randY = random.uniform(-delta, delta, len(nonboundaryNodes))
     elif (distribution.lower() == 'lhs_uniform'):
-        randX = LHS_uniform(var=len(nodes), strats=numberOfRuns, lim=0.2)
-        randY = LHS_uniform(var=len(nodes), strats=numberOfRuns, lim=0.2)
+        randX = randX_all[idNum-1]
+        randY = randX_all[idNum-1]
     elif (distribution.lower() == 'normal'):
         randX = random.normal(0.0, delta, len(nonboundaryNodes))
         randY = random.normal(0.0, delta, len(nonboundaryNodes))
@@ -768,8 +769,8 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
         randY = random.exponential(1/delta, len(nonboundaryNodes))
     
 
-    nonboundaryCoordX = nonboundaryCoordX + randX
-    nonboundaryCoordY = nonboundaryCoordY + randY
+    nonboundaryCoordX = nonboundaryCoordX + randX[:len(nonboundaryCoordX)]
+    nonboundaryCoordY = nonboundaryCoordY + randY[:len(nonboundaryCoordX)]
     
     nodesR[:,0] = nodes[:,0]
     nodesR[:,1] = nodes[:,1]
@@ -1054,7 +1055,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
 
 def LHS_uniform(var, strats, lim, mean=0, plot=False):
     lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
-    upper_limits = lower_limits + (lower_limits[1] - lower_limits[0])
+    upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/len(lower_limits))
     ticks = np.append(lower_limits, upper_limits)
     
     points = np.zeros((strats, var))
@@ -1088,6 +1089,28 @@ elif (finalRun.lower() == 'no'):
 if nodeVar == "no":
     fac = 0.0
 
+geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval=UTval)
+nnx = geom[0]
+nny = geom[1]
+L = geom[2]
+H = geom[3]
+W = geom[4]
+B = geom[5]
+a0 = geom[6]
+ai = geom[7]
+totalNodes = geom[8]
+totalBracketNodes = geom[9]
+
+if (distribution.lower() == 'uniform'):
+    fac = fac
+if (distribution.lower() == 'lhs_uniform'):    
+    randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=0.2)
+    randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=0.2)
+elif (distribution.lower() == 'normal'):
+    fac = (2*fac)/sqrt(2*pi*exp(1))
+elif (distribution.lower() == 'exponential'):
+    fac = exp(1)/(2*fac)
+
 # for nnx in [10, 16, 26]:
 for idNum in range(initial,numOfJobs):
     
@@ -1095,29 +1118,6 @@ for idNum in range(initial,numOfJobs):
     PBC          = 'no'
     elemType     = B21
     units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
-
-    ############################################################################################
-    ####################### Probability Distribution & Dimentions ##############################
-    ############################################################################################
-
-    if (distribution.lower() == 'uniform'):
-        fac = fac
-    elif (distribution.lower() == 'normal'):
-        fac = (2*fac)/sqrt(2*pi*exp(1))
-    elif (distribution.lower() == 'exponential'):
-        fac = exp(1)/(2*fac)
-
-    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval=UTval)
-    nnx = geom[0]
-    nny = geom[1]
-    L = geom[2]
-    H = geom[3]
-    W = geom[4]
-    B = geom[5]
-    a0 = geom[6]
-    ai = geom[7]
-    totalNodes = geom[8]
-    totalBracketNodes = geom[9]
     
     nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution)
 
@@ -1763,6 +1763,7 @@ for idNum in range(initial,numOfJobs):
                 delNodes.append(nodes[kk][0]-1)
                 continue
 
+        delNodes = np.array(delNodes, dtype=int)
         nodes = delete(nodes,delNodes,0)
         nodesR = delete(nodesR,delNodes,0)
 
@@ -1797,6 +1798,7 @@ for idNum in range(initial,numOfJobs):
                 delNodes.append(nodes[kk][0]-1)
                 continue
 
+        delNodes = np.array(delNodes, dtype=int)
         element = delete(element,delNodes,0)
         
         #############################################################################################
