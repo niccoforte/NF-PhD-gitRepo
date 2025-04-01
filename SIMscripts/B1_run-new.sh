@@ -79,8 +79,8 @@ rsync -av /data/scratch/exy053/$JOB_ID/transfer/* /data/scratch/exy053/$JOB_ID/z
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/zip/
 
-mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/$JOB_ID/
-mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$LAT/$JOB_ID/zip/
+mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/
+mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
 rsync -av /data/scratch/exy053/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
 
 if [ "$zip" = true ] ; then
