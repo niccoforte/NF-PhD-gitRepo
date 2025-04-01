@@ -31,8 +31,8 @@ ppJOBparent=/data/home/exy053/p1-LatticeFractureToughness/Ti/10dN/tri-new
 
 
 # Load required modules
-#module load abaqus/2020
-#module load intel
+module load abaqus/2024
+module load intel
 
 /bin/echo Running on host: `hostname`.
 /bin/echo Starting on: `date`, in `pwd`.
@@ -42,8 +42,8 @@ ppJOBparent=/data/home/exy053/p1-LatticeFractureToughness/Ti/10dN/tri-new
 # Replace the following line with abaqus command
 #abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
-module load python
-python A-HPC-2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus python A-HPC-2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 /bin/echo Inputs and outputs collected.
 
