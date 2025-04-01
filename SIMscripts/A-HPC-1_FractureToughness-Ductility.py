@@ -65,19 +65,27 @@ if len(cmdIN) > 0:
 
 STEP_TIME = 1E-1
 sm_amp = False
+AdaptiveTimeStepping = False
+RayleighDampling = False
+SevereDisplacementControl = False
+
+if (latticeType.lower() == "kagome" or latticeType.lower() == "hex"):
+    AdaptiveTimeStepping = True
+
+## AMPLITUDE
 if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
-        strainAppUT = 0.045                                               # FINAL 30 - 0.045
-        strainAppFT = 0.050                                               # FINAL 30 - 0.05
+        strainAppUT = 0.045                                               # FINAL 20 - 0.045
+        strainAppFT = 0.050                                               # FINAL 20 - 0.05
     elif latticeType.lower() == "tri":
         strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.050  #26-0.065 20-0.072                           # FINAL 20 - 0.05
-        strainAppFT = 0.050  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05
+        strainAppUT = 0.05  #26-0.065 20-0.072                           # FINAL 20 - 0.05  0.04
+        strainAppFT = 0.05  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05  0.04
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.070  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.073
-        strainAppFT = 0.057  #20-0.05 50-0.032                            # FINAL 20 - 0.06
+        strainAppUT = 0.070  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07   0.065
+        strainAppFT = 0.060  #20-0.05 50-0.032                            # FINAL 20 - 0.057  0.055
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
@@ -105,6 +113,7 @@ elif userMaterial.lower() == "al":
         strainAppUT = 0.100
         strainAppFT = 0.032
 
+## MESH SIZING
 if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0          # minimum coarse element size
@@ -133,7 +142,7 @@ elif latticeType.lower() == "hex":
 ############################################################################################
 ############################################################################################
 ############################################################################################
-	
+	 
 def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution):
     if latticeType.lower() == "fcc" or latticeType.lower() == "fcc2":
         unitX = L / nnx
@@ -238,50 +247,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
                 if round(node[2],2) in Dcoords[10:]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
         
-        #print(nodes)
-        #print(bracket_nodes)
-        
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere(yCoord == 0)
-        topNodes = argwhere(yCoord == H)
-        leftNodes = argwhere(xCoord == 0)
-        rightNodes = argwhere(xCoord == L)
-        
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        #boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-        
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
         delta = 0.5 * sqrt(unitX * unitX + unitY * unitY) * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            #delta = 2.5
-            randX = random.exponential(1/delta, len(nonboundaryNodes))
-            randY = random.exponential(1/delta, len(nonboundaryNodes))
-        
-
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
-        
-        nodesR[:,0] = nodes[:,0]
-        nodesR[:,1] = nodes[:,1]
-        nodesR[:,2] = nodes[:,2]
-        nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
     
     elif latticeType.lower() == "tri":
         unitX = 0.5 * sqrt(3) * unitCellSize
@@ -394,50 +360,8 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             if round(node[1],2) in Dcoords[:2]:
                 if round(node[2],2) in Dcoords[2:]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
-        
-        #print(nodes)
-        #print(bracket_nodes)
-        
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-        
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere(yCoord == 0)
-        topNodes = argwhere((yCoord < H + 1e-3) & (yCoord > H - 1e-3))
-        leftNodes = argwhere(xCoord == 0)
-        rightNodes = argwhere((xCoord < L + 1e-3) & (xCoord > L - 1e-3))
-
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        # boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes, return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int) - 1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int) - 1, 2]
 
         delta = unitCellSize * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            # delta = 2.5
-            randX = random.exponential(1 / delta, len(nonboundaryNodes))
-            randY = random.exponential(1 / delta, len(nonboundaryNodes))
-
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
-
-        nodesR[:, 0] = nodes[:, 0]
-        nodesR[:, 1] = nodes[:, 1]
-        nodesR[:, 2] = nodes[:, 2]
-        nodesR[nonboundaryNodes.astype(int) - 1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int) - 1, 2] = nonboundaryCoordY
 
     elif latticeType.lower() == "kagome":
         unitX = float(unitCellSize)
@@ -586,47 +510,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
                 if round(node[1],2) == DcoordsX[1] or node[1] == DcoordsX[5]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
         
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-        
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere(yCoord == 0)
-        topNodes = argwhere((yCoord < H+1e-3) & (yCoord > H-1e-3))
-        leftNodes = argwhere(xCoord == 0)
-        rightNodes = argwhere((xCoord < L+1e-3) & (xCoord > L-1e-3))
-        
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        #boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-        
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
         delta = unitCellSize * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            #delta = 2.5
-            randX = random.exponential(1/delta, len(nonboundaryNodes))
-            randY = random.exponential(1/delta, len(nonboundaryNodes))
-        
-
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
-        
-        nodesR[:,0] = nodes[:,0]
-        nodesR[:,1] = nodes[:,1]
-        nodesR[:,2] = nodes[:,2]
-        nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
     
     elif latticeType.lower() == "hex":
         unitX = sqrt(3)*unitCellSize
@@ -801,47 +685,50 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
                 if round(node[1],2) in DcoordsX:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
         
-        bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-        
-        xCoord = nodes[:, 1]
-        yCoord = nodes[:, 2]
-        bottomNodes = argwhere((yCoord>=-1e-3) & (yCoord<=+1e-3))
-        topNodes = argwhere((yCoord>=H-1e-3) & (yCoord<=H+1e-3))
-        leftNodes = argwhere((xCoord>=-1e-3) & (xCoord<=+1e-3))
-        rightNodes = argwhere((xCoord>=L-1e-3) & (xCoord<=L+1e-3))
-        
-        boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-        #boundaryNodes = concatenate((bottomNodes, topNodes))
-        boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-        boundaryNodesInx = nodes[boundaryNodes, 0]
-        
-        nodeIndex = nodes[:, 0]
-        nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-        nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-        nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
         delta = unitCellSize * fac
-        if (distribution.lower() == 'uniform'):
-            randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-            randY = random.uniform(-delta, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'normal'):
-            randX = random.normal(0.0, delta, len(nonboundaryNodes))
-            randY = random.normal(0.0, delta, len(nonboundaryNodes))
-        elif (distribution.lower() == 'exponential'):
-            #delta = 2.5
-            randX = random.exponential(1/delta, len(nonboundaryNodes))
-            randY = random.exponential(1/delta, len(nonboundaryNodes))
-        
+    
+    Dnodes_brackets = np.array(Dnodes_brackets, dtype=int)
+    bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
 
-        nonboundaryCoordX = nonboundaryCoordX + randX
-        nonboundaryCoordY = nonboundaryCoordY + randY
+    xCoord = nodes[:, 1]
+    yCoord = nodes[:, 2]
+    bottomNodes = argwhere((yCoord >= -1e-3) & (yCoord <= 1e-3))
+    topNodes = argwhere((yCoord <= H + 1e-3) & (yCoord >= H - 1e-3))
+    leftNodes = argwhere((xCoord >= -1e-3) & (xCoord <= 1e-3))
+    rightNodes = argwhere((xCoord <= L + 1e-3) & (xCoord >= L - 1e-3))
+    
+    boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
+    boundaryNodes, inx = unique(boundaryNodes,return_index=True)
+    boundaryNodesInx = nodes[boundaryNodes, 0]
+    
+    nodeIndex = nodes[:, 0]
+    nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
+
+    nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
+    nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
         
-        nodesR[:,0] = nodes[:,0]
-        nodesR[:,1] = nodes[:,1]
-        nodesR[:,2] = nodes[:,2]
-        nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-        nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
+    if (distribution.lower() == 'uniform'):
+        randX = random.uniform(-delta, delta, len(nonboundaryNodes))
+        randY = random.uniform(-delta, delta, len(nonboundaryNodes))
+    elif (distribution.lower() == 'lhs_uniform'):
+        randX = randX_all[idNum-1]
+        randY = randX_all[idNum-1]
+    elif (distribution.lower() == 'normal'):
+        randX = random.normal(0.0, delta, len(nonboundaryNodes))
+        randY = random.normal(0.0, delta, len(nonboundaryNodes))
+    elif (distribution.lower() == 'exponential'):
+        randX = random.exponential(1/delta, len(nonboundaryNodes))
+        randY = random.exponential(1/delta, len(nonboundaryNodes))
+    
+
+    nonboundaryCoordX = nonboundaryCoordX + randX[:len(nonboundaryCoordX)]
+    nonboundaryCoordY = nonboundaryCoordY + randY[:len(nonboundaryCoordX)]
+    
+    nodesR[:,0] = nodes[:,0]
+    nodesR[:,1] = nodes[:,1]
+    nodesR[:,2] = nodes[:,2]
+    nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
+    nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
     
     return nodes, nodesR, bracket_nodes
 
@@ -1118,6 +1005,19 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
 
     return [nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, vol, l, LAT]
 
+def LHS_uniform(var, strats, lim, mean=0, plot=False):
+    lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
+    upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/len(lower_limits))
+    ticks = np.append(lower_limits, upper_limits)
+    
+    points = np.zeros((strats, var))
+    for i in range(var):
+        points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
+        np.random.shuffle(points[:, i])
+    if plot:
+        plot_LHS(points, lim, ticks)
+    return points
+    
 ############################################################################################
 ############################################################################################
 ############################################################################################
@@ -1141,35 +1041,35 @@ elif (finalRun.lower() == 'no'):
 if nodeVar == "no":
     fac = 0.0
 
+geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval=UTval)
+nnx = geom[0]
+nny = geom[1]
+L = geom[2]
+H = geom[3]
+W = geom[4]
+B = geom[5]
+a0 = geom[6]
+ai = geom[7]
+totalNodes = geom[8]
+totalBracketNodes = geom[9]
+
+if (distribution.lower() == 'uniform'):
+    fac = fac
+if (distribution.lower() == 'lhs_uniform'):    
+    randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=0.2)
+    randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=0.2)
+elif (distribution.lower() == 'normal'):
+    fac = (2*fac)/sqrt(2*pi*exp(1))
+elif (distribution.lower() == 'exponential'):
+    fac = exp(1)/(2*fac)
+
+# for nnx in [10, 16, 26]:
 for idNum in range(initial,numOfJobs):
     
     #data 	     = sys.argv[-1]
     PBC          = 'no'
     elemType     = B21
     units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
-
-    ############################################################################################
-    ####################### Probability Distribution & Dimentions ##############################
-    ############################################################################################
-
-    if (distribution.lower() == 'uniform'):
-        fac = fac
-    elif (distribution.lower() == 'normal'):
-        fac = (2*fac)/sqrt(2*pi*exp(1))
-    elif (distribution.lower() == 'exponential'):
-        fac = exp(1)/(2*fac)
-
-    geom = geometry(latticeType, unitCellSize, nnx, stiffMatrix=stiffMatrix, UTval=UTval)
-    nnx = geom[0]
-    nny = geom[1]
-    L = geom[2]
-    H = geom[3]
-    W = geom[4]
-    B = geom[5]
-    a0 = geom[6]
-    ai = geom[7]
-    totalNodes = geom[8]
-    totalBracketNodes = geom[9]
     
     nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution)
 
@@ -1240,7 +1140,7 @@ for idNum in range(initial,numOfJobs):
             
             thickness = thick_est
             if UTval:
-                thickness = 1.0
+                thickness = 1.1
             Area = 1.0*thickness
 
         if (units.lower() == 'millimeter'):
@@ -1515,10 +1415,22 @@ for idNum in range(initial,numOfJobs):
         ############################################################################################
         ######################################## Step ##############################################
         ############################################################################################
-
-        mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', 
-            timePeriod=STEP_TIME)
-            
+        
+        if AdaptiveTimeStepping:
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME, 
+                                                       improvedDtMethod=ON, scaleFactor=0.95)
+        
+        if RayleighDampling:
+            mdb.models[ModelName].materials[userMaterial].Damping(alpha=0.0, beta=1e-6)
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
+        
+        if SevereDisplacementControl:
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME,
+                                                       linearBulkViscosity=0.06, quadBulkViscosity=1.2)
+        
+        if AdaptiveTimeStepping == False and RayleighDampling == False and SevereDisplacementControl == False:
+            mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
+        
         # ############################################################################################
         # ######################################## Mesh ##############################################
         # ############################################################################################
@@ -1740,6 +1652,7 @@ for idNum in range(initial,numOfJobs):
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            mdb.jobs[Job].waitForCompletion()
         
             
 # ######################################################################################################
@@ -1768,7 +1681,7 @@ for idNum in range(initial,numOfJobs):
         ridge1 = [-10000, -10000, -10000, -10000]#[0.2*W, (H/2)-(0.1*W), 0.35*W, (H/2)+(0.1*W)]
         ridge2 = [-10000, -10000, -10000, -10000]#[-0.1*W, (H/2)-(0.21*W), 0.25*W, (H/2)+(0.21*W)]
         
-        if latticeType.lower() == "fcc" or latticeType.lower() == "tri":
+        if latticeType.lower() == "fcc" or latticeType.lower() == "fcc2" or latticeType.lower() == "tri":
             CrRegSTAT = [xCrE[0]-(1.6*unitCellSize), xCrE[0]+(3.1*unitCellSize), (H/2)-(2.1*unitCellSize), (H/2)+(2.1*unitCellSize)]
             CrRegMESH = [xCrE[0]-(2.1*unitCellSize), xCrE[0]+(5.6*unitCellSize), (H/2)-(4.1*unitCellSize), (H/2)+(4.1*unitCellSize)]
         elif latticeType.lower() == "kagome" or latticeType.lower() == "hex":
@@ -1802,6 +1715,7 @@ for idNum in range(initial,numOfJobs):
                 delNodes.append(nodes[kk][0]-1)
                 continue
 
+        delNodes = np.array(delNodes, dtype=int)
         nodes = delete(nodes,delNodes,0)
         nodesR = delete(nodesR,delNodes,0)
 
@@ -1836,6 +1750,7 @@ for idNum in range(initial,numOfJobs):
                 delNodes.append(nodes[kk][0]-1)
                 continue
 
+        delNodes = np.array(delNodes, dtype=int)
         element = delete(element,delNodes,0)
         
         #############################################################################################
