@@ -14,8 +14,8 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'FCC'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
-MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
+latticeType = 'kagome'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 20                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
@@ -39,7 +39,7 @@ UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-pDir = "C:\\Users\\exy053\\Documents\\test" # SiC" # sApp" # sApp\\5" # 
+pDir = "C:\\Users\\exy053\\Documents\\sApp" # SiC" # sApp" # sApp\\5" # test # 
 #pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
@@ -129,11 +129,11 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
         strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.040  #26-0.065 20-0.072                           # FINAL 20 - 0.05  0.04
-        strainAppFT = 0.040  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05  0.04
+        strainAppUT = 0.05  #26-0.065 20-0.072                           # FINAL 20 - 0.05  0.04
+        strainAppFT = 0.05  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05  0.04
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.08  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07   0.065
-        strainAppFT = 0.055  #20-0.05 50-0.032                            # FINAL 20 - 0.057  0.055
+        strainAppUT = 0.070  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07   0.065
+        strainAppFT = 0.060  #20-0.05 50-0.032                            # FINAL 20 - 0.057  0.055
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
