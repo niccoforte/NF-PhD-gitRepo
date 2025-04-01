@@ -23,9 +23,9 @@ echo Running on host: `hostname`.
 echo Starting on: `date`, in `pwd`.
 
 if [[ $loc == "transfer" ]]; then
-	scp exy053@login.hpc.qmul.ac.uk:/data/home/exy053/Paper1-LatticeFractureToughness/Ti/$LAT/C1_$loc-$LAT-$DIS-$JOBn.tgz "`pwd`"
+    scp exy053@login.hpc.qmul.ac.uk:/data/home/exy053/Paper1-LatticeFractureToughness/Ti/$LAT/C1_$loc-$LAT-$DIS-$JOBn.tgz "`pwd`"
 elif [[ $loc == "zip" ]]; then
-	scp exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/C2_$loc-$LAT-$DIS-$JOBn.tgz "`pwd`"
+    scp exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/C2_$loc-$LAT-$DIS-$JOBn.tgz "`pwd`"
 fi
 
 tar -xvzf C*_$loc-$LAT-$DIS-$JOBn.tgz
