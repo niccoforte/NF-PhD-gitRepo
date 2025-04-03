@@ -14,22 +14,22 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'hex'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+latticeType = 'kagome'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-nnx = 10                                    # number of Unit cells in X direction
+nnx = 20                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
 distribution = 'lhs_uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
-finalRun = 'no'
+finalRun = 'yes'
 numberOfRuns = 3
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'no'                               # distortion
+nodeVar = 'yes'                               # distortion
 fac = 0.2
 sizeVar = 'no'
 beta = 0.2
@@ -39,7 +39,7 @@ UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\"+str(int(unitCellSize))
-pDir = "C:\\Users\\exy053\\Documents\\sApp\\20" # SiC" # sApp" # sApp\\5" # test # 
+pDir = "C:\\Users\\exy053\\Documents\\sApp\\" + str(int(fac*100)) # SiC" # sApp" # sApp\\5" # test # 
 #pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
 
 cmdIN = sys.argv[8:]
@@ -191,7 +191,7 @@ elif latticeType.lower() == "hex":
 ############################################################################################
 ############################################################################################
 	 
-def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution):
+def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution):
     if latticeType.lower() == "fcc" or latticeType.lower() == "fcc2":
         unitX = L / nnx
         unitY = H / nny
@@ -294,8 +294,6 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             if round(node[1],2) in Dcoords[8:10]:
                 if round(node[2],2) in Dcoords[10:]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
-        
-        delta = 0.5 * sqrt(unitX * unitX + unitY * unitY) * fac
     
     elif latticeType.lower() == "tri":
         unitX = 0.5 * sqrt(3) * unitCellSize
@@ -408,8 +406,6 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             if round(node[1],2) in Dcoords[:2]:
                 if round(node[2],2) in Dcoords[2:]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
-
-        delta = unitCellSize * fac
 
     elif latticeType.lower() == "kagome":
         unitX = float(unitCellSize)
@@ -557,8 +553,6 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             if round(node[2],2) in DcoordsY[6:8]:
                 if round(node[1],2) == DcoordsX[1] or node[1] == DcoordsX[5]:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
-        
-        delta = unitCellSize * fac
     
     elif latticeType.lower() == "hex":
         unitX = sqrt(3)*unitCellSize
@@ -732,8 +726,6 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distri
             if round(node[2],2) in DcoordsY:
                 if round(node[1],2) in DcoordsX:
                     Dnodes_brackets.append(node[0]-totalNodes-1)
-        
-        delta = unitCellSize * fac
     
     Dnodes_brackets = np.array(Dnodes_brackets, dtype=int)
     bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
@@ -889,6 +881,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = (nnx + 1) * (nny + 1) + nnx * nny
+        deltaNM = 0.5 * sqrt(l*l + l*l)
         
     elif (LAT.lower() == 'tri'):
         if nnx % 2.0 == 1.0:
@@ -944,6 +937,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
+        deltaNM = l
 
     elif (LAT.lower() == 'kagome'):
         L = l*(2.0*nnx - 1)
@@ -996,6 +990,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = int((2*nnx*(nny+1)) + (nnx-1)*math.ceil(nny/2.0) + (nnx)*math.floor(nny/2))
+        deltaNM = l
         
     elif (LAT.lower() == 'hex'):
         L = (3.0**(0.5))*l*nnx
@@ -1049,9 +1044,10 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = ((2*nny) * (nnx+1)) + (((2*nny)+1) * nnx) + 50
+        deltaNM = l
     B = 0.5*W
 
-    return [nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, vol, l, LAT]
+    return [nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM]
 
 def LHS_uniform(var, strats, lim, mean=0, plot=False):
     lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
@@ -1100,12 +1096,14 @@ a0 = geom[6]
 ai = geom[7]
 totalNodes = geom[8]
 totalBracketNodes = geom[9]
+deltaNM = geom[10]
+delta = deltaNM * fac
 
 if (distribution.lower() == 'uniform'):
     fac = fac
 if (distribution.lower() == 'lhs_uniform'):    
-    randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=0.2)
-    randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=0.2)
+    randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
+    randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
 elif (distribution.lower() == 'normal'):
     fac = (2*fac)/sqrt(2*pi*exp(1))
 elif (distribution.lower() == 'exponential'):

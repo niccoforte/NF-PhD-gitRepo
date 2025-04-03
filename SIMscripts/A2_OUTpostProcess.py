@@ -92,7 +92,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         nnx = 10
     t = rDthickness(LAT, l, rD=rD)
     
-    if (LAT.lower() == 'fcc'):
+    if (LAT.lower() == 'fcc' or LAT.lower() == 'fcc2'):
         L = float(l * nnx)
         H0 = 0.96 * L
         Hs = [l*i for i in range(100)]
@@ -140,6 +140,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = (nnx + 1) * (nny + 1) + nnx * nny
+        deltaNM = 0.5 * sqrt(l*l + l*l)
         
     elif (LAT.lower() == 'tri'):
         if nnx % 2.0 == 1.0:
@@ -195,6 +196,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
+        deltaNM = l
 
     elif (LAT.lower() == 'kagome'):
         L = l*(2.0*nnx - 1)
@@ -247,6 +249,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = int((2*nnx*(nny+1)) + (nnx-1)*math.ceil(nny/2.0) + (nnx)*math.floor(nny/2))
+        deltaNM = l
         
     elif (LAT.lower() == 'hex'):
         L = (3.0**(0.5))*l*nnx
@@ -300,6 +303,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = ((2*nny) * (nnx+1)) + (((2*nny)+1) * nnx) + 50
+        deltaNM = l
     B = 0.5*W
 
     return H, L
