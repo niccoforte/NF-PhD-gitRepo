@@ -1117,7 +1117,7 @@ for idNum in range(initial,numOfJobs):
     elemType     = B21
     units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
     
-    nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, fac, distribution)
+    nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution)
 
 # ######################################################################################################
 # ######################################################################################################
