@@ -4,6 +4,7 @@ from odbAccess import *
 import numpy as np
 import sys
 import math
+import os
 
 mode = "any"
 unitCellSize = 10.0
@@ -70,6 +71,23 @@ if len(cmdIN) > 0:
       
 os.chdir(pDir)
 
+def rDthickness(LAT, l, t=None, rD=None):
+    if LAT.lower() == "fcc":
+        A = 2*(1+np.sqrt(2))
+    elif LAT.lower() == "tri":
+        A = 2*np.sqrt(3)
+    elif LAT.lower() == "kagome":
+        A = np.sqrt(3)
+    elif LAT.lower() == "hex":
+        A = 2/np.sqrt(3)
+        
+    if t:
+        rD = A*(t/l)
+        return rD
+    elif rD:
+        t = (l*rD)/A
+        return t
+
 def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
@@ -123,7 +141,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = (nnx + 1) * (nny + 1) + nnx * nny
-        deltaNM = 0.5 * sqrt(l*l + l*l)
+        deltaNM = 0.5 * np.sqrt(l*l + l*l)
         
     elif (LAT.lower() == 'tri'):
         if nnx % 2.0 == 1.0:

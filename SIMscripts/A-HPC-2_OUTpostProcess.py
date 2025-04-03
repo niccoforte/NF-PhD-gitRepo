@@ -3,7 +3,7 @@ from abaqusConstants import *
 from odbAccess import *
 import numpy as np
 import sys
-import math
+import os
 
 mode = "any"
 unitCellSize = 10.0
@@ -116,7 +116,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
             if stiffMatrix:
                 nnx, nny = 10, 10
                 totalNodes = (nnx + 1) * (nny + 1) + nnx * nny
-        deltaNM = 0.5 * sqrt(l*l + l*l)
+        deltaNM = 0.5 * np.sqrt(l*l + l*l)
         
     elif (LAT.lower() == 'tri'):
         if nnx % 2.0 == 1.0:
