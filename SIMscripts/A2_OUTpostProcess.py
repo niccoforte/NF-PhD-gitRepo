@@ -6,17 +6,19 @@ import sys
 import math
 import os
 
-mode = "any"
+mode = "any"                             # "ductile", "fracture", "both", "any"
 unitCellSize = 10.0
 
-LAT = "tri"
-DIS = "per"
-nnx = 30
+LAT = "hex"
+DIS = "disNodes"
+nnx = 20
 
-initial = 1
+initial = 2
 numOfJobs = 1
 
-pDir = r"C:\\Users\\exy053\\Documents\\ModelChanges"
+expected_steps = 201
+
+pDir = r"C:\\Users\\exy053\\Documents\\sApp"
 #pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
 #pDir = r"C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
 
@@ -310,7 +312,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
     return H, L
 
 
-def get_DuctData(Job, data, H, L):
+def get_DuctData(Job, H, L):
     odb = openOdb(path=Job) 
     step = "Step-1"
     variables = ["U2", "RF2"]
@@ -323,8 +325,16 @@ def get_DuctData(Job, data, H, L):
         if reg_load in reg:
             U2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[0]].data]
             RF2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[1]].data]
+            U2 = list(np.nan_to_num(U2))
+            RF2 = list(np.nan_to_num(RF2))
+            if len(U2) != expected_steps:
+                U2, RF2 = U2[:-1], RF2[:-1]
+                intrv = (U2[20] - U2[10])/10
+                U2 = U2 + [(i+1)*intrv for i in range(len(U2), expected_steps)]
+                RF2 = RF2 + list(np.zeros(expected_steps-len(RF2)))
             U2s.append(U2)
             RF2s.append(RF2)
+            
     
     U2s = np.transpose(U2s)
     RF2s = np.transpose(RF2s)
@@ -342,11 +352,12 @@ def get_DuctData(Job, data, H, L):
         s = RFsum/(L*1)
         strain.append(e)
         stress.append(s)
+
     STEPS_OUT = np.transpose([strain, stress])
     odb.close()
     return STEPS_OUT
 
-def get_FracData(Job, data):
+def get_FracData(Job):
     odb = openOdb(path=Job) 
     step = "Step-1"
     variables = ["U2", "RF2", "STATUS"]
@@ -356,11 +367,24 @@ def get_FracData(Job, data):
 
     U2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[0]].data]
     RF2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[1]].data]
-    
+    U2 = list(np.nan_to_num(U2))
+    RF2 = list(np.nan_to_num(RF2))
+
+    if len(U2) != expected_steps:
+        U2, RF2 = U2[:-1], RF2[:-1]
+        intrv = (U2[20] - U2[10])/10
+        U2 = U2 + [(i+1)*intrv for i in range(len(U2), expected_steps)]
+        RF2 = RF2 + list(np.zeros(expected_steps-len(RF2)))
+        
     ALL_STATUS = []
     for reg in odb.steps[step].historyRegions.keys():
         if reg_cracktip in reg:
             STATUS = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[2]].data]
+            STATUS = list(np.nan_to_num(STATUS))
+            if len(STATUS) != expected_steps:
+                STATUS = STATUS[:-1]
+                intrv = (U2[20] - U2[10])/10
+                STATUS = STATUS + list(np.zeros(expected_steps-len(STATUS)))
             ALL_STATUS.append(STATUS)
     
     ALL_STATUS = np.transpose(ALL_STATUS)
@@ -390,12 +414,12 @@ if mode.lower() == 'any':
             if 'Ductile' in odb:
                 Job = odbPath
                 data = curDirectory + "/transfer/OUT-" + odb.split('.')[0] + '.csv'
-                OUT = get_DuctData(Job, data, H, L)
+                OUT = get_DuctData(Job, H, L)
                 np.savetxt(data, OUT, delimiter=",")
             elif 'Fracture' in odb:
                 Job = odbPath
                 data = curDirectory + "/transfer/OUT-" + odb.split('.')[0] + '.csv'
-                OUT = get_FracData(Job, data)
+                OUT = get_FracData(Job)
                 np.savetxt(data, OUT, delimiter=",")
             
 
@@ -408,7 +432,7 @@ if (mode.lower() == 'ductile' or mode.lower() == 'both'):
     for kk in range(initial, initial+numOfJobs):
         Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
         data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
-        OUT = get_DuctData(Job, data, H, L)
+        OUT = get_DuctData(Job, H, L)
         np.savetxt(data, OUT, delimiter=",")
 
 
@@ -420,5 +444,5 @@ if (mode.lower() == 'fracture' or mode.lower() == 'both'):
     for kk in range(initial, initial+numOfJobs):
         Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
         data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
-        OUT = get_FracData(Job, data)
+        OUT = get_FracData(Job)
         np.savetxt(data, OUT, delimiter=",")
