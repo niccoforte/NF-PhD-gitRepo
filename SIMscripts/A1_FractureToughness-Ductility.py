@@ -1052,7 +1052,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
 
 def LHS_uniform(var, strats, lim, mean=0, plot=False):
     lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
-    upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/len(lower_limits))
+    upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/(len(lower_limits)-1))
     ticks = np.append(lower_limits, upper_limits)
     
     points = np.zeros((strats, var))
