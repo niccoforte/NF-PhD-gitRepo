@@ -8,8 +8,6 @@ def addPredix():
         if file.name.endswith('.txt') and 'IN-' not in file.name and 'OUT-' not in file.name:
             #print(path + file.name)
             os.rename(path+file.name, f'{path}OUT-{file.name}')
-        else:
-            pass
 
 def TXTtoCSV():
     ## Change .txt file to .csv file.
@@ -18,8 +16,6 @@ def TXTtoCSV():
         if file.name.endswith('.txt') and 'IN-' not in file.name and 'OUT-' not in file.name:
             #print(path + file.name)
             os.rename(path+file.name, f'{path}OUT-{file.name}')
-        else:
-            pass
 
 def renumber():
     ## Change simulation numbering
@@ -28,5 +24,3 @@ def renumber():
         if file.name.endswith('.csv') and 'IN-' not in file.name and 'OUT-' not in file.name:
             #print(path + file.name)
             os.rename(path+file.name, f'{path}OUT-{file.name}')
-        else:
-            passs
