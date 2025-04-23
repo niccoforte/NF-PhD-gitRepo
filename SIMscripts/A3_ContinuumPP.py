@@ -353,7 +353,7 @@ def connectivity(job, latticeType, unitCellSize, nodes):
     for ii in range(len(nodes)):
         if (latticeType.lower() == "fcc" and nodes[ii][1])%2 == 1.0 and (nodes[ii][2])%2 == 1.0:
             continue
-        distance = np.sqrt(array(nodes[ii, 1] - nodes[:, 1])**2 + array(nodes[ii, 2] - nodes[:, 2])**2)
+        distance = np.sqrt(np.array(nodes[ii, 1] - nodes[:, 1])**2 + np.array(nodes[ii, 2] - nodes[:, 2])**2)
         inside = np.argwhere(distance <= radius)
         nearNodes = np.setdiff1d(inside.astype(int), [ii])
         for jj in range(len(nearNodes)):

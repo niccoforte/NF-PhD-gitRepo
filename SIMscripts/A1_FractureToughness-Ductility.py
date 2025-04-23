@@ -1059,8 +1059,6 @@ def LHS_uniform(var, strats, lim, mean=0, plot=False):
     for i in range(var):
         points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
         np.random.shuffle(points[:, i])
-    if plot:
-        plot_LHS(points, lim, ticks)
     return points
     
 ############################################################################################
