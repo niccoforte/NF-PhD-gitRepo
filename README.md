@@ -14,7 +14,7 @@ ABAQUS scipts for local and HPC simulation execution are found in the `SIMscript
 
 Files beginning with "A" are the core python 3 scripts to run ABAQUS/Explicit jobs (A1/A-HPC-1) and their post processing (A2/A-HPC-2). A3 is an alternative post processing targeting the output sctructure required for the developmenent of continuum plots.  
 Files beginning with "B" are the main BASH (`.sh`) files used to submit jobs to HPC, transfer files between local and/or remote directories, and generally handle simulations files after completion. Custom scripts are present of a variety of different useful tasks.  
-HPC job scripts are exact copies of local job scripts adapted for HPC runs.The main differences include  of path specification and some variable definitions being provided from the job's BASH file. 
+HPC job scripts are exact copies of local job scripts adapted for HPC runs.The main differences include the removal of path specification within the python scripts and adjustment of the `sys.argv` variable inputs provided from the job's BASH file, allowing to modily all necessary parameters from the BASH file.
 
 ## Data Processing
 Jupyter notebooks (`.ipynb`) used for data processing and visualizing results are stored in the `code` directory. Within this directory, the `resources` directory stores PYTHON (`.py`) scripts with general, versatile functions that are imported into a variety of notebooks.
