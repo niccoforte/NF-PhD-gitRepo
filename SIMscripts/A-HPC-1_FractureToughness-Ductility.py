@@ -2207,5 +2207,5 @@ for idNum in range(initial,numOfJobs):
         
         if (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
-            mdb.jobs[Job].submit(consistencyChecking=OFF)
-            mdb.jobs[Job].waitForCompletion()
+            # mdb.jobs[Job].submit(consistencyChecking=OFF)
+            # mdb.jobs[Job].waitForCompletion()
