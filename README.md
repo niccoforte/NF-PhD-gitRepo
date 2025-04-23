@@ -1,11 +1,20 @@
-# Niccolo Forte
+# Niccolo Forte's PhD Repository
+
+#### Optional but recommended:
+Please run the following terminal commands to ensure use of a Vitrual Environment (venv) and local installation of all required packages in the `requirements.txt` scripts upon download of this repo:
+
+Access repo directory: `cd path\to\repo\p1git-Lattices`  
+Initiate venv: `pytjon -m venv venv`
+Activate venv: `venv\Scripts\activate`
+Install required packages: `pip install -r requirements.txt`
+
 
 ## ABAQUS Simulation Files
-ABAQUS and HPC simulation files are found in the `SIMscripts` directory.
+ABAQUS scipts for local and HPC simulation execution are found in the `SIMscripts` directory.
 
-Files beginning with "A" are the core python scripts to run ABAQUS/Explicit jobs (A1) and their post processing (A2). 
-Files beginning with "B" are the main BASH (`.sh`) files used to submit jobs to HPC.
-Scripts used to submit HPC jobs are identical to those used to submit local jobs, with the exception of path specification and some variable definitions being provided from the job's BASH file. 
+Files beginning with "A" are the core python 3 scripts to run ABAQUS/Explicit jobs (A1/A-HPC-1) and their post processing (A2/A-HPC-2). A3 is an alternative post processing targeting the output sctructure required for the developmenent of continuum plots.  
+Files beginning with "B" are the main BASH (`.sh`) files used to submit jobs to HPC, transfer files between local and/or remote directories, and generally handle simulations files after completion. Custom scripts are present of a variety of different useful tasks.  
+HPC job scripts are exact copies of local job scripts adapted for HPC runs.The main differences include  of path specification and some variable definitions being provided from the job's BASH file. 
 
 ## Data Processing
 Jupyter notebooks (`.ipynb`) used for data processing and visualizing results are stored in the `code` directory. Within this directory, the `resources` directory stores PYTHON (`.py`) scripts with general, versatile functions that are imported into a variety of notebooks.
