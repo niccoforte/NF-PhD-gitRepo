@@ -4,10 +4,10 @@
 Please run the following terminal commands to ensure use of a Vitrual Environment (venv) and local installation of all required packages in the `requirements.txt` scripts upon download of this repo:
 
 Access repo directory: `cd path\to\repo\p1git-Lattices`  
-Initiate venv: `pytjon -m venv venv`
-Activate venv: `venv\Scripts\activate`
-Install required packages: `pip install -r requirements.txt`
-Deactivate venv: `deactivate`
+Initiate venv: `pytjon -m venv venv`  
+Activate venv: `venv\Scripts\activate`  
+Install required packages: `pip install -r requirements.txt`  
+Deactivate venv: `deactivate`  
 
 Your Virtual Environment will now store all required packages for this repo wihtout damaging or altering existing package versions in your base python interpreter. These will remain stored also once the Virtual Environment is deactivated.  
 
