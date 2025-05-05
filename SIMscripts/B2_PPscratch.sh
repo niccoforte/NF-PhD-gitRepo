@@ -14,20 +14,21 @@
 set -e
 
 # ^^^ RENAME ^^^
-LAT=LAT
-DIS=per
-nnx=10
+LAT=kagome
+DIS=disNodes
+fac=0.2
+nnx=20
 unitCellSize=10
 rD=0.2
-initial=1
-nJobs=1
+initial=101
+nJobs=200
 CPUs=$NSLOTS
 
 zip=false
 delete_scratch=true
 
-ppJOB=5296707
-ppJOBparent=/data/home/exy053/p1-LatticeFractureToughness/Ti/10dN/tri-new
+ppJOB=5774827
+ppJOBparent=/data/home/exy053/p1-LatticeFractureToughness/Ti/$dis/$fac/$LAT
 
 
 # Load required modules
@@ -40,38 +41,36 @@ module load intel
 /bin/echo Working in directory: `pwd`.
 
 # Replace the following line with abaqus command
-#abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
-
-abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
-abaqus python A-HPC-2_INpostProcess.py -- $LAT $DIS $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $DIS $fac $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus python A-HPC-2_INpostProcess.py -- $LAT $DIS $fac $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 /bin/echo Inputs and outputs collected.
 
 
 # file transfer
-rsync -av /data/scratch/exy053/$ppJOB/A* /data/scratch/exy053/$ppJOB/zip/
-rsync -av /data/scratch/exy053/$ppJOB/B* /data/scratch/exy053/$ppJOB/zip/
-rsync -av /data/scratch/exy053/$ppJOB/abaqus* /data/scratch/exy053/$ppJOB/zip/
-rsync -av /data/scratch/exy053/$ppJOB/*.odb /data/scratch/exy053/$ppJOB/zip/
-rsync -av /data/scratch/exy053/$ppJOB/*.inp /data/scratch/exy053/$ppJOB/zip/
-rsync -av /data/scratch/exy053/$ppJOB/transfer/* /data/scratch/exy053/$ppJOB/zip/transfer/
+rsync -av /data/scratch/exy053/$JOB_ID/A* /data/scratch/exy053/$JOB_ID/zip/
+rsync -av /data/scratch/exy053/$JOB_ID/B* /data/scratch/exy053/$JOB_ID/zip/
+rsync -av /data/scratch/exy053/$JOB_ID/abaqus* /data/scratch/exy053/$JOB_ID/zip/
+rsync -av /data/scratch/exy053/$JOB_ID/*.odb /data/scratch/exy053/$JOB_ID/zip/
+rsync -av /data/scratch/exy053/$JOB_ID/*.inp /data/scratch/exy053/$JOB_ID/zip/
+rsync -av /data/scratch/exy053/$JOB_ID/transfer/* /data/scratch/exy053/$JOB_ID/zip/transfer/
 
-/bin/echo Simulation files in /data/scratch/exy053/$ppJOB/zip.
+/bin/echo Simulation files in /data/scratch/exy053/$JOB_ID/zip.
 
 
 # clean up and compression
+rsync -av $ppJOBparent/*.o$ppJOB /data/scratch/exy053/$ppJOB/zip
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$ppJOB/zip/
-rsync -av $ppJOBparent/*$ppJOB /data/scratch/exy053/$ppJOB/zip/
 
-mkdir $ppJOBparent/$ppJOB/
-mkdir $ppJOBparent/$ppJOB/zip/
-rsync -av /data/scratch/exy053/$ppJOB/zip/* $ppJOBparent/$ppJOB/zip/
+mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$ppJOB/
+mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$ppJOB/zip/
+rsync -av /data/scratch/exy053/$ppJOB/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$ppJOB/zip/
 
 if [ "$zip" = true ] ; then
     tar -czf C1_transfer-$LAT-$DIS-$ppJOB.tgz /data/scratch/exy053/$ppJOB/transfer/
     tar -czf C2_zip-$LAT-$DIS-$ppJOB.tgz /data/scratch/exy053/$ppJOB/zip/
-    rsync -av /data/scratch/exy053/$ppJOB/C1_transfer-$LAT-$DIS-$ppJOB.tgz $ppJOBparent
-    rsync -av /data/scratch/exy053/$ppJOB/C2_zip-$LAT-$DIS-$ppJOB.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/
+    rsync -av /data/scratch/exy053/$ppJOB/C1_transfer-$LAT-$DIS-$ppJOB.tgz $SGE_O_WORKDIR
+    rsync -av /data/scratch/exy053/$ppJOB/C2_zip-$LAT-$DIS-$ppJOB.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/
 fi
 
 if [ "$delete_scratch" = true ] ; then
@@ -79,4 +78,4 @@ if [ "$delete_scratch" = true ] ; then
 fi
 
 /bin/echo Job completed at: `date`.
-/bin/echo Final and compressed data saved in $SGE_O_WORKDIR and /data/SEMS-TaoLab/Niccolo-Forte/
+/bin/echo Finished. Data saved in $SGE_O_WORKDIR and /data/SEMS-TaoLab/Niccolo-Forte/
