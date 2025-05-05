@@ -323,10 +323,14 @@ def get_DuctData(Job, H, L):
     RF2s = []
     for reg in odb.steps[step].historyRegions.keys():
         if reg_load in reg:
-            U2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[0]].data]
-            RF2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[1]].data]
-            U2 = list(np.nan_to_num(U2))
-            RF2 = list(np.nan_to_num(RF2))
+            try:
+                U2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[0]].data]
+                RF2 = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[1]].data]
+                U2 = list(np.nan_to_num(U2))
+                RF2 = list(np.nan_to_num(RF2))
+            except:
+                U2 = list(np.zeros(expected_steps))
+                RF2 = list(np.zeros(expected_steps))
             if len(U2) != expected_steps:
                 U2, RF2 = U2[:-1], RF2[:-1]
                 intrv = (U2[20] - U2[10])/10
@@ -364,12 +368,15 @@ def get_FracData(Job):
 
     reg_load = 'Node ASSEMBLY.1'
     reg_cracktip = 'Element '
-
-    U2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[0]].data]
-    RF2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[1]].data]
-    U2 = list(np.nan_to_num(U2))
-    RF2 = list(np.nan_to_num(RF2))
-
+    
+    try:
+        U2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[0]].data]
+        RF2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[1]].data]
+        U2 = list(np.nan_to_num(U2))
+        RF2 = list(np.nan_to_num(RF2))
+    except:
+        U2 = list(np.zeros(expected_steps))
+        RF2 = list(np.zeros(expected_steps))
     if len(U2) != expected_steps:
         U2, RF2 = U2[:-1], RF2[:-1]
         intrv = (U2[20] - U2[10])/10
@@ -379,11 +386,13 @@ def get_FracData(Job):
     ALL_STATUS = []
     for reg in odb.steps[step].historyRegions.keys():
         if reg_cracktip in reg:
-            STATUS = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[2]].data]
-            STATUS = list(np.nan_to_num(STATUS))
+            try:
+                STATUS = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[2]].data]
+                STATUS = list(np.nan_to_num(STATUS))
+            except:
+                STATUS = list(np.zeros(expected_steps))
             if len(STATUS) != expected_steps:
                 STATUS = STATUS[:-1]
-                intrv = (U2[20] - U2[10])/10
                 STATUS = STATUS + list(np.zeros(expected_steps-len(STATUS)))
             ALL_STATUS.append(STATUS)
     
