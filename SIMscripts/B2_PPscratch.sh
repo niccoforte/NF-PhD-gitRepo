@@ -28,7 +28,7 @@ zip=false
 delete_scratch=true
 
 ppJOB=5774827
-ppJOBparent=/data/home/exy053/p1-LatticeFractureToughness/Ti/$dis/$fac/$LAT
+ppJOBparent=/data/home/exy053/p1/Ti/$DIS/$fac/$LAT
 
 
 # Load required modules
@@ -48,14 +48,14 @@ abaqus python A-HPC-2_INpostProcess.py -- $LAT $DIS $fac $nnx $unitCellSize $rD 
 
 
 # file transfer
-rsync -av /data/scratch/exy053/$JOB_ID/A* /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/B* /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/abaqus* /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/*.odb /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/*.inp /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/transfer/* /data/scratch/exy053/$JOB_ID/zip/transfer/
+rsync -av /data/scratch/exy053/$ppJOB/A* /data/scratch/exy053/$ppJOB/zip/
+rsync -av /data/scratch/exy053/$ppJOB/B* /data/scratch/exy053/$ppJOB/zip/
+rsync -av /data/scratch/exy053/$ppJOB/abaqus* /data/scratch/exy053/$ppJOB/zip/
+rsync -av /data/scratch/exy053/$ppJOB/*.odb /data/scratch/exy053/$ppJOB/zip/
+rsync -av /data/scratch/exy053/$ppJOB/*.inp /data/scratch/exy053/$ppJOB/zip/
+rsync -av /data/scratch/exy053/$ppJOB/transfer/* /data/scratch/exy053/$ppJOB/zip/transfer/
 
-/bin/echo Simulation files in /data/scratch/exy053/$JOB_ID/zip.
+/bin/echo Simulation files in /data/scratch/exy053/$ppJOB/zip.
 
 
 # clean up and compression
