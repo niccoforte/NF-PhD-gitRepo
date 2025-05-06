@@ -50,7 +50,7 @@ class Dataset_(Dataset):
     
 
 class DATA:
-    def __init__(self, path=0, load=False, LAT="FCC", dis="dN", dN=20, model="MLP", format=0):
+    def __init__(self, path=0, load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", format=0):
         self.path = path
         self.LAT = LAT
         self.dis = dis
