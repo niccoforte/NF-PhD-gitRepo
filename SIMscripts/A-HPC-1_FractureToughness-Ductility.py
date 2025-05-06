@@ -19,7 +19,7 @@ MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 nnx = 10                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
-distribution = 'uniform'                    # 'uniform', 'normal', 'exponential'
+distribution = 'lhs_uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
 
 finalRun = 'yes'
