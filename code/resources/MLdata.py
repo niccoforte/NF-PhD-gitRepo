@@ -80,7 +80,7 @@ class DATA:
         pFTdisNodes  = pAK + 'Fracture-disNodes/'
 
         pTi    = pData + 'Ti/'
-        pTiLAT = pTi + f'{self.dN}dN/{self.LAT}/'
+        pTiLAT = pTi + f'{self.dN}{self.dis}/{self.LAT}/'
 
         if self.path == 0:
             self.PATH  = pUTdisNodes2
