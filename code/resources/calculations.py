@@ -39,8 +39,12 @@ def get_struts(thicksCSV):
     return thicks
 
 
-def get_ductileData(CSVout, crit=0.25, delimiter=','):
-    output_df = pd.read_csv(CSVout, names=['x', 'y'], usecols=['x', 'y'], delimiter=delimiter)
+def get_ductileData(CSVout, crit=0.25, delimiter=',', typ='n'):
+    if typ == 'n':
+        output_df = pd.read_csv(CSVout, names=['x', 'y'], usecols=['x', 'y'], delimiter=delimiter)
+    elif typ == 'a':
+        output_df = pd.read_csv(CSVout, names=['i', 'x', 'y'], usecols=['i', 'x', 'y'], delimiter=delimiter)
+        output_df = output_df.drop(columns=['i'])
     e = [0] + output_df.x.tolist()[1:]
     s = [0] + output_df.y.tolist()[1:]
     s_sm = smooth(smooth(s))
