@@ -1,26 +1,20 @@
 import os
 
 
-def addPredix():
-    ## Add IN- / OUT- prefix to .txt file.
-    path = 'FCC-21X21/disNodes2/'
-    for file in os.scandir(path):
-        if file.name.endswith('.txt') and 'IN-' not in file.name and 'OUT-' not in file.name:
-            #print(path + file.name)
-            os.rename(path+file.name, f'{path}OUT-{file.name}')
-
-def TXTtoCSV():
-    ## Change .txt file to .csv file.
-    path = 'FCC-21X21/disNodes2/'
-    for file in os.scandir(path):
-        if file.name.endswith('.txt') and 'IN-' not in file.name and 'OUT-' not in file.name:
-            #print(path + file.name)
-            os.rename(path+file.name, f'{path}OUT-{file.name}')
-
-def renumber():
-    ## Change simulation numbering
-    path = 'Ti/tri-old/'
-    for file in os.scandir(path):
-        if file.name.endswith('.csv') and 'IN-' not in file.name and 'OUT-' not in file.name:
-            #print(path + file.name)
-            os.rename(path+file.name, f'{path}OUT-{file.name}')
+def rename(path, filetype, prefix=None, suffix=None, renumber=None):
+    if prefix:
+        for file in os.scandir(path):
+            if file.name.endswith(filetype) and prefix not in file.name:
+                os.rename(path+file.name, f'{path}{prefix}-{file.name}')
+    if suffix:
+        for file in os.scandir(path):
+            if file.name.endswith(filetype):
+                os.rename(path+file.name, f'{path}{file.name.split(".")[0]}.{suffix}')
+    if renumber:
+        for file in os.scandir(path):
+            if file.name.endswith(filetype):
+                rest, suf = file.name.split(".")[0], file.name.split(".")[-1]
+                rest, num = rest.split("-")[:-1], int(rest.split("-")[-1])
+                num = num + renumber
+                name = "-".join(rest + num)
+                os.rename(path+file.name, f'{path}{name}.{suf}')
