@@ -1,9 +1,251 @@
 import numpy as np
 import pandas as pd
 from torch.utils.data.dataset import Dataset
-import sklearn
+import random
+import matplotlib.pyplot as plt
+
+from resources.calculations import calcUT, calcFT
 
 ### General Data Initialization
+def load_data(inputs, outputs):
+    IN_df = pd.read_csv(inputs, index_col=0).sort_index()
+    OUT_df = pd.read_csv(outputs, index_col=0).sort_index()
+
+    perIN_df = IN_df.loc[:0].T
+    perIN_df = perIN_df.rename(columns={0: "in"})
+    perOUT_df = OUT_df.iloc[:2].T.iloc[1:]
+    perOUT_df.columns = ["x", "y"]
+
+    dIN_df = IN_df - IN_df.iloc[0].values
+    dIN_df = dIN_df.loc[:, ~(dIN_df == 0.0).all()].sort_index()
+    dOUT_df = OUT_df - OUT_df.iloc[1].values
+    dOUT_df = dOUT_df.drop(columns='0')  # dOUT_df['0'] = OUT_df['0']
+    dOUT_df = dOUT_df.iloc[1:].sort_index()
+    OUT_df = OUT_df.iloc[1:].sort_index()
+    
+    return IN_df, OUT_df, perIN_df, perOUT_df, dIN_df, dOUT_df
+
+def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df):
+    dIN = dIN_df.to_numpy()
+    dOUT = dOUT_df.to_numpy()
+    xOUT = np.linspace(0, max(perOUT_df.x.tolist()), len(dOUT[0]))
+    
+    ducts, strens, stiffs = [], [], []
+    for _, row in OUT_df.iterrows():
+        UT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
+        ductility, strength, stiffness = calcUT(UT_df)
+        
+        ducts.append(ductility)
+        strens.append(strength)
+        stiffs.append(stiffness)
+        
+    props = [ducts, strens, stiffs]
+    return dIN, dOUT, xOUT, props
+
+def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff):
+    dIN = dIN_df.to_numpy()
+    dOUT = dOUT_df.to_numpy()
+    xOUT = np.linspace(0, max(perOUT_df.x.tolist()), len(dOUT[0]))
+    
+    Kjs, Ks, Ps, ds = [], [], [], []
+    for indx, row in OUT_df.iterrows():
+        FT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
+        P, dd, K, Kj = calcFT(FT_df, geom, E_eff, n_Ks=1)
+        
+        Kjs.append(Kj[0])
+        Ks.append(K[0])
+        Ps.append(P)
+        ds.append(dd)
+    
+    props = [Kjs, Ks, Ps, ds]
+    return dIN, dOUT, xOUT, props
+
+def find_outliers(data):
+    mean = np.mean(data)
+    stdev = np.std(data)
+    
+    outlier_idxs = [data.index(x) for x in data if (x < mean - 3*stdev) or (x > mean + 3*stdev) if data.index(x) != 0]
+    return np.array(outlier_idxs, dtype="int")
+
+def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df):
+    all_outlier_idxs = []
+    for prop_r in props_r:
+        idxs = find_outliers(data=prop_r)
+        if len(idxs) == 0:
+            continue
+        for idx in idxs:
+            all_outlier_idxs.append(idx)
+    outlier_idxs = np.array(list(set(all_outlier_idxs)))
+    
+    if len(outlier_idxs) > 0:
+        dIN = np.delete(dIN_r, outlier_idxs, axis=0)
+        dOUT = np.delete(dOUT_r, outlier_idxs, axis=0)
+        IN_df = IN_df.drop(IN_df.iloc[outlier_idxs].index)
+        OUT_df = OUT_df.drop(OUT_df.iloc[outlier_idxs].index)
+        dIN_df = dIN_df.drop(dIN_df.iloc[outlier_idxs].index)
+        dOUT_df = dOUT_df.drop(dOUT_df.iloc[outlier_idxs].index)
+        props = []
+        for prop_r in props_r:
+            prop = np.delete(prop_r, outlier_idxs, axis=0)
+            props.append(prop)
+        props = np.array(props).tolist()
+    else:
+        dIN, dOUT, props = dIN_r, dOUT_r, props_r
+    
+    return dIN, dOUT, props, IN_df, OUT_df, dIN_df, dOUT_df
+
+def split_data(dIN, dOUT, PATH, mode, split=0.85):
+    idxs = list(range(len(dOUT)))
+    random.shuffle(idxs)
+    train_idxs = idxs[:int(split*len(dOUT))]
+    train_idxs, val_idxs = train_idxs[:int(split*len(train_idxs))], train_idxs[int(split*len(train_idxs)):]
+    test_idxs = [i for i in idxs if i not in train_idxs]
+    
+    train_in = dIN[train_idxs]
+    val_in = dIN[val_idxs]
+    test_in = dIN[test_idxs]
+    train_out = dOUT[train_idxs]
+    val_out = dOUT[val_idxs]
+    test_out = dOUT[test_idxs]
+    
+    pd.DataFrame(train_in).to_csv(PATH + f"NN-{mode}-dN-trainIN.csv")
+    pd.DataFrame(val_in).to_csv(PATH + f"NN-{mode}-dN-valIN.csv")
+    pd.DataFrame(test_in).to_csv(PATH + f"NN-{mode}-dN-testIN.csv")
+    pd.DataFrame(train_out).to_csv(PATH + f"NN-{mode}-dN-trainOUT.csv")
+    pd.DataFrame(val_out).to_csv(PATH + f"NN-{mode}-dN-valOUT.csv")
+    pd.DataFrame(test_out).to_csv(PATH + f"NN-{mode}-dN-testOUT.csv")
+    
+    return train_in, train_out, val_in, val_out, test_in, test_out
+
+def plot_distribution(df, LAT, l, indx=None, num=5, by="lattice"):
+    if by.lower() == "node":
+        df = df.T
+    if indx is None:
+        indx = random.sample(df.index.tolist(), num)
+    elif type(indx) is int:
+        indx = [indx]
+    for i in indx:
+        plt.figure(figsize=(10, 6))
+        plt.hist(df.loc[i].to_numpy()/(np.sqrt(2*l**2)*1000), bins=50, alpha=0.7, color='blue')
+        plt.title(f'Distribution of Disorder for {LAT.capitalize()} {by.capitalize()} {i}')
+        plt.xlabel('normalized disorder')
+        plt.ylabel('Frequency')
+        plt.grid(True)
+        plt.show()
+
+def locSims(prop, OUT_df):
+    max_idx, min_idx = prop.index(max(prop[1:])), prop.index(min(prop[1:]))
+    nSim_max, nSim_min = OUT_df.iloc[max_idx].name, OUT_df.iloc[min_idx].name
+    return nSim_max, nSim_min
+
+def get_stats(props):
+    stats = []
+    for prop in props:
+        mean = np.mean(prop[1:])
+        st_dev = np.std(prop[1:])
+        stats.append([mean, st_dev])
+    return stats
+
+def plot_frequency(raw_data, data, test, bins=50):
+    raw_data = np.array(data)
+    data = np.array(data)
+    
+    if test == "UT":
+        x_label = 'Normalized Ductility'
+    elif test == "FT":
+        x_label = 'Normalized Fracture Toughness ($K_{IC}$)'
+    
+    fig1, (ax1, ax2) = plt.subplots(1, 2)
+    fig1.set_figheight(5)
+    fig1.set_figwidth(15)
+    
+    ax1.set_title('Raw Data')
+    ax1.axvline(x=raw_data[0]/raw_data[0], color='orangered', label="Perfect")
+    ax1.hist(raw_data[1:]/raw_data[0], bins=bins, label='Disordered')
+    ax1.set_ylabel('Frequency')
+    ax1.set_xlabel(x_label)
+    ax1.legend()
+    
+    ax2.set_title('Without Outliers')
+    ax2.axvline(x=data[0]/data[0], color='orangered', label="Perfect")
+    ax2.hist(data[1:]/data[0], bins=bins, label='Disordered')
+    ax2.set_ylabel('Frequency')
+    ax2.set_xlabel(x_label)
+    ax2.legend()
+    
+    plt.show()
+
+def plot_properties(x_data, y_data, test):
+    x_data = np.array(x_data)
+    y_data = np.array(y_data)
+    
+    if test == "UT":
+        title = "Uniaxial Tension"
+        x_label = 'Normalized Ductility'
+        y_label = 'Normalized Strength'
+    elif test == "FT":
+        title = "Compact Tension"
+        x_label = 'Normalized Fracture Toughness ($K_{IC}$)'
+        y_label = 'Normalized Displacement'
+    
+    fig1, ax1 = plt.subplots(1, 1)
+    fig1.set_figheight(5)
+    fig1.set_figwidth(10)
+    
+    ax1.set_title(title)
+    ax1.scatter(x_data[0]/x_data[0], y_data[0]/y_data[0], label='Perfect')
+    ax1.scatter(x_data[1:]/x_data[0], y_data[1:]/y_data[0], label='Disordered')
+    ax1.axvline(x=1, linestyle='--')
+    ax1.axhline(y=1, linestyle='--')
+    ax1.set_ylabel(y_label)
+    ax1.set_xlabel(x_label)
+    ax1.legend()
+    
+    plt.show()
+
+def plot_curve(OUT_df, xOUT, mode, idx=None, q=15):
+    fig2, (ax1) = plt.subplots(1, 1)
+    fig2.set_figheight(5)
+    fig2.set_figwidth(9)
+    
+    p = OUT_df.loc[0].tolist()[1:]
+    indx = int(OUT_df.loc[0].tolist()[0])
+    
+    if idx:
+        d = OUT_df.loc[idx].tolist()[1:]
+        indx2 = int(OUT_df.loc[idx].tolist()[0])
+        ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in d], label=f'Disordered{idx}')
+        ax1.axvline(x=xOUT[indx2]/xOUT[indx], ymax=0.2, c='g', linestyle='--')
+        ax1.axhline(y=max(d)/max(p), xmax=0.2, c='g', linestyle='--')
+        
+    else:
+        idxs = OUT_df.index.tolist()[1:]
+        if q == 'all':
+            idxs = idxs
+        else:
+            idxs = random.sample(idxs, q)
+            print(idxs)
+        
+        for idxx in idxs:
+            d = OUT_df.loc[idxx].tolist()[1:]
+            ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in d], label=f'Disordered{idxx}')
+    
+    if mode.lower() == "ut":
+        ax1.set_ylabel('Normalized Stress', fontsize=14, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Strain', fontsize=14, fontname="Times New Roman")
+    if mode.lower() == "ft":
+        ax1.set_ylabel('Normalized Force', fontsize=14, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Displacement', fontsize=14, fontname="Times New Roman")
+    
+    ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Perfect", c='k')
+    ax1.axvline(x=1, ymax=0.2, c='r', linestyle='--')
+    ax1.axhline(y=1, xmax=0.2, c='r', linestyle='--')
+    
+    if idx or q != 'all' and q <= 10:
+        ax1.legend()
+    ax1.grid()
+
+    plt.show()
 
 
 def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV_test_in, CSV_test_out):
