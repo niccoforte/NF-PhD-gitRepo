@@ -5,7 +5,7 @@ from caeModules import *
 import os
 from os.path import join, getsize
 
-parentDirectory = r'C:\\Users\\exy053\\Documents\\al'
+parentDirectory = r'C:\\Users\\exy053\\Documents'
 
 testMode = False
 deleteOldOdbs = True
