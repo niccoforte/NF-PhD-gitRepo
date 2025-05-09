@@ -351,7 +351,7 @@ def connectivity(job, LAT, nodes, geom, stiff=False, mode=None):
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (LAT.lower() == "fcc" and nodes[ii][0]*1000)%2 == 1.0 and (nodes[ii][1]*1000)%2 == 1.0:
+        if (LAT.lower() == "fcc" and nodes[ii][1])%2 == 1.0 and (nodes[ii][2])%2 == 1.0:
             continue
         distance = np.sqrt(np.array(nodes[ii, 1] - nodes[:, 1])**2 + np.array(nodes[ii, 2] - nodes[:, 2])**2)
         inside = np.argwhere(distance <= radius)
