@@ -94,7 +94,7 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df):
     
     return dIN, dOUT, props, IN_df, OUT_df, dIN_df, dOUT_df
 
-def split_data(dIN, dOUT, PATH, mode, split=0.85):
+def split_data(dIN, dOUT, PATH, mode, dis, split=0.85):
     idxs = list(range(len(dOUT)))
     random.shuffle(idxs)
     train_idxs = idxs[:int(split*len(dOUT))]
@@ -108,12 +108,12 @@ def split_data(dIN, dOUT, PATH, mode, split=0.85):
     val_out = dOUT[val_idxs]
     test_out = dOUT[test_idxs]
     
-    pd.DataFrame(train_in).to_csv(PATH + f"NN-{mode}-dN-trainIN.csv")
-    pd.DataFrame(val_in).to_csv(PATH + f"NN-{mode}-dN-valIN.csv")
-    pd.DataFrame(test_in).to_csv(PATH + f"NN-{mode}-dN-testIN.csv")
+    pd.DataFrame(train_in).to_csv(PATH + f"NN-{mode}-{dis}-trainIN.csv")
+    pd.DataFrame(val_in).to_csv(PATH + f"NN-{mode}-{dis}-valIN.csv")
+    pd.DataFrame(test_in).to_csv(PATH + f"NN-{mode}-{dis}-testIN.csv")
     pd.DataFrame(train_out).to_csv(PATH + f"NN-{mode}-dN-trainOUT.csv")
-    pd.DataFrame(val_out).to_csv(PATH + f"NN-{mode}-dN-valOUT.csv")
-    pd.DataFrame(test_out).to_csv(PATH + f"NN-{mode}-dN-testOUT.csv")
+    pd.DataFrame(val_out).to_csv(PATH + f"NN-{mode}-{dis}-valOUT.csv")
+    pd.DataFrame(test_out).to_csv(PATH + f"NN-{mode}-{dis}-testOUT.csv")
     
     return train_in, train_out, val_in, val_out, test_in, test_out
 
