@@ -16,7 +16,7 @@ nnx = 30
 initial = 1
 numOfJobs = 1
 
-pDir = r"C:\\Users\\exy053\\Documents\\ModelChanges"
+pDir = r"C:\\Users\\exy053\\Documents\\continuum"
 #pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
 #pDir = r"C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
 
@@ -307,7 +307,7 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = l
     B = 0.5*W
 
-    return totalNodes
+    return [nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM, vol, l, t, LAT]  # len=14
 
 
 def export_Udata(job, totalNodes):
@@ -346,12 +346,12 @@ def export_nodes(job, totalNodes):
             f.write("{}, {}, {}\n".format(int(node[0]), node[1], node[2]))
     return np.array(nodes)
 
-def connectivity(job, latticeType, unitCellSize, nodes):
-    radius = unitCellSize + unitCellSize*1e-3
+def connectivity(job, LAT, nodes, geom, stiff=False, mode=None):
+    radius = geom[12] + geom[12]*1e-3
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (latticeType.lower() == "fcc" and nodes[ii][1])%2 == 1.0 and (nodes[ii][2])%2 == 1.0:
+        if (LAT.lower() == "fcc" and nodes[ii][0]*1000)%2 == 1.0 and (nodes[ii][1]*1000)%2 == 1.0:
             continue
         distance = np.sqrt(np.array(nodes[ii, 1] - nodes[:, 1])**2 + np.array(nodes[ii, 2] - nodes[:, 2])**2)
         inside = np.argwhere(distance <= radius)
@@ -369,8 +369,27 @@ def connectivity(job, latticeType, unitCellSize, nodes):
     for i in range(0,len(dummyElem)):
         if (dummyElem[i][0] == 0 and dummyElem[i][1] == 0 and dummyElem[i][2] == 0):
             indexRemove.append(i)
+        if stiff:
+            if LAT.lower() == "tri" and mode.lower() == "unit":
+                if (dummyElem[i][1] == 3 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 3):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 0 and dummyElem[i][2] == 3) or (dummyElem[i][1] == 3 and dummyElem[i][2] == 0):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 3 and dummyElem[i][2] == 5) or (dummyElem[i][1] == 5 and dummyElem[i][2] == 3):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 1 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 1):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 4 and dummyElem[i][2] == 6) or (dummyElem[i][1] == 6 and dummyElem[i][2] == 4):
+                    indexRemove.append(i)
+            elif LAT.lower() == "tri" and mode.lower() == "lattice":
+                if ((nodes[dummyElem[i][1]][1] == 0 and nodes[dummyElem[i][2]][1] == 0) or 
+                    (nodes[dummyElem[i][1]][1] == geom[3] and nodes[dummyElem[i][2]][1] == geom[3])):
+                    indexRemove.append(i)
     realElem = np.delete(dummyElem, [indexRemove], axis=0)
-    realElem = realElem + 1
+    if stiff:
+        realElem = realElem
+    else:
+        realElem = realElem + 1
     for i in range(len(realElem)):
         realElem[i][0] = i+1
     
@@ -394,9 +413,9 @@ if mode.lower() == 'any':
             MechMode = sim.split('-')[0]
             LAT = sim.split('-')[1]
             nnx = int(sim.split('-')[2])
-            totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+            geom = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
             
-            export_Udata(odbPath, totalNodes)
+            export_Udata(odbPath, geom[8])
             
         for inp in inps:
             inpPath = os.path.join(curDirectory, inp)
@@ -407,10 +426,10 @@ if mode.lower() == 'any':
             MechMode = sim.split('-')[0]
             LAT = sim.split('-')[1]
             nnx = int(sim.split('-')[2])
-            totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+            geom = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
             
-            nodes = export_nodes(inpPath, totalNodes)
-            elems = connectivity(inpPath, LAT, unitCellSize, nodes)
+            nodes = export_nodes(inpPath, geom[8])
+            elems = connectivity(inpPath, LAT, nodes, geom)
 
 if (mode.lower() == 'ductile' or mode.lower() == 'both'):
     MechMode = 'Ductile'
@@ -421,11 +440,11 @@ if (mode.lower() == 'ductile' or mode.lower() == 'both'):
         
         odbPath = sim + ".odb"
         inpPath = sim + ".inp"
-        totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+        geom = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
         
-        export_Udata(odbPath, totalNodes)
-        nodes = export_nodes(inpPath, totalNodes)
-        elems = connectivity(inpPath, LAT, unitCellSize, nodes)
+        export_Udata(odbPath, geom[8])
+        nodes = export_nodes(inpPath, geom[8])
+        elems = connectivity(inpPath, LAT, nodes, geom)
         
 if (mode.lower() == 'fracture' or mode.lower() == 'both'):
     MechMode = 'Fracture'
@@ -436,8 +455,8 @@ if (mode.lower() == 'fracture' or mode.lower() == 'both'):
         
         odbPath = sim + ".odb"
         inpPath = sim + ".inp"
-        totalNodes = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
+        geom = geometry(LAT, unitCellSize, nnx, nodeCount=True, mode=MechMode)
         
-        export_Udata(odbPath, totalNodes)
-        nodes = export_nodes(inpPath, totalNodes)
-        elems = connectivity(inpPath, LAT, unitCellSize, nodes)
+        export_Udata(odbPath, geom[8])
+        nodes = export_nodes(inpPath, geom[8])
+        elems = connectivity(inpPath, LAT, nodes, geom)
