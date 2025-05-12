@@ -346,7 +346,7 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy05
     return nodes, Dnodes
 
 def connectivity(LAT, nodes, geom, stiff=False, mode=None):
-    radius = geom[11] + geom[11]*1e-3
+    radius = geom[12] + geom[12]*1e-3
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
