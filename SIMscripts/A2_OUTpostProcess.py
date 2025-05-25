@@ -13,14 +13,14 @@ LAT = "hex"
 DIS = "disNodes"
 nnx = 20
 
-initial = 2
+initial = 1
 numOfJobs = 1
 
 expected_steps = 201
 
-pDir = r"C:\\Users\\exy053\\Documents\\sApp"
+#pDir = r"C:\\Users\\exy053\\Documents\\sApp"
 #pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
-#pDir = r"C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
+pDir = r"C:\\Users\\exy053\\Documents\\MeshConv\\1-5-1"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
