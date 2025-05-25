@@ -17,8 +17,6 @@ initial = 1
 numOfJobs = 1
 
 pDir = r"C:\\Users\\exy053\\Documents\\continuum"
-#pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
-#pDir = r"C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
