@@ -260,9 +260,13 @@ def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV
 def load_perData(INcsv, OUTcsv):
     IN_df = pd.read_csv(INcsv, index_col=0).sort_index()
     OUT_df = pd.read_csv(OUTcsv, index_col=0).sort_index()
-    perIN_df = IN_df.loc[:0]
+
+    perIN_df_r = IN_df.loc[:0]
+    dIN_df = IN_df - IN_df.iloc[0].values
+    fixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
+    perIN_df = perIN_df_r.loc[:, ~dIN_df.columns.isin(fixed_cols)].sort_index()
     perOUT_df = OUT_df.loc[:0]
-    return perIN_df.to_numpy()[0], perOUT_df.to_numpy()[:,1:]
+    return perIN_df_r.to_numpy()[0], perIN_df.to_numpy()[0], perOUT_df.to_numpy()[:,1:]
 
 
 def dataParams(x):
@@ -292,7 +296,7 @@ class Dataset_(Dataset):
     
 
 class DATA:
-    def __init__(self, path=0, load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", format=0):
+    def __init__(self, path=1, load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", format=0):
         self.path = path
         self.LAT = LAT
         self.dis = dis
@@ -358,7 +362,7 @@ class DATA:
             self.val_out = val_out
             self.test_in = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
             self.test_out = test_out
-        self.perIN, self.perOUT = load_perData(self.INcsv, self.OUTcsv)
+        self.perIN_r, self.perIN, self.perOUT = load_perData(self.INcsv, self.OUTcsv)
 
         self.inParams = dataParams(np.concatenate((self.train_in, self.val_in, self.test_in)))
         self.outParams = dataParams(np.concatenate((self.train_out, self.val_out, self.test_out)))
@@ -378,9 +382,7 @@ class DATA:
         self.test_outNM = normalize(self.test_out, self.outParams[2], self.outParams[3])
     
     def load_DisDist_v1(self):
-        train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
-        self.train_in1 = np.array([i for i in train_in1 if max(train_in1[:,0]) != i[0] and min(train_in1[:,0]) != i[0] and 
-                                                           max(train_in1[:,1]) != i[1] and min(train_in1[:,1]) != i[1]])
+        self.train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
 
         train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
         self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
@@ -398,9 +400,7 @@ class DATA:
         self.dy_out1NM = normalize(self.dy_out1, self.outParams1dy[2], self.outParams1dy[3])
     
     def load_DisDist_v2(self):
-        train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
-        self.train_in1 = np.array([i for i in train_in1 if max(train_in1[:,0]) != i[0] and min(train_in1[:,0]) != i[0] and 
-                                                           max(train_in1[:,1]) != i[1] and min(train_in1[:,1]) != i[1]])
+        self.train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
         self.train_in2 = np.array([self.train_in1.flatten()]*2)
 
         train_out2 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
