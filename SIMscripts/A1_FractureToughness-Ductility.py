@@ -14,15 +14,16 @@ executeOnCaeStartup()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'kagome'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
+latticeType = 'tri'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 relDensity = 0.2                            # relative density
 distribution = 'uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
-if latticeType.lower() in ["hex", "kagome"]: nnx = 20
+if latticeType.lower() == "tri": nnx = 30
+elif latticeType.lower() == "kagome": nnx = 20
+elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
-elif latticeType.lower() == "tri": nnx = 30
 nnx = nnx                                   # number of Unit cells in X direction (Y automatic)
 
 finalRun = 'yes'
@@ -127,17 +128,17 @@ if (latticeType.lower() == "kagome" or latticeType.lower() == "hex"):
 ## AMPLITUDE
 if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
-        strainAppUT = 0.060                                               # FINAL 20 - 0.055
-        strainAppFT = 0.060                                               # FINAL 20 - 0.060
+        strainAppUT = 0.060                                               # FINAL 20 - 0.060
+        strainAppFT = 0.000                                               # FINAL 20 - 0.000
     elif latticeType.lower() == "tri":
-        strainAppUT = 0.100                                               # FINAL 30 - 0.1
-        strainAppFT = 0.080                                               # FINAL 30 - 0.08
+        strainAppUT = 0.100                                               # FINAL 30 - 0.100
+        strainAppFT = 0.085                                               # FINAL 30 - 0.085
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.070                                               # FINAL 20 - 0.070
-        strainAppFT = 0.075                                               # FINAL 20 - 0.075
+        strainAppUT = 0.075                                               # FINAL 20 - 0.075
+        strainAppFT = 0.085                                               # FINAL 20 - 0.085
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.200                                               # FINAL 20 - 
-        strainAppFT = 0.200                                               # FINAL 20 - 
+        strainAppUT = 0.200                                               # FINAL 20 - 0.200
+        strainAppFT = 0.200                                               # FINAL 20 - 0.200
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
@@ -186,8 +187,8 @@ elif latticeType.lower() == "kagome":
     FineElemSizeFT   = unitCellSize/5.0
 elif latticeType.lower() == "hex":
     BracketElemSize  = unitCellSize/1.0
-    CoarseElemSizeUT = unitCellSize/5.0
-    FineElemSizeUT   = unitCellSize/15.0
+    CoarseElemSizeUT = unitCellSize/1.0
+    FineElemSizeUT   = unitCellSize/10.0
     CoarseElemSizeFT = unitCellSize/1.0
     FineElemSizeFT   = unitCellSize/10.0
 
