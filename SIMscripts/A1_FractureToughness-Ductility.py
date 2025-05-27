@@ -8,14 +8,16 @@ import math
 import os
 import sys
 executeOnCaeStartup()
+import time
 
 ############################################################################################
 ####################################### INPUT ##############################################
 ############################################################################################
+starttime = time.time()
 
 unitCellSize = 10.0                         # Strut length
 latticeType = 'tri'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
-MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
+MechanicalModel = 'fracture'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 relDensity = 0.2                            # relative density
 distribution = 'uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
@@ -1707,6 +1709,8 @@ for idNum in range(initial,numOfJobs):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+            endtime = time.time()
+            print(endtime - starttime, "== time for job", Job)
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
@@ -2269,3 +2273,5 @@ for idNum in range(initial,numOfJobs):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+            endtime = time.time()
+            print(endtime - starttime, "== time for job", Job)
