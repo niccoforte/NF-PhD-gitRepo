@@ -20,7 +20,7 @@ latticeType = 'tri'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kago
 MechanicalModel = 'fracture'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 relDensity = 0.2                            # relative density
-distribution = 'uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
+distribution = 'lhs_uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
 if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
@@ -1113,9 +1113,13 @@ totalBracketNodes = geom[9]
 deltaNM = geom[10]
 delta = deltaNM * fac
 
+if (distribution.lower() == 'lhs_uniform'):    
+    if numberOfRuns == 1:
+        distribution = 'uniform'
+
 if (distribution.lower() == 'uniform'):
     fac = fac
-if (distribution.lower() == 'lhs_uniform'):    
+elif (distribution.lower() == 'lhs_uniform'):    
     randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
     randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
 elif (distribution.lower() == 'normal'):
