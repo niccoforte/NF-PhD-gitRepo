@@ -5,9 +5,11 @@ from driverUtils import executeOnCaeStartup
 import numpy as np
 from numpy import *
 import math
-import os
 import sys
 executeOnCaeStartup()
+import time
+
+starttime = time.time()
 
 ############################################################################################
 ####################################### INPUT ##############################################
@@ -17,16 +19,20 @@ unitCellSize = 10.0                         # Strut length
 latticeType = 'FCC'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-nnx = 10                                    # number of Unit cells in X direction
 relDensity = 0.2                            # relative density
 distribution = 'lhs_uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
+if latticeType.lower() == "tri": nnx = 30
+elif latticeType.lower() == "kagome": nnx = 20
+elif latticeType.lower() == "hex": nnx = 20
+elif latticeType.lower() == "fcc": nnx = 16
+nnx = nnx                                   # number of Unit cells in X direction (Y automatic)
 
-finalRun = 'yes'
+finalRun = 'no'
 numberOfRuns = 1
 initialJob = 1
-cpus = 12
-FieldOut_frames = 10
+cpus = 8
+FieldOut_frames = 20
 HistOut_frames = 200
 
 nodeVar = 'no'                               # distortion
@@ -75,17 +81,17 @@ if (latticeType.lower() == "kagome" or latticeType.lower() == "hex"):
 ## AMPLITUDE
 if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
-        strainAppUT = 0.045                                               # FINAL 20 - 0.045
-        strainAppFT = 0.050                                               # FINAL 20 - 0.05
+        strainAppUT = 0.060                                               # FINAL 20 - 0.060
+        strainAppFT = 0.000                                               # FINAL 20 - 0.000
     elif latticeType.lower() == "tri":
-        strainAppUT = 0.100  #30-0.1                                      # FINAL 30 - 0.1
-        strainAppFT = 0.080  #100-0.025 80-0.05 50-0.1 30-0.08            # FINAL 30 - 0.08
+        strainAppUT = 0.100                                               # FINAL 30 - 0.100
+        strainAppFT = 0.085                                               # FINAL 30 - 0.085
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.05  #26-0.065 20-0.072                           # FINAL 20 - 0.05  0.04
-        strainAppFT = 0.05  #70-0.025 26-0.052 20-0.067                  # FINAL 20 - 0.05  0.04
+        strainAppUT = 0.075                                               # FINAL 20 - 0.075
+        strainAppFT = 0.085                                               # FINAL 20 - 0.085
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.070  #14-0.15 24-0.1 34-0.045                     # FINAL 20 - 0.07   0.065
-        strainAppFT = 0.060  #20-0.05 50-0.032                            # FINAL 20 - 0.057  0.055
+        strainAppUT = 0.200                                               # FINAL 20 - 0.200
+        strainAppFT = 0.200                                               # FINAL 20 - 0.200
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
         strainAppUT = 0.00125
@@ -116,31 +122,31 @@ elif userMaterial.lower() == "al":
 ## MESH SIZING
 if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':
     BracketElemSize  = unitCellSize/1.0
-    CoarseElemSizeUT = unitCellSize/5.0          # minimum coarse element size
-    FineElemSizeUT   = unitCellSize/5.0          # mimimum fine element size
-    CoarseElemSizeFT = unitCellSize/5.0
-    FineElemSizeFT   = unitCellSize/15.0
-elif latticeType.lower() == "tri":
-    BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0
     FineElemSizeUT   = unitCellSize/5.0
+    CoarseElemSizeFT = unitCellSize/1.0
+    FineElemSizeFT   = unitCellSize/1.0
+elif latticeType.lower() == "tri":
+    BracketElemSize  = unitCellSize/1.0
+    CoarseElemSizeUT = unitCellSize/2.0
+    FineElemSizeUT   = unitCellSize/5.0
     CoarseElemSizeFT = unitCellSize/2.0
-    FineElemSizeFT   = unitCellSize/15.0
+    FineElemSizeFT   = unitCellSize/5.0
 elif latticeType.lower() == "kagome":
     BracketElemSize  = unitCellSize/1.0
-    CoarseElemSizeUT = unitCellSize/2.0          # minimum coarse element size
-    FineElemSizeUT   = unitCellSize/10.0         # mimimum fine element size
-    CoarseElemSizeFT = unitCellSize/2.0
-    FineElemSizeFT   = unitCellSize/30.0
+    CoarseElemSizeUT = unitCellSize/2.0
+    FineElemSizeUT   = unitCellSize/10.0
+    CoarseElemSizeFT = unitCellSize/1.0
+    FineElemSizeFT   = unitCellSize/5.0
 elif latticeType.lower() == "hex":
     BracketElemSize  = unitCellSize/1.0
-    CoarseElemSizeUT = unitCellSize/5.0          # minimum coarse element size
-    FineElemSizeUT   = unitCellSize/20.0         # mimimum fine element size
-    CoarseElemSizeFT = unitCellSize/2.0
-    FineElemSizeFT   = unitCellSize/45.0
+    CoarseElemSizeUT = unitCellSize/1.0
+    FineElemSizeUT   = unitCellSize/10.0
+    CoarseElemSizeFT = unitCellSize/1.0
+    FineElemSizeFT   = unitCellSize/10.0
 
 ############################################################################################
-############################################################################################
+################################# FUNCTIONS ################################################
 ############################################################################################
 	 
 def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution):
@@ -1013,8 +1019,17 @@ def LHS_uniform(var, strats, lim, mean=0, plot=False):
     return points
     
 ############################################################################################
+################################## START ###################################################
 ############################################################################################
-############################################################################################
+## For PSC:
+# for nnx in nnxs:
+
+## For MeshConv:
+# for CoarseElemSizeUT, CoarseElemSizeFT in zip(CoarseElemSizeUTs, CoarseElemSizeFTs):
+#     for FineElemSizeUT, FineElemSizeFT in zip(FineElemSizeUTs, FineElemSizeFTs):
+#         if not os.path.exists(pDir+"\\"+str(int(unitCellSize/BracketElemSize))+"-"+str(int(unitCellSize/CoarseElemSizeUT))+"-"+str(int(unitCellSize/FineElemSizeUT))):
+#             os.makedirs(pDir+"\\"+str(int(unitCellSize/BracketElemSize))+"-"+str(int(unitCellSize/CoarseElemSizeUT))+"-"+str(int(unitCellSize/FineElemSizeUT)))
+#         os.chdir(pDir+"\\"+str(int(unitCellSize/BracketElemSize))+"-"+str(int(unitCellSize/CoarseElemSizeUT))+"-"+str(int(unitCellSize/FineElemSizeUT)))
 
 if (nodeVar == 'no' and sizeVar == 'no'):
     imper = 'per'
@@ -1049,9 +1064,13 @@ totalBracketNodes = geom[9]
 deltaNM = geom[10]
 delta = deltaNM * fac
 
+if (distribution.lower() == 'lhs_uniform'):    
+    if numberOfRuns == 1:
+        distribution = 'uniform'
+
 if (distribution.lower() == 'uniform'):
     fac = fac
-if (distribution.lower() == 'lhs_uniform'):    
+elif (distribution.lower() == 'lhs_uniform'):    
     randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
     randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
 elif (distribution.lower() == 'normal'):
@@ -1259,7 +1278,7 @@ for idNum in range(initial,numOfJobs):
             mdb.models[ModelName].materials[userMaterial].Elastic(table=((410000, 0.14), ))
             mdb.models[ModelName].materials[userMaterial].Plastic(table=
                 ((550, 0.0),
-                 (550.01,	0.00001)))
+                (550.01,	0.00001)))
             mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
                 table=((0.00001, 0.333333, 0.0), ))
             mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
@@ -1398,7 +1417,7 @@ for idNum in range(initial,numOfJobs):
 #                    thicknessAssignment=FROM_SECTION)
 #
 #                p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
- 
+
         ###########################################################################################
         ####################################### Assembly ##########################################
         ###########################################################################################
@@ -1414,7 +1433,7 @@ for idNum in range(initial,numOfJobs):
         
         if AdaptiveTimeStepping:
             mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME, 
-                                                       improvedDtMethod=ON, scaleFactor=0.95)
+                                                    improvedDtMethod=ON, scaleFactor=0.95)
         
         if RayleighDampling:
             mdb.models[ModelName].materials[userMaterial].Damping(alpha=0.0, beta=1e-6)
@@ -1422,7 +1441,7 @@ for idNum in range(initial,numOfJobs):
         
         if SevereDisplacementControl:
             mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME,
-                                                       linearBulkViscosity=0.06, quadBulkViscosity=1.2)
+                                                    linearBulkViscosity=0.06, quadBulkViscosity=1.2)
         
         if AdaptiveTimeStepping == False and RayleighDampling == False and SevereDisplacementControl == False:
             mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
@@ -1614,7 +1633,7 @@ for idNum in range(initial,numOfJobs):
                 timeSpan=STEP, data=((0.0, 0.0), (STEP_TIME, strainAppUT*H)))
         else:
             mdb.models[ModelName].TabularAmplitude(name='Amp-1', timeSpan=STEP, 
-               smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, strainAppUT*H)))
+            smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, strainAppUT*H)))
 
         a = mdb.models[ModelName].rootAssembly
         region = a.sets['Set-top']
@@ -1645,6 +1664,8 @@ for idNum in range(initial,numOfJobs):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+            endtime = time.time()
+            print(endtime - starttime, "== time for job", Job)
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
@@ -2140,15 +2161,15 @@ for idNum in range(initial,numOfJobs):
         region1=a.sets['fixity']
         region2=a.sets['Set-fix']
         mdb.models[ModelName].Coupling(name='couplingFixity', controlPoint=region1, 
-           surface=region2, influenceRadius=WHOLE_SURFACE, couplingType=KINEMATIC, 
-           localCsys=None, u1=ON, u2=ON, ur3=ON)    
+        surface=region2, influenceRadius=WHOLE_SURFACE, couplingType=KINEMATIC, 
+        localCsys=None, u1=ON, u2=ON, ur3=ON)    
 
         a = mdb.models[ModelName].rootAssembly
         region1=a.sets['load']
         region2=a.sets['Set-load']
         mdb.models[ModelName].Coupling(name='couplingLoad', controlPoint=region1, 
-           surface=region2, influenceRadius=WHOLE_SURFACE, couplingType=KINEMATIC, 
-           localCsys=None, u1=ON, u2=ON, ur3=ON)
+        surface=region2, influenceRadius=WHOLE_SURFACE, couplingType=KINEMATIC, 
+        localCsys=None, u1=ON, u2=ON, ur3=ON)
 
         # if (elemType == B32):
             # a = mdb.models[ModelName].rootAssembly
@@ -2176,7 +2197,7 @@ for idNum in range(initial,numOfJobs):
                 timeSpan=STEP, data=((0.0, 0.0), (STEP_TIME, strainAppFT*H)))
         else:
             mdb.models[ModelName].TabularAmplitude(name='Amp-1', timeSpan=STEP, 
-               smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, strainAppFT*H)))
+            smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, strainAppFT*H)))
 
         a = mdb.models[ModelName].rootAssembly
         region = a.sets['load']
@@ -2205,5 +2226,7 @@ for idNum in range(initial,numOfJobs):
         
         if (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
-            # mdb.jobs[Job].submit(consistencyChecking=OFF)
-            # mdb.jobs[Job].waitForCompletion()
+            mdb.jobs[Job].submit(consistencyChecking=OFF)
+            mdb.jobs[Job].waitForCompletion()
+            endtime = time.time()
+            print(endtime - starttime, "== time for job", Job)
