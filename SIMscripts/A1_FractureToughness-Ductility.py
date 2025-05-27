@@ -5,15 +5,16 @@ from driverUtils import executeOnCaeStartup
 import numpy as np
 from numpy import *
 import math
-import os
 import sys
 executeOnCaeStartup()
 import time
+import os
+
+starttime = time.time()
 
 ############################################################################################
 ####################################### INPUT ##############################################
 ############################################################################################
-starttime = time.time()
 
 unitCellSize = 10.0                         # Strut length
 latticeType = 'tri'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
