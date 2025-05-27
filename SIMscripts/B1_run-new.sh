@@ -12,6 +12,7 @@
 # -l avx512
 
 set -e
+USER=exy053
 
 # ^^^ RENAME ^^^
 LAT=lat
@@ -37,22 +38,22 @@ module load intel
 
 
 # make dir
-mkdir /data/scratch/exy053/$JOB_ID
-mkdir /data/scratch/exy053/$JOB_ID/transfer/
-mkdir /data/scratch/exy053/$JOB_ID/zip/
-mkdir /data/scratch/exy053/$JOB_ID/zip/transfer/
+mkdir /data/scratch/$USER/$JOB_ID
+mkdir /data/scratch/$USER/$JOB_ID/transfer/
+mkdir /data/scratch/$USER/$JOB_ID/zip/
+mkdir /data/scratch/$USER/$JOB_ID/zip/transfer/
 
 
 # copy command
-rsync -av $SGE_O_WORKDIR/A* /data/scratch/exy053/$JOB_ID
-rsync -av $SGE_O_WORKDIR/B* /data/scratch/exy053/$JOB_ID
-cd /data/scratch/exy053/$JOB_ID
+rsync -av $SGE_O_WORKDIR/A* /data/scratch/$USER/$JOB_ID
+rsync -av $SGE_O_WORKDIR/B* /data/scratch/$USER/$JOB_ID
+cd /data/scratch/$USER/$JOB_ID
 
 /bin/echo Working in directory: `pwd`.
 
 
 # Replace the following line with abaqus command
-#abaqus job=callmat cpus=${NSLOTS} user=PhaseField_5m-std.o mp_mode=THREADS scratch=/data/scratch/exy053/
+#abaqus job=callmat cpus=${NSLOTS} user=PhaseField_5m-std.o mp_mode=THREADS scratch=/data/scratch/$USER/
 abaqus cae noGUI=A-HPC-1_FractureToughness-Ductility.py -- $LAT $DIS $fac $nnx $unitCellSize $rD $initial $nJobs $CPUs
 
 /bin/echo Simulation completed at: `date`.
@@ -65,33 +66,33 @@ abaqus python A-HPC-2_INpostProcess.py -- $LAT $DIS $fac $nnx $unitCellSize $rD 
 
 
 # file transfer
-rsync -av /data/scratch/exy053/$JOB_ID/A* /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/B* /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/abaqus* /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/*.odb /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/*.inp /data/scratch/exy053/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/transfer/* /data/scratch/exy053/$JOB_ID/zip/transfer/
+rsync -av /data/scratch/$USER/$JOB_ID/A* /data/scratch/$USER/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/B* /data/scratch/$USER/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/abaqus* /data/scratch/$USER/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/*.odb /data/scratch/$USER/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/*.inp /data/scratch/$USER/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/transfer/* /data/scratch/$USER/$JOB_ID/zip/transfer/
 
-/bin/echo Simulation files in /data/scratch/exy053/$JOB_ID/zip.
+/bin/echo Simulation files in /data/scratch/$USER/$JOB_ID/zip.
 
 
 # clean up and compression
-rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/
-rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/exy053/$JOB_ID/zip/
+rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/$USER/$JOB_ID/
+rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/$USER/$JOB_ID/zip/
 
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
-rsync -av /data/scratch/exy053/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
 
 if [ "$zip" = true ] ; then
-    tar -czf C1_transfer-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/transfer/
-    tar -czf C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/scratch/exy053/$JOB_ID/zip/
-    rsync -av /data/scratch/exy053/$JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
-    rsync -av /data/scratch/exy053/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/
+    tar -czf C1_transfer-$LAT-$DIS-$JOB_ID.tgz /data/scratch/$USER/$JOB_ID/transfer/
+    tar -czf C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/scratch/$USER/$JOB_ID/zip/
+    rsync -av /data/scratch/$USER/$JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
+    rsync -av /data/scratch/$USER/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/
 fi
 
 if [ "$delete_scratch" = true ] ; then
-    rm -rf /data/scratch/exy053/$JOB_ID
+    rm -rf /data/scratch/$USER/$JOB_ID
 fi
 
 /bin/echo Job completed at: `date`.
