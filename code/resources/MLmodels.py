@@ -223,5 +223,6 @@ class GAT(nn.Module):
 
 # TODO: Add Deep Ritz / ResNet models once finished.
 
+# TODO: Add autoencorder (incorporate with exsiting blocks)
 
 # TODO: Add macro model class with all hyperparameters and model selection.

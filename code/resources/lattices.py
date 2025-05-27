@@ -262,7 +262,7 @@ def effProperties(LAT, E_s, rD):
     return E, v
 
 
-def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/", sim=1):  # TODO: Rename
+def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/", sim=1):
     if mode.lower() == "unit":
         if LAT.lower() == "fcc":
             nodes = np.array([[0,0,0],
@@ -401,5 +401,5 @@ def plot_lattice(elems, nodes, geom):
     for elem, tt in zip(elems, geom[12]):
         node1 = nodes[elem[1]]
         node2 = nodes[elem[2]]
-        plt.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2500, c='black')
+        ax.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2500, c='black')
     plt.show()
