@@ -87,10 +87,10 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.100                                               # FINAL 30 - 0.100
         strainAppFT = 0.085                                               # FINAL 30 - 0.085
     elif latticeType.lower() == "kagome":
-        strainAppUT = 0.075                                               # FINAL 20 - 0.075
-        strainAppFT = 0.085                                               # FINAL 20 - 0.085
+        strainAppUT = 0.070                                               # FINAL 20 - 0.070
+        strainAppFT = 0.080                                               # FINAL 20 - 0.080
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.200                                               # FINAL 20 - 0.200
+        strainAppUT = 0.165                                               # FINAL 20 - 
         strainAppFT = 0.200                                               # FINAL 20 - 0.200
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
@@ -134,14 +134,14 @@ elif latticeType.lower() == "tri":
     FineElemSizeFT   = unitCellSize/5.0
 elif latticeType.lower() == "kagome":
     BracketElemSize  = unitCellSize/1.0
-    CoarseElemSizeUT = unitCellSize/2.0
+    CoarseElemSizeUT = unitCellSize/1.0
     FineElemSizeUT   = unitCellSize/10.0
     CoarseElemSizeFT = unitCellSize/1.0
-    FineElemSizeFT   = unitCellSize/5.0
+    FineElemSizeFT   = unitCellSize/10.0
 elif latticeType.lower() == "hex":
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/1.0
-    FineElemSizeUT   = unitCellSize/10.0
+    FineElemSizeUT   = unitCellSize/15.0
     CoarseElemSizeFT = unitCellSize/1.0
     FineElemSizeFT   = unitCellSize/10.0
 
