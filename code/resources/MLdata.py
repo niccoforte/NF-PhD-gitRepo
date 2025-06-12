@@ -117,7 +117,7 @@ def split_data(dIN, dOUT, PATH, mode, dis, split=0.85):
     
     return train_in, train_out, val_in, val_out, test_in, test_out
 
-def plot_distribution(df, LAT, l, indx=None, num=5, by="lattice"):
+def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
     if by.lower() == "node":
         df = df.T
     if indx is None:
