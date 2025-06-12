@@ -187,7 +187,7 @@ def predict_model(typ, model, test_dataloader):
 def weights_init(m):
     if isinstance(m, nn.Linear):
         #nn.init.xavier_normal_(m.weight)
-        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+        nn.init.kaiming_normal_(m.weight, nonlinearity='sigmoid')
         if m.bias is not None:
             nn.init.constant_(m.bias, 0.01)
 
@@ -212,6 +212,27 @@ class EarlyStopping:
                 print(f"Early stopping triggered after {self.patience} epochs without improvement.")
             self.early_stop = True  # Set flag for stopping
 
+class TrainModel:
+    def __init__(self, typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, run=True):
+        self.typ = typ.lower()
+        self.model = model
+        self.lossf = lossf
+        self.n_epochs = n_epochs
+        self.opt = opt
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
+        self.scheduler = scheduler
+        self.earlyStop = earlyStop
+        self.verbose = verbose
+
+        if run:
+            self.model, self.epoch, self.train_lossLog, self.val_lossLog = self.train()
+
+    def train(self):
+        return train_model(self.typ, self.model, self.lossf, self.n_epochs, self.opt, 
+                           self.train_dataloader, self.val_dataloader, 
+                           self.scheduler, self.earlyStop, self.verbose)
+
 # TODO: Hyperparameter optimization functions
 
 ### Custom Loss Functions
@@ -228,15 +249,16 @@ def physics_loss(target, output):
 
 ### Plotting Functions
 
-def plot_loss(epoch, train, val):
+def plot_loss(epoch, train, val=None):
     fig = plt.figure(figsize=(10, 5))
-    plt.plot(np.linspace(1, epoch, len(train)), train)
-    plt.plot(np.linspace(1, epoch, len(val)), val)
+    plt.plot(np.linspace(1, epoch, len(train)), train, label="Training")
+    if val:
+        plt.plot(np.linspace(1, epoch, len(val)), val, label="Validation")
     plt.xlabel("Training Epoch")
     plt.ylabel("Mean Squared Error (MSE)")
     plt.yscale("log")
     plt.title("Training and Validation Loss Vs Epoch")
-    plt.legend(["Training", "Validation"])
+    plt.legend()
     plt.grid()
     plt.show()
 
@@ -262,10 +284,10 @@ def plot_StressStrainERR(perOUT, train_out, test_outputs, indx=0):
     plt.grid()
     plt.show()
 
-def plot_Distribution(train_in1, test_outputs, dx_out1=None, typ="contour"):
+def plot_Distribution(train_in1, test_outputs, truth=None, typ="contour"):
     x_, y_ = train_in1[:,0], train_in1[:,1]
-    if dx_out1 is not None:
-        val_ = dx_out1 - test_outputs
+    if truth is not None:
+        val_ = truth - test_outputs
         title = "Error Distribution"
     else:
         val_ = test_outputs
