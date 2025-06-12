@@ -212,6 +212,7 @@ class EarlyStopping:
                 print(f"Early stopping triggered after {self.patience} epochs without improvement.")
             self.early_stop = True  # Set flag for stopping
 
+# TODO: Hyperparameter optimization functions
 
 ### Custom Loss Functions
 
