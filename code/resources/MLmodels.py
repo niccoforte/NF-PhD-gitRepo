@@ -35,7 +35,7 @@ class resBlock(nn.Module):
         self.norm = norm
         self.fc1 = nn.Linear(size, size*2, bias=bias)
         self.fc2 = nn.Linear(size*2, size, bias=bias)
-        self.act = nn.ReLU()
+        self.act = nn.Sigmoid()
         if norm == 'layer':
             self.normL1 = nn.LayerNorm(size*2)
             self.normL2 = nn.LayerNorm(size)
@@ -56,12 +56,12 @@ class resBlock(nn.Module):
         x = self.act(x)
         return x #+ skip
 
-class MLPhlayer(nn.Module):
+class mlpBlock(nn.Module):
     def __init__(self, in_size, out_size, norm=None, bias=True):
-        super(MLPhlayer, self).__init__()
+        super(mlpBlock, self).__init__()
         self.norm = norm
         self.fc = nn.Linear(in_size, out_size, bias=bias)
-        self.act = nn.ReLU()
+        self.act = nn.Sigmoid()
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size)
         elif norm == 'batch':
@@ -82,17 +82,17 @@ class MLP(nn.Module):
             self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)
             if block == "mlp":
                 self.hlayers = nn.ModuleList([
-                    MLPhlayer(i, j, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
+                    mlpBlock(i, j, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
             elif block == "res":
                 self.hlayers = nn.ModuleList([
-                    resBlock(i, norm) for i in h_size])
+                    resBlock(i, norm, bias) for i in h_size])
         else:
             self.hlayers = None
             self.fcIN = None
             h_size = [in_size]
         
         self.fcOUT = nn.Linear(h_size[-1], out_size, bias=bias)
-        self.act = nn.ReLU()
+        self.act = nn.Sigmoid()
 
         self.norm = norm
         if norm == 'layer':
@@ -223,6 +223,19 @@ class GAT(nn.Module):
 
 # TODO: Add Deep Ritz / ResNet models once finished.
 
-# TODO: Add autoencorder (incorporate with exsiting blocks)
+class Autoencoder(nn.Module):
+    def __init__(self, in_size, latent_size, h_size=None):
+        super(Autoencoder, self).__init__()
+
+        if h_size is None:
+            h_size = in_size // 2
+
+        self.encoder = MLP(in_size, h_size, latent_size, block="mlp")
+        self.decoder = MLP(latent_size, h_size, in_size, block="mlp")
+        
+    def forward(self, x):
+        latent = self.encoder(x)
+        recon = self.decoder(latent)
+        return recon
 
 # TODO: Add macro model class with all hyperparameters and model selection.
