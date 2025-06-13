@@ -30,12 +30,12 @@ class GPRmodel(GPR):
 
 ### Multi-Layer Perceptron model
 class resBlock(nn.Module):
-    def __init__(self, size, norm=None, bias=True):
+    def __init__(self, size, act, norm=None, bias=True):
         super(resBlock, self).__init__()
         self.norm = norm
         self.fc1 = nn.Linear(size, size*2, bias=bias)
         self.fc2 = nn.Linear(size*2, size, bias=bias)
-        self.act = nn.Sigmoid()
+        self.act = act
         if norm == 'layer':
             self.normL1 = nn.LayerNorm(size*2)
             self.normL2 = nn.LayerNorm(size)
@@ -57,11 +57,11 @@ class resBlock(nn.Module):
         return x #+ skip
 
 class mlpBlock(nn.Module):
-    def __init__(self, in_size, out_size, norm=None, bias=True):
+    def __init__(self, in_size, out_size, act, norm=None, bias=True):
         super(mlpBlock, self).__init__()
         self.norm = norm
         self.fc = nn.Linear(in_size, out_size, bias=bias)
-        self.act = nn.Sigmoid()
+        self.act = act
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size)
         elif norm == 'batch':
@@ -77,22 +77,23 @@ class mlpBlock(nn.Module):
 class MLP(nn.Module):
     def __init__(self, in_size, h_size, out_size, block="mlp", norm=None, bias=True):
         super(MLP, self).__init__()
+        
+        self.act = nn.Sigmoid()
 
         if len(h_size) > 0:
             self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)
             if block == "mlp":
                 self.hlayers = nn.ModuleList([
-                    mlpBlock(i, j, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
+                    mlpBlock(i, j, self.act, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
             elif block == "res":
                 self.hlayers = nn.ModuleList([
-                    resBlock(i, norm, bias) for i in h_size])
+                    resBlock(i, self.act, norm, bias) for i in h_size])
         else:
             self.hlayers = None
             self.fcIN = None
             h_size = [in_size]
         
         self.fcOUT = nn.Linear(h_size[-1], out_size, bias=bias)
-        self.act = nn.Sigmoid()
 
         self.norm = norm
         if norm == 'layer':
@@ -118,7 +119,7 @@ class MLP(nn.Module):
 
 ### Graph Convolutional Network model
 class GCNhlayer(nn.Module):
-    def __init__(self, in_size, out_size, norm=None):
+    def __init__(self, in_size, out_size, act, norm=None):
         super(GCNhlayer, self).__init__()
         self.norm = norm
         
@@ -145,13 +146,13 @@ class GCN(nn.Module):
         self.GconvIN = GCNConv(in_size, h_size[0])
         # self.GconvOUT = GCNConv(h_size[-1], out_size)
         self.fcOUT = nn.Linear(h_size[-1], out_size)
-        self.act = nn.ReLU()
+        self.act = nn.Sigmoid()
         if norm == 'layer':
             self.normIN = nn.LayerNorm(h_size[0])
         if norm == 'batch':
             self.normIN = nn.BatchNorm1d(h_size[0])
         self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([GCNhlayer(i, j, norm) for i, j in zip(h_size[:-1], h_size[1:])])
+        self.hlayers = nn.ModuleList([GCNhlayer(i, j, self.act, norm) for i, j in zip(h_size[:-1], h_size[1:])])
 
     def forward(self, x, edge_index, batch):
         x = self.GconvIN(x, edge_index)
@@ -170,13 +171,13 @@ class GCN(nn.Module):
 
 ### Graph Attetion Network model
 class GAThlayer(nn.Module):
-    def __init__(self, in_size, out_size, heads=1, norm=None):
+    def __init__(self, in_size, out_size, act, heads=1, norm=None):
         super(GAThlayer, self).__init__()
         self.norm = norm
         self.heads = heads
         
         self.GATconv = GATConv(in_size, out_size // heads, heads=heads)
-        self.act = nn.ReLU()
+        self.act = act
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size)
         elif norm == 'batch':
@@ -198,13 +199,13 @@ class GAT(nn.Module):
 
         self.GATconvIN = GATConv(in_size, h_size[0] // heads, heads=heads)
         # self.GATconvOUT = GATConv(h_size[-1], out_size // heads, heads=heads)
-        self.act = nn.ReLU()
+        self.act = nn.Sigmoid()
         if norm == 'layer':
             self.normIN = nn.LayerNorm(h_size[0])
         elif norm == 'batch':
             self.normIN = nn.BatchNorm1d(h_size[0])
         self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([GAThlayer(i, j, heads=heads, norm=norm) for i, j in zip(h_size[:-1], h_size[1:])])
+        self.hlayers = nn.ModuleList([GAThlayer(i, j, self.act, heads=heads, norm=norm) for i, j in zip(h_size[:-1], h_size[1:])])
         self.fcOUT = nn.Linear(h_size[-1], out_size)
 
     def forward(self, x, edge_index, batch):
@@ -220,8 +221,6 @@ class GAT(nn.Module):
             x = global_add_pool(x, batch)
         x = self.fcOUT(x)
         return x
-
-# TODO: Add Deep Ritz / ResNet models once finished.
 
 class Autoencoder(nn.Module):
     def __init__(self, in_size, latent_size, h_size=None):
