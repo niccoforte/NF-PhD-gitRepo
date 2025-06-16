@@ -194,7 +194,7 @@ class MLP(nn.Module):
 ### Graph Convolutional Network model
 class gcnBlock(nn.Module):
     def __init__(self, in_size, out_size, act, norm=None):
-        super(GCNhlayer, self).__init__()
+        super(gcnBlock, self).__init__()
         self.norm = norm
         
         self.Gconv = GCNConv(in_size, out_size)
@@ -246,7 +246,7 @@ class GCN(nn.Module):
 ### Graph Attetion Network model
 class gatBlock(nn.Module):
     def __init__(self, in_size, out_size, act, heads=1, norm=None):
-        super(GAThlayer, self).__init__()
+        super(gcnBlock, self).__init__()
         self.norm = norm
         self.heads = heads
         
