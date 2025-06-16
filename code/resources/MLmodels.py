@@ -192,7 +192,7 @@ class MLP(nn.Module):
 
 
 ### Graph Convolutional Network model
-class GCNhlayer(nn.Module):
+class gcnBlock(nn.Module):
     def __init__(self, in_size, out_size, act, norm=None):
         super(GCNhlayer, self).__init__()
         self.norm = norm
@@ -226,7 +226,7 @@ class GCN(nn.Module):
         if norm == 'batch':
             self.normIN = nn.BatchNorm1d(h_size[0])
         self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([GCNhlayer(i, j, self.act, norm) for i, j in zip(h_size[:-1], h_size[1:])])
+        self.hlayers = nn.ModuleList([gcnBlock(i, j, self.act, norm) for i, j in zip(h_size[:-1], h_size[1:])])
 
     def forward(self, x, edge_index, batch):
         x = self.GconvIN(x, edge_index)
@@ -244,7 +244,7 @@ class GCN(nn.Module):
 
 
 ### Graph Attetion Network model
-class GAThlayer(nn.Module):
+class gatBlock(nn.Module):
     def __init__(self, in_size, out_size, act, heads=1, norm=None):
         super(GAThlayer, self).__init__()
         self.norm = norm
@@ -279,7 +279,7 @@ class GAT(nn.Module):
         elif norm == 'batch':
             self.normIN = nn.BatchNorm1d(h_size[0])
         self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([GAThlayer(i, j, self.act, heads=heads, norm=norm) for i, j in zip(h_size[:-1], h_size[1:])])
+        self.hlayers = nn.ModuleList([gatBlock(i, j, self.act, heads=heads, norm=norm) for i, j in zip(h_size[:-1], h_size[1:])])
         self.fcOUT = nn.Linear(h_size[-1], out_size)
 
     def forward(self, x, edge_index, batch):
