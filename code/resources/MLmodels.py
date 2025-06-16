@@ -242,7 +242,6 @@ class GCN(nn.Module):
         x = self.fcOUT(x)
         return x
 
-
 ### Graph Attetion Network model
 class gatBlock(nn.Module):
     def __init__(self, in_size, out_size, act, heads=1, norm=None):
@@ -296,6 +295,7 @@ class GAT(nn.Module):
         x = self.fcOUT(x)
         return x
 
+### Other Models
 class Autoencoder(nn.Module):
     def __init__(self, in_size, latent_size, h_size=None):
         super(Autoencoder, self).__init__()
