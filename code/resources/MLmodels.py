@@ -72,8 +72,8 @@ class MODEL:
         print(f"Best prediction: {self.best}, Worst prediction: {self.worst}")
 
         if plot:
-            plot_StressStrainOUT(self.data.perOUT, self.truth, self.test_outputs, indx=self.best)
-            plot_StressStrainOUT(self.data.perOUT, self.truth, self.test_outputs, indx=self.worst)
+            plot_StressStrainOUT(self.data.perOUT, self.test_outputs, truth=self.truth, indx=self.best)
+            plot_StressStrainOUT(self.data.perOUT, self.test_outputs, truth=self.truth, indx=self.worst)
         
     def save(self, path, name):
         torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
