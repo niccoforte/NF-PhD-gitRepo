@@ -2,8 +2,6 @@ from resources.imports import *
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch import optim
 from torch_geometric.utils import to_networkx
 import networkx as nx
 
