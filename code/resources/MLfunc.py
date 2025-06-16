@@ -1,7 +1,4 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from resources.imports import *
 
 import torch
 import torch.nn as nn
@@ -11,15 +8,19 @@ from torch_geometric.utils import to_networkx
 import networkx as nx
 
 
-def err(A, B, mean=False):
-    if mean:
-        return np.mean(np.abs(A - B))
+def err(A, B, typ=None, axis=None):
+    if typ == "mean":
+        return np.mean(np.abs(A - B), axis=axis)
+    elif typ == "sum":
+        return np.sum(np.abs(A - B), axis=axis)
     else:
         return np.abs(A - B)
 
-def mse(A, B, mean=False):
-    if mean:
-        return np.mean((A - B)**2)
+def mse(A, B, typ=False, axis=None):
+    if typ == "mean":
+        return np.mean((A - B)**2, axis=axis)
+    elif typ == "sum":
+        return np.sum((A - B)**2, axis=axis)
     else:
         return (A - B)**2
 
@@ -166,23 +167,25 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                 print("Epoch:", epoch, "- Loss:", loss.item())
             
     print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
-    # torch.save(model.state_dict(), "new_best_deep_ritz1.mdl")
     return model, epoch, train_lossLog, val_lossLog
 
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
+    truth = []
     with torch.no_grad():
         for batch in test_dataloader:
             if typ.lower() == "gnn":
                 x, y = batch.x.float(), batch.y.float()
-                y_predict = model(batch.x, batch.edge_index, batch.batch)
+                y_predict = model(x, batch.edge_index, batch.batch)  # CHECK
                 y = batch.y.view(batch.num_graphs, -1)
             else:
                 x, y = batch[:][0].float(), batch[:][1].float()
                 y_predict = model(x)
             test_outputs.append(y_predict.detach().cpu().numpy())
+            truth.append(y.detach().cpu().numpy())
     test_outputs = np.concatenate(test_outputs)
-    return test_outputs
+    truth = np.concatenate(truth)
+    return test_outputs, truth
 
 def weights_init(m):
     if isinstance(m, nn.Linear):
@@ -212,35 +215,17 @@ class EarlyStopping:
                 print(f"Early stopping triggered after {self.patience} epochs without improvement.")
             self.early_stop = True  # Set flag for stopping
 
-class TrainModel:
-    def __init__(self, typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, run=True):
-        self.typ = typ.lower()
-        self.model = model
-        self.lossf = lossf
-        self.n_epochs = n_epochs
-        self.opt = opt
-        self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
-        self.scheduler = scheduler
-        self.earlyStop = earlyStop
-        self.verbose = verbose
-
-        if run:
-            self.model, self.epoch, self.train_lossLog, self.val_lossLog = self.train()
-
-    def train(self):
-        return train_model(self.typ, self.model, self.lossf, self.n_epochs, self.opt, 
-                           self.train_dataloader, self.val_dataloader, 
-                           self.scheduler, self.earlyStop, self.verbose)
-
 # TODO: Hyperparameter optimization functions
+
+# TODO: GPU integration
+# TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
 ### Custom Loss Functions
 
 def QuantileLoss():
     pass
 
-def custom_loss(target, output):   ### TODO: Quantile loss
+def custom_loss(target, output):
     return torch.mean((output - target)**2)
 
 def physics_loss(target, output):
@@ -266,18 +251,7 @@ def plot_StressStrainOUT(perOUT, train_out, test_outputs, indx=0):
     fig = plt.figure(figsize=(10, 5))
     plt.scatter(perOUT[0], train_out[indx]+perOUT[1], s=5, label=f"Truth-{indx}")
     plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label=f"Prediction-{indx}")
-    plt.ylabel("Stress ($\sigma$) [MPa]")
-    plt.xlabel("Strain ($\epsilon$)")
-    plt.legend()
-    plt.grid()
-    plt.show()
-
-# TODO: ERROR PLOTTING 
-
-def plot_StressStrainERR(perOUT, train_out, test_outputs, indx=0):
-    fig = plt.figure(figsize=(10, 5))
-    plt.scatter(perOUT[0], train_out[indx], s=5, label="Truth")
-    plt.scatter(perOUT[0], test_outputs[indx], s=5, label="Prediction")
+    plt.bar(perOUT[0], err(train_out[indx], test_outputs[indx]), width=(max(perOUT[0])-min(perOUT[0]))/(len(perOUT[0])), alpha=0.25, label="Error")
     plt.ylabel("Stress ($\sigma$) [MPa]")
     plt.xlabel("Strain ($\epsilon$)")
     plt.legend()

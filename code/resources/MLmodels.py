@@ -3,6 +3,80 @@ import torch.nn as nn
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 
+from resources.MLfunc import *
+from resources.MLdata import standardize
+
+
+class MODEL:
+    def __init__(self, typ, model, lossf, opt, batch, lr, data, train_dataloader, val_dataloader=None, test_dataloader=None, scheduler=None, earlyStop=None, w_init=False):
+        self.typ = typ
+        self.model = model
+        self.lossf = lossf
+        self.opt = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=opt[1])
+        self.batch = batch
+        self.lr = lr
+        self.data = data 
+        self.train_dataloader = train_dataloader
+        self.val_dataloader = val_dataloader
+        self.test_dataloader = test_dataloader
+        self.earlyStop = earlyStop
+        if scheduler:
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, 
+                                                                        mode=scheduler[0], 
+                                                                        factor=scheduler[1],
+                                                                        patience=scheduler[2], 
+                                                                        threshold=scheduler[3], 
+                                                                        verbose=scheduler[4])
+        else:
+            self.scheduler = None
+        
+        if w_init:
+            self.model.apply(w_init)
+        
+        self.epoch = None
+        self.train_lossLog = None
+        self.val_lossLog = None
+
+        self.test_outputs = None
+        self.truth = None
+        self.err = None
+        self.best, self.worst = None, None
+    
+    def train(self, n_epochs, verbose, plot=False):
+        self.model, self.epoch, self.train_lossLog, self.val_lossLog = train_model(self.typ, 
+                                                                                   self.model, 
+                                                                                   self.lossf, 
+                                                                                   n_epochs, 
+                                                                                   self.opt, 
+                                                                                   self.train_dataloader, 
+                                                                                   val_dataloader=self.val_dataloader, 
+                                                                                   scheduler=self.scheduler, 
+                                                                                   earlyStop=self.earlyStop, 
+                                                                                   verbose=verbose)
+        if plot:
+            plot_loss(self.epoch, self.train_lossLog, self.val_lossLog)
+    
+    def predict(self, stand=False, test_dataloader=None, plot=False):
+        if test_dataloader is None:
+            test_dataloader = self.test_dataloader
+
+        self.test_outputs, self.truth = predict_model(self.typ,
+                                                       self.model, 
+                                                       test_dataloader)
+        if stand:
+            self.test_outputs = standardize(self.test_outputs, self.data.outParams[0], self.data.outParams[1], mode=1)
+        
+        self.err = err(self.test_outputs, self.truth, typ="sum", axis=1)
+        self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
+        print(f"Best prediction: {self.best}, Worst prediction: {self.worst}")
+
+        if plot:
+            plot_StressStrainOUT(self.data.perOUT, self.truth, self.test_outputs, indx=self.best)
+            plot_StressStrainOUT(self.data.perOUT, self.truth, self.test_outputs, indx=self.worst)
+        
+    def save(self, path, name):
+        torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
+
 
 ### Gaussian Process Regression model
 class GPRmodel(GPR):
