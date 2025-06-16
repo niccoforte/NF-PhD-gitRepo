@@ -299,14 +299,14 @@ class GAT(nn.Module):
 
 ### Other Models
 class Autoencoder(nn.Module):
-    def __init__(self, in_size, latent_size, h_size=None):
+    def __init__(self, in_size, latent_size, h_size=None, block="mlp"):
         super(Autoencoder, self).__init__()
 
         if h_size is None:
             h_size = in_size // 2
 
-        self.encoder = MLP(in_size, h_size, latent_size, block="mlp")
-        self.decoder = MLP(latent_size, h_size, in_size, block="mlp")
+        self.encoder = MLP(in_size, h_size, latent_size, block=block)
+        self.decoder = MLP(latent_size, h_size, in_size, block=block)
         
     def forward(self, x):
         latent = self.encoder(x)
