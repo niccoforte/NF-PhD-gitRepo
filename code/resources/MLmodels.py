@@ -246,7 +246,7 @@ class GCN(nn.Module):
 ### Graph Attetion Network model
 class gatBlock(nn.Module):
     def __init__(self, in_size, out_size, act, heads=1, norm=None):
-        super(gcnBlock, self).__init__()
+        super(gatBlock, self).__init__()
         self.norm = norm
         self.heads = heads
         
