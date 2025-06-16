@@ -296,6 +296,7 @@ class GAT(nn.Module):
         x = self.fcOUT(x)
         return x
 
+
 ### Other Models
 class Autoencoder(nn.Module):
     def __init__(self, in_size, latent_size, h_size=None):
