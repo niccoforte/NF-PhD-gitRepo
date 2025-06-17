@@ -259,7 +259,7 @@ class gatBlock(nn.Module):
     
     def forward(self, x, edge_index):
         x = self.GATconv(x, edge_index)
-        if self.normL:
+        if self.norm:
             x = self.normL(x)
         x = self.act(x)
         return x
