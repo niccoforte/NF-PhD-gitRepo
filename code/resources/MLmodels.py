@@ -8,7 +8,7 @@ from resources.MLdata import standardize
 
 
 class MODEL:
-    def __init__(self, typ, model, lossf, opt, batch, lr, data, train_dataloader, val_dataloader=None, test_dataloader=None, scheduler=None, earlyStop=None, w_init=False):
+    def __init__(self, typ, model, lossf, opt, batch, lr, data, train_dataloader, val_dataloader=None, test_dataloader=None, scheduler=None, earlyStop=None, w_init=False, optTrial=None):
         self.typ = typ
         self.model = model
         self.lossf = lossf
@@ -29,9 +29,9 @@ class MODEL:
                                                                         verbose=scheduler[4])
         else:
             self.scheduler = None
-        
         if w_init:
             self.model.apply(w_init)
+        self.optTrial = optTrial
         
         self.epoch = None
         self.train_lossLog = None
@@ -42,17 +42,22 @@ class MODEL:
         self.err = None
         self.best, self.worst = None, None
     
-    def train(self, n_epochs, verbose, plot=False):
-        self.model, self.epoch, self.train_lossLog, self.val_lossLog = train_model(self.typ, 
-                                                                                   self.model, 
-                                                                                   self.lossf, 
-                                                                                   n_epochs, 
-                                                                                   self.opt, 
-                                                                                   self.train_dataloader, 
-                                                                                   val_dataloader=self.val_dataloader, 
-                                                                                   scheduler=self.scheduler, 
-                                                                                   earlyStop=self.earlyStop, 
-                                                                                   verbose=verbose)
+    def train(self, n_epochs, verbose=10, plot=False):
+        self.model, \
+            self.epoch, \
+                self.train_lossLog, \
+                    self.val_lossLog, \
+                        self.best_loss = train_model(self.typ, 
+                                                    self.model, 
+                                                    self.lossf, 
+                                                    n_epochs, 
+                                                    self.opt, 
+                                                    self.train_dataloader, 
+                                                    val_dataloader=self.val_dataloader, 
+                                                    scheduler=self.scheduler, 
+                                                    earlyStop=self.earlyStop, 
+                                                    verbose=verbose,
+                                                    optTrial=self.optTrial)
         if plot:
             plot_loss(self.epoch, self.train_lossLog, self.val_lossLog)
     
@@ -249,13 +254,13 @@ class gatBlock(nn.Module):
         super(gatBlock, self).__init__()
         self.norm = norm
         self.heads = heads
-        
-        self.GATconv = GATConv(in_size, out_size // heads, heads=heads)
         self.act = act
+        
+        self.GATconv = GATConv(in_size, out_size, heads=heads, concat=True)
         if norm == 'layer':
-            self.normL = nn.LayerNorm(out_size)
+            self.normL = nn.LayerNorm(out_size * heads)
         elif norm == 'batch':
-            self.normL = nn.BatchNorm1d(out_size)
+            self.normL = nn.BatchNorm1d(out_size * heads)
     
     def forward(self, x, edge_index):
         x = self.GATconv(x, edge_index)
@@ -270,16 +275,27 @@ class GAT(nn.Module):
         self.norm = norm
         self.heads = heads
         self.pool = pool.lower()
+        self.act = nn.ReLU()
 
-        self.GATconvIN = GATConv(in_size, h_size[0] // heads, heads=heads)
+        ## ENCODER
+        self.GATconvIN = GATConv(in_size, h_size[0], heads=heads, concat=True)
+        self.hlayers = nn.ModuleList([gatBlock(i*heads, j, self.act, heads=heads, norm=norm) 
+                                      for i, j in zip(h_size[:-1], h_size[1:])])
         # self.GATconvOUT = GATConv(h_size[-1], out_size // heads, heads=heads)
-        self.act = nn.Sigmoid()
+
+        ## DECODER
+        self.decoder = nn.Sequential(
+            nn.Linear(h_size[-1]*heads, 2*h_size[-1]*heads),
+            self.act,
+            nn.Linear(2*h_size[-1]*heads, out_size),
+        )
+
         if norm == 'layer':
-            self.normIN = nn.LayerNorm(h_size[0])
+            self.normIN = nn.LayerNorm(h_size[0] * heads)
         elif norm == 'batch':
-            self.normIN = nn.BatchNorm1d(h_size[0])
+            self.normIN = nn.BatchNorm1d(h_size[0] * heads)
+
         self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([gatBlock(i, j, self.act, heads=heads, norm=norm) for i, j in zip(h_size[:-1], h_size[1:])])
         self.fcOUT = nn.Linear(h_size[-1], out_size)
 
     def forward(self, x, edge_index, batch):
@@ -293,7 +309,7 @@ class GAT(nn.Module):
             x = global_mean_pool(x, batch)
         elif self.pool == "add":
             x = global_add_pool(x, batch)
-        x = self.fcOUT(x)
+        x = self.decoder(x)
         return x
 
 
@@ -302,8 +318,8 @@ class Autoencoder(nn.Module):
     def __init__(self, in_size, latent_size, h_size=None, block="mlp"):
         super(Autoencoder, self).__init__()
 
-        if h_size is None:
-            h_size = in_size // 2
+        # if h_size is None:
+        #     h_size = in_size // 2
 
         self.encoder = MLP(in_size, h_size, latent_size, block=block)
         self.decoder = MLP(latent_size, h_size, in_size, block=block)
@@ -312,5 +328,3 @@ class Autoencoder(nn.Module):
         latent = self.encoder(x)
         recon = self.decoder(latent)
         return recon
-
-# TODO: Add macro model class with all hyperparameters and model selection.
