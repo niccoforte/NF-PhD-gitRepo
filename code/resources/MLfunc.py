@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch_geometric.utils import to_networkx
 import networkx as nx
+import optuna
 
 
 def err(A, B, typ=None, axis=None):
@@ -100,12 +101,13 @@ def plot_Fsurface(x_values, y_values, val, typ="3d"):
 
 ### NEURAL NETWORK FUNCTIONS
 
-def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10):
+def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, optTrial=None):
     train_lossLog = []
     val_lossLog = []
     best_loss, best_epoch = 1000, 0
     for epoch in range(1, n_epochs+1):
         train_lossSum = 0
+        model.train()
         for batch in train_dataloader:
             if typ.lower() == "gnn":
                 x, y = batch.x.float(), batch.y.float()
@@ -126,6 +128,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
         train_lossAvg = train_lossSum/len(train_dataloader)
         
         if val_dataloader:
+            model.eval()
             with torch.no_grad():
                 val_lossSum = 0
                 for batch in val_dataloader:
@@ -142,6 +145,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                     val_lossSum += loss
 
                 val_lossAvg = val_lossSum/len(val_dataloader)
+
             if scheduler:
                 scheduler.step(val_lossAvg)
             if earlyStop:
@@ -155,17 +159,23 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                 earlyStop(train_lossAvg)
                 if earlyStop.early_stop:
                     break
-        
-        if torch.abs(loss) < best_loss:
-            best_loss = torch.abs(loss).item()
+
+        lossAvg = val_lossAvg if val_dataloader else train_lossAvg
+        if lossAvg < best_loss:
+            best_loss = lossAvg
             best_epoch = epoch
         
+        if optTrial:
+            optTrial.report(lossAvg, epoch)
+            if optTrial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+
         if verbose:
             if epoch == 1 or epoch % int(verbose) == 0:
                 print("Epoch:", epoch, "- Loss:", loss.item())
             
     print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
-    return model, epoch, train_lossLog, val_lossLog
+    return model, epoch, train_lossLog, val_lossLog, best_loss
 
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
