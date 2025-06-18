@@ -72,7 +72,7 @@ class MODEL:
             self.test_outputs = standardize(self.test_outputs, self.data.outParams[0], self.data.outParams[1], mode=1)
             self.truth = standardize(self.truth, self.data.outParams[0], self.data.outParams[1], mode=1)
 
-        self.err = err(self.test_outputs, self.truth, typ="sum", axis=1)
+        self.err = absErr(self.test_outputs, self.truth, typ="sum", axis=1)
         self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
         print(f"Best prediction: {self.best}, Worst prediction: {self.worst}")
 
