@@ -269,8 +269,8 @@ def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name
     pruner = optuna.pruners.MedianPruner()
 
     if save:
-        os.makedirs(f"{path}/{name}", exist_ok=True)
-        storage_name = f"sqlite:///{path}/{name}/HPO.db"
+        os.makedirs(f"{path}/{name}/HPO", exist_ok=True)
+        storage_name = f"sqlite:///{path}/{name}/HPO/full_study.db"
         study_name = name
         study = optuna.create_study(storage=storage_name,
                                     study_name=study_name,
@@ -295,7 +295,7 @@ def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name
     
     if save:
         best_params = best_trial.params
-        with open(f"{path}/{name}/best_params.json", "w") as f:
+        with open(f"{path}/{name}/HPO/best_params.json", "w") as f:
             json.dump(best_params, f, indent=4)
     
     return study
