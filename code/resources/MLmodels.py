@@ -1,9 +1,11 @@
+from resources.imports import *
+
 import torch
 import torch.nn as nn
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 
-from resources.MLfunc import *
+from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr
 from resources.MLdata import standardize
 
 
@@ -43,21 +45,20 @@ class MODEL:
         self.best, self.worst = None, None
     
     def train(self, n_epochs, verbose=10, plot=False):
-        self.model, \
-            self.epoch, \
-                self.train_lossLog, \
-                    self.val_lossLog, \
-                        self.best_loss = train_model(self.typ, 
-                                                    self.model, 
-                                                    self.lossf, 
-                                                    n_epochs, 
-                                                    self.opt, 
-                                                    self.train_dataloader, 
-                                                    val_dataloader=self.val_dataloader, 
-                                                    scheduler=self.scheduler, 
-                                                    earlyStop=self.earlyStop, 
-                                                    verbose=verbose,
-                                                    optTrial=self.optTrial)
+        self.model, self.epoch, self.train_lossLog, self.val_lossLog, self.best_loss = train_model(
+            self.typ, 
+            self.model, 
+            self.lossf, 
+            n_epochs, 
+            self.opt, 
+            self.train_dataloader, 
+            val_dataloader=self.val_dataloader, 
+            scheduler=self.scheduler, 
+            earlyStop=self.earlyStop, 
+            verbose=verbose,
+            optTrial=self.optTrial
+        )
+        
         if plot:
             plot_loss(self.epoch, self.train_lossLog, self.val_lossLog)
     
