@@ -288,7 +288,7 @@ def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name
         print(f"  Number of finished trials: {len(study.trials)}")
 
         best_trial = study.best_trial
-        print("\nBest trial \n Loss: {best_trial.value:.4f}")
+        print(f"\nBest trial \n Loss: {best_trial.value}")
         print("\n Hyperparameters:")
         for key, value in best_trial.params.items():
             print(f"  {key}: {value}")
