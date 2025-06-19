@@ -5,9 +5,10 @@ import torch.nn as nn
 from torch_geometric.utils import to_networkx
 import networkx as nx
 import optuna
+import json
 
 
-def err(A, B, typ=None, axis=None):
+def absErr(A, B, typ=None, axis=None):
     if typ == "mean":
         return np.mean(np.abs(A - B), axis=axis)
     elif typ == "sum":
@@ -22,6 +23,14 @@ def mse(A, B, typ=False, axis=None):
         return np.sum((A - B)**2, axis=axis)
     else:
         return (A - B)**2
+
+def rmse(A, B, typ=False, axis=None):
+    if typ == "mean":
+        return np.sqrt(np.mean((A - B)**2, axis=axis))
+    elif typ == "sum":
+        return np.sqrt(np.sum((A - B)**2, axis=axis))
+    else:
+        return np.sqrt((A - B)**2)
 
 ### GAUSSIAN PROCESS FUNCTIONS
 
@@ -104,7 +113,7 @@ def plot_Fsurface(x_values, y_values, val, typ="3d"):
 def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, optTrial=None):
     train_lossLog = []
     val_lossLog = []
-    best_loss, best_epoch = 1000, 0
+    best_loss, best_epoch, best_model_state = 1000, 0, None
     for epoch in range(1, n_epochs+1):
         train_lossSum = 0
         model.train()
@@ -164,11 +173,15 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
         if lossAvg < best_loss:
             best_loss = lossAvg
             best_epoch = epoch
+            best_model_state = model.state_dict().copy()
         
         if optTrial:
             optTrial.report(lossAvg, epoch)
             if optTrial.should_prune():
                 raise optuna.exceptions.TrialPruned()
+        
+        if best_model_state:
+            model.load_state_dict(best_model_state)
 
         if verbose:
             if epoch == 1 or epoch % int(verbose) == 0:
@@ -223,7 +236,69 @@ class EarlyStopping:
                 print(f"Early stopping triggered after {self.patience} epochs without improvement.")
             self.early_stop = True  # Set flag for stopping
 
-# TODO: Hyperparameter optimization functions
+### HYPERPARAMETER OPTIMIZATION
+
+def objective(trial, model):
+    n_layers = trial.suggest_int('n_layers', 1, 4)
+    hidden_dim = trial.suggest_int('hidden_dim', 8, 64, log=True)
+    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    batch_size = trial.suggest_categorical('batch_size', [1, 2, 8, 16])
+    h_size = [hidden_dim] * n_layers
+
+    model_instance = MODEL( # type: ignore
+        typ="MLP",
+        model="INSERT MODEL HERE",
+        lossf=nn.MSELoss(),
+        opt=("adam", 0),
+        batch=batch_size,
+        lr=lr,
+        data=model.data,
+        train_dataloader=model.train_dataloader,
+        val_dataloader=None,
+        test_dataloader=None,
+        scheduler=("min", 0.7, 10, 1e-4, True),
+        earlyStop=EarlyStopping(patience=10, verbose=False),
+        w_init=weights_init,
+        optTrial=trial
+    )
+
+    model_instance.train(n_epochs=50, verbose=50)
+    return model_instance.best_loss
+
+def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name="sample"):
+    pruner = optuna.pruners.MedianPruner()
+
+    if save:
+        os.makedirs(f"{path}/{name}", exist_ok=True)
+        storage_name = f"sqlite:///{path}/{name}/HPO.db"
+        study_name = name
+        study = optuna.create_study(storage=storage_name,
+                                    study_name=study_name,
+                                    direction="minimize",
+                                    pruner=pruner,
+                                    load_if_exists=True)
+    else:
+        study = optuna.create_study(direction="minimize", pruner=pruner)
+    
+    study.optimize(objective, n_trials=n_trials)
+
+    if prnt:
+        print("\n" + "="*50)
+        print(" Optimization Finished. Study statistics: ")
+        print(f"  Number of finished trials: {len(study.trials)}")
+
+        best_trial = study.best_trial
+        print("\nBest trial \n Loss: {best_trial.value:.4f}")
+        print("\n Hyperparameters:")
+        for key, value in best_trial.params.items():
+            print(f"  {key}: {value}")
+    
+    if save:
+        best_params = best_trial.params
+        with open(f"{path}/{name}/best_params.json", "w") as f:
+            json.dump(best_params, f, indent=4)
+    
+    return study
 
 # TODO: GPU integration
 # TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
@@ -260,7 +335,7 @@ def plot_StressStrainOUT(perOUT, test_outputs, truth=None, indx=0):
     plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label=f"Prediction-{indx}")
     if truth is not None:
         plt.scatter(perOUT[0], truth[indx]+perOUT[1], s=5, label=f"Truth-{indx}")
-        plt.bar(perOUT[0], err(truth[indx], test_outputs[indx]), width=(max(perOUT[0])-min(perOUT[0]))/(len(perOUT[0])), alpha=0.25, label="Error")
+        plt.bar(perOUT[0], absErr(truth[indx], test_outputs[indx]), width=(max(perOUT[0])-min(perOUT[0]))/(len(perOUT[0])), alpha=0.25, label="Error")
     plt.ylabel("Stress ($\sigma$) [MPa]")
     plt.xlabel("Strain ($\epsilon$)")
     plt.legend()
