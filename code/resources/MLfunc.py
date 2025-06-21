@@ -1,27 +1,36 @@
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from resources.imports import *
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch import optim
 from torch_geometric.utils import to_networkx
 import networkx as nx
+import optuna
+import json
 
 
-def err(A, B, mean=False):
-    if mean:
-        return np.mean(np.abs(A - B))
+def absErr(A, B, typ=None, axis=None):
+    if typ == "mean":
+        return np.mean(np.abs(A - B), axis=axis)
+    elif typ == "sum":
+        return np.sum(np.abs(A - B), axis=axis)
     else:
         return np.abs(A - B)
 
-def mse(A, B, mean=False):
-    if mean:
-        return np.mean((A - B)**2)
+def mse(A, B, typ=False, axis=None):
+    if typ == "mean":
+        return np.mean((A - B)**2, axis=axis)
+    elif typ == "sum":
+        return np.sum((A - B)**2, axis=axis)
     else:
         return (A - B)**2
+
+def rmse(A, B, typ=False, axis=None):
+    if typ == "mean":
+        return np.sqrt(np.mean((A - B)**2, axis=axis))
+    elif typ == "sum":
+        return np.sqrt(np.sum((A - B)**2, axis=axis))
+    else:
+        return np.sqrt((A - B)**2)
 
 ### GAUSSIAN PROCESS FUNCTIONS
 
@@ -101,12 +110,13 @@ def plot_Fsurface(x_values, y_values, val, typ="3d"):
 
 ### NEURAL NETWORK FUNCTIONS
 
-def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10):
+def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, optTrial=None):
     train_lossLog = []
     val_lossLog = []
-    best_loss, best_epoch = 1000, 0
+    best_loss, best_epoch, best_model_state = 1000, 0, None
     for epoch in range(1, n_epochs+1):
         train_lossSum = 0
+        model.train()
         for batch in train_dataloader:
             if typ.lower() == "gnn":
                 x, y = batch.x.float(), batch.y.float()
@@ -127,6 +137,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
         train_lossAvg = train_lossSum/len(train_dataloader)
         
         if val_dataloader:
+            model.eval()
             with torch.no_grad():
                 val_lossSum = 0
                 for batch in val_dataloader:
@@ -143,6 +154,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                     val_lossSum += loss
 
                 val_lossAvg = val_lossSum/len(val_dataloader)
+
             if scheduler:
                 scheduler.step(val_lossAvg)
             if earlyStop:
@@ -156,38 +168,50 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                 earlyStop(train_lossAvg)
                 if earlyStop.early_stop:
                     break
-        
-        if torch.abs(loss) < best_loss:
-            best_loss = torch.abs(loss).item()
+
+        lossAvg = val_lossAvg if val_dataloader else train_lossAvg
+        if lossAvg < best_loss:
+            best_loss = lossAvg
             best_epoch = epoch
+            best_model_state = model.state_dict().copy()
         
+        if optTrial:
+            optTrial.report(lossAvg, epoch)
+            if optTrial.should_prune():
+                raise optuna.exceptions.TrialPruned()
+        
+        if best_model_state:
+            model.load_state_dict(best_model_state)
+
         if verbose:
             if epoch == 1 or epoch % int(verbose) == 0:
                 print("Epoch:", epoch, "- Loss:", loss.item())
             
     print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
-    # torch.save(model.state_dict(), "new_best_deep_ritz1.mdl")
-    return model, epoch, train_lossLog, val_lossLog
+    return model, epoch, train_lossLog, val_lossLog, best_loss
 
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
+    truth = []
     with torch.no_grad():
         for batch in test_dataloader:
             if typ.lower() == "gnn":
                 x, y = batch.x.float(), batch.y.float()
-                y_predict = model(batch.x, batch.edge_index, batch.batch)
+                y_predict = model(x, batch.edge_index, batch.batch)  # CHECK
                 y = batch.y.view(batch.num_graphs, -1)
             else:
                 x, y = batch[:][0].float(), batch[:][1].float()
                 y_predict = model(x)
             test_outputs.append(y_predict.detach().cpu().numpy())
+            truth.append(y.detach().cpu().numpy())
     test_outputs = np.concatenate(test_outputs)
-    return test_outputs
+    truth = np.concatenate(truth)
+    return test_outputs, truth
 
 def weights_init(m):
     if isinstance(m, nn.Linear):
         #nn.init.xavier_normal_(m.weight)
-        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+        nn.init.kaiming_normal_(m.weight, nonlinearity='sigmoid')
         if m.bias is not None:
             nn.init.constant_(m.bias, 0.01)
 
@@ -212,13 +236,79 @@ class EarlyStopping:
                 print(f"Early stopping triggered after {self.patience} epochs without improvement.")
             self.early_stop = True  # Set flag for stopping
 
+### HYPERPARAMETER OPTIMIZATION
+
+def objective(trial, model):
+    n_layers = trial.suggest_int('n_layers', 1, 4)
+    hidden_dim = trial.suggest_int('hidden_dim', 8, 64, log=True)
+    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
+    batch_size = trial.suggest_categorical('batch_size', [1, 2, 8, 16])
+    h_size = [hidden_dim] * n_layers
+
+    model_instance = MODEL( # type: ignore
+        typ="MLP",
+        model="INSERT MODEL HERE",
+        lossf=nn.MSELoss(),
+        opt=("adam", 0),
+        batch=batch_size,
+        lr=lr,
+        data=model.data,
+        train_dataloader=model.train_dataloader,
+        val_dataloader=None,
+        test_dataloader=None,
+        scheduler=("min", 0.7, 10, 1e-4, True),
+        earlyStop=EarlyStopping(patience=10, verbose=False),
+        w_init=weights_init,
+        optTrial=trial
+    )
+
+    model_instance.train(n_epochs=50, verbose=50)
+    return model_instance.best_loss
+
+def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name="sample"):
+    pruner = optuna.pruners.MedianPruner()
+
+    if save:
+        os.makedirs(f"{path}/{name}/HPO", exist_ok=True)
+        storage_name = f"sqlite:///{path}/{name}/HPO/full_study.db"
+        study_name = name
+        study = optuna.create_study(storage=storage_name,
+                                    study_name=study_name,
+                                    direction="minimize",
+                                    pruner=pruner,
+                                    load_if_exists=True)
+    else:
+        study = optuna.create_study(direction="minimize", pruner=pruner)
+    
+    study.optimize(objective, n_trials=n_trials)
+
+    if prnt:
+        print("\n" + "="*50)
+        print(" Optimization Finished. Study statistics: ")
+        print(f"  Number of finished trials: {len(study.trials)}")
+
+        best_trial = study.best_trial
+        print("\nBest trial \n Loss: {best_trial.value:.4f}")
+        print("\n Hyperparameters:")
+        for key, value in best_trial.params.items():
+            print(f"  {key}: {value}")
+    
+    if save:
+        best_params = best_trial.params
+        with open(f"{path}/{name}/HPO/best_params.json", "w") as f:
+            json.dump(best_params, f, indent=4)
+    
+    return study
+
+# TODO: GPU integration
+# TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
 ### Custom Loss Functions
 
 def QuantileLoss():
     pass
 
-def custom_loss(target, output):   ### TODO: Quantile loss
+def custom_loss(target, output):
     return torch.mean((output - target)**2)
 
 def physics_loss(target, output):
@@ -227,44 +317,35 @@ def physics_loss(target, output):
 
 ### Plotting Functions
 
-def plot_loss(epoch, train, val):
+def plot_loss(epoch, train, val=None):
     fig = plt.figure(figsize=(10, 5))
-    plt.plot(np.linspace(1, epoch, len(train)), train)
-    plt.plot(np.linspace(1, epoch, len(val)), val)
+    plt.plot(np.linspace(1, epoch, len(train)), train, label="Training")
+    if val:
+        plt.plot(np.linspace(1, epoch, len(val)), val, label="Validation")
     plt.xlabel("Training Epoch")
     plt.ylabel("Mean Squared Error (MSE)")
     plt.yscale("log")
     plt.title("Training and Validation Loss Vs Epoch")
-    plt.legend(["Training", "Validation"])
+    plt.legend()
     plt.grid()
     plt.show()
 
-def plot_StressStrainOUT(perOUT, train_out, test_outputs, indx=0):
+def plot_StressStrainOUT(perOUT, test_outputs, truth=None, indx=0):
     fig = plt.figure(figsize=(10, 5))
-    plt.scatter(perOUT[0], train_out[indx]+perOUT[1], s=5, label=f"Truth-{indx}")
     plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label=f"Prediction-{indx}")
+    if truth is not None:
+        plt.scatter(perOUT[0], truth[indx]+perOUT[1], s=5, label=f"Truth-{indx}")
+        plt.bar(perOUT[0], absErr(truth[indx], test_outputs[indx]), width=(max(perOUT[0])-min(perOUT[0]))/(len(perOUT[0])), alpha=0.25, label="Error")
     plt.ylabel("Stress ($\sigma$) [MPa]")
     plt.xlabel("Strain ($\epsilon$)")
     plt.legend()
     plt.grid()
     plt.show()
 
-# TODO: ERROR PLOTTING 
-
-def plot_StressStrainERR(perOUT, train_out, test_outputs, indx=0):
-    fig = plt.figure(figsize=(10, 5))
-    plt.scatter(perOUT[0], train_out[indx], s=5, label="Truth")
-    plt.scatter(perOUT[0], test_outputs[indx], s=5, label="Prediction")
-    plt.ylabel("Stress ($\sigma$) [MPa]")
-    plt.xlabel("Strain ($\epsilon$)")
-    plt.legend()
-    plt.grid()
-    plt.show()
-
-def plot_Distribution(train_in1, test_outputs, dx_out1=None, typ="contour"):
+def plot_Distribution(train_in1, test_outputs, truth=None, typ="contour"):
     x_, y_ = train_in1[:,0], train_in1[:,1]
-    if dx_out1 is not None:
-        val_ = dx_out1 - test_outputs
+    if truth is not None:
+        val_ = truth - test_outputs
         title = "Error Distribution"
     else:
         val_ = test_outputs
