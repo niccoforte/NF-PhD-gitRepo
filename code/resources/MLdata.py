@@ -98,8 +98,8 @@ def split_data(dIN, dOUT, PATH, mode, dis, split=0.85):
     idxs = list(range(len(dOUT)))
     random.shuffle(idxs)
     train_idxs = idxs[:int(split*len(dOUT))]
-    train_idxs, val_idxs = train_idxs[:int(split*len(train_idxs))], train_idxs[int(split*len(train_idxs)):]
     test_idxs = [i for i in idxs if i not in train_idxs]
+    train_idxs, val_idxs = train_idxs[:int(split*len(train_idxs))], train_idxs[int(split*len(train_idxs)):]
     
     train_in = dIN[train_idxs]
     val_in = dIN[val_idxs]
