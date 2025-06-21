@@ -20,7 +20,7 @@ latticeType = 'FCC'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kago
 MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 relDensity = 0.2                            # relative density
-distribution = 'lhs_uniform'                    # 'uniform', 'lhs_uniform', 'normal', 'exponential'
+distribution = 'lhs_uniform'                # 'uniform', 'lhs_uniform', 'normal', 'exponential'
 crossSection = 'rect'
 if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
@@ -90,7 +90,7 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.070                                               # FINAL 20 - 0.070
         strainAppFT = 0.080                                               # FINAL 20 - 0.080
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.165                                               # FINAL 20 - 
+        strainAppUT = 0.165                                               # FINAL 20 - 0.165
         strainAppFT = 0.200                                               # FINAL 20 - 0.200
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":

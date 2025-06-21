@@ -17,8 +17,8 @@ starttime = time.time()
 ############################################################################################
 
 unitCellSize = 10.0                         # Strut length
-latticeType = 'tri'                         # 'FCC', 'tri', 'hex', 'kagome'
-MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
+latticeType = 'FCC'                         # 'FCC', 'tri', 'hex', 'kagome'
+MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                         # 'al', 'sic', 'ti'
 relDensity = 0.2                            # relative density
 distribution = 'lhs_uniform'                # 'uniform', 'lhs_uniform', 'normal', 'exponential'
@@ -27,16 +27,16 @@ if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
 elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
-nnx = nnx                                   # number of Unit cells in X direction (Y automatic)
+#nnxs = [26,30,34]                                   # number of Unit cells in X direction (Y automatic)
 
 finalRun = 'yes'
-numberOfRuns = 1
-initialJob = 1
+numberOfRuns = 100
+initialJobs = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-nodeVar = 'no'                               # distortion
+nodeVar = 'yes'                               # distortion
 fac = 0.2
 sizeVar = 'no'
 beta = 0.2
@@ -45,9 +45,10 @@ stiffMatrix = False
 UTval = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-#pDir = "C:\\Users\\exy053\\Documents\\MeshConv" #PSC\\"+str(int(unitCellSize))
+pDir = "C:\\Users\\exy053\\Documents\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
+pDir = "Z:\\p1\sims\\Ti\\dimReductionData"
 #pDir = "Z:\\p1-LatticeFractureToughness\\sims\\Ti\\disConv\\" + latticeType
-pDir = "C:\\Users\\exy053\\Documents\\sApp" # \\" + str(int(fac*100))
+#pDir = "C:\\Users\\exy053\\Documents\\sApp" # \\" + str(int(fac*100))
 #pDir = "C:\\Users\\exy053\\Documents\\ModelChanges" # SiC" # test # 
 
 cmdIN = sys.argv[8:]
@@ -97,7 +98,7 @@ if len(cmdIN) > 0:
     elif path.lower() == "mc":
         pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
-        pDir = "C:\\Users\\exy053\\Documents\\" + str(path)
+        pDir = str(path)
 
 if stiffMatrix:
     MechanicalModel = 'ductile'
@@ -140,7 +141,7 @@ if userMaterial.lower() == "ti":
         strainAppUT = 0.070                                               # FINAL 20 - 0.070
         strainAppFT = 0.080                                               # FINAL 20 - 0.080
     elif latticeType.lower() == "hex":
-        strainAppUT = 0.165                                               # FINAL 20 - 
+        strainAppUT = 0.165                                               # FINAL 20 - 0.165
         strainAppFT = 0.200                                               # FINAL 20 - 0.200
 elif userMaterial.lower() == "sic":
     if latticeType.lower() == "fcc":
@@ -1071,7 +1072,7 @@ def LHS_uniform(var, strats, lim, mean=0, plot=False):
 ############################################################################################
 ################################## START ###################################################
 ############################################################################################
-## For PSC:
+## For PSC/DSC:
 # for nnx in nnxs:
 
 ## For MeshConv:
@@ -1712,10 +1713,10 @@ for idNum in range(initial,numOfJobs):
         
         if (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
-            mdb.jobs[Job].submit(consistencyChecking=OFF)
-            mdb.jobs[Job].waitForCompletion()
-            endtime = time.time()
-            print(endtime - starttime, "== time for job", Job)
+            # mdb.jobs[Job].submit(consistencyChecking=OFF)
+            # mdb.jobs[Job].waitForCompletion()
+            # endtime = time.time()
+            # print(endtime - starttime, "== time for job", Job)
         
         if stiffMatrix:
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
