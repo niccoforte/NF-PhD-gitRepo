@@ -5,8 +5,8 @@ import sys
 
 stiffMatrix = True
 
-#pDir = os.chdir("C:\\Users\\exy053\\Documents\\PerSizeConv4\\10")
-pDir = os.chdir("C:\\Users\\exy053\\Documents\\disConv")
+#pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
+pDir = "C:\\Users\\exy053\\Documents" #\\disConv"
 
 cmdIN = sys.argv[2:]
 if len(cmdIN) > 0:
