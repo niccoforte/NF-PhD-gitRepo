@@ -20,7 +20,7 @@ expected_steps = 201
 
 #pDir = r"C:\\Users\\exy053\\Documents\\sApp"
 #pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
-pDir = r"C:\\Users\\exy053\\Documents\\MeshConv\\1-5-1"
+pDir = r"C:\\Users\\exy053\\Documents" #\\MeshConv\\1-5-1"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
