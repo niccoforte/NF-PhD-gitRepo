@@ -1,12 +1,12 @@
-import numpy as np
-import pandas as pd
+from resources.imports import *
+
 from torch.utils.data.dataset import Dataset
-import random
-import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 from resources.calculations import calcUT, calcFT
 
-### General Data Initialization
+
 def load_data(inputs, outputs):
     IN_df = pd.read_csv(inputs, index_col=0).sort_index()
     OUT_df = pd.read_csv(outputs, index_col=0).sort_index()
@@ -246,6 +246,78 @@ def plot_curve(OUT_df, xOUT, mode, idx=None, q=15):
     ax1.grid()
 
     plt.show()
+
+
+class PCA_:
+    def __init__(self):
+        self.scaler = StandardScaler()
+
+        self.data = None
+        self.n_components = None
+
+        self.scaled_data = None
+        self.pca = None
+        self.final_pca = None
+        self.reduced_data = None
+        
+    
+    def fit(self, data, scale=False, verbose=False):
+        self.data = data
+        if scale:
+            self.scaled_data = self.scaler.fit_transform(self.data)
+        else:
+            self.scaled_data = self.data
+        self.pca = PCA()
+        self.pca.fit(self.scaled_data)
+        if verbose:
+            plt.figure(figsize=(10, 6))
+            plt.plot(np.cumsum(self.pca.explained_variance_ratio_), 'b-')
+            plt.xlabel('Number of Components')
+            plt.ylabel('Cumulative Explained Variance')
+            plt.title('Explained Variance by PCA Components')
+            plt.grid(True)
+            # plt.axhline(y=0.95, color='teal', linestyle='--', label='95% Threshold')
+            # plt.axhline(y=0.90, color='green', linestyle='--', label='90% Threshold')
+            # plt.axhline(y=0.80, color='orange', linestyle='--', label='80% Threshold')
+            # plt.axhline(y=0.50, color='red', linestyle='--', label='50% Threshold')
+            plt.legend()
+            plt.show()
+
+            n_components_50 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.5)[0][0] + 1
+            n_components_80 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.8)[0][0] + 1
+            n_components_90 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.9)[0][0] + 1
+            n_components_95 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.95)[0][0] + 1
+            n_components_100 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.999999)[0][0] + 1
+            print(f"Number of components to capture 50% variance: {n_components_50}")
+            print(f"Number of components to capture 80% variance: {n_components_80}")
+            print(f"Number of components to capture 90% variance: {n_components_90}")
+            print(f"Number of components to capture 95% variance: {n_components_95}")
+            print(f"Number of components to capture 100% variance: {n_components_100}")
+
+    def reduce(self, data=None, scale=False, accuracy=0.999999, n_components=None, verbose=False):
+        if data is None:
+            data = self.data
+        if scale:
+            scaled_data = self.scaler.transform(data)
+        else:
+            scaled_data = data
+        self.n_components = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= accuracy)[0][0] + 1
+        if n_components is not None:
+            self.n_components = n_components
+        self.final_pca = PCA(n_components=self.n_components)
+        self.reduced_data = self.final_pca.fit_transform(scaled_data)
+
+        if verbose:
+            print(f"Original data shape: {self.data.shape}")
+            print(f"Reduced data shape: {self.reduced_data.shape}")
+        
+        return self.reduced_data
+    
+    def reconstruct(self, data, scale=False):
+        reconstructed_data = self.final_pca.inverse_transform(data)
+        if scale:
+            reconstructed_data = self.scaler.inverse_transform(reconstructed_data)
+        return reconstructed_data
 
 
 def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV_test_in, CSV_test_out):
