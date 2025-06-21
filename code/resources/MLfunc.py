@@ -2,6 +2,8 @@ from resources.imports import *
 
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
+from torchinfo import summary
 from torch_geometric.utils import to_networkx
 import networkx as nx
 import optuna
@@ -288,7 +290,7 @@ def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name
         print(f"  Number of finished trials: {len(study.trials)}")
 
         best_trial = study.best_trial
-        print("\nBest trial \n Loss: {best_trial.value:.4f}")
+        print(f"\nBest trial \n Loss: {best_trial.value}")
         print("\n Hyperparameters:")
         for key, value in best_trial.params.items():
             print(f"  {key}: {value}")
@@ -299,6 +301,12 @@ def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name
             json.dump(best_params, f, indent=4)
     
     return study
+
+def load_bestParams(path="models/etc", name="sample"):
+    with open(f"{path}/{name}/HPO/best_params.json", "r") as f:
+        best_params = json.load(f)
+
+    return best_params
 
 # TODO: GPU integration
 # TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
