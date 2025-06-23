@@ -173,7 +173,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
 
         lossAvg = val_lossAvg if val_dataloader else train_lossAvg
         if lossAvg < best_loss:
-            best_loss = lossAvg
+            best_loss = lossAvg.item()
             best_epoch = epoch
             best_model_state = model.state_dict().copy()
         
@@ -187,9 +187,9 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
 
         if verbose:
             if epoch == 1 or epoch % int(verbose) == 0:
-                print("Epoch:", epoch, "- Loss:", lossAvg)
+                print("Epoch:", epoch, "- Loss:", lossAvg.item())
             
-    print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
+    print(f"Best Epoch: {best_epoch}, with loss {best_loss.item()}")
     return model, epoch, train_lossLog, val_lossLog, best_loss
 
 def predict_model(typ, model, test_dataloader):
