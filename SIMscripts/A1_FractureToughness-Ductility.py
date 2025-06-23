@@ -761,7 +761,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
         randY = random.uniform(-delta, delta, len(nonboundaryNodes))
     elif (distribution.lower() == 'lhs_uniform'):
         randX = randX_all[idNum-initialJob]
-        randY = randX_all[idNum-initialJob]
+        randY = randY_all[idNum-initialJob]
     elif (distribution.lower() == 'normal'):
         randX = random.normal(0.0, delta, len(nonboundaryNodes))
         randY = random.normal(0.0, delta, len(nonboundaryNodes))
