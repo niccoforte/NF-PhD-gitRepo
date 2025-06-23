@@ -187,7 +187,7 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
 
         if verbose:
             if epoch == 1 or epoch % int(verbose) == 0:
-                print("Epoch:", epoch, "- Loss:", loss.item())
+                print("Epoch:", epoch, "- Loss:", lossAvg)
             
     print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
     return model, epoch, train_lossLog, val_lossLog, best_loss
