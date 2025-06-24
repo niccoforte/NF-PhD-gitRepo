@@ -404,6 +404,8 @@ class DATA:
             self.PATH  = pUTdisNodes2
         elif self.path == 1:
             self.PATH  = pTiLAT
+        else:
+            self.PATH  = str(self.path)
 
     def get_DataFiles(self):
         self.CSV_train_in  = self.PATH + f'NN-UT-{self.dis}-trainIN.csv'
