@@ -44,7 +44,7 @@ class MODEL:
         self.err = None
         self.best, self.worst = None, None
     
-    def train(self, n_epochs, verbose=10, plot=False):
+    def train(self, n_epochs, verbose=10, plot=False, RMSEcheck=False):
         self.model, self.epoch, self.train_lossLog, self.val_lossLog, self.best_loss = train_model(
             self.typ, 
             self.model, 
@@ -56,7 +56,8 @@ class MODEL:
             scheduler=self.scheduler, 
             earlyStop=self.earlyStop, 
             verbose=verbose,
-            optTrial=self.optTrial
+            optTrial=self.optTrial,
+            RMSEcheck=RMSEcheck
         )
         
         if plot:
@@ -69,9 +70,12 @@ class MODEL:
         self.test_outputs, self.truth = predict_model(self.typ,
                                                        self.model, 
                                                        test_dataloader)
-        if stand:
+        if stand is True:
             self.test_outputs = standardize(self.test_outputs, self.data.outParams[0], self.data.outParams[1], mode=1)
             self.truth = standardize(self.truth, self.data.outParams[0], self.data.outParams[1], mode=1)
+        elif stand == "in":
+            self.test_outputs = standardize(self.test_outputs, self.data.inParams[0], self.data.inParams[1], mode=1)
+            self.truth = standardize(self.truth, self.data.inParams[0], self.data.inParams[1], mode=1)
 
         self.err = absErr(self.test_outputs, self.truth, typ="sum", axis=1)
         self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
