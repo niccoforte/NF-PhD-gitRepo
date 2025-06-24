@@ -6,9 +6,9 @@ import numpy as np
 from numpy import *
 import math
 import sys
-executeOnCaeStartup()
 import time
 import os
+executeOnCaeStartup()
 
 starttime = time.time()
 

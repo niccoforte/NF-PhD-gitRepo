@@ -6,8 +6,8 @@ import numpy as np
 from numpy import *
 import math
 import sys
-executeOnCaeStartup()
 import time
+executeOnCaeStartup()
 
 starttime = time.time()
 
@@ -710,7 +710,7 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
         randY = random.uniform(-delta, delta, len(nonboundaryNodes))
     elif (distribution.lower() == 'lhs_uniform'):
         randX = randX_all[idNum-initialJob]
-        randY = randX_all[idNum-initialJob]
+        randY = randY_all[idNum-initialJob]
     elif (distribution.lower() == 'normal'):
         randX = random.normal(0.0, delta, len(nonboundaryNodes))
         randY = random.normal(0.0, delta, len(nonboundaryNodes))
@@ -1021,7 +1021,7 @@ def LHS_uniform(var, strats, lim, mean=0, plot=False):
 ############################################################################################
 ################################## START ###################################################
 ############################################################################################
-## For PSC:
+## For PSC/DSC:
 # for nnx in nnxs:
 
 ## For MeshConv:
@@ -2226,7 +2226,7 @@ for idNum in range(initial,numOfJobs):
         
         if (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
-            # mdb.jobs[Job].submit(consistencyChecking=OFF)
-            # mdb.jobs[Job].waitForCompletion()
+            mdb.jobs[Job].submit(consistencyChecking=OFF)
+            mdb.jobs[Job].waitForCompletion()
             endtime = time.time()
             print(endtime - starttime, "== time for job", Job)
