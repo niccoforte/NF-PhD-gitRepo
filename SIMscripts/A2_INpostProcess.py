@@ -8,7 +8,7 @@ stiffMatrix = True
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
 pDir = "C:\\Users\\exy053\\Documents" #\\disConv"
 
-cmdIN = sys.argv[2:]
+cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     dis = str(cmdIN[1])
@@ -55,7 +55,7 @@ if len(cmdIN) > 0:
     elif path.lower() == "mc":
         pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
-        str(path)
+        pDir = str(path)
 
 if stiffMatrix:
     pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
