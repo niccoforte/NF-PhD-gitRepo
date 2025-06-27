@@ -204,7 +204,7 @@ class MLP(nn.Module):
         return x
 
 
-### Graph Convolutional Network model
+### Graph Convolutional Network model  # TODO : Fix GNN predictions.
 class gcnBlock(nn.Module):
     def __init__(self, in_size, out_size, act, norm=None):
         super(gcnBlock, self).__init__()
