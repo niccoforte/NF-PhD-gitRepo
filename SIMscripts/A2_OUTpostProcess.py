@@ -69,7 +69,7 @@ if len(cmdIN) > 0:
     elif path.lower() == "mc":
         pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
     else:
-        str(path)
+        pDir = str(path)
        
 os.chdir(pDir)
 
