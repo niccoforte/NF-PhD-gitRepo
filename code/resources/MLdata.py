@@ -126,8 +126,8 @@ def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
         indx = [indx]
     for i in indx:
         plt.figure(figsize=(10, 6))
-        plt.hist(df.loc[i].to_numpy()/(np.sqrt(2*l**2)*1000), bins=50, alpha=0.7, color='blue')
-        plt.title(f'Distribution of Disorder for {LAT.capitalize()} {by.capitalize()} {i}')
+        plt.hist(df.loc[i].to_numpy()/(l*1000), bins=50, alpha=0.7, color='blue')
+        plt.title(f'Distribution of Disorder for {LAT.upper()} {by.capitalize()} {i}')
         plt.xlabel('normalized disorder')
         plt.ylabel('Frequency')
         plt.grid(True)
