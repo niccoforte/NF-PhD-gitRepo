@@ -36,28 +36,31 @@ class MODEL:
         self.optTrial = optTrial
         
         self.epoch = None
-        self.train_lossLog = None
-        self.val_lossLog = None
+        self.train_lossLog, self.val_lossLog = None, None
+        self.best_loss, self.best_rmse, self.best_epoch = None, None, None
 
-        self.test_outputs = None
-        self.truth = None
-        self.err = None
+        self.test_outputs, self.truth, self.err = None, None, None
         self.best, self.worst = None, None
     
-    def train(self, n_epochs, verbose=10, plot=False):
-        self.model, self.epoch, self.train_lossLog, self.val_lossLog, self.best_loss = train_model(
-            self.typ, 
-            self.model, 
-            self.lossf, 
-            n_epochs, 
-            self.opt, 
-            self.train_dataloader, 
-            val_dataloader=self.val_dataloader, 
-            scheduler=self.scheduler, 
-            earlyStop=self.earlyStop, 
-            verbose=verbose,
-            optTrial=self.optTrial
-        )
+    def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
+        self.model, \
+        self.epoch, \
+        self.train_lossLog, \
+        self.val_lossLog, \
+        self.best_loss, \
+        self.best_rmse, \
+        self.best_epoch = train_model(self.typ, 
+                                    self.model, 
+                                    self.lossf, 
+                                    n_epochs, 
+                                    self.opt, 
+                                    self.train_dataloader, 
+                                    val_dataloader=self.val_dataloader, 
+                                    scheduler=self.scheduler, 
+                                    earlyStop=self.earlyStop, 
+                                    verbose=verbose,
+                                    optTrial=self.optTrial,
+                                    RMSEtarget=RMSEtarget)
         
         if plot:
             plot_loss(self.epoch, self.train_lossLog, self.val_lossLog)
@@ -69,9 +72,12 @@ class MODEL:
         self.test_outputs, self.truth = predict_model(self.typ,
                                                        self.model, 
                                                        test_dataloader)
-        if stand:
+        if stand is True:
             self.test_outputs = standardize(self.test_outputs, self.data.outParams[0], self.data.outParams[1], mode=1)
             self.truth = standardize(self.truth, self.data.outParams[0], self.data.outParams[1], mode=1)
+        elif stand == "in":
+            self.test_outputs = standardize(self.test_outputs, self.data.inParams[0], self.data.inParams[1], mode=1)
+            self.truth = standardize(self.truth, self.data.inParams[0], self.data.inParams[1], mode=1)
 
         self.err = absErr(self.test_outputs, self.truth, typ="sum", axis=1)
         self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
@@ -198,7 +204,7 @@ class MLP(nn.Module):
         return x
 
 
-### Graph Convolutional Network model
+### Graph Convolutional Network model  # TODO : Fix GNN predictions.
 class gcnBlock(nn.Module):
     def __init__(self, in_size, out_size, act, norm=None):
         super(gcnBlock, self).__init__()
@@ -318,9 +324,6 @@ class GAT(nn.Module):
 class Autoencoder(nn.Module):
     def __init__(self, in_size, latent_size, h_size=None, block="mlp"):
         super(Autoencoder, self).__init__()
-
-        # if h_size is None:
-        #     h_size = in_size // 2
 
         self.encoder = MLP(in_size, h_size, latent_size, block=block)
         self.decoder = MLP(latent_size, h_size, in_size, block=block)

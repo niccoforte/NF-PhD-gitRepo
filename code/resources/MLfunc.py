@@ -112,12 +112,13 @@ def plot_Fsurface(x_values, y_values, val, typ="3d"):
 
 ### NEURAL NETWORK FUNCTIONS
 
-def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, optTrial=None):
+def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, optTrial=None, RMSEtarget=False):
     train_lossLog = []
     val_lossLog = []
-    best_loss, best_epoch, best_model_state = 1000, 0, None
+    best_loss, best_rmse, best_epoch, best_model_state = 1000, (False, 1000), 0, None
     for epoch in range(1, n_epochs+1):
         train_lossSum = 0
+        train_rmse = 0
         model.train()
         for batch in train_dataloader:
             if typ.lower() == "gnn":
@@ -128,20 +129,23 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                 x, y = batch[:][0].float(), batch[:][1].float()
                 y_predict = model(x)
             loss = lossf(y_predict, y)
-            train_lossSum += loss
+            train_lossLog.append(loss.item())
+            train_lossSum += loss.item()
+            train_rmse += np.sqrt(loss.item())
 
             opt.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
 
-            train_lossLog.append(loss.item())
         train_lossAvg = train_lossSum/len(train_dataloader)
+        train_rmseAvg = train_rmse/len(train_dataloader)
         
         if val_dataloader:
             model.eval()
             with torch.no_grad():
                 val_lossSum = 0
+                val_rmse = 0
                 for batch in val_dataloader:
                     if typ.lower() == "gnn":
                         x, y = batch.x.float(), batch.y.float()
@@ -153,27 +157,18 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                     loss = lossf(y_predict, y)
 
                     val_lossLog.append(loss.item())
-                    val_lossSum += loss
+                    val_lossSum += loss.item()
+                    val_rmse += np.sqrt(loss.item())
 
                 val_lossAvg = val_lossSum/len(val_dataloader)
-
-            if scheduler:
-                scheduler.step(val_lossAvg)
-            if earlyStop:
-                earlyStop(val_lossAvg)
-                if earlyStop.early_stop:
-                    break
-        else:
-            if scheduler:
-                scheduler.step(train_lossAvg)
-            if earlyStop:
-                earlyStop(train_lossAvg)
-                if earlyStop.early_stop:
-                    break
+                val_rmseAvg = val_rmse/len(val_dataloader)
 
         lossAvg = val_lossAvg if val_dataloader else train_lossAvg
+        rmse_lossAvg = val_rmseAvg if val_dataloader else train_rmseAvg
+
         if lossAvg < best_loss:
             best_loss = lossAvg
+            best_rmse = (False, rmse_lossAvg)
             best_epoch = epoch
             best_model_state = model.state_dict().copy()
         
@@ -181,16 +176,34 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
             optTrial.report(lossAvg, epoch)
             if optTrial.should_prune():
                 raise optuna.exceptions.TrialPruned()
-        
-        if best_model_state:
-            model.load_state_dict(best_model_state)
 
         if verbose:
             if epoch == 1 or epoch % int(verbose) == 0:
-                print("Epoch:", epoch, "- Loss:", lossAvg)
-            
+                print("Epoch:", epoch, "- Loss:", lossAvg, "- RMSE Loss:", rmse_lossAvg)
+        
+        if RMSEtarget:
+
+            if RMSEtarget is True:
+                target = 0.1*np.sqrt(1/12)
+            else:
+                target = float(RMSEtarget)
+            if rmse_lossAvg <= target:
+                best_rmse = (True, best_rmse)
+                print(f"RMSE check passed at epoch {epoch} with RMSE: {rmse_lossAvg:.4f}")
+                break
+
+        if scheduler:
+            scheduler.step(lossAvg)
+        if earlyStop:
+            earlyStop(lossAvg)
+            if earlyStop.early_stop:
+                break
+        
+    if best_model_state:
+        model.load_state_dict(best_model_state)
+
     print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
-    return model, epoch, train_lossLog, val_lossLog, best_loss
+    return model, epoch, train_lossLog, val_lossLog, best_loss, best_rmse, best_epoch
 
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
