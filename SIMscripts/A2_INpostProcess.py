@@ -3,10 +3,10 @@ import numpy as np
 import math
 import sys
 
-stiffMatrix = True
+stiffMatrix = False
 
 #pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
-pDir = "C:\\Users\\exy053\\Documents" #\\disConv"
+pDir = "C:\\Users\\exy053\\Documents\\TargetedDisorder\\xs" #\\disConv"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
