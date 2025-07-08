@@ -30,12 +30,12 @@ elif latticeType.lower() == "fcc": nnx = 16
 
 finalRun = 'yes'
 numberOfRuns = 50
-initialJob = 1
+initialJob = 51
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-distribution = 'lhs_uniform'                # 'uniform', 'lhs_uniform', 'normal', 'exponential'
+distribution = 'lhs_uniform'                # uniform, lhs_uniform, normal, exponential
 targeted_disorder = "xs"                    # None, X, nX, D, DD, DDD, v, h, o, oo, xs
 nodeVar = 'yes'                             # distortion
 fac = 0.2
@@ -45,14 +45,15 @@ beta = 0.2
 stiffMatrix = False
 UTval = False
 
-#pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-# pDir = "Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
-# pDir = "Z:\\p1\sims\\Ti\\dimReductionData"
-#pDir = "C:\\Users\\exy053\\Documents\\sApp" # \\" + str(int(fac*100))
-#pDir = "C:\\Users\\exy053\\Documents\\ModelChanges" # SiC" # test # 
-pDir = "C:\\Users\\exy053\\Documents\\TargetedDisorder"
+#pDir = f"C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
+# pDir = f"Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
+# pDir = f"Z:\\p1\sims\\Ti\\dimReductionData"
+#pDir = f"C:\\Users\\exy053\\Documents\\sApp" # \\" + str(int(fac*100))
+#pDir = f"C:\\Users\\exy053\\Documents\\ModelChanges" # SiC" # test # 
+pDir = f"Z:\\p1\sims\\Ti\\TargetedDisorder\\{targeted_disorder}"
 
 cmdIN = sys.argv[8:]
+print(sys.argv, cmdIN)
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     dis = str(cmdIN[1])
@@ -66,7 +67,6 @@ if len(cmdIN) > 0:
     cpus = int(cmdIN[9])
     FieldOut_frames = int(cmdIN[10])
     HistOut_frames = int(cmdIN[11])
-    
     path = str(cmdIN[12])
     
     stiffMatrix = False
@@ -850,10 +850,10 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
         disNodes = []
         for i in range(len(Hs)-1):
             for j in range(len(Ls)-1):
-                disNodes_pos = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (ycoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
-                disNodes_neg = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (ycoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
+                disNodes_pos = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
+                disNodes_neg = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
                 disNodes.append(np.concatenate((disNodes_pos, disNodes_neg)))
-        disNodes = np.concatenate((np.array(disNodes, dtype=object)))
+        disNodes = np.array(np.concatenate((np.array(disNodes, dtype=object))), dtype=int)
         disNodes, inx = unique(disNodes,return_index=True)
         disNodes = nonboundaryNodes[disNodes].flatten()
         disorderNodes = disNodes
