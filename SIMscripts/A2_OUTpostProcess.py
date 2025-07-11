@@ -9,35 +9,34 @@ import os
 mode = "any"                             # "ductile", "fracture", "both", "any"
 unitCellSize = 10.0
 
-LAT = "hex"
+LAT = "FCC"
 DIS = "disNodes"
-nnx = 20
+nnx = 16
 
 initial = 1
-numOfJobs = 1
-
+numberOfRuns = 1
 expected_steps = 201
 
-#pDir = r"C:\\Users\\exy053\\Documents\\sApp"
-#pDir = r"C:\\Users\\exy053\\Documents\\validation\\3\\0.13"
 pDir = r"C:\\Users\\exy053\\Documents\\TargetedDisorder\\xs" #\\MeshConv\\1-5-1"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    nnx = int(cmdIN[2])
-    unitCellSize = float(cmdIN[3])
-    MechanicalModel = str(cmdIN[4])
-    userMaterial = str(cmdIN[5])
-    relDensity = float(cmdIN[6])
-    initialJob = int(cmdIN[7])
-    numberOfRuns = int(cmdIN[8])
-    cpus = int(cmdIN[9])
-    FieldOut_frames = int(cmdIN[10])
-    HistOut_frames = int(cmdIN[11])
-    
-    path = str(cmdIN[12])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    MechanicalModel = str(cmdIN[3])
+    userMaterial = str(cmdIN[4])
+    relDensity = float(cmdIN[5])
+    dis = str(cmdIN[6])
+    fac = float(cmdIN[7])
+    distribution = str(cmdIN[8])
+    targeted_disorder = str(cmdIN[9])
+    initialJob = int(cmdIN[10])
+    numberOfRuns = int(cmdIN[11])
+    cpus = int(cmdIN[12])
+    FieldOut_frames = int(cmdIN[13])
+    HistOut_frames = int(cmdIN[14])
+    pDir = str(cmdIN[15])
     
     stiffMatrix = False
     UTval = False
@@ -55,21 +54,6 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-    
-    if path.lower() == "val":
-        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "psc":
-        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
-    elif path.lower() == "dsc":
-        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
-    elif path.lower() == "sic":
-        pDir = "C:\\Users\\exy053\\Documents\\SiC"
-    elif path.lower() == "rd":
-        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
-    elif path.lower() == "mc":
-        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
-    else:
-        pDir = str(path)
        
 os.chdir(pDir)
 
@@ -438,7 +422,7 @@ if (mode.lower() == 'ductile' or mode.lower() == 'both'):
     
     H, L = geometry(LAT, unitCellSize, nnx, brackets=True)
     MechMode = 'Ductile'
-    for kk in range(initial, initial+numOfJobs):
+    for kk in range(initial, initial+numberOfRuns):
         Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
         data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
         OUT = get_DuctData(Job, H, L)
@@ -450,7 +434,7 @@ if (mode.lower() == 'fracture' or mode.lower() == 'both'):
         os.makedirs("transfer")
     
     MechMode = 'Fracture'
-    for kk in range(initial, initial+numOfJobs):
+    for kk in range(initial, initial+numberOfRuns):
         Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
         data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
         OUT = get_FracData(Job)
