@@ -8,6 +8,7 @@ import math
 import sys
 import time
 import os
+from fractions import Fraction
 executeOnCaeStartup()
 
 starttime = time.time()
@@ -16,28 +17,28 @@ starttime = time.time()
 ####################################### INPUT ##############################################
 ############################################################################################
 
-unitCellSize = 10.0                         # Strut length
-latticeType = 'FCC'                         # 'FCC', 'tri', 'hex', 'kagome'
-MechanicalModel = 'ductile'                    # 'fracture', 'ductile', 'both'
-userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-relDensity = 0.2                            # relative density
+unitCellSize = 10.0                             # Strut length
+latticeType = 'FCC'                             # 'FCC', 'tri', 'hex', 'kagome'
+MechanicalModel = 'ductile'                        # 'fracture', 'ductile', 'both'
+userMaterial = 'ti'                             # 'al', 'sic', 'ti'
+relDensity = 0.2                                # relative density
 crossSection = 'rect'
 if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
 elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
-# nnx = 16 #s = [26,30,34]                      # number of Unit cells in X direction (Y automatic)
+nnx = nnx #s = [26,30,34] m                     # number of Unit cells in X direction (Y automatic)
 
-finalRun = 'yes'
-numberOfRuns = 50
-initialJob = 51
+finalRun = 'inp'
+numberOfRuns = 1
+initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-distribution = 'lhs_uniform'                # uniform, lhs_uniform, normal, exponential
-targeted_disorder = "xs"                    # None, X, nX, D, DD, DDD, v, h, o, oo, xs
-nodeVar = 'yes'                             # distortion
+distribution = 'frequency'                      # uniform, lhs_uniform, frequency, normal, exponential
+targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
+nodeVar = 'yes'                                 # distortion
 fac = 0.2
 sizeVar = 'no'
 beta = 0.2
@@ -45,29 +46,31 @@ beta = 0.2
 stiffMatrix = False
 UTval = False
 
-#pDir = f"C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-# pDir = f"Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
-# pDir = f"Z:\\p1\sims\\Ti\\dimReductionData"
-#pDir = f"C:\\Users\\exy053\\Documents\\sApp" # \\" + str(int(fac*100))
-#pDir = f"C:\\Users\\exy053\\Documents\\ModelChanges" # SiC" # test # 
-pDir = f"Z:\\p1\sims\\Ti\\TargetedDisorder\\{targeted_disorder}"
+#pDir = f"C:\\Users\\exy053\\Documents\\ModelChanges"
+#pDir = f"Z:\\p1\sims\\Ti\\Validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
+#pDir = f"Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
+#pDir = f"Z:\\p1\sims\\Ti\\DimReductionData"
+#pDir = f"Z:\\p1\sims\\Ti\\sApp" # \\" + str(int(fac*100))
+pDir = f"Z:\\p1\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
 
 cmdIN = sys.argv[8:]
-print(sys.argv, cmdIN)
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    nnx = int(cmdIN[2])
-    unitCellSize = float(cmdIN[3])
-    MechanicalModel = str(cmdIN[4])
-    userMaterial = str(cmdIN[5])
-    relDensity = float(cmdIN[6])
-    initialJob = int(cmdIN[7])
-    numberOfRuns = int(cmdIN[8])
-    cpus = int(cmdIN[9])
-    FieldOut_frames = int(cmdIN[10])
-    HistOut_frames = int(cmdIN[11])
-    path = str(cmdIN[12])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    MechanicalModel = str(cmdIN[3])
+    userMaterial = str(cmdIN[4])
+    relDensity = float(cmdIN[5])
+    dis = str(cmdIN[6])
+    fac = float(cmdIN[7])
+    distribution = str(cmdIN[8])
+    targeted_disorder = str(cmdIN[9])
+    initialJob = int(cmdIN[10])
+    numberOfRuns = int(cmdIN[11])
+    cpus = int(cmdIN[12])
+    FieldOut_frames = int(cmdIN[13])
+    HistOut_frames = int(cmdIN[14])
+    pDir = str(cmdIN[15])
     
     stiffMatrix = False
     UTval = False
@@ -86,21 +89,6 @@ if len(cmdIN) > 0:
     else:
         raise Exception("Invalid disorder input.")
     
-    if path.lower() == "val":
-        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "psc":
-        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
-    elif path.lower() == "dsc":
-        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
-    elif path.lower() == "sic":
-        pDir = "C:\\Users\\exy053\\Documents\\SiC"
-    elif path.lower() == "rd":
-        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
-    elif path.lower() == "mc":
-        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
-    else:
-        pDir = str(path)
-
 if stiffMatrix:
     MechanicalModel = 'ductile'
     pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
@@ -860,17 +848,17 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     else:
         disorderNodes = nonboundaryNodes
     
-    print(len(disorderNodes)/len(nonboundaryNodes))
-    
-    if int(idNum-initialJob) == 0:
-        global randX_all, randY_all
-        randX_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
-        randY_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
-        
+    # print(len(disorderNodes)/len(nonboundaryNodes))
+    global frequencies
+    frequencies = []
     if (distribution.lower() == 'uniform'):
         randX = random.uniform(-delta, delta, len(disorderNodes))
         randY = random.uniform(-delta, delta, len(disorderNodes))
     elif (distribution.lower() == 'lhs_uniform'):
+        if int(idNum-initialJob) == 0:
+            global randX_all, randY_all
+            randX_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
+            randY_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
         randX = randX_all[idNum-initialJob]
         randY = randY_all[idNum-initialJob]
     elif (distribution.lower() == 'normal'):
@@ -880,16 +868,35 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
         randX = random.exponential(1/delta, len(disorderNodes))
         randY = random.exponential(1/delta, len(disorderNodes))
     elif (distribution.lower() == 'frequency'):
-        pass
+        rows = set(nodes[disorderNodes.astype(int)-1,2])
+        while len(frequencies) < (2*len(rows)):
+            f = random_low_alias_freq(dx=unitCellSize)
+            if f not in frequencies:
+                frequencies.append(f)
+        rand = nodes[disorderNodes.astype(int)-1]
+        rand[:,1] = np.zeros(len(disorderNodes))
+        rand[:,2] = np.zeros(len(disorderNodes))
+        for i, y in enumerate(rows):
+            dN = nodes[disorderNodes.astype(int)-1]
+            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
+            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
+                          for j in dN_xs])
+            idxs = np.isin(rand[:,0], r[:,0])
+            sorter = np.argsort(r[:,0])
+            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
+            rand[idxs,1] = r[match_idxs,1]
+            rand[idxs,2] = r[match_idxs,2]
+        randX = rand[:,1]
+        randY = rand[:,2]
     
-    disorderCoordX = nodes[disorderNodes.astype(int)-1, 1] + randX
-    disorderCoordY = nodes[disorderNodes.astype(int)-1, 2] + randY
+    disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
+    disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
     
     nodesR[:,0] = nodes[:,0]
     nodesR[:,1] = nodes[:,1]
     nodesR[:,2] = nodes[:,2]
-    nodesR[disorderNodes.astype(int)-1, 1] = disorderCoordX
-    nodesR[disorderNodes.astype(int)-1, 2] = disorderCoordY
+    nodesR[disorderNodes.astype(int)-1,1] = disorderCoordX
+    nodesR[disorderNodes.astype(int)-1,2] = disorderCoordY
     
     return nodes, nodesR, bracket_nodes
 
@@ -1179,7 +1186,27 @@ def LHS_uniform(var, strats, lim, mean=0, plot=False):
         points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
         np.random.shuffle(points[:, i])
     return points
-    
+
+def triangle_wave(x, f, A):
+    frac = np.mod(f * x, 1.0)
+    tri = np.where(frac < 0.5, 2 * frac, 2 * (1 - frac))
+    return A * (2 * tri - 1)
+
+def sine_wave(x, f, A):
+    return A * np.sin(2 * np.pi * f * x)
+
+def is_well_approximable(alpha, q_max=20, tol=1e-6):
+    frac = Fraction(alpha).limit_denominator(q_max)
+    return abs(alpha - frac.numerator/frac.denominator) < tol
+
+def random_low_alias_freq(dx=10.0, q_max=20, tol=1e-6):
+    f_max = 1.0 / (2.0 * dx)
+    while True:
+        f = random.uniform(0, f_max)
+        alpha = f * dx
+        if not is_well_approximable(alpha, q_max=q_max, tol=tol):
+            return f
+
 ############################################################################################
 ################################## START ###################################################
 ############################################################################################
@@ -1203,7 +1230,7 @@ elif (nodeVar == 'no' and sizeVar == 'yes'):
 else:
     imper = 'disNodesStruts'
 
-if (finalRun.lower() == 'yes'):
+if (finalRun.lower() == 'yes' or finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
     initial = initialJob
     numOfJobs = initial + numberOfRuns
 elif (finalRun.lower() == 'no'):
@@ -1822,7 +1849,13 @@ for idNum in range(initial,numOfJobs):
             resultsFormat=ODB, parallelizationMethodExplicit=DOMAIN, numDomains=cpus, 
             activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=cpus)
         
-        if (finalRun.lower() == 'yes'):
+        if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+            mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            with open(Job+'.inp', 'a') as f:
+                print(frequencies)
+                f.write('**\n**FREQUENCIES:\n' + ', '.join(map(str, frequencies)) + '\n**END FREQUENCIES\n')
+        
+        elif (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
