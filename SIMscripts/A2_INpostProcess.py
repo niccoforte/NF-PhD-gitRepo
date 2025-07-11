@@ -5,25 +5,26 @@ import sys
 
 stiffMatrix = False
 
-#pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv4\\10"
-pDir = "C:\\Users\\exy053\\Documents\\TargetedDisorder\\xs" #\\disConv"
+pDir = f"Z:\\p1\sims\\Ti\\FrequencyDisorder"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    nnx = int(cmdIN[2])
-    unitCellSize = float(cmdIN[3])
-    MechanicalModel = str(cmdIN[4])
-    userMaterial = str(cmdIN[5])
-    relDensity = float(cmdIN[6])
-    initialJob = int(cmdIN[7])
-    numberOfRuns = int(cmdIN[8])
-    cpus = int(cmdIN[9])
-    FieldOut_frames = int(cmdIN[10])
-    HistOut_frames = int(cmdIN[11])
-    
-    path = str(cmdIN[12])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    MechanicalModel = str(cmdIN[3])
+    userMaterial = str(cmdIN[4])
+    relDensity = float(cmdIN[5])
+    dis = str(cmdIN[6])
+    fac = float(cmdIN[7])
+    distribution = str(cmdIN[8])
+    targeted_disorder = str(cmdIN[9])
+    initialJob = int(cmdIN[10])
+    numberOfRuns = int(cmdIN[11])
+    cpus = int(cmdIN[12])
+    FieldOut_frames = int(cmdIN[13])
+    HistOut_frames = int(cmdIN[14])
+    pDir = str(cmdIN[15])
     
     stiffMatrix = False
     UTval = False
@@ -41,21 +42,6 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-    
-    if path.lower() == "val":
-        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "psc":
-        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
-    elif path.lower() == "dsc":
-        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
-    elif path.lower() == "sic":
-        pDir = "C:\\Users\\exy053\\Documents\\SiC"
-    elif path.lower() == "rd":
-        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
-    elif path.lower() == "mc":
-        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
-    else:
-        pDir = str(path)
 
 if stiffMatrix:
     pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
@@ -301,6 +287,18 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
     return totalNodes
 
 
+def export_frequencies(inpFile, expFile):
+    with open(inpFile, 'r') as f:
+        lines = f.readlines()
+
+    freq_start = int([lines.index(line) for line in lines if "**FREQUENCIES:" in line][0]) + 1
+    freq_end = int([lines.index(line) for line in lines if "**END FREQUENCIES" in line][0])
+    frequencies = [line.strip().strip("**") for line in lines[freq_start:freq_end]]
+    
+    with open(expFile, 'w') as f:
+        for freq in frequencies:
+            f.write(freq + '\n')
+
 def export_nodes(inpFile, expFile):
     LAT = inpFile.split('-')[1]
     nnx = int(inpFile.split('-')[2])
@@ -359,8 +357,10 @@ if not os.path.exists("transfer"):
 for file in os.scandir():
     if 'per' in file.name or 'disNodes' in file.name:
         if file.name.endswith('.inp'):
-            expFile = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
-            export_nodes(file.name, expFile)
+            expFile_n = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
+            expFile_f = "transfer/IN-f" + file.name[:-4].replace('_','-') + ".csv"
+            export_nodes(file.name, expFile_n)
+            export_frequencies(file.name, expFile_f)
 
     if 'per' in file.name or 'disStruts' in file.name:
         if file.name.endswith('.inp'):

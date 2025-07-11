@@ -1852,8 +1852,10 @@ for idNum in range(initial,numOfJobs):
         if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             with open(Job+'.inp', 'a') as f:
-                print(frequencies)
-                f.write('**\n**FREQUENCIES:\n' + ', '.join(map(str, frequencies)) + '\n**END FREQUENCIES\n')
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
         
         elif (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
