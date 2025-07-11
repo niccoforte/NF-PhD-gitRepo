@@ -17,56 +17,6 @@ initial = 1
 numOfJobs = 1
 
 pDir = r"C:\\Users\\exy053\\Documents\\continuum"
-
-cmdIN = sys.argv[8:]
-if len(cmdIN) > 0:
-    latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    nnx = int(cmdIN[2])
-    unitCellSize = float(cmdIN[3])
-    MechanicalModel = str(cmdIN[4])
-    userMaterial = str(cmdIN[5])
-    relDensity = float(cmdIN[6])
-    initialJob = int(cmdIN[7])
-    numberOfRuns = int(cmdIN[8])
-    cpus = int(cmdIN[9])
-    FieldOut_frames = int(cmdIN[10])
-    HistOut_frames = int(cmdIN[11])
-    
-    path = str(cmdIN[12])
-    
-    stiffMatrix = False
-    UTval = False
-    
-    finalRun = 'yes'
-    
-    if dis.lower() == 'per':
-        nodeVar = 'no'
-        sizeVar = 'no'
-    elif dis.lower() == 'disnodes':
-        nodeVar = 'yes'
-        sizeVar = 'no'
-    elif dis.lower() == 'disstruts':
-        nodeVar = 'no'
-        sizeVar = 'yes'
-    else:
-        raise Exception("Invalid disorder input.")
-    
-    if path.lower() == "val":
-        pDir = "C:\\Users\\exy053\\Documents\\validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-    elif path.lower() == "psc":
-        pDir = "C:\\Users\\exy053\\Documents\\PerSizeConv3\\"+str(int(unitCellSize))
-    elif path.lower() == "dsc":
-        pDir = "C:\\Users\\exy053\\Documents\\disConv\\"+latticeType
-    elif path.lower() == "sic":
-        pDir = "C:\\Users\\exy053\\Documents\\SiC"
-    elif path.lower() == "rd":
-        pDir = "C:\\Users\\exy053\\Documents\\relD\\"+str(relDensity)
-    elif path.lower() == "mc":
-        pDir = "C:\\Users\\exy053\\Documents\\ModelChanges"
-    else:
-        str(path)
-      
 os.chdir(pDir)
 
 def rDthickness(LAT, l, t=None, rD=None):
