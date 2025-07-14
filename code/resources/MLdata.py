@@ -388,7 +388,7 @@ class DATA:
 
 
     def get_DataPath(self):
-        pData = 'data/'
+        pData = 'Z:/p1/data/'
 
         pAl          = pData + 'Al/'
         pAK          = pAl + 'AK/'
