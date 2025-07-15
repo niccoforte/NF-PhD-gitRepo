@@ -29,7 +29,7 @@ elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
 nnx = nnx #s = [26,30,34] m                     # number of Unit cells in X direction (Y automatic)
 
-finalRun = 'inp'
+finalRun = 'yes'
 numberOfRuns = 1
 initialJob = 1
 cpus = 12
@@ -51,7 +51,7 @@ UTval = False
 #pDir = f"Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
 #pDir = f"Z:\\p1\sims\\Ti\\DimReductionData"
 #pDir = f"Z:\\p1\sims\\Ti\\sApp" # \\" + str(int(fac*100))
-pDir = f"Z:\\p1\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
+pDir = f"Z:\\p1\\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -1861,6 +1861,11 @@ for idNum in range(initial,numOfJobs):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
             endtime = time.time()
             print(endtime - starttime, "== time for job", Job)
         
