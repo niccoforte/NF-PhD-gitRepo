@@ -1,5 +1,5 @@
-$LAT="tri"
-$nnx=30
+$LAT="FCC"
+$nnx=16
 $unitCellSize=10
 $mode="ductile"
 $material="ti"
@@ -16,7 +16,7 @@ $Hout=200
 $dir="Z:\\p1\sims\\Ti\\FrequencyDisorder\\FCC"
 
 Set-Location C:\temp
-
+`
 for ($i = 1; $i -le 401; $i += 100) {
 	$initial=$i
 	abaqus cae noGUI=C:\Users\exy053\Documents\p1git-Lattices\SIMscripts\A1_FractureToughness-Ductility.py -- $LAT $nnx $unitCellSize $mode $material $rD $DIS $fac $distribution $target $initial $nJobs $CPUs $Fout $Hout $dir
