@@ -3,9 +3,7 @@ read LAT
 
 # LAT=tri
 
-cd C:/Users/exy053
-cd "OneDrive - Queen Mary, University of London"
-cd Documents/Research/p1-LatticeFractureToughness/p1git-Lattices/code/data/Ti/20disNodes/$LAT/
+cd Z:/p1/data/Ti/20disNodes/$LAT/
 
 # rm -rf transfer
 
