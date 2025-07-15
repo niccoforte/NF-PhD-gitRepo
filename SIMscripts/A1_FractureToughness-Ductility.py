@@ -39,9 +39,9 @@ HistOut_frames = 200
 distribution = 'frequency'                      # uniform, lhs_uniform, frequency, normal, exponential
 targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
 nodeVar = 'yes'                                 # distortion
-fac = 0.2
 sizeVar = 'no'
-beta = 0.2
+fac = 0.2
+beta = fac
 
 stiffMatrix = False
 UTval = False
@@ -1289,7 +1289,7 @@ for idNum in range(initial,numOfJobs):
         
     if  (MechanicalModel.lower() == 'ductile' or MechanicalModel.lower() == 'both'):
     
-        ModelName = f"Ductile-{latticeType}-{int(nnx)}-{imper}-{targeted_disorder}-{idNum}"
+        ModelName = f"Ductile-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{targeted_disorder}-{idNum}"
         Job = ModelName
         if stiffMatrix and latticeType.lower() == "tri":
             ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-{imper}-{idNum}"
