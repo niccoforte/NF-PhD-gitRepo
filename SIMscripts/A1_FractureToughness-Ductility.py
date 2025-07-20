@@ -1260,12 +1260,19 @@ if (distribution.lower() == 'lhs_uniform'):
 
 if (distribution.lower() == 'uniform'):
     fac = fac
+    dist = "uni"
 elif (distribution.lower() == 'lhs_uniform'):
     fac = fac
+    dist = "lhs"
+elif (distribution.lower() == 'frequency'):
+    fac = fac
+    dist = "freq"
 elif (distribution.lower() == 'normal'):
     fac = (2*fac)/sqrt(2*pi*exp(1))
+    dist = "norm"
 elif (distribution.lower() == 'exponential'):
     fac = exp(1)/(2*fac)
+    dist = "exp"
 
 # for nnx in [10, 16, 26]:
 for idNum in range(initial,numOfJobs):
@@ -1289,10 +1296,10 @@ for idNum in range(initial,numOfJobs):
         
     if  (MechanicalModel.lower() == 'ductile' or MechanicalModel.lower() == 'both'):
     
-        ModelName = f"Ductile-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{targeted_disorder}-{idNum}"
+        ModelName = f"Ductile-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
         Job = ModelName
         if stiffMatrix and latticeType.lower() == "tri":
-            ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-{imper}-{idNum}"
+            ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
             Job = ModelName
 
         #############################################################################################
@@ -1884,7 +1891,7 @@ for idNum in range(initial,numOfJobs):
         
     if (MechanicalModel.lower() == 'fracture' or MechanicalModel.lower() == 'both'):
         
-        ModelName = f"Fracture-{latticeType}-{int(nnx)}-{imper}-{idNum}"
+        ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
         Job = ModelName
         
         #############################################################################################
