@@ -3,20 +3,24 @@ import numpy as np
 import math
 import sys
 
-cmdIN = sys.argv[2:]
+cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    fac = float(cmdIN[2])
-    beta = float(cmdIN[2])
-    nnx = int(cmdIN[3])
-    unitCellSize = float(cmdIN[4])
-    relDensity = float(cmdIN[5])
-    initialJob = int(cmdIN[6])
-    numberOfRuns = int(cmdIN[7])
-    cpus = int(cmdIN[8])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    relDensity = float(cmdIN[3])
+    dis = str(cmdIN[4])
+    fac = float(cmdIN[5])
+    beta = fac
+    distribution = str(cmdIN[6])
+    targeted_disorder = str(cmdIN[7])
+    initialJob = int(cmdIN[8])
+    numberOfRuns = int(cmdIN[9])
+    cpus = int(cmdIN[10])
+
     finalRun = 'yes'
     MechanicalModel = 'both'
+
     stiffMatrix = False
     UTval = False
         
@@ -271,6 +275,18 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
     return totalNodes
 
 
+def export_frequencies(inpFile, expFile):
+    with open(inpFile, 'r') as f:
+        lines = f.readlines()
+
+    freq_start = int([lines.index(line) for line in lines if "**FREQUENCIES:" in line][0]) + 1
+    freq_end = int([lines.index(line) for line in lines if "**END FREQUENCIES" in line][0])
+    frequencies = [line.strip().strip("**") for line in lines[freq_start:freq_end]]
+    
+    with open(expFile, 'w') as f:
+        for freq in frequencies:
+            f.write(freq + '\n')
+
 def export_nodes(inpFile, expFile):
     LAT = inpFile.split('-')[1]
     nnx = int(inpFile.split('-')[2])
@@ -329,8 +345,10 @@ if not os.path.exists("transfer"):
 for file in os.scandir():
     if 'per' in file.name or 'disNodes' in file.name:
         if file.name.endswith('.inp'):
-            expFile = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
-            export_nodes(file.name, expFile)
+            expFile_n = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
+            expFile_f = "transfer/IN-f" + file.name[:-4].replace('_','-') + ".csv"
+            export_nodes(file.name, expFile_n)
+            export_frequencies(file.name, expFile_f)
 
     if 'per' in file.name or 'disStruts' in file.name:
         if file.name.endswith('.inp'):

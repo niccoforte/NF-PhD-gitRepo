@@ -14,8 +14,7 @@ DIS = "per"
 nnx = 10
 
 initial = 1
-numOfJobs = 1
-
+numberOfRuns = 1
 expected_steps = 201
 
 pDir = os.getcwd()
@@ -23,17 +22,21 @@ pDir = os.getcwd()
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    fac = float(cmdIN[2])
-    beta = float(cmdIN[2])
-    nnx = int(cmdIN[3])
-    unitCellSize = float(cmdIN[4])
-    relDensity = float(cmdIN[5])
-    initialJob = int(cmdIN[6])
-    numberOfRuns = int(cmdIN[7])
-    cpus = int(cmdIN[8])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    relDensity = float(cmdIN[3])
+    dis = str(cmdIN[4])
+    fac = float(cmdIN[5])
+    beta = fac
+    distribution = str(cmdIN[6])
+    targeted_disorder = str(cmdIN[7])
+    initialJob = int(cmdIN[8])
+    numberOfRuns = int(cmdIN[9])
+    cpus = int(cmdIN[10])
+
     finalRun = 'yes'
     MechanicalModel = 'both'
+
     stiffMatrix = False
     UTval = False
         
@@ -414,7 +417,7 @@ if (mode.lower() == 'ductile' or mode.lower() == 'both'):
     
     H, L = geometry(LAT, unitCellSize, nnx, brackets=True)
     MechMode = 'Ductile'
-    for kk in range(initial, initial+numOfJobs):
+    for kk in range(initial, initial+numberOfRuns):
         Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
         data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
         OUT = get_DuctData(Job, H, L)
@@ -426,7 +429,7 @@ if (mode.lower() == 'fracture' or mode.lower() == 'both'):
         os.makedirs("transfer")
     
     MechMode = 'Fracture'
-    for kk in range(initial, initial+numOfJobs):
+    for kk in range(initial, initial+numberOfRuns):
         Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
         data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
         OUT = get_FracData(Job)
