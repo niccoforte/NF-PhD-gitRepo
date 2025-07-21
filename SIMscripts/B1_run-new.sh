@@ -16,11 +16,13 @@ USER=exy053
 
 # ^^^ RENAME ^^^
 LAT=lat
-DIS=per
-fac=0.0
 nnx=10
 unitCellSize=10
 rD=0.2
+DIS=per
+fac=0.0
+distribution="lhs_uniform"
+target=all
 initial=1
 nJobs=1
 CPUs=$NSLOTS
@@ -54,13 +56,13 @@ cd /data/scratch/$USER/$JOB_ID
 
 # Replace the following line with abaqus command
 #abaqus job=callmat cpus=${NSLOTS} user=PhaseField_5m-std.o mp_mode=THREADS scratch=/data/scratch/$USER/
-abaqus cae noGUI=A-HPC-1_FractureToughness-Ductility.py -- $LAT $DIS $fac $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-1_FractureToughness-Ductility.py -- $LAT $nnx $unitCellSize $rD $DIS $fac $distribution $target $initial $nJobs $CPUs
 
 /bin/echo Simulation completed at: `date`.
 /bin/echo Processing outputs...
 
-abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $DIS $fac $nnx $unitCellSize $rD $initial $nJobs $CPUs
-abaqus python A-HPC-2_INpostProcess.py -- $LAT $DIS $fac $nnx $unitCellSize $rD $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- $LAT $nnx $unitCellSize $rD $DIS $fac $distribution $target $initial $nJobs $CPUs
+abaqus cae noGUI=A-HPC-2_INpostProcess.py -- $LAT $nnx $unitCellSize $rD $DIS $fac $distribution $target $initial $nJobs $CPUs
 
 /bin/echo Inputs and outputs collected.
 

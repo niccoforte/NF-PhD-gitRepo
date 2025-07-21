@@ -7,6 +7,8 @@ from numpy import *
 import math
 import sys
 import time
+import os
+from fractions import Fraction
 executeOnCaeStartup()
 
 starttime = time.time()
@@ -15,18 +17,17 @@ starttime = time.time()
 ####################################### INPUT ##############################################
 ############################################################################################
 
-unitCellSize = 10.0                         # Strut length
-latticeType = 'FCC'                         # 'FCC', 'FCC2', 'tri', 'hex', 'kagome'
-MechanicalModel = 'both'                    # 'fracture', 'ductile', 'both'
-userMaterial = 'ti'                         # 'al', 'sic', 'ti'
-relDensity = 0.2                            # relative density
-distribution = 'lhs_uniform'                # 'uniform', 'lhs_uniform', 'normal', 'exponential'
+unitCellSize = 10.0                             # Strut length
+latticeType = 'FCC'                             # 'FCC', 'tri', 'hex', 'kagome'
+MechanicalModel = 'ductile'                        # 'fracture', 'ductile', 'both'
+userMaterial = 'ti'                             # 'al', 'sic', 'ti'
+relDensity = 0.2                                # relative density
 crossSection = 'rect'
 if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
 elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
-nnx = nnx                                   # number of Unit cells in X direction (Y automatic)
+nnx = nnx                                        # number of Unit cells in X direction (Y automatic)
 
 finalRun = 'no'
 numberOfRuns = 1
@@ -35,25 +36,31 @@ cpus = 8
 FieldOut_frames = 20
 HistOut_frames = 200
 
-nodeVar = 'no'                               # distortion
-fac = 0.2
+distribution = 'frequency'                      # uniform, lhs_uniform, frequency, normal, exponential
+targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
+nodeVar = 'no'                                 # distortion
 sizeVar = 'no'
-beta = 0.2
+fac = 0.2
+beta = fac
 
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
-    dis = str(cmdIN[1])
-    fac = float(cmdIN[2])
-    beta = float(cmdIN[2])
-    nnx = int(cmdIN[3])
-    unitCellSize = float(cmdIN[4])
-    relDensity = float(cmdIN[5])
-    initialJob = int(cmdIN[6])
-    numberOfRuns = int(cmdIN[7])
-    cpus = int(cmdIN[8])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    relDensity = float(cmdIN[3])
+    dis = str(cmdIN[4])
+    fac = float(cmdIN[5])
+    beta = fac
+    distribution = str(cmdIN[6])
+    targeted_disorder = str(cmdIN[7])
+    initialJob = int(cmdIN[8])
+    numberOfRuns = int(cmdIN[9])
+    cpus = int(cmdIN[10])
+
     finalRun = 'yes'
     MechanicalModel = 'both'
+
     stiffMatrix = False
     UTval = False
         
@@ -702,31 +709,161 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     nodeIndex = nodes[:, 0]
     nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
 
-    nonboundaryCoordX = nodes[nonboundaryNodes.astype(int)-1, 1]
-    nonboundaryCoordY = nodes[nonboundaryNodes.astype(int)-1, 2]
-        
+    xCoord = nodes[nonboundaryNodes.astype(int)-1][:, 1]
+    yCoord = nodes[nonboundaryNodes.astype(int)-1][:, 2]
+    if targeted_disorder == "X":
+        disNodes_pos = argwhere(((yCoord/H >= (xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (xCoord+1.0*unitCellSize)/L)))
+        disNodes_neg = argwhere(((yCoord/H >= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (L-xCoord+1.0*unitCellSize)/L)))
+        disNodes = np.concatenate((disNodes_pos, disNodes_neg))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "nX":
+        disNodes12 = argwhere(((yCoord/H >= (L-xCoord+1.0*unitCellSize)/L) & (yCoord/H >= (xCoord+1.0*unitCellSize)/L)))
+        disNodes23 = argwhere(((yCoord/H <= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H >= (xCoord+1.0*unitCellSize)/L)))
+        disNodes34 = argwhere(((yCoord/H <= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (xCoord-1.0*unitCellSize)/L)))
+        disNodes41 = argwhere(((yCoord/H >= (L-xCoord+1.0*unitCellSize)/L) & (yCoord/H <= (xCoord-1.0*unitCellSize)/L)))
+        disNodes = np.concatenate((disNodes12, disNodes23, disNodes34, disNodes41))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "v":
+        disNodes1 = argwhere(((xCoord >= 1*L/4-0.75*unitCellSize) & (xCoord <= 1*L/4+0.75*unitCellSize)))
+        disNodes2 = argwhere(((xCoord >= 2*L/4-0.75*unitCellSize) & (xCoord <= 2*L/4+0.75*unitCellSize)))
+        disNodes3 = argwhere(((xCoord >= 3*L/4-0.75*unitCellSize) & (xCoord <= 3*L/4+0.75*unitCellSize)))
+        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "h":
+        disNodes1 = argwhere(((yCoord >= 1*H/4-0.75*unitCellSize) & (yCoord <= 1*H/4+0.75*unitCellSize)))
+        disNodes2 = argwhere(((yCoord >= 2*H/4-0.75*unitCellSize) & (yCoord <= 2*H/4+0.75*unitCellSize)))
+        disNodes3 = argwhere(((yCoord >= 3*H/4-0.75*unitCellSize) & (yCoord <= 3*H/4+0.75*unitCellSize)))
+        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "o":
+        disNodes1 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (3*unitCellSize)**2) & 
+                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (6*unitCellSize)**2)))
+        disNodes = np.concatenate((disNodes1))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "oo":
+        disNodes1 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (2*unitCellSize)**2) & 
+                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (4*unitCellSize)**2)))
+        disNodes2 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (6*unitCellSize)**2) & 
+                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (8*unitCellSize)**2)))
+        disNodes = np.concatenate((disNodes1, disNodes2))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "D":
+        disNodes1 = argwhere(((yCoord/(H/2) >= ((3*L/2)-xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((3*L/2)-xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes2 = argwhere(((yCoord/(H/2) >= ((L/2)+xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((L/2)+xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes3 = argwhere(((yCoord/(H/2) >= ((L/2)-xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((L/2)-xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes4 = argwhere(((yCoord/(H/2) >= ((-L/2)+xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((-L/2)+xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3, disNodes4))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "DD":
+        disNodes11 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((4*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((4*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes12 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((5*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((5*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes21 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes22 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((2*L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((2*L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes31 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes32 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((2*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((2*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes41 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((-2*L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((-2*L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes42 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((-L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((-L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes = np.concatenate((disNodes11, disNodes12, disNodes21, disNodes22, disNodes31, disNodes32, disNodes41, disNodes42))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "DDD":
+        disNodes11 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((5*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((5*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes12 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((6*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((6*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes13 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((7*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((7*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes21 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes22 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((2*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((2*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes23 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((3*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((3*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes31 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes32 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((2*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((2*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes33 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((3*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((3*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes41 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-3*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-3*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes42 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-2*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-2*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes43 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes = np.concatenate((disNodes11, disNodes12, disNodes13, disNodes21, disNodes22, disNodes23, disNodes31, disNodes32, 
+                                  disNodes33, disNodes41, disNodes42, disNodes43))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "xs":
+        Hs = [0, H/3, 2*H/3, H]
+        Ls = [0, L/3, 2*L/3, L]
+        disNodes = []
+        for i in range(len(Hs)-1):
+            for j in range(len(Ls)-1):
+                disNodes_pos = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
+                disNodes_neg = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
+                disNodes.append(np.concatenate((disNodes_pos, disNodes_neg)))
+        disNodes = np.array(np.concatenate((np.array(disNodes, dtype=object))), dtype=int)
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    else:
+        disorderNodes = nonboundaryNodes
+    
+    # print(len(disorderNodes)/len(nonboundaryNodes))
+    global frequencies
+    frequencies = []
     if (distribution.lower() == 'uniform'):
-        randX = random.uniform(-delta, delta, len(nonboundaryNodes))
-        randY = random.uniform(-delta, delta, len(nonboundaryNodes))
+        randX = random.uniform(-delta, delta, len(disorderNodes))
+        randY = random.uniform(-delta, delta, len(disorderNodes))
     elif (distribution.lower() == 'lhs_uniform'):
+        if int(idNum-initialJob) == 0:
+            global randX_all, randY_all
+            randX_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
+            randY_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
         randX = randX_all[idNum-initialJob]
         randY = randY_all[idNum-initialJob]
     elif (distribution.lower() == 'normal'):
-        randX = random.normal(0.0, delta, len(nonboundaryNodes))
-        randY = random.normal(0.0, delta, len(nonboundaryNodes))
+        randX = random.normal(0.0, delta, len(disorderNodes))
+        randY = random.normal(0.0, delta, len(disorderNodes))
     elif (distribution.lower() == 'exponential'):
-        randX = random.exponential(1/delta, len(nonboundaryNodes))
-        randY = random.exponential(1/delta, len(nonboundaryNodes))
+        randX = random.exponential(1/delta, len(disorderNodes))
+        randY = random.exponential(1/delta, len(disorderNodes))
+    elif (distribution.lower() == 'frequency'):
+        rows = set(nodes[disorderNodes.astype(int)-1,2])
+        while len(frequencies) < (2*len(rows)):
+            f = random_low_alias_freq(dx=unitCellSize)
+            if f not in frequencies:
+                frequencies.append(f)
+        rand = nodes[disorderNodes.astype(int)-1]
+        rand[:,1] = np.zeros(len(disorderNodes))
+        rand[:,2] = np.zeros(len(disorderNodes))
+        for i, y in enumerate(rows):
+            dN = nodes[disorderNodes.astype(int)-1]
+            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
+            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
+                          for j in dN_xs])
+            idxs = np.isin(rand[:,0], r[:,0])
+            sorter = np.argsort(r[:,0])
+            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
+            rand[idxs,1] = r[match_idxs,1]
+            rand[idxs,2] = r[match_idxs,2]
+        randX = rand[:,1]
+        randY = rand[:,2]
     
-
-    nonboundaryCoordX = nonboundaryCoordX + randX[:len(nonboundaryCoordX)]
-    nonboundaryCoordY = nonboundaryCoordY + randY[:len(nonboundaryCoordX)]
+    disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
+    disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
     
     nodesR[:,0] = nodes[:,0]
     nodesR[:,1] = nodes[:,1]
     nodesR[:,2] = nodes[:,2]
-    nodesR[nonboundaryNodes.astype(int)-1, 1] = nonboundaryCoordX
-    nodesR[nonboundaryNodes.astype(int)-1, 2] = nonboundaryCoordY
+    nodesR[disorderNodes.astype(int)-1,1] = disorderCoordX
+    nodesR[disorderNodes.astype(int)-1,2] = disorderCoordY
     
     return nodes, nodesR, bracket_nodes
 
@@ -1010,17 +1147,37 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
 def LHS_uniform(var, strats, lim, mean=0, plot=False):
     lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
     upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/(len(lower_limits)-1))
-    ticks = np.append(lower_limits, upper_limits)
     
     points = np.zeros((strats, var))
     for i in range(var):
         points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
         np.random.shuffle(points[:, i])
     return points
-    
+
+def triangle_wave(x, f, A):
+    frac = np.mod(f * x, 1.0)
+    tri = np.where(frac < 0.5, 2 * frac, 2 * (1 - frac))
+    return A * (2 * tri - 1)
+
+def sine_wave(x, f, A):
+    return A * np.sin(2 * np.pi * f * x)
+
+def is_well_approximable(alpha, q_max=20, tol=1e-6):
+    frac = Fraction(alpha).limit_denominator(q_max)
+    return abs(alpha - frac.numerator/frac.denominator) < tol
+
+def random_low_alias_freq(dx=10.0, q_max=20, tol=1e-6):
+    f_max = 1.0 / (2.0 * dx)
+    while True:
+        f = random.uniform(0, f_max)
+        alpha = f * dx
+        if not is_well_approximable(alpha, q_max=q_max, tol=tol):
+            return f
+
 ############################################################################################
 ################################## START ###################################################
 ############################################################################################
+
 ## For PSC/DSC:
 # for nnx in nnxs:
 
@@ -1040,7 +1197,7 @@ elif (nodeVar == 'no' and sizeVar == 'yes'):
 else:
     imper = 'disNodesStruts'
 
-if (finalRun.lower() == 'yes'):
+if (finalRun.lower() == 'yes' or finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
     initial = initialJob
     numOfJobs = initial + numberOfRuns
 elif (finalRun.lower() == 'no'):
@@ -1070,13 +1227,19 @@ if (distribution.lower() == 'lhs_uniform'):
 
 if (distribution.lower() == 'uniform'):
     fac = fac
-elif (distribution.lower() == 'lhs_uniform'):    
-    randX_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
-    randY_all = LHS_uniform(var=totalNodes, strats=numberOfRuns, lim=delta)
+    dist = "uni"
+elif (distribution.lower() == 'lhs_uniform'):
+    fac = fac
+    dist = "lhs"
+elif (distribution.lower() == 'frequency'):
+    fac = fac
+    dist = "freq"
 elif (distribution.lower() == 'normal'):
     fac = (2*fac)/sqrt(2*pi*exp(1))
+    dist = "norm"
 elif (distribution.lower() == 'exponential'):
     fac = exp(1)/(2*fac)
+    dist = "exp"
 
 # for nnx in [10, 16, 26]:
 for idNum in range(initial,numOfJobs):
@@ -1100,11 +1263,12 @@ for idNum in range(initial,numOfJobs):
         
     if  (MechanicalModel.lower() == 'ductile' or MechanicalModel.lower() == 'both'):
     
-        ModelName    = 'Ductile' + '-' + latticeType + '-' + str(int(nnx)) + '-' + imper + '-' + str(idNum)
-        Job          = 'Ductile' + '-' + latticeType + '-' + str(int(nnx)) + '-' + imper + '-' + str(idNum)
+        ModelName = f"Ductile-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+        if imper == 'per':
+            ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
         if stiffMatrix and latticeType.lower() == "tri":
-            ModelName    = 'Ductile' + '-' + latticeType + '-' + str(int(nnx/2)) + '-' + imper + '-' + str(idNum)
-            Job          = 'Ductile' + '-' + latticeType + '-' + str(int(nnx/2)) + '-' + imper + '-' + str(idNum)
+            ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+        Job = ModelName
 
         #############################################################################################
         #################################### Brackets ###############################################
@@ -1660,10 +1824,23 @@ for idNum in range(initial,numOfJobs):
             resultsFormat=ODB, parallelizationMethodExplicit=DOMAIN, numDomains=cpus, 
             activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=cpus)
         
-        if (finalRun.lower() == 'yes'):
+        if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+            mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
+        
+        elif (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
             endtime = time.time()
             print(endtime - starttime, "== time for job", Job)
         
@@ -1682,8 +1859,10 @@ for idNum in range(initial,numOfJobs):
         
     if (MechanicalModel.lower() == 'fracture' or MechanicalModel.lower() == 'both'):
         
-        ModelName    = 'Fracture' + '-' + latticeType + '-' + str(int(nnx)) + '-' + imper + '-' + str(idNum)
-        Job          = 'Fracture' + '-' + latticeType + '-' + str(int(nnx)) + '-' + imper + '-' + str(idNum)
+        ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+        if imper == 'per':
+            ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
+        Job = ModelName
         
         #############################################################################################
         ######################################### Crack #############################################
@@ -2224,9 +2403,22 @@ for idNum in range(initial,numOfJobs):
             resultsFormat=ODB, parallelizationMethodExplicit=DOMAIN, numDomains=cpus, 
             activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=cpus)
         
-        if (finalRun.lower() == 'yes'):
+        if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+            mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
+        
+        elif (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             # mdb.jobs[Job].submit(consistencyChecking=OFF)
             # mdb.jobs[Job].waitForCompletion()
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
             endtime = time.time()
             print(endtime - starttime, "== time for job", Job)
