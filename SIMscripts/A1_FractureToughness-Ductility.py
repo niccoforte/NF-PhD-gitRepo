@@ -1297,10 +1297,11 @@ for idNum in range(initial,numOfJobs):
     if  (MechanicalModel.lower() == 'ductile' or MechanicalModel.lower() == 'both'):
     
         ModelName = f"Ductile-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
-        Job = ModelName
+        if imper == 'per':
+            ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
         if stiffMatrix and latticeType.lower() == "tri":
             ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
-            Job = ModelName
+        Job = ModelName
 
         #############################################################################################
         #################################### Brackets ###############################################
@@ -1892,6 +1893,8 @@ for idNum in range(initial,numOfJobs):
     if (MechanicalModel.lower() == 'fracture' or MechanicalModel.lower() == 'both'):
         
         ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+        if imper == 'per':
+            ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
         Job = ModelName
         
         #############################################################################################
