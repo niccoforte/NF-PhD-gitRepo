@@ -2436,9 +2436,22 @@ for idNum in range(initial,numOfJobs):
             resultsFormat=ODB, parallelizationMethodExplicit=DOMAIN, numDomains=cpus, 
             activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=cpus)
         
-        if (finalRun.lower() == 'yes'):
+        if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+            mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
+        
+        elif (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
             mdb.jobs[Job].submit(consistencyChecking=OFF)
             mdb.jobs[Job].waitForCompletion()
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
             endtime = time.time()
             print(endtime - starttime, "== time for job", Job)
