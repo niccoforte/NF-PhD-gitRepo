@@ -30,6 +30,14 @@ def get_nodes(nodesCSV, lineStart=None, lineEnd=None):
     
     return nodes, nodesCoords, nodes_df
 
+def get_frequencies(freqCSV):
+    with open(freqCSV, 'r') as f:
+        lines = f.readlines()
+    
+    freqs = [float(line.strip('\n')) for line in lines]
+    
+    return freqs
+
 def get_struts(thicksCSV):
     with open(thicksCSV, 'r') as f:
         lines = f.readlines()
