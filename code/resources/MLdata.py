@@ -7,9 +7,12 @@ from sklearn.decomposition import PCA
 from resources.calculations import calcUT, calcFT
 
 
-def load_data(inputs, outputs):
+def load_data(inputs, outputs, f_inputs=None):
     IN_df = pd.read_csv(inputs, index_col=0).sort_index()
     OUT_df = pd.read_csv(outputs, index_col=0).sort_index()
+    INf_df = None
+    if f_inputs is not None:
+        INf_df = pd.read_csv(f_inputs, index_col=0).sort_index()
 
     perIN_df = IN_df.loc[:0].T
     perIN_df = perIN_df.rename(columns={0: "in"})
@@ -23,12 +26,15 @@ def load_data(inputs, outputs):
     dOUT_df = dOUT_df.iloc[1:].sort_index()
     OUT_df = OUT_df.iloc[1:].sort_index()
     
-    return IN_df, OUT_df, perIN_df, perOUT_df, dIN_df, dOUT_df
+    return IN_df, OUT_df, INf_df, perIN_df, perOUT_df, dIN_df, dOUT_df
 
-def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df):
+def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
     dIN = dIN_df.to_numpy()
     dOUT = dOUT_df.to_numpy()
     xOUT = np.linspace(0, max(perOUT_df.x.tolist()), len(dOUT[0]))
+    INf = None
+    if INf_df is not None:
+        INf = INf_df.to_numpy()
     
     ducts, strens, stiffs = [], [], []
     for _, row in OUT_df.iterrows():
@@ -40,12 +46,15 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df):
         stiffs.append(stiffness)
         
     props = [ducts, strens, stiffs]
-    return dIN, dOUT, xOUT, props
+    return dIN, dOUT, INf, xOUT, props
 
-def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff):
+def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
     dIN = dIN_df.to_numpy()
     dOUT = dOUT_df.to_numpy()
     xOUT = np.linspace(0, max(perOUT_df.x.tolist()), len(dOUT[0]))
+    INf = None
+    if INf_df is not None:
+        INf = INf_df.to_numpy()
     
     Kjs, Ks, Ps, ds = [], [], [], []
     for indx, row in OUT_df.iterrows():
@@ -58,7 +67,7 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff):
         ds.append(dd)
     
     props = [Kjs, Ks, Ps, ds]
-    return dIN, dOUT, xOUT, props
+    return dIN, dOUT, INf, xOUT, props
 
 def find_outliers(data):
     mean = np.mean(data)
@@ -67,7 +76,7 @@ def find_outliers(data):
     outlier_idxs = [data.index(x) for x in data if (x < mean - 3*stdev) or (x > mean + 3*stdev) if data.index(x) != 0]
     return np.array(outlier_idxs, dtype="int")
 
-def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df):
+def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_r=None, INf_df=None):
     all_outlier_idxs = []
     for prop_r in props_r:
         idxs = find_outliers(data=prop_r)
@@ -80,21 +89,27 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df):
     if len(outlier_idxs) > 0:
         dIN = np.delete(dIN_r, outlier_idxs, axis=0)
         dOUT = np.delete(dOUT_r, outlier_idxs, axis=0)
+        INf = None
+        if INf_r is not None:
+            INf = np.delete(INf_r, outlier_idxs, axis=0)
+
         IN_df = IN_df.drop(IN_df.iloc[outlier_idxs].index)
         OUT_df = OUT_df.drop(OUT_df.iloc[outlier_idxs].index)
         dIN_df = dIN_df.drop(dIN_df.iloc[outlier_idxs].index)
         dOUT_df = dOUT_df.drop(dOUT_df.iloc[outlier_idxs].index)
+        if INf_df is not None:
+            INf_df = INf_df.drop(INf_df.iloc[outlier_idxs].index)
         props = []
         for prop_r in props_r:
             prop = np.delete(prop_r, outlier_idxs, axis=0)
             props.append(prop)
         props = np.array(props).tolist()
     else:
-        dIN, dOUT, props = dIN_r, dOUT_r, props_r
+        dIN, dOUT, INf, props = dIN_r, dOUT_r, INf_r, props_r
     
-    return dIN, dOUT, props, IN_df, OUT_df, dIN_df, dOUT_df
+    return dIN, dOUT, INf, props, IN_df, OUT_df, dIN_df, dOUT_df, INf_df
 
-def split_data(dIN, dOUT, PATH, mode, dis, split=0.85):
+def split_data(dIN, dOUT, PATH, mode, dis, INf, split=0.85):
     idxs = list(range(len(dOUT)))
     random.shuffle(idxs)
     train_idxs = idxs[:int(split*len(dOUT))]
@@ -104,18 +119,31 @@ def split_data(dIN, dOUT, PATH, mode, dis, split=0.85):
     train_in = dIN[train_idxs]
     val_in = dIN[val_idxs]
     test_in = dIN[test_idxs]
+
     train_out = dOUT[train_idxs]
     val_out = dOUT[val_idxs]
     test_out = dOUT[test_idxs]
+
+    train_in_f, val_in_f, test_in_f = None, None, None
+    if INf is not None:
+        train_in_f = INf[train_idxs]
+        val_in_f = INf[val_idxs]
+        test_in_f = INf[test_idxs]
+
+    os.makedirs(PATH+"/MLdata", exist_ok=True)
     
-    pd.DataFrame(train_in).to_csv(PATH + f"NN-{mode}-{dis}-trainIN.csv")
-    pd.DataFrame(val_in).to_csv(PATH + f"NN-{mode}-{dis}-valIN.csv")
-    pd.DataFrame(test_in).to_csv(PATH + f"NN-{mode}-{dis}-testIN.csv")
-    pd.DataFrame(train_out).to_csv(PATH + f"NN-{mode}-{dis}-trainOUT.csv")
-    pd.DataFrame(val_out).to_csv(PATH + f"NN-{mode}-{dis}-valOUT.csv")
-    pd.DataFrame(test_out).to_csv(PATH + f"NN-{mode}-{dis}-testOUT.csv")
+    pd.DataFrame(train_in).to_csv(PATH + f"MLdata/{mode}-{dis}-trainIN.csv")
+    pd.DataFrame(val_in).to_csv(PATH + f"MLdata/{mode}-{dis}-valIN.csv")
+    pd.DataFrame(test_in).to_csv(PATH + f"MLdata/{mode}-{dis}-testIN.csv")
+    pd.DataFrame(train_out).to_csv(PATH + f"MLdata/{mode}-{dis}-trainOUT.csv")
+    pd.DataFrame(val_out).to_csv(PATH + f"MLdata/{mode}-{dis}-valOUT.csv")
+    pd.DataFrame(test_out).to_csv(PATH + f"MLdata/{mode}-{dis}-testOUT.csv")
+    if train_in_f is not None:
+        pd.DataFrame(train_in_f).to_csv(PATH + f"MLdata/{mode}-{dis}-trainINf.csv")
+        pd.DataFrame(val_in_f).to_csv(PATH + f"MLdata/{mode}-{dis}-valINf.csv")
+        pd.DataFrame(test_in_f).to_csv(PATH + f"MLdata/{mode}-{dis}-testINf.csv")
     
-    return train_in, train_out, val_in, val_out, test_in, test_out
+    return train_in, train_out, val_in, val_out, test_in, test_out, train_in_f, val_in_f, test_in_f
 
 def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
     if by.lower() == "node":
@@ -127,8 +155,8 @@ def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
     for i in indx:
         plt.figure(figsize=(10, 6))
         plt.hist(df.loc[i].to_numpy()/(l*1000), bins=50, alpha=0.7, color='blue')
-        plt.title(f'Distribution of Disorder for {LAT.upper()} {by.capitalize()} {i}')
-        plt.xlabel('normalized disorder')
+        plt.title(f'Distribution of Disorder for {LAT.upper()} {by.capitalize()} {int(i)}')
+        plt.xlabel('Normalized Disorder')
         plt.ylabel('Frequency')
         plt.grid(True)
         plt.show()
