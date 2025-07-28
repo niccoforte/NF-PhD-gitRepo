@@ -26,6 +26,7 @@ target=all
 initial=1
 nJobs=1
 CPUs=$NSLOTS
+PATH_EXTRA="Frequency"
 
 zip=false
 delete_scratch=true
@@ -82,15 +83,15 @@ rsync -av /data/scratch/$USER/$JOB_ID/transfer/* /data/scratch/$USER/$JOB_ID/zip
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/$USER/$JOB_ID/
 rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$JOB_ID /data/scratch/$USER/$JOB_ID/zip/
 
-mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/
-mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
-rsync -av /data/scratch/$USER/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/$JOB_ID/zip/
+mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$JOB_ID/
+mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$JOB_ID/zip/
+rsync -av /data/scratch/$USER/$JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$JOB_ID/zip/
 
 if [ "$zip" = true ] ; then
     tar -czf C1_transfer-$LAT-$DIS-$JOB_ID.tgz /data/scratch/$USER/$JOB_ID/transfer/
     tar -czf C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/scratch/$USER/$JOB_ID/zip/
     rsync -av /data/scratch/$USER/$JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
-    rsync -av /data/scratch/$USER/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$fac/$LAT/
+    rsync -av /data/scratch/$USER/$JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/
 fi
 
 if [ "$delete_scratch" = true ] ; then
