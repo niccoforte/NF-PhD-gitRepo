@@ -357,6 +357,12 @@ def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV
     test_out = pd.read_csv(CSV_test_out, index_col=0, header=0).to_numpy()
     return train_in, train_out, val_in, val_out, test_in, test_out
 
+def load_freqInputData(CSV_train_in_f, CSV_val_in_f, CSV_test_in_f):
+    train_in_f = pd.read_csv(CSV_train_in_f, index_col=0, header=0).to_numpy()
+    val_in_f = pd.read_csv(CSV_val_in_f, index_col=0, header=0).to_numpy()
+    test_in_f = pd.read_csv(CSV_test_in_f, index_col=0, header=0).to_numpy()
+    return train_in_f, val_in_f, test_in_f
+
 def load_perData(INcsv, OUTcsv):
     IN_df = pd.read_csv(INcsv, index_col=0).sort_index()
     OUT_df = pd.read_csv(OUTcsv, index_col=0).sort_index()
@@ -396,12 +402,13 @@ class Dataset_(Dataset):
     
 
 class DATA:
-    def __init__(self, path=1, load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", format=0):
+    def __init__(self, path=1, load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", freq=False, format=0):
         self.path = path
         self.LAT = LAT
         self.dis = dis
         self.dN = dN
         self.model = model
+        self.freq = freq
 
         self.get_DataPath()
 
@@ -426,7 +433,7 @@ class DATA:
         pFTdisNodes  = pAK + 'Fracture-disNodes/'
 
         pTi    = pData + 'Ti/'
-        pTiLAT = pTi + f'{self.dN}{self.dis}/{self.LAT}/'
+        pTiLAT = pTi + f'{self.dis}/{self.dN}/{self.LAT}/'
 
         if self.path == 0:
             self.PATH  = pUTdisNodes2
@@ -436,15 +443,21 @@ class DATA:
             self.PATH  = str(self.path)+"/"
 
     def get_DataFiles(self):
-        self.CSV_train_in  = self.PATH + f'NN-UT-{self.dis}-trainIN.csv'
-        self.CSV_train_out = self.PATH + f'NN-UT-{self.dis}-trainOUT.csv'
-        self.CSV_val_in  = self.PATH + f'NN-UT-{self.dis}-valIN.csv'
-        self.CSV_val_out = self.PATH + f'NN-UT-{self.dis}-valOUT.csv'
-        self.CSV_test_in  = self.PATH + f'NN-UT-{self.dis}-testIN.csv'
-        self.CSV_test_out = self.PATH + f'NN-UT-{self.dis}-testOUT.csv'
+        self.CSV_train_in  = self.PATH + f'MLdata/NN-UT-{self.dis}-trainIN.csv'
+        self.CSV_train_out = self.PATH + f'MLdata/NN-UT-{self.dis}-trainOUT.csv'
+        self.CSV_val_in  = self.PATH + f'MLdata/NN-UT-{self.dis}-valIN.csv'
+        self.CSV_val_out = self.PATH + f'MLdata/NN-UT-{self.dis}-valOUT.csv'
+        self.CSV_test_in  = self.PATH + f'MLdata/NN-UT-{self.dis}-testIN.csv'
+        self.CSV_test_out = self.PATH + f'MLdata/NN-UT-{self.dis}-testOUT.csv'
 
         self.INcsv = self.PATH + f'Ductile-disNodes-IN.csv'
         self.OUTcsv = self.PATH + f'Ductile-disNodes-OUT.csv'
+
+        if self.freq:
+            self.CSV_train_in_f  = self.PATH + f'MLdata/NN-UT-{self.dis}-trainINf.csv'
+            self.CSV_val_in_f  = self.PATH + f'MLdata/NN-UT-{self.dis}-valINf.csv'
+            self.CSV_test_in_f  = self.PATH + f'MLdata/NN-UT-{self.dis}-testINf.csv'
+            self.INcsv_f = self.PATH + f'Ductile-disNodes-INf.csv'
 
     def load_data(self):
         train_in, train_out, val_in, val_out, test_in, test_out = load_TrainTestData(self.CSV_train_in, 
@@ -453,6 +466,11 @@ class DATA:
                                                                                      self.CSV_val_out, 
                                                                                      self.CSV_test_in, 
                                                                                      self.CSV_test_out)
+        if self.freq:
+            train_in, val_in, test_in = load_freqInputData(self.CSV_train_in_f, 
+                                                            self.CSV_val_in_f, 
+                                                            self.CSV_test_in_f)
+
         if self.model.lower() == "mlp" or self.model.lower() == "gpr":
             self.train_in, self.train_out = train_in, train_out
             self.val_in, self.val_out = val_in, val_out
@@ -464,6 +482,7 @@ class DATA:
             self.val_out = val_out
             self.test_in = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
             self.test_out = test_out
+        
         self.perIN_r, self.perIN, self.perOUT = load_perData(self.INcsv, self.OUTcsv)
 
         self.inParams = dataParams(np.concatenate((self.train_in, self.val_in, self.test_in)))
