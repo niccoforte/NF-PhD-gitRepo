@@ -443,20 +443,20 @@ class DATA:
             self.PATH  = str(self.path)+"/"
 
     def get_DataFiles(self):
-        self.CSV_train_in  = self.PATH + f'MLdata/NN-UT-{self.dis}-trainIN.csv'
-        self.CSV_train_out = self.PATH + f'MLdata/NN-UT-{self.dis}-trainOUT.csv'
-        self.CSV_val_in  = self.PATH + f'MLdata/NN-UT-{self.dis}-valIN.csv'
-        self.CSV_val_out = self.PATH + f'MLdata/NN-UT-{self.dis}-valOUT.csv'
-        self.CSV_test_in  = self.PATH + f'MLdata/NN-UT-{self.dis}-testIN.csv'
-        self.CSV_test_out = self.PATH + f'MLdata/NN-UT-{self.dis}-testOUT.csv'
+        self.CSV_train_in  = self.PATH + f'MLdata/UT-{self.dis}-trainIN.csv'
+        self.CSV_train_out = self.PATH + f'MLdata/UT-{self.dis}-trainOUT.csv'
+        self.CSV_val_in  = self.PATH + f'MLdata/UT-{self.dis}-valIN.csv'
+        self.CSV_val_out = self.PATH + f'MLdata/UT-{self.dis}-valOUT.csv'
+        self.CSV_test_in  = self.PATH + f'MLdata/UT-{self.dis}-testIN.csv'
+        self.CSV_test_out = self.PATH + f'MLdata/UT-{self.dis}-testOUT.csv'
 
         self.INcsv = self.PATH + f'Ductile-disNodes-IN.csv'
         self.OUTcsv = self.PATH + f'Ductile-disNodes-OUT.csv'
 
         if self.freq:
-            self.CSV_train_in_f  = self.PATH + f'MLdata/NN-UT-{self.dis}-trainINf.csv'
-            self.CSV_val_in_f  = self.PATH + f'MLdata/NN-UT-{self.dis}-valINf.csv'
-            self.CSV_test_in_f  = self.PATH + f'MLdata/NN-UT-{self.dis}-testINf.csv'
+            self.CSV_train_in_f  = self.PATH + f'MLdata/UT-{self.dis}-trainINf.csv'
+            self.CSV_val_in_f  = self.PATH + f'MLdata/UT-{self.dis}-valINf.csv'
+            self.CSV_test_in_f  = self.PATH + f'MLdata/UT-{self.dis}-testINf.csv'
             self.INcsv_f = self.PATH + f'Ductile-disNodes-INf.csv'
 
     def load_data(self):
