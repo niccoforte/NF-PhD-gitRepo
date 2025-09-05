@@ -372,7 +372,7 @@ def load_perData(INcsv, OUTcsv):
     fixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
     perIN_df = perIN_df_r.loc[:, ~dIN_df.columns.isin(fixed_cols)].sort_index()
     perOUT_df = OUT_df.loc[:0]
-    return perIN_df_r.to_numpy()[0], perIN_df.to_numpy()[0], perOUT_df.to_numpy()[:,1:]
+    return perIN_df_r.to_numpy()[0], perIN_df.to_numpy()[0], perOUT_df.to_numpy()[:,1:], IN_df, OUT_df
 
 
 def dataParams(x):
@@ -483,7 +483,7 @@ class DATA:
             self.test_in = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
             self.test_out = test_out
         
-        self.perIN_r, self.perIN, self.perOUT = load_perData(self.INcsv, self.OUTcsv)
+        self.perIN_r, self.perIN, self.perOUT, self.IN_df, self.OUT_df = load_perData(self.INcsv, self.OUTcsv)
 
         self.inParams = dataParams(np.concatenate((self.train_in, self.val_in, self.test_in)))
         self.outParams = dataParams(np.concatenate((self.train_out, self.val_out, self.test_out)))
