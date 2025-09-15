@@ -231,13 +231,13 @@ def plot_properties(x_data, y_data, test):
     
     plt.show()
 
-def plot_curve(OUT_df, xOUT, mode, idx=None, q=15):
+def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15):
     fig2, (ax1) = plt.subplots(1, 1)
     fig2.set_figheight(5)
     fig2.set_figwidth(9)
     
-    p = OUT_df.loc[0].tolist()[1:]
-    indx = int(OUT_df.loc[0].tolist()[0])
+    p = OUT_df.loc[pi].tolist()[1:]
+    indx = int(OUT_df.loc[pi].tolist()[0])
     
     if idx:
         d = OUT_df.loc[idx].tolist()[1:]
@@ -402,8 +402,9 @@ class Dataset_(Dataset):
     
 
 class DATA:
-    def __init__(self, path=1, load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", freq=False, format=0):
+    def __init__(self, path=1, path_add='', load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", freq=False, format=0):
         self.path = path
+        self.path_add = path_add
         self.LAT = LAT
         self.dis = dis
         self.dN = dN
@@ -433,7 +434,7 @@ class DATA:
         pFTdisNodes  = pAK + 'Fracture-disNodes/'
 
         pTi    = pData + 'Ti/'
-        pTiLAT = pTi + f'{self.dis}/{self.dN}/{self.LAT}/'
+        pTiLAT = pTi + f'{self.dis}/{self.path_add}/{self.dN}/{self.LAT}/'
 
         if self.path == 0:
             self.PATH  = pUTdisNodes2
