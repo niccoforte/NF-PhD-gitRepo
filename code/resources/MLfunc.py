@@ -321,10 +321,10 @@ def load_bestParams(path="models/etc", name="sample"):
 
     return best_params
 
-# TODO: GPU integration
-# TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
 ### Custom Loss Functions
+# TODO: GPU integration
+# TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
 def QuantileLoss():
     pass
@@ -393,6 +393,7 @@ def plot_Distribution(train_in1, test_outputs, truth=None, typ="contour"):
 
 
 ### GNN Functions
+# TODO: Fix
 
 def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
     for batch in loader:
