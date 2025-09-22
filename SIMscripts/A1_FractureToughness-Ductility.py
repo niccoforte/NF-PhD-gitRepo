@@ -27,17 +27,17 @@ if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
 elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
-nnx = nnx #s = [26,30,34] m                     # number of Unit cells in X direction (Y automatic)
+nnx = nnx #s = [26,30,34]                     # number of Unit cells in X direction (Y automatic)
 
-finalRun = 'yes'
+finalRun = 'no'
 numberOfRuns = 1
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
 HistOut_frames = 200
 
-distribution = 'frequency'                      # uniform, lhs_uniform, frequency, normal, exponential
-targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
+distribution = 'lhs_uniform'                      # uniform, lhs_uniform, frequency, normal, exponential
+targeted_disorder = "xs"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
 nodeVar = 'yes'                                 # distortion
 sizeVar = 'no'
 fac = 0.2
@@ -52,6 +52,7 @@ UTval = False
 #pDir = f"Z:\\p1\sims\\Ti\\DimReductionData"
 #pDir = f"Z:\\p1\sims\\Ti\\sApp" # \\" + str(int(fac*100))
 pDir = f"Z:\\p1\\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
+pDir = "C:\\temp"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -63,6 +64,7 @@ if len(cmdIN) > 0:
     relDensity = float(cmdIN[5])
     dis = str(cmdIN[6])
     fac = float(cmdIN[7])
+    beta = fac
     distribution = str(cmdIN[8])
     targeted_disorder = str(cmdIN[9])
     initialJob = int(cmdIN[10])
@@ -71,6 +73,14 @@ if len(cmdIN) > 0:
     FieldOut_frames = int(cmdIN[13])
     HistOut_frames = int(cmdIN[14])
     pDir = str(cmdIN[15])
+
+    if "OptLoop" in cmdIN:
+        sampleN = int(cmdIN[-1])
+        opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
+        print(opt_disorder, opt_disorder.shape, opt_disorder.dtype)
+        opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
+        opt_dis_x = opt_disorder[:,0]
+        opt_dis_y = opt_disorder[:,1]
     
     stiffMatrix = False
     UTval = False
@@ -848,6 +858,8 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     else:
         disorderNodes = nonboundaryNodes
     
+    print(len(disorderNodes))
+    
     # print(len(disorderNodes)/len(nonboundaryNodes))
     global frequencies
     frequencies = []
@@ -888,7 +900,10 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
             rand[idxs,2] = r[match_idxs,2]
         randX = rand[:,1]
         randY = rand[:,2]
-    
+    elif (distribution.lower() == 'opt'):
+        randX = opt_dis_x
+        randY = opt_dis_y
+
     disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
     disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
     
@@ -1267,6 +1282,9 @@ elif (distribution.lower() == 'lhs_uniform'):
 elif (distribution.lower() == 'frequency'):
     fac = fac
     dist = "freq"
+elif (distribution.lower() == 'opt'):
+    fac = fac
+    dist = "opt"
 elif (distribution.lower() == 'normal'):
     fac = (2*fac)/sqrt(2*pi*exp(1))
     dist = "norm"
@@ -1283,6 +1301,9 @@ for idNum in range(initial,numOfJobs):
     units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
     
     nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution)
+
+    if (distribution.lower() == 'opt'):
+        idNum = sampleN
 
 # ######################################################################################################
 # ######################################################################################################

@@ -29,6 +29,7 @@ if len(cmdIN) > 0:
     relDensity = float(cmdIN[5])
     dis = str(cmdIN[6])
     fac = float(cmdIN[7])
+    beta = fac
     distribution = str(cmdIN[8])
     targeted_disorder = str(cmdIN[9])
     initialJob = int(cmdIN[10])
@@ -37,6 +38,14 @@ if len(cmdIN) > 0:
     FieldOut_frames = int(cmdIN[13])
     HistOut_frames = int(cmdIN[14])
     pDir = str(cmdIN[15])
+
+    if "OptLoop" in cmdIN:
+        sampleN = int(cmdIN[-1])
+        opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
+        print(opt_disorder, opt_disorder.shape, opt_disorder.dtype)
+        opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
+        opt_dis_x = opt_disorder[:,0]
+        opt_dis_y = opt_disorder[:,1]
     
     stiffMatrix = False
     UTval = False
