@@ -14,19 +14,22 @@ def load_data(inputs, outputs, f_inputs=None):
     if f_inputs is not None:
         INf_df = pd.read_csv(f_inputs, index_col=0).sort_index()
 
-    perIN_df = IN_df.loc[:0].T
-    perIN_df = perIN_df.rename(columns={0: "in"})
-    perOUT_df = OUT_df.iloc[:2].T.iloc[1:]
-    perOUT_df.columns = ["x", "y"]
-
     dIN_df = IN_df - IN_df.iloc[0].values
-    dIN_df = dIN_df.loc[:, ~(dIN_df == 0.0).all()].sort_index()
+    INfixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
+    dIN_df = dIN_df.drop(columns=INfixed_cols) 
     dOUT_df = OUT_df - OUT_df.iloc[1].values
     dOUT_df = dOUT_df.drop(columns='0')  # dOUT_df['0'] = OUT_df['0']
     dOUT_df = dOUT_df.iloc[1:].sort_index()
     OUT_df = OUT_df.iloc[1:].sort_index()
+
+    perINr_df = IN_df.loc[:0].T
+    perINr_df = perINr_df.rename(columns={0: "in"}).sort_index()
+    perIN_df = IN_df.loc[:0].drop(columns=INfixed_cols).T
+    perIN_df = perIN_df.rename(columns={0: "in"}).sort_index()
+    perOUT_df = OUT_df.iloc[:2].T.iloc[1:]
+    perOUT_df.columns = ["x", "y"]
     
-    return IN_df, OUT_df, INf_df, perIN_df, perOUT_df, dIN_df, dOUT_df
+    return IN_df, OUT_df, INf_df, perINr_df, perIN_df, perOUT_df, dIN_df, dOUT_df
 
 def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
     dIN = dIN_df.to_numpy()
@@ -363,17 +366,6 @@ def load_freqInputData(CSV_train_in_f, CSV_val_in_f, CSV_test_in_f):
     test_in_f = pd.read_csv(CSV_test_in_f, index_col=0, header=0).to_numpy()
     return train_in_f, val_in_f, test_in_f
 
-def load_perData(INcsv, OUTcsv):
-    IN_df = pd.read_csv(INcsv, index_col=0).sort_index()
-    OUT_df = pd.read_csv(OUTcsv, index_col=0).sort_index()
-
-    perIN_df_r = IN_df.loc[:0]
-    dIN_df = IN_df - IN_df.iloc[0].values
-    fixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
-    perIN_df = perIN_df_r.loc[:, ~dIN_df.columns.isin(fixed_cols)].sort_index()
-    perOUT_df = OUT_df.loc[:0]
-    return perIN_df_r.to_numpy()[0], perIN_df.to_numpy()[0], perOUT_df.to_numpy()[:,1:], IN_df, OUT_df
-
 
 def dataParams(x):
     return [np.min(x), np.max(x), np.mean(x), np.std(x)]
@@ -461,6 +453,8 @@ class DATA:
             self.INcsv_f = self.PATH + f'Ductile-disNodes-INf.csv'
 
     def load_data(self):
+        self.IN_df, self.OUT_df, self.INf_df, self.perINr_df, self.perIN_df, self.perOUT_df, self.dIN_df, self.dOUT_df = load_data(self.INcsv, self.OUTcsv, self.INcsv_f if self.freq else None)
+
         train_in, train_out, val_in, val_out, test_in, test_out = load_TrainTestData(self.CSV_train_in, 
                                                                                      self.CSV_train_out, 
                                                                                      self.CSV_val_in, 
@@ -484,8 +478,6 @@ class DATA:
             self.test_in = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
             self.test_out = test_out
         
-        self.perIN_r, self.perIN, self.perOUT, self.IN_df, self.OUT_df = load_perData(self.INcsv, self.OUTcsv)
-
         self.inParams = dataParams(np.concatenate((self.train_in, self.val_in, self.test_in)))
         self.outParams = dataParams(np.concatenate((self.train_out, self.val_out, self.test_out)))
 
@@ -504,7 +496,7 @@ class DATA:
         self.test_outNM = normalize(self.test_out, self.outParams[2], self.outParams[3])
     
     def load_DisDist_v1(self):
-        self.train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
+        self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
 
         train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
         self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
@@ -522,7 +514,7 @@ class DATA:
         self.dy_out1NM = normalize(self.dy_out1, self.outParams1dy[2], self.outParams1dy[3])
     
     def load_DisDist_v2(self):
-        self.train_in1 = self.perIN.reshape(len(self.perIN)//2, 2)
+        self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
         self.train_in2 = np.array([self.train_in1.flatten()]*2)
 
         train_out2 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
