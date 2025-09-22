@@ -8,25 +8,27 @@ from resources.calculations import calcUT, calcFT
 
 
 def load_data(inputs, outputs, f_inputs=None):
-    IN_df = pd.read_csv(inputs, index_col=0).sort_index()
-    OUT_df = pd.read_csv(outputs, index_col=0).sort_index()
+    IN_df = pd.read_csv(inputs, index_col=0)
+    OUTr_df = pd.read_csv(outputs, index_col=0)
     INf_df = None
     if f_inputs is not None:
-        INf_df = pd.read_csv(f_inputs, index_col=0).sort_index()
+        INf_df = pd.read_csv(f_inputs, index_col=0)
 
     dIN_df = IN_df - IN_df.iloc[0].values
     INfixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
     dIN_df = dIN_df.drop(columns=INfixed_cols) 
-    dOUT_df = OUT_df - OUT_df.iloc[1].values
+    dOUT_df = OUTr_df - OUTr_df.iloc[1].values
     dOUT_df = dOUT_df.drop(columns='0')  # dOUT_df['0'] = OUT_df['0']
     dOUT_df = dOUT_df.iloc[1:].sort_index()
-    OUT_df = OUT_df.iloc[1:].sort_index()
+    OUT_df = OUTr_df.iloc[1:].sort_index()
 
     perINr_df = IN_df.loc[:0].T
-    perINr_df = perINr_df.rename(columns={0: "in"}).sort_index()
+    perINr_df = perINr_df.rename(columns={0: "in"})
+    perINr_df = perINr_df
     perIN_df = IN_df.loc[:0].drop(columns=INfixed_cols).T
-    perIN_df = perIN_df.rename(columns={0: "in"}).sort_index()
-    perOUT_df = OUT_df.iloc[:2].T.iloc[1:]
+    perIN_df = perIN_df.rename(columns={0: "in"})
+    perIN_df = perIN_df
+    perOUT_df = OUTr_df.iloc[:2].T.iloc[1:]
     perOUT_df.columns = ["x", "y"]
     
     return IN_df, OUT_df, INf_df, perINr_df, perIN_df, perOUT_df, dIN_df, dOUT_df
