@@ -9,6 +9,8 @@ import networkx as nx
 import optuna
 import json
 
+from sklearn.model_selection import GridSearchCV
+
 
 def absErr(A, B, typ=None, axis=None):
     if typ == "mean":
@@ -252,6 +254,10 @@ class EarlyStopping:
             self.early_stop = True  # Set flag for stopping
 
 ### HYPERPARAMETER OPTIMIZATION
+
+def GPR_HPopt(data, gpr, params, cv=5, verb=0):
+    grid_search = GridSearchCV(gpr, params, cv=cv, scoring=None, verbose=verb)
+    return grid_search.fit(data[0], data[1])
 
 def objective(trial, model):
     n_layers = trial.suggest_int('n_layers', 1, 4)

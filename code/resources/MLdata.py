@@ -396,7 +396,18 @@ class Dataset_(Dataset):
     
 
 class DATA:
-    def __init__(self, path=1, path_add='', load=False, LAT="FCC", dis="disNodes", dN=20, model="MLP", freq=False, format=0):
+    def __init__(
+        self, 
+        path=1, 
+        path_add='', 
+        load=False, 
+        LAT="FCC", 
+        dis="disNodes", 
+        dN=20, 
+        model="MLP", 
+        freq=False, 
+        format=0
+    ):
         self.path = path
         self.path_add = path_add
         self.LAT = LAT
