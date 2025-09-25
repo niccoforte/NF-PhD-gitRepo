@@ -50,7 +50,7 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
         strens.append(strength)
         stiffs.append(stiffness)
         
-    props = [ducts, strens, stiffs]
+    props = np.array([ducts, strens, stiffs])
     return dIN, dOUT, INf, xOUT, props
 
 def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
@@ -77,7 +77,8 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
 def find_outliers(data):
     mean = np.mean(data)
     stdev = np.std(data)
-    
+
+    data = data.tolist()    
     outlier_idxs = [data.index(x) for x in data if (x < mean - 3*stdev) or (x > mean + 3*stdev) if data.index(x) != 0]
     return np.array(outlier_idxs, dtype="int")
 
@@ -108,13 +109,13 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_
         for prop_r in props_r:
             prop = np.delete(prop_r, outlier_idxs, axis=0)
             props.append(prop)
-        props = np.array(props).tolist()
+        props = np.array(props)
     else:
         dIN, dOUT, INf, props = dIN_r, dOUT_r, INf_r, props_r
     
     return dIN, dOUT, INf, props, IN_df, OUT_df, dIN_df, dOUT_df, INf_df
 
-def split_data(dIN, dOUT, PATH, mode, dis, INf, split=0.85):
+def split_data(dIN, dOUT, props, INf, split=0.85):
     idxs = list(range(len(dOUT)))
     random.shuffle(idxs)
     train_idxs = idxs[:int(split*len(dOUT))]
@@ -129,26 +130,40 @@ def split_data(dIN, dOUT, PATH, mode, dis, INf, split=0.85):
     val_out = dOUT[val_idxs]
     test_out = dOUT[test_idxs]
 
+    train_props = props[:, train_idxs]
+    val_props = props[:, val_idxs]
+    test_props = props[:, test_idxs]
+
     train_in_f, val_in_f, test_in_f = None, None, None
     if INf is not None:
         train_in_f = INf[train_idxs]
         val_in_f = INf[val_idxs]
         test_in_f = INf[test_idxs]
+    
+    train = [train_in, train_out, train_props, train_in_f]
+    val = [val_in, val_out, val_props, val_in_f]
+    test = [test_in, test_out, test_props, test_in_f]
+    
+    return train, val, test
 
+def save_MLdata(train, val, test, PATH, mode, dis):
     os.makedirs(PATH+"/MLdata", exist_ok=True)
     
-    pd.DataFrame(train_in).to_csv(PATH + f"MLdata/{mode}-{dis}-trainIN.csv")
-    pd.DataFrame(val_in).to_csv(PATH + f"MLdata/{mode}-{dis}-valIN.csv")
-    pd.DataFrame(test_in).to_csv(PATH + f"MLdata/{mode}-{dis}-testIN.csv")
-    pd.DataFrame(train_out).to_csv(PATH + f"MLdata/{mode}-{dis}-trainOUT.csv")
-    pd.DataFrame(val_out).to_csv(PATH + f"MLdata/{mode}-{dis}-valOUT.csv")
-    pd.DataFrame(test_out).to_csv(PATH + f"MLdata/{mode}-{dis}-testOUT.csv")
-    if train_in_f is not None:
-        pd.DataFrame(train_in_f).to_csv(PATH + f"MLdata/{mode}-{dis}-trainINf.csv")
-        pd.DataFrame(val_in_f).to_csv(PATH + f"MLdata/{mode}-{dis}-valINf.csv")
-        pd.DataFrame(test_in_f).to_csv(PATH + f"MLdata/{mode}-{dis}-testINf.csv")
-    
-    return train_in, train_out, val_in, val_out, test_in, test_out, train_in_f, val_in_f, test_in_f
+    pd.DataFrame(train[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainIN.csv")
+    pd.DataFrame(val[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-valIN.csv")
+    pd.DataFrame(test[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-testIN.csv")
+    pd.DataFrame(train[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainOUT.csv")
+    pd.DataFrame(val[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-valOUT.csv")
+    pd.DataFrame(test[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-testOUT.csv")
+
+    pd.DataFrame(train[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainProps.csv")
+    pd.DataFrame(val[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-valProps.csv")
+    pd.DataFrame(test[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-testProps.csv")
+
+    if train[-1] is not None:
+        pd.DataFrame(train[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainINf.csv")
+        pd.DataFrame(val[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-valINf.csv")
+        pd.DataFrame(test[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-testINf.csv")
 
 def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
     if by.lower() == "node":
@@ -167,7 +182,7 @@ def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
         plt.show()
 
 def locSims(prop, OUT_df):
-    max_idx, min_idx = prop.index(max(prop[1:])), prop.index(min(prop[1:]))
+    max_idx, min_idx = prop.tolist().index(max(prop[1:])), prop.tolist().index(min(prop[1:]))
     nSim_max, nSim_min = OUT_df.iloc[max_idx].name, OUT_df.iloc[min_idx].name
     return nSim_max, nSim_min
 
