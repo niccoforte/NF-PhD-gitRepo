@@ -1,7 +1,7 @@
 from resources.imports import *
 
 from torch.utils.data.dataset import Dataset
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 
 from resources.calculations import calcUT, calcFT
@@ -146,9 +146,12 @@ def split_data(dIN, dOUT, props, INf, split=0.85):
     
     return train, val, test
 
-def save_MLdata(train, val, test, PATH, mode, dis):
+def save_MLdata(perIN_df, perOUT_df, train, val, test, PATH, mode, dis):
     os.makedirs(PATH+"/MLdata", exist_ok=True)
     
+    perIN_df.to_csv(PATH + f"MLdata/{mode}-perIN.csv")
+    perOUT_df.to_csv(PATH + f"MLdata/{mode}-perOUT.csv")
+
     pd.DataFrame(train[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainIN.csv")
     pd.DataFrame(val[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-valIN.csv")
     pd.DataFrame(test[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-testIN.csv")
@@ -368,14 +371,19 @@ class PCA_:
         return reconstructed_data
 
 
-def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV_test_in, CSV_test_out):
+def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_trainProps, CSV_val_in, CSV_val_out, CSV_valProps, CSV_test_in, CSV_test_out, CSV_testProps):
     train_in = pd.read_csv(CSV_train_in, index_col=0, header=0).to_numpy()
     train_out = pd.read_csv(CSV_train_out, index_col=0, header=0).to_numpy()
+    trainProps = pd.read_csv(CSV_trainProps, index_col=0, header=0).to_numpy()
     val_in = pd.read_csv(CSV_val_in, index_col=0, header=0).to_numpy()
     val_out = pd.read_csv(CSV_val_out, index_col=0, header=0).to_numpy()
+    valProps = pd.read_csv(CSV_valProps, index_col=0, header=0).to_numpy()
     test_in = pd.read_csv(CSV_test_in, index_col=0, header=0).to_numpy()
     test_out = pd.read_csv(CSV_test_out, index_col=0, header=0).to_numpy()
-    return train_in, train_out, val_in, val_out, test_in, test_out
+    testProps = pd.read_csv(CSV_testProps, index_col=0, header=0).to_numpy()
+
+    train, val, test = [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
+    return train, val, test
 
 def load_freqInputData(CSV_train_in_f, CSV_val_in_f, CSV_test_in_f):
     train_in_f = pd.read_csv(CSV_train_in_f, index_col=0, header=0).to_numpy()
@@ -419,6 +427,7 @@ class DATA:
         LAT="FCC", 
         dis="disNodes", 
         dN=20, 
+        mechMode="UT",
         model="MLP", 
         freq=False, 
         format=0
@@ -428,8 +437,17 @@ class DATA:
         self.LAT = LAT
         self.dis = dis
         self.dN = dN
+        self.mechMode = mechMode
         self.model = model
         self.freq = freq
+
+        if path_add.lower() == "frequency":
+            self.freq = True
+
+        if mechMode.lower() == "ut":
+            self.mechTest = "Ductile"
+        elif mechMode.lower() == "ft":
+            self.mechTest = "Fracture"
 
         self.get_DataPath()
 
@@ -464,64 +482,63 @@ class DATA:
             self.PATH  = str(self.path)+"/"
 
     def get_DataFiles(self):
-        self.CSV_train_in  = self.PATH + f'MLdata/UT-{self.dis}-trainIN.csv'
-        self.CSV_train_out = self.PATH + f'MLdata/UT-{self.dis}-trainOUT.csv'
-        self.CSV_val_in  = self.PATH + f'MLdata/UT-{self.dis}-valIN.csv'
-        self.CSV_val_out = self.PATH + f'MLdata/UT-{self.dis}-valOUT.csv'
-        self.CSV_test_in  = self.PATH + f'MLdata/UT-{self.dis}-testIN.csv'
-        self.CSV_test_out = self.PATH + f'MLdata/UT-{self.dis}-testOUT.csv'
+        self.INcsv = self.PATH + f'{self.mechTest}-disNodes-IN.csv'
+        self.OUTcsv = self.PATH + f'{self.mechTest}-disNodes-OUT.csv'
 
-        self.INcsv = self.PATH + f'Ductile-disNodes-IN.csv'
-        self.OUTcsv = self.PATH + f'Ductile-disNodes-OUT.csv'
+        self.CSV_train_in  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainIN.csv'
+        self.CSV_train_out = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainOUT.csv'
+        self.CSV_val_in  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valIN.csv'
+        self.CSV_val_out = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valOUT.csv'
+        self.CSV_test_in  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testIN.csv'
+        self.CSV_test_out = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testOUT.csv'
+
+        self.CSV_trainProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainProps.csv'
+        self.CSV_valProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valProps.csv'
+        self.CSV_testProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testProps.csv'
 
         if self.freq:
-            self.CSV_train_in_f  = self.PATH + f'MLdata/UT-{self.dis}-trainINf.csv'
-            self.CSV_val_in_f  = self.PATH + f'MLdata/UT-{self.dis}-valINf.csv'
-            self.CSV_test_in_f  = self.PATH + f'MLdata/UT-{self.dis}-testINf.csv'
-            self.INcsv_f = self.PATH + f'Ductile-disNodes-INf.csv'
+            self.CSV_train_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainINf.csv'
+            self.CSV_val_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valINf.csv'
+            self.CSV_test_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testINf.csv'
+            self.INcsv_f = self.PATH + f'{self.mechTest}-disNodes-INf.csv'
 
     def load_data(self):
-        self.IN_df, self.OUT_df, self.INf_df, self.perINr_df, self.perIN_df, self.perOUT_df, self.dIN_df, self.dOUT_df = load_data(self.INcsv, self.OUTcsv, self.INcsv_f if self.freq else None)
+        self.IN_df, self.OUT_df, self.INf_df, self.perINr_df, self.perIN_df, self.perOUT_df, self.dIN_df, self.dOUT_df = load_data(self.INcsv, 
+                                                                                                                                   self.OUTcsv, 
+                                                                                                                                   self.INcsv_f if self.freq else None)
+        train, val, test = load_TrainTestData(self.CSV_train_in, 
+                                            self.CSV_train_out,
+                                            self.CSV_trainProps, 
+                                            self.CSV_val_in, 
+                                            self.CSV_val_out, 
+                                            self.CSV_valProps,
+                                            self.CSV_test_in, 
+                                            self.CSV_test_out,
+                                            self.CSV_testProps)
+        train_in, train_out, trainProps = train
+        val_in, val_out, valProps = val
+        test_in, test_out, testProps = test
 
-        train_in, train_out, val_in, val_out, test_in, test_out = load_TrainTestData(self.CSV_train_in, 
-                                                                                     self.CSV_train_out, 
-                                                                                     self.CSV_val_in, 
-                                                                                     self.CSV_val_out, 
-                                                                                     self.CSV_test_in, 
-                                                                                     self.CSV_test_out)
         if self.freq:
             train_in, val_in, test_in = load_freqInputData(self.CSV_train_in_f, 
                                                             self.CSV_val_in_f, 
                                                             self.CSV_test_in_f)
 
         if self.model.lower() == "mlp" or self.model.lower() == "gpr":
-            self.train_in, self.train_out = train_in, train_out
-            self.val_in, self.val_out = val_in, val_out
-            self.test_in, self.test_out = test_in, test_out
+            self.train_in = train_in
+            self.val_in = val_in
+            self.test_in = test_in
         elif self.model.lower() == "gnn":
             self.train_in = train_in.reshape(*train_in.shape[:-1], train_in.shape[-1]//2, 2)
-            self.train_out = train_out
             self.val_in = val_in.reshape(*val_in.shape[:-1], val_in.shape[-1]//2, 2)
-            self.val_out = val_out
             self.test_in = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
-            self.test_out = test_out
-        
-        self.inParams = dataParams(np.concatenate((self.train_in, self.val_in, self.test_in)))
-        self.outParams = dataParams(np.concatenate((self.train_out, self.val_out, self.test_out)))
+        self.train_out, self.trainProps = train_out, trainProps
+        self.val_out, self.valProps = val_out, valProps
+        self.test_out, self.testProps = test_out, testProps
 
-        self.train_inST = standardize(self.train_in, self.inParams[0], self.inParams[1])
-        self.train_outST = standardize(self.train_out, self.outParams[0], self.outParams[1])
-        self.val_inST = standardize(self.val_in, self.inParams[0], self.inParams[1])
-        self.val_outST = standardize(self.val_out, self.outParams[0], self.outParams[1])
-        self.test_inST = standardize(self.test_in, self.inParams[0], self.inParams[1])
-        self.test_outST = standardize(self.test_out, self.outParams[0], self.outParams[1])
-        
-        self.train_inNM = normalize(self.train_in, self.inParams[2], self.inParams[3])
-        self.train_outNM = normalize(self.train_out, self.outParams[2], self.outParams[3])
-        self.val_inNM = normalize(self.val_in, self.inParams[2], self.inParams[3])
-        self.val_outNM = normalize(self.val_out, self.outParams[2], self.outParams[3])
-        self.test_inNM = normalize(self.test_in, self.inParams[2], self.inParams[3])
-        self.test_outNM = normalize(self.test_out, self.outParams[2], self.outParams[3])
+        self.all_in = np.concatenate((self.train_in, self.val_in, self.test_in))
+        self.all_out = np.concatenate((self.train_out, self.val_out, self.test_out))
+        self.allProps = np.concatenate((self.trainProps, self.valProps, self.testProps), axis=1)
     
     def load_DisDist_v1(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
@@ -529,17 +546,6 @@ class DATA:
         train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
         self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
         self.dy_out1 = train_out1[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2,1)
-
-        self.inParams1 = dataParams(self.train_in1)
-        self.train_in1ST = standardize(self.train_in1, self.inParams1[0], self.inParams1[1])
-        self.train_in1NM = normalize(self.train_in1, self.inParams1[2], self.inParams1[3])
-
-        self.outParams1dx = dataParams(self.dx_out1)
-        self.outParams1dy = dataParams(self.dy_out1)
-        self.dx_out1ST = standardize(self.dx_out1, self.outParams1dx[0], self.outParams1dx[1])
-        self.dy_out1ST = standardize(self.dy_out1, self.outParams1dy[0], self.outParams1dy[1])
-        self.dx_out1NM = normalize(self.dx_out1, self.outParams1dx[2], self.outParams1dx[3])
-        self.dy_out1NM = normalize(self.dy_out1, self.outParams1dy[2], self.outParams1dy[3])
     
     def load_DisDist_v2(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
@@ -551,14 +557,50 @@ class DATA:
         dy_out2 = train_out2[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2)
         self.dy_out2 = np.stack((dy_out2, dy_out2), axis=1)
 
-        self.inParams2 = dataParams(self.train_in2)
-        self.train_in2ST = standardize(self.train_in2, self.inParams2[0], self.inParams2[1])
-        self.train_in2NM = normalize(self.train_in2, self.inParams2[2], self.inParams2[3])
 
-        self.outParams2dx = dataParams(self.dx_out2)
-        self.outParams2dy = dataParams(self.dx_out2)
-        self.dx_out2ST = standardize(self.dx_out2, self.outParams2dx[0], self.outParams2dx[1])
-        self.dx_out2ST = standardize(self.dx_out2, self.outParams2dy[0], self.outParams2dy[1])
-        self.dx_out2NM = normalize(self.dx_out2, self.outParams2dx[2], self.outParams2dx[3])
-        self.dx_out2NM = normalize(self.dx_out2, self.outParams2dy[2], self.outParams2dy[3])
 
+#### Normalisation and Standardization Data Class Variables
+        # self.inParams = dataParams(self.all_in)
+        # self.outParams = dataParams(self.all_out)
+
+        # self.train_inST = standardize(self.train_in, self.inParams[0], self.inParams[1])
+        # self.train_outST = standardize(self.train_out, self.outParams[0], self.outParams[1])
+        # self.val_inST = standardize(self.val_in, self.inParams[0], self.inParams[1])
+        # self.val_outST = standardize(self.val_out, self.outParams[0], self.outParams[1])
+        # self.test_inST = standardize(self.test_in, self.inParams[0], self.inParams[1])
+        # self.test_outST = standardize(self.test_out, self.outParams[0], self.outParams[1])
+        # self.all_inST = standardize(self.all_in, self.inParams[0], self.inParams[1])
+        # self.all_outST = standardize(self.all_out, self.outParams[0], self.outParams[1])
+        
+        # self.train_inNM = normalize(self.train_in, self.inParams[2], self.inParams[3])
+        # self.train_outNM = normalize(self.train_out, self.outParams[2], self.outParams[3])
+        # self.val_inNM = normalize(self.val_in, self.inParams[2], self.inParams[3])
+        # self.val_outNM = normalize(self.val_out, self.outParams[2], self.outParams[3])
+        # self.test_inNM = normalize(self.test_in, self.inParams[2], self.inParams[3])
+        # self.test_outNM = normalize(self.test_out, self.outParams[2], self.outParams[3])
+        # self.all_inNM = normalize(self.all_in, self.inParams[2], self.inParams[3])
+        # self.all_outNM = normalize(self.all_out, self.outParams[2], self.outParams[3])
+
+
+        # self.inParams1 = dataParams(self.train_in1)
+        # self.train_in1ST = standardize(self.train_in1, self.inParams1[0], self.inParams1[1])
+        # self.train_in1NM = normalize(self.train_in1, self.inParams1[2], self.inParams1[3])
+
+        # self.outParams1dx = dataParams(self.dx_out1)
+        # self.outParams1dy = dataParams(self.dy_out1)
+        # self.dx_out1ST = standardize(self.dx_out1, self.outParams1dx[0], self.outParams1dx[1])
+        # self.dy_out1ST = standardize(self.dy_out1, self.outParams1dy[0], self.outParams1dy[1])
+        # self.dx_out1NM = normalize(self.dx_out1, self.outParams1dx[2], self.outParams1dx[3])
+        # self.dy_out1NM = normalize(self.dy_out1, self.outParams1dy[2], self.outParams1dy[3])
+        
+
+        # self.inParams2 = dataParams(self.train_in2)
+        # self.train_in2ST = standardize(self.train_in2, self.inParams2[0], self.inParams2[1])
+        # self.train_in2NM = normalize(self.train_in2, self.inParams2[2], self.inParams2[3])
+
+        # self.outParams2dx = dataParams(self.dx_out2)
+        # self.outParams2dy = dataParams(self.dx_out2)
+        # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dx[0], self.outParams2dx[1])
+        # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dy[0], self.outParams2dy[1])
+        # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dx[2], self.outParams2dx[3])
+        # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dy[2], self.outParams2dy[3])
