@@ -5,7 +5,7 @@ import sys
 
 stiffMatrix = False
 
-pDir = f"Z:\\p1\sims\\Ti\\FrequencyDisorder"
+pDir = "C:\\temp" #"Z:\\p1\sims\\Ti\\FrequencyDisorder"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -30,7 +30,6 @@ if len(cmdIN) > 0:
     if "OptLoop" in cmdIN:
         sampleN = int(cmdIN[-1])
         opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
-        print(opt_disorder, opt_disorder.shape, opt_disorder.dtype)
         opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
         opt_dis_x = opt_disorder[:,0]
         opt_dis_y = opt_disorder[:,1]
