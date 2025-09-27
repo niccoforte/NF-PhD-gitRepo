@@ -37,7 +37,7 @@ FieldOut_frames = 100
 HistOut_frames = 200
 
 distribution = 'lhs_uniform'                      # uniform, lhs_uniform, frequency, normal, exponential
-targeted_disorder = "xs"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
+targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
 nodeVar = 'yes'                                 # distortion
 sizeVar = 'no'
 fac = 0.2
@@ -51,8 +51,11 @@ UTval = False
 #pDir = f"Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
 #pDir = f"Z:\\p1\sims\\Ti\\DimReductionData"
 #pDir = f"Z:\\p1\sims\\Ti\\sApp" # \\" + str(int(fac*100))
-pDir = f"Z:\\p1\\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
+#pDir = f"Z:\\p1\\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
 pDir = "C:\\temp"
+
+global frequencies
+frequencies = []
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -77,10 +80,12 @@ if len(cmdIN) > 0:
     if "OptLoop" in cmdIN:
         sampleN = int(cmdIN[-1])
         opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
-        print(opt_disorder, opt_disorder.shape, opt_disorder.dtype)
-        opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
-        opt_dis_x = opt_disorder[:,0]
-        opt_dis_y = opt_disorder[:,1]
+        if distribution.lower() == "opt-f":
+            frequencies = opt_disorder
+        else:
+            opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
+            opt_dis_x = opt_disorder[:,0]
+            opt_dis_y = opt_disorder[:,1]
     
     stiffMatrix = False
     UTval = False
@@ -858,11 +863,6 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     else:
         disorderNodes = nonboundaryNodes
     
-    print(len(disorderNodes))
-    
-    # print(len(disorderNodes)/len(nonboundaryNodes))
-    global frequencies
-    frequencies = []
     if (distribution.lower() == 'uniform'):
         randX = random.uniform(-delta, delta, len(disorderNodes))
         randY = random.uniform(-delta, delta, len(disorderNodes))
@@ -903,6 +903,24 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     elif (distribution.lower() == 'opt'):
         randX = opt_dis_x
         randY = opt_dis_y
+    elif (distribution.lower() == 'opt-f'):
+        rows = set(nodes[disorderNodes.astype(int)-1,2])
+        print(len(rows), len(frequencies))
+        rand = nodes[disorderNodes.astype(int)-1]
+        rand[:,1] = np.zeros(len(disorderNodes))
+        rand[:,2] = np.zeros(len(disorderNodes))
+        for i, y in enumerate(rows):
+            dN = nodes[disorderNodes.astype(int)-1]
+            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
+            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
+                          for j in dN_xs])
+            idxs = np.isin(rand[:,0], r[:,0])
+            sorter = np.argsort(r[:,0])
+            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
+            rand[idxs,1] = r[match_idxs,1]
+            rand[idxs,2] = r[match_idxs,2]
+        randX = rand[:,1]
+        randY = rand[:,2]
 
     disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
     disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
@@ -1282,7 +1300,7 @@ elif (distribution.lower() == 'lhs_uniform'):
 elif (distribution.lower() == 'frequency'):
     fac = fac
     dist = "freq"
-elif (distribution.lower() == 'opt'):
+elif (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
     fac = fac
     dist = "opt"
 elif (distribution.lower() == 'normal'):
@@ -1302,7 +1320,7 @@ for idNum in range(initial,numOfJobs):
     
     nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution)
 
-    if (distribution.lower() == 'opt'):
+    if (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
         idNum = sampleN
 
 # ######################################################################################################
