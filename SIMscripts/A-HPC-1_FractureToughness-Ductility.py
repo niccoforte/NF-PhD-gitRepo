@@ -36,41 +36,58 @@ cpus = 8
 FieldOut_frames = 20
 HistOut_frames = 200
 
-distribution = 'frequency'                      # uniform, lhs_uniform, frequency, normal, exponential
+distribution = 'lhs_uniform'                    # uniform, lhs_uniform, frequency, normal, exponential
 targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
-nodeVar = 'no'                                 # distortion
+nodeVar = 'no'                                  # distortion
 sizeVar = 'no'
 fac = 0.2
 beta = fac
+
+global frequencies
+frequencies = []
 
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     nnx = int(cmdIN[1])
     unitCellSize = float(cmdIN[2])
-    relDensity = float(cmdIN[3])
-    dis = str(cmdIN[4])
-    fac = float(cmdIN[5])
+    MechanicalModel = str(cmdIN[3])
+    userMaterial = str(cmdIN[4])
+    relDensity = float(cmdIN[5])
+    dis = str(cmdIN[6])
+    fac = float(cmdIN[7])
     beta = fac
-    distribution = str(cmdIN[6])
-    targeted_disorder = str(cmdIN[7])
-    initialJob = int(cmdIN[8])
-    numberOfRuns = int(cmdIN[9])
-    cpus = int(cmdIN[10])
+    distribution = str(cmdIN[8])
+    targeted_disorder = str(cmdIN[9])
+    initialJob = int(cmdIN[10])
+    numberOfRuns = int(cmdIN[11])
+    cpus = int(cmdIN[12])
+    FieldOut_frames = int(cmdIN[13])
+    HistOut_frames = int(cmdIN[14])
+    pDir = str(cmdIN[15])
 
-    finalRun = 'yes'
-    MechanicalModel = 'both'
-
+    if "OptLoop" in cmdIN:
+        sampleN = int(cmdIN[-1])
+        opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
+        if distribution.lower() == "opt-f":
+            frequencies = opt_disorder
+        else:
+            opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
+            opt_dis_x = opt_disorder[:,0]
+            opt_dis_y = opt_disorder[:,1]
+    
     stiffMatrix = False
     UTval = False
-        
-    if dis == 'per':
+    
+    finalRun = 'yes'
+    
+    if dis.lower() == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
-    elif dis == 'disNodes':
+    elif dis.lower() == 'disnodes':
         nodeVar = 'yes'
         sizeVar = 'no'
-    elif dis == 'disStruts':
+    elif dis.lower() == 'disstruts':
         nodeVar = 'no'
         sizeVar = 'yes'
     else:
@@ -815,9 +832,6 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     else:
         disorderNodes = nonboundaryNodes
     
-    # print(len(disorderNodes)/len(nonboundaryNodes))
-    global frequencies
-    frequencies = []
     if (distribution.lower() == 'uniform'):
         randX = random.uniform(-delta, delta, len(disorderNodes))
         randY = random.uniform(-delta, delta, len(disorderNodes))
@@ -855,7 +869,28 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
             rand[idxs,2] = r[match_idxs,2]
         randX = rand[:,1]
         randY = rand[:,2]
-    
+    elif (distribution.lower() == 'opt'):
+        randX = opt_dis_x
+        randY = opt_dis_y
+    elif (distribution.lower() == 'opt-f'):
+        rows = set(nodes[disorderNodes.astype(int)-1,2])
+        print(len(rows), len(frequencies))
+        rand = nodes[disorderNodes.astype(int)-1]
+        rand[:,1] = np.zeros(len(disorderNodes))
+        rand[:,2] = np.zeros(len(disorderNodes))
+        for i, y in enumerate(rows):
+            dN = nodes[disorderNodes.astype(int)-1]
+            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
+            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
+                          for j in dN_xs])
+            idxs = np.isin(rand[:,0], r[:,0])
+            sorter = np.argsort(r[:,0])
+            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
+            rand[idxs,1] = r[match_idxs,1]
+            rand[idxs,2] = r[match_idxs,2]
+        randX = rand[:,1]
+        randY = rand[:,2]
+
     disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
     disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
     
@@ -1234,6 +1269,9 @@ elif (distribution.lower() == 'lhs_uniform'):
 elif (distribution.lower() == 'frequency'):
     fac = fac
     dist = "freq"
+elif (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
+    fac = fac
+    dist = "opt"
 elif (distribution.lower() == 'normal'):
     fac = (2*fac)/sqrt(2*pi*exp(1))
     dist = "norm"
@@ -1250,6 +1288,9 @@ for idNum in range(initial,numOfJobs):
     units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
     
     nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution)
+
+    if (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
+        idNum = sampleN
 
 # ######################################################################################################
 # ######################################################################################################
@@ -2413,8 +2454,8 @@ for idNum in range(initial,numOfJobs):
         
         elif (finalRun.lower() == 'yes'):
             mdb.jobs[Job].writeInput(consistencyChecking=OFF)
-            # mdb.jobs[Job].submit(consistencyChecking=OFF)
-            # mdb.jobs[Job].waitForCompletion()
+            mdb.jobs[Job].submit(consistencyChecking=OFF)
+            mdb.jobs[Job].waitForCompletion()
             with open(Job+'.inp', 'a') as f:
                 f.write('**\n**FREQUENCIES:\n')
                 for freq in frequencies:

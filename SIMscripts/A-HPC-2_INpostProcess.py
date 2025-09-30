@@ -8,29 +8,43 @@ if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     nnx = int(cmdIN[1])
     unitCellSize = float(cmdIN[2])
-    relDensity = float(cmdIN[3])
-    dis = str(cmdIN[4])
-    fac = float(cmdIN[5])
+    MechanicalModel = str(cmdIN[3])
+    userMaterial = str(cmdIN[4])
+    relDensity = float(cmdIN[5])
+    dis = str(cmdIN[6])
+    fac = float(cmdIN[7])
     beta = fac
-    distribution = str(cmdIN[6])
-    targeted_disorder = str(cmdIN[7])
-    initialJob = int(cmdIN[8])
-    numberOfRuns = int(cmdIN[9])
-    cpus = int(cmdIN[10])
+    distribution = str(cmdIN[8])
+    targeted_disorder = str(cmdIN[9])
+    initialJob = int(cmdIN[10])
+    numberOfRuns = int(cmdIN[11])
+    cpus = int(cmdIN[12])
+    FieldOut_frames = int(cmdIN[13])
+    HistOut_frames = int(cmdIN[14])
+    pDir = str(cmdIN[15])
 
-    finalRun = 'yes'
-    MechanicalModel = 'both'
-
+    if "OptLoop" in cmdIN:
+        sampleN = int(cmdIN[-1])
+        opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
+        if distribution.lower() == "opt-f":
+            frequencies = opt_disorder
+        else:
+            opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
+            opt_dis_x = opt_disorder[:,0]
+            opt_dis_y = opt_disorder[:,1]
+    
     stiffMatrix = False
     UTval = False
-        
-    if dis == 'per':
+    
+    finalRun = 'yes'
+    
+    if dis.lower() == 'per':
         nodeVar = 'no'
         sizeVar = 'no'
-    elif dis == 'disNodes':
+    elif dis.lower() == 'disnodes':
         nodeVar = 'yes'
         sizeVar = 'no'
-    elif dis == 'disStruts':
+    elif dis.lower() == 'disstruts':
         nodeVar = 'no'
         sizeVar = 'yes'
     else:
