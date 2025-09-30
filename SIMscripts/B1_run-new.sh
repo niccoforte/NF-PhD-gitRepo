@@ -30,7 +30,9 @@ nJobs=1
 CPUs=$NSLOTS
 Fout=20
 Hout=200
-PATH_EXTRA=" "
+pDir=None
+
+PATH_EXTRA=
 
 zip=false
 delete_scratch=true
