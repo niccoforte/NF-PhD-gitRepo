@@ -30,7 +30,9 @@ nJobs=1
 CPUs=$NSLOTS
 Fout=20
 Hout=200
-PATH_EXTRA=Frequency
+pDir=None
+
+PATH_EXTRA=
 
 zip=false
 delete_scratch=true
@@ -52,6 +54,8 @@ mkdir /data/scratch/$USER/$JOB_ID/zip/transfer/
 
 
 # copy command
+rsync -av $SGE_O_WORKDIR/A* /data/scratch/$USER/$JOB_ID
+rsync -av $SGE_O_WORKDIR/B* /data/scratch/$USER/$JOB_ID
 rsync -av $SGE_O_WORKDIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
 cd /data/scratch/$USER/$JOB_ID
 
