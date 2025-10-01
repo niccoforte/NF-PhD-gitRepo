@@ -4,8 +4,9 @@ import math
 import sys
 
 stiffMatrix = False
+distribution = "Frequency"
 
-pDir = "C:\\temp" #"Z:\\p1\sims\\Ti\\FrequencyDisorder"
+pDir = "C:\\temp"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -361,6 +362,8 @@ def export_struts(inpFile, expFile):
         for thick in thicks:
             f.write(str(thick) + '\n')
 
+if distribution.lower() == "frequency" or distribution.lower() == "opt-f":
+    freq = True
 
 if not os.path.exists("transfer"):
     os.makedirs("transfer")
@@ -371,7 +374,8 @@ for file in os.scandir():
             expFile_n = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
             expFile_f = "transfer/IN-f" + file.name[:-4].replace('_','-') + ".csv"
             export_nodes(file.name, expFile_n)
-            export_frequencies(file.name, expFile_f)
+            if freq:
+                export_frequencies(file.name, expFile_f)
 
     if 'per' in file.name or 'disStruts' in file.name:
         if file.name.endswith('.inp'):
