@@ -89,6 +89,8 @@ for inp_file in "${inp_files[@]}"; do
     /bin/echo "----------------------------------------------------"
 done
 
+rsync -av $SGE_O_WORKDIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
+
 /bin/echo Simulation completed at: `date`.
 /bin/echo Processing outputs...
 
