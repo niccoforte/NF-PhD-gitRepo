@@ -17,8 +17,6 @@ initial = 1
 numberOfRuns = 1
 expected_steps = 201
 
-pDir = os.getcwd()
-
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
@@ -65,6 +63,8 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
+
+pDir = os.getcwd()
 
 def rDthickness(LAT, l, t=None, rD=None):
     if LAT.lower() == "fcc":
