@@ -362,6 +362,7 @@ def export_struts(inpFile, expFile):
         for thick in thicks:
             f.write(str(thick) + '\n')
 
+freq = False
 if distribution.lower() == "frequency" or distribution.lower() == "opt-f":
     freq = True
 
