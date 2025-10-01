@@ -36,7 +36,7 @@ PATH_EXTRA=
 OG_JOBS=(/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/*)
 
 for OG_JOB in "${OG_JOBS[@]}"; do
-    ORIGIN_DIR=/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$OG_JOB/zip #$SGE_O_WORKDIR
+    ORIGIN_DIR=$OG_JOB/zip #$SGE_O_WORKDIR
 
     zip=false
     delete_scratch=true
@@ -59,7 +59,7 @@ for OG_JOB in "${OG_JOBS[@]}"; do
 
     # copy command
     rsync -av $ORIGIN_DIR/A* /data/scratch/$USER/$JOB_ID
-    rsync -av $ORIGIN_DIR/B* /data/scratch/$USER/$JOB_ID
+    # rsync -av $ORIGIN_DIR/B* /data/scratch/$USER/$JOB_ID
     rsync -av $ORIGIN_DIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
     cd /data/scratch/$USER/$JOB_ID
 
