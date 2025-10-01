@@ -56,14 +56,40 @@ mkdir /data/scratch/$USER/$JOB_ID/zip/transfer/
 # copy command
 rsync -av $SGE_O_WORKDIR/A* /data/scratch/$USER/$JOB_ID
 rsync -av $SGE_O_WORKDIR/B* /data/scratch/$USER/$JOB_ID
+rsync -av $SGE_O_WORKDIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
 cd /data/scratch/$USER/$JOB_ID
 
 /bin/echo Working in directory: `pwd`.
 
+shopt -s nullglob
+inp_files=(*.inp)
+shopt -u nullglob
 
-# Replace the following line with abaqus command
-#abaqus job=callmat cpus=${NSLOTS} user=PhaseField_5m-std.o mp_mode=THREADS scratch=/data/scratch/$USER/
-abaqus cae noGUI=A-HPC-1_FractureToughness-Ductility.py -- $LAT $nnx $unitCellSize $mode $material $rD $DIS $fac $distribution $target $initial $nJobs $CPUs $Fout $Hout $pDir
+if [ ${#inp_files[@]} -eq 0 ]; then
+    /bin/echo "Error: No .inp files found in `pwd`. Exiting."
+    exit 1
+fi
+
+/bin/echo "Found ${#inp_files[@]} input files to process."
+
+for inp_file in "${inp_files[@]}"; do
+    job_name="${inp_file%.inp}"
+
+    /bin/echo "----------------------------------------------------"
+    /bin/echo "Submitting Abaqus job: $job_name"
+    /bin/echo "Input file: $inp_file"
+    /bin/echo "Time: $(date)"
+    /bin/echo "----------------------------------------------------"
+
+    abaqus job=$job_name input=$inp_file cpus=$CPUs mp_mode=THREADS interactive
+
+    /bin/echo "----------------------------------------------------"
+    /bin/echo "Finished job: $job_name"
+    /bin/echo "Time: $(date)"
+    /bin/echo "----------------------------------------------------"
+done
+
+rsync -av $SGE_O_WORKDIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
 
 /bin/echo Simulation completed at: `date`.
 /bin/echo Processing outputs...
