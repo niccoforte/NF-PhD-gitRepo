@@ -33,7 +33,7 @@ Hout=200
 pDir=None
 
 PATH_EXTRA=
-SKIP=("6023702")
+SKIP=()
 BASE_DIR="/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT"
 OG_JOBS=("$BASE_DIR"/*/)
 
