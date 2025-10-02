@@ -6,7 +6,14 @@ from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_po
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 
 from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr
-from resources.MLdata import standardize
+from resources.MLdata import standardize, MinMaxScaler
+
+from torch.serialization import safe_globals
+from botorch.models import SingleTaskGP
+from botorch.fit import fit_gpytorch_mll
+from botorch.optim import optimize_acqf
+from botorch.acquisition import UpperConfidenceBound
+from gpytorch.mlls import ExactMarginalLogLikelihood
 
 
 class MODEL:
@@ -332,3 +339,181 @@ class Autoencoder(nn.Module):
         latent = self.encoder(x)
         recon = self.decoder(latent)
         return recon
+
+
+### Optimization Algorithms
+class BoTorchOptimizer:
+    def __init__(
+        self,
+        fitness_fn,
+        input_shape,
+        DATApath,
+        bounds=(-0.2, 0.2),
+        X_initial=None,
+        y_initial=None,
+        resume=False,
+        save_log=True,
+        save_state=True,
+        argv=None
+    ):
+        self.fitness_fn = fitness_fn
+        self.input_shape = input_shape
+        self.DATApath = DATApath
+        self.dim = np.prod(self.input_shape)
+        self.save_log = save_log
+        self.save_state = save_state
+        self.argv = argv
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.dtype = torch.double
+        
+        log_file = f"{DATApath}/Opt/BO_log.txt"
+        log_dir = os.path.dirname(log_file)
+        if log_dir and not os.path.exists(log_dir):
+            os.makedirs(log_dir)
+        self.state_file = os.path.join(log_dir, 'BO_optimizer_state.pt')
+            
+        self.train_X = None
+        self.train_Y = None
+        self.scaler = None
+
+        self.starting_iteration = 1
+
+        if resume and os.path.exists(self.state_file):
+            print(f"--- Resuming optimization from saved state: {self.state_file} ---")
+            state = torch.load(self.state_file, weights_only=False)
+            self.train_X = state['train_X'].to(self.device, dtype=self.dtype)
+            self.train_Y = state['train_Y'].to(self.device, dtype=self.dtype)
+            self.scaler = state['scaler']
+            self.bounds = torch.tensor([[0.0] * self.dim, [1.0] * self.dim], device=self.device, dtype=self.dtype)
+            
+            for filename in os.listdir(log_dir):
+                if filename.startswith("BO_sample") and filename.endswith(".txt"):
+                    sample_num = int(filename.split(".")[0][9:])
+                    if sample_num >= self.starting_iteration:
+                        self.starting_iteration = sample_num + 1
+            print(f"Found highest sample number {self.starting_iteration-1} in directory.")
+            print(f"Next iteration will be numbered starting from {self.starting_iteration}.")
+            
+            if self.save_log:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                base, ext = os.path.splitext(log_file)
+                self.log_file = f"{base}_resume_{timestamp}{ext}"
+
+            print(f"Starting new log file for this run at: {self.log_file}")
+        elif X_initial is not None and y_initial is not None:
+            print(f"--- Warm-starting optimizer with {len(y_initial)} initial points. ---")
+            self.scaler = MinMaxScaler(feature_range=(0, 1))
+            X_reshaped = X_initial.reshape(len(y_initial), -1)
+            self.scaler.fit(X_reshaped)
+            X_scaled = self.scaler.transform(X_reshaped)
+            
+            self.train_X = torch.tensor(X_scaled, device=self.device, dtype=self.dtype)
+            self.train_Y = torch.tensor(y_initial, device=self.device, dtype=self.dtype).unsqueeze(-1)
+            self.bounds = torch.tensor([[0.0] * self.dim, [1.0] * self.dim], device=self.device, dtype=self.dtype)
+
+            if self.save_log:
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                base, ext = os.path.splitext(log_file)
+                self.log_file = f"{base}_initial_{timestamp}{ext}"
+                print(f"Starting new log file for this run at: {self.log_file}")
+        else:
+            self.bounds = torch.tensor([[bounds[0]] * self.dim, [bounds[1]] * self.dim], device=self.device, dtype=self.dtype)
+
+    def _save_state(self):
+        if not self.save_state:
+            return
+        
+        state = {
+            'train_X': self.train_X,
+            'train_Y': self.train_Y,
+            'scaler': self.scaler
+        }
+        torch.save(state, self.state_file)
+        print(f"-> Optimizer state saved to {self.state_file}")
+    
+    def _get_fitted_model(self):
+        model = SingleTaskGP(self.train_X, self.train_Y)
+        mll = ExactMarginalLogLikelihood(model.likelihood, model)
+        fit_gpytorch_mll(mll)
+        return model
+
+    def _report_progress(self, iteration, history):
+        if self.save_log:
+            with open(self.log_file, 'a') as f:
+                f.write(f"Iteration: {iteration:4} | Best Fitness Found: {max(history):10.4f}\n")
+        
+        plt.clf()
+        plt.plot(history, marker='o', linestyle='-', markersize=4)
+        plt.title(f'BoTorch Convergence (Iter: {iteration})')
+        plt.xlabel('Iteration')
+        plt.ylabel('Best Fitness Score Found')
+        plt.grid(True)
+        plt.tight_layout()
+        plt.pause(0.01)
+
+    def run(self, n_iterations=50, n_initial_points=10, beta=4.0):
+        if self.train_X is None:
+            print(f"--- Starting fresh run. Generating {n_initial_points} points using LHS. ---")
+            sampler = scipy.stats.qmc.LatinHypercube(d=self.dim)
+            X_init_np = sampler.random(n=n_initial_points)
+            if self.scaler is None:
+                low, high = self.bounds[0,0].item(), self.bounds[1,0].item()
+                X_init_np = low + (high - low) * X_init_np
+            
+            y_init_np = np.array([self.fitness_fn(x.reshape(self.input_shape), 0) for x in X_init_np])
+            self.train_X = torch.tensor(X_init_np, device=self.device, dtype=self.dtype)
+            self.train_Y = torch.tensor(y_init_np, device=self.device, dtype=self.dtype).unsqueeze(-1)
+        
+        history = [self.train_Y.max().item()]
+        self._report_progress(self.starting_iteration - 1, history)
+
+        for i in range(self.starting_iteration, self.starting_iteration + n_iterations):
+            print(f"\n--- Iteration {i}/{self.starting_iteration + n_iterations - 1} ---")
+
+            print("1. Fitting the GPR model...")
+            model = self._get_fitted_model()
+            
+            print("2. Redefining and optimizing the acquisition function...")
+            acq_function = UpperConfidenceBound(model, beta=beta)
+            candidate, acq_value = optimize_acqf(
+                acq_function=acq_function,
+                bounds=self.bounds,
+                q=1,
+                num_restarts=20,
+                raw_samples=512
+            )
+            
+            new_x_scaled = candidate.detach()
+            
+            print("3. Evaluating new candidate with fitness function...")
+            physical_x_flat = new_x_scaled.cpu().numpy().reshape(1, -1)
+            if self.scaler:
+                physical_x_flat = self.scaler.inverse_transform(physical_x_flat)
+            physical_x = physical_x_flat.reshape(self.input_shape)
+            new_y_val = self.fitness_fn(physical_x, i, self.DATApath, self.argv)
+            print(f"   -> Score found: {new_y_val:.4f}")
+            
+            new_y = torch.tensor([[new_y_val]], device=self.device, dtype=self.dtype)
+            
+            self.train_X = torch.cat([self.train_X, new_x_scaled])
+            self.train_Y = torch.cat([self.train_Y, new_y])
+            
+            history.append(self.train_Y.max().item())
+            self._report_progress(i, history)
+
+            self._save_state()
+
+        plt.ioff()
+        print("\nOptimization finished.")
+        plt.show()
+        
+        best_idx = self.train_Y.argmax()
+        best_solution_scaled = self.train_X[best_idx]
+        best_score = self.train_Y[best_idx].item()
+
+        best_solution_physical = best_solution_scaled.reshape(1, -1)
+        if self.scaler:
+            best_solution_physical = self.scaler.inverse_transform(best_solution_physical)
+        return best_solution_physical.reshape(self.input_shape), best_score, self.train_X, self.train_Y
+

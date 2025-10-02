@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import subprocess
 
 
 def smooth(y_old):
@@ -158,3 +159,38 @@ def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):
         Kjs.append(Kj)
     
     return P, dd, Ks, Kjs
+
+def FEA_run(x_new, iter, path, argv):
+    new_sample_file = f"{path}/Opt/BO_sample{iter}.txt"
+    np.savetxt(new_sample_file, x_new.flatten()[np.newaxis], fmt='%.6f')
+
+    try:
+        print("-> Running Abaqus simulation and post-processing...")
+        abq_argv = f"{argv} {iter}"
+        
+        abq_run_file = r"C:\\Users\\exy053\\Documents\\p1git-Lattices\\SIMscripts\\A1_FractureToughness-Ductility.py"
+        abq_run_cmd = f"abaqus cae noGUI={abq_run_file} -- {abq_argv}"
+        subprocess.run(abq_run_cmd, shell=True, check=True)
+
+        abq_inPP_file = r"C:\\Users\\exy053\\Documents\\p1git-Lattices\\SIMscripts\\A2_INpostProcess.py"
+        abq_inPP_cmd = f"abaqus cae noGUI={abq_inPP_file} -- {abq_argv}"
+        subprocess.run(abq_inPP_cmd, shell=True, check=True)
+
+        abq_outPP_file = r"C:\\Users\\exy053\\Documents\\p1git-Lattices\\SIMscripts\\A2_OUTpostProcess.py"
+        abq_outPP_cmd = f"abaqus cae noGUI={abq_outPP_file} -- {abq_argv}"
+        subprocess.run(abq_outPP_cmd, shell=True, check=True)
+
+        CSVout = f"{path}/Opt/transfer/OUT-Ductile-{argv[0]}-{int(argv[1])}-{int(argv[7]*100)}{argv[6]}-opt-{argv[9]}-{iter}.csv"
+        UTdf = get_ductileData(CSVout, crit=0.25)
+        ductility, strength, stiffness = calcUT(UTdf)
+        score = ductility
+        return score
+    
+    except subprocess.CalledProcessError as e:
+        print(f"!!! An Abaqus process failed: {e}")
+        return 0
+
+    except Exception as e:
+        print(f"!!! An unexpected error occurred in the FEA workflow: {e}")
+        return 0
+
