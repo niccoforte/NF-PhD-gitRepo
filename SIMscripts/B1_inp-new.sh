@@ -33,14 +33,21 @@ Hout=200
 pDir=None
 
 PATH_EXTRA=
-OG_JOBS=(/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/*)
+SKIP=("6023702")
+BASE_DIR="/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT"
+OG_JOBS=("$BASE_DIR"/*/)
+
+zip=false
+delete_scratch=true
 
 for OG_JOB in "${OG_JOBS[@]}"; do
+    JOB_NAME=$(basename "$OG_JOB")
+    if [[ " ${SKIP[*]} " == *" $JOB_NAME "* ]]; then
+        echo "Skipping job $JOB_NAME"
+        continue
+    fi
+
     ORIGIN_DIR=$OG_JOB/zip #$SGE_O_WORKDIR
-
-    zip=false
-    delete_scratch=true
-
 
     # Load required modules
     module load abaqus/2024
@@ -123,6 +130,7 @@ for OG_JOB in "${OG_JOBS[@]}"; do
     # mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$JOB_ID/zip/
     rsync -av /data/scratch/$USER/$JOB_ID/zip/* $ORIGIN_DIR
 
+    cd $SGE_O_WORKDIR
     if [ "$delete_scratch" = true ] ; then
         rm -rf /data/scratch/$USER/$JOB_ID
     fi
