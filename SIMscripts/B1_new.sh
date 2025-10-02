@@ -54,7 +54,7 @@ mkdir /data/scratch/$USER/$JOB_ID/zip/transfer/
 
 
 # copy command
-rsync -av $SGE_O_WORKDIR/A* /data/scratch/$USER/$JOB_ID
+rsync -av /data/home/exy053/p1/p1git-Lattices/SIMscripts/A-HPC-* /data/scratch/$USER/$JOB_ID
 rsync -av $SGE_O_WORKDIR/B* /data/scratch/$USER/$JOB_ID
 cd /data/scratch/$USER/$JOB_ID
 

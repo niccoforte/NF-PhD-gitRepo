@@ -58,7 +58,7 @@ for OG_JOB in "${OG_JOBS[@]}"; do
 
 
     # copy command
-    rsync -av $ORIGIN_DIR/A* /data/scratch/$USER/$JOB_ID
+    rsync -av /data/home/exy053/p1/p1git-Lattices/SIMscripts/A-HPC-* /data/scratch/$USER/$JOB_ID
     # rsync -av $ORIGIN_DIR/B* /data/scratch/$USER/$JOB_ID
     rsync -av $ORIGIN_DIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
     cd /data/scratch/$USER/$JOB_ID
