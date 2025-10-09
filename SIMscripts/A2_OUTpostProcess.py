@@ -17,7 +17,7 @@ initial = 1
 numberOfRuns = 1
 expected_steps = 201
 
-pDir = r"C:\\Users\\exy053\\Documents\\TargetedDisorder\\xs" #\\MeshConv\\1-5-1"
+pDir = r"C:\\temp" #Users\\exy053\\Documents\\TargetedDisorder\\xs" #\\MeshConv\\1-5-1"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:

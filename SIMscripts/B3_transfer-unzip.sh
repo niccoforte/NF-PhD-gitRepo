@@ -11,7 +11,7 @@ mkdir -p Z:/p1/data/Ti/disNodes/$EXTRA/0.2/$LAT/transfer
 mkdir -p Z:/p1/data/Ti/per/$LAT/transfer
 cd Z:/p1/data/Ti/disNodes/$EXTRA/0.2/$LAT/transfer
 
-scp exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/disNodes/$EXTRA/0.2/$LAT/*/zip/transfer/* exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/per/0.0/$LAT/*/zip/transfer/* "`pwd`"
+scp exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/per/0.0/$LAT/*/zip/transfer/* exy053@login.hpc.qmul.ac.uk:/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/disNodes/$EXTRA/0.2/$LAT/*/zip/transfer/* "`pwd`"
 
 cp *per* Z:/p1/data/Ti/per/$LAT/transfer
 
