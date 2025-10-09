@@ -61,11 +61,11 @@ def rename_NameConventionChange(root_dir, prefix, mechanical_model, lattice_type
                 os.rename(src, dst)
 
 
-ROOT_DIR         = "Z:\\p1\\data\\Ti\\20disNodes\\tri\\" 
+ROOT_DIR         = "Z:\\p1\\data\\Ti\\disNodes\\0.2\\kagome\\" 
 PREFIX           = r'(?:IN-f|IN-n|OUT-)?'
-MECHANICAL_MODEL = "Fracture"
-LATTICE_TYPE     = "tri"
-SIZE             = "30"
+MECHANICAL_MODEL = "Ductile"
+LATTICE_TYPE     = "kagome"
+SIZE             = "20"
 DISORDER_TYPE    = "disNodes"
 
 DISORDER_MAGNITUDE = "20"
