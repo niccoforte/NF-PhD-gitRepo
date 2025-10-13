@@ -3,6 +3,27 @@ import re
 import sys
 
 
+def bump_simN(root_dir=os.getcwd(), bump=500):
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for fname in filenames:
+            base, ext = os.path.splitext(fname)
+            if ext.lower() not in ('.inp', '.odb', '.csv'):
+                continue
+
+            parts = base.split('-')
+            number = int(parts[-1])
+
+            new_number = number + bump
+            parts[-1] = str(new_number)
+            new_base = '-'.join(parts)
+            new_fname = new_base + ext
+
+            old_path = os.path.join(dirpath, fname)
+            new_path = os.path.join(dirpath, new_fname)
+
+            os.rename(old_path, new_path)
+
+
 def rename(path, filetype, prefix=None, suffix=None, renumber=None):
     if prefix:
         for file in os.scandir(path):
@@ -20,7 +41,6 @@ def rename(path, filetype, prefix=None, suffix=None, renumber=None):
                 num = num + renumber
                 name = "-".join(rest + num)
                 os.rename(path+file.name, f'{path}{name}.{suf}')
-
 
 
 def rename_NameConventionChange(root_dir, prefix, mechanical_model, lattice_type, size, disorder_type, disorder_magnitude, distribution, disorder_nodes, dry_run=False):
@@ -61,7 +81,7 @@ def rename_NameConventionChange(root_dir, prefix, mechanical_model, lattice_type
                 os.rename(src, dst)
 
 
-ROOT_DIR         = "Z:\\p1\\data\\Ti\\20disNodes\\tri\\" 
+ROOT_DIR         = os.getcwd() #"Z:\\p1\\data\\Ti\\20disNodes\\tri\\" 
 PREFIX           = r'(?:IN-f|IN-n|OUT-)?'
 MECHANICAL_MODEL = "Fracture"
 LATTICE_TYPE     = "tri"
