@@ -3,8 +3,8 @@ import numpy as np
 import math
 import sys
 
-stiffMatrix = False
-distribution = "Frequency"
+stiffMatrix = True
+distribution = "lhs_uniform"
 
 pDir = "C:\\temp"
 
@@ -56,7 +56,7 @@ if len(cmdIN) > 0:
         raise Exception("Invalid disorder input.")
 
 if stiffMatrix:
-    pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
+    pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix"
 
 os.chdir(pDir)
 

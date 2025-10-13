@@ -106,8 +106,8 @@ if len(cmdIN) > 0:
     
 if stiffMatrix:
     MechanicalModel = 'ductile'
-    pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
-    finalRun = 'no'
+    pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix\\transfer"
+    finalRun = 'inp'
     UTval = False
 
 if UTval:
