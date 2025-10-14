@@ -1902,7 +1902,7 @@ for idNum in range(initial,numOfJobs):
         
         ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
         if imper == 'per':
-            ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
+            ModelName = f"Fracture-{latticeType}-{int(nnx)}-per-{idNum}"
         Job = ModelName
         
         #############################################################################################
