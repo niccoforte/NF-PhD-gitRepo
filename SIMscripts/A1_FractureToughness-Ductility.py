@@ -106,8 +106,8 @@ if len(cmdIN) > 0:
     
 if stiffMatrix:
     MechanicalModel = 'ductile'
-    pDir = "C:\\Users\\exy053\\Documents\\stiffMatrix"
-    finalRun = 'no'
+    pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix\\transfer"
+    finalRun = 'inp'
     UTval = False
 
 if UTval:
@@ -1933,7 +1933,7 @@ for idNum in range(initial,numOfJobs):
         
         ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
         if imper == 'per':
-            ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
+            ModelName = f"Fracture-{latticeType}-{int(nnx)}-per-{idNum}"
         Job = ModelName
         
         #############################################################################################
