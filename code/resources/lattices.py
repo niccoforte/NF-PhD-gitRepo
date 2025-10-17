@@ -21,12 +21,14 @@ def rDthickness(LAT, l, t=None, rD=None):
         t = (l*rD)/A
         return t
 
-def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
+def geometry(LAT, l, nnx=None, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
     t = rDthickness(LAT, l, rD=rD)
     
     if (LAT.lower() == 'fcc' or LAT.lower() == 'fcc2'):
+        if nnx is None:
+            nnx = 16
         L = float(l * nnx)
         H0 = 0.96 * L
         Hs = [l*i for i in range(100)]
@@ -77,6 +79,8 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = 0.5 * np.sqrt(l*l + l*l)
         
     elif (LAT.lower() == 'tri'):
+        if nnx is None:
+            nnx = 30
         if nnx % 2.0 == 1.0:
             nnx = nnx - 1
         L = 0.5 * (3.0**(0.5)) * l * nnx
@@ -133,6 +137,8 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = l
 
     elif (LAT.lower() == 'kagome'):
+        if nnx is None:
+            nnx = 20
         L = l*(2.0*nnx - 1)
         H0 = 0.96 * L
         Hs = [(3.0**0.5)*l*i for i in range(100)]
@@ -186,6 +192,8 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = l
         
     elif (LAT.lower() == 'hex'):
+        if nnx is None:
+            nnx = 20
         L = (3.0**(0.5))*l*nnx
         H0 = 0.96 * L
         Hs = [(0.5*l)+(1.5*l*i) for i in range(100)]
