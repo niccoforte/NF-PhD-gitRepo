@@ -1,10 +1,12 @@
 from resources.imports import *
+from resources.calculations import calcUT, calcFT
+from resources.lattices import geometry
+
+from matplotlib.gridspec import GridSpec
 
 from torch.utils.data.dataset import Dataset
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
-
-from resources.calculations import calcUT, calcFT
 
 
 def load_data(inputs, outputs, f_inputs=None):
@@ -77,12 +79,12 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
 def find_outliers(data):
     mean = np.mean(data)
     stdev = np.std(data)
-
-    data = data.tolist()    
+    if type(data) is not list:
+        data = data.tolist()    
     outlier_idxs = [data.index(x) for x in data if (x < mean - 3*stdev) or (x > mean + 3*stdev) if data.index(x) != 0]
     return np.array(outlier_idxs, dtype="int")
 
-def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_r=None, INf_df=None):
+def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_r=None, INf_df=None, manual=None):
     all_outlier_idxs = []
     for prop_r in props_r:
         idxs = find_outliers(data=prop_r)
@@ -90,7 +92,7 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_
             continue
         for idx in idxs:
             all_outlier_idxs.append(idx)
-    outlier_idxs = np.array(list(set(all_outlier_idxs)))
+    outlier_idxs = np.array(list(set(all_outlier_idxs)), dtype="int")
     
     if len(outlier_idxs) > 0:
         dIN = np.delete(dIN_r, outlier_idxs, axis=0)
@@ -105,11 +107,33 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_
         dOUT_df = dOUT_df.drop(dOUT_df.iloc[outlier_idxs].index)
         if INf_df is not None:
             INf_df = INf_df.drop(INf_df.iloc[outlier_idxs].index)
-        props = []
+        props1 = []
         for prop_r in props_r:
             prop = np.delete(prop_r, outlier_idxs, axis=0)
-            props.append(prop)
-        props = np.array(props)
+            props1.append(prop)
+        props1 = np.array(props1)
+        
+        if manual is not None:
+            manual = np.array(manual, dtype="int")
+            dIN = np.delete(dIN, manual, axis=0)
+            dOUT = np.delete(dOUT, manual, axis=0)
+            if INf is not None:
+                INf = np.delete(INf, manual, axis=0)
+
+            IN_df = IN_df.drop(IN_df.iloc[manual].index)
+            OUT_df = OUT_df.drop(OUT_df.iloc[manual].index)
+            dIN_df = dIN_df.drop(dIN_df.iloc[manual].index)
+            dOUT_df = dOUT_df.drop(dOUT_df.iloc[manual].index)
+            if INf_df is not None:
+                INf_df = INf_df.drop(INf_df.iloc[manual].index)
+            props = []
+            for prop1 in props1:
+                prop = np.delete(prop1, manual, axis=0)
+                props.append(prop)
+            props = np.array(props)
+        else:
+            props = props1
+
     else:
         dIN, dOUT, INf, props = dIN_r, dOUT_r, INf_r, props_r
     
@@ -177,10 +201,11 @@ def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
         indx = [indx]
     for i in indx:
         plt.figure(figsize=(10, 6))
-        plt.hist(df.loc[i].to_numpy()/(l*1000), bins=50, alpha=0.7, color='blue')
-        plt.title(f'Distribution of Disorder for {LAT.upper()} {by.capitalize()} {int(i)}')
-        plt.xlabel('Normalized Disorder')
-        plt.ylabel('Frequency')
+        plt.hist(df.loc[i].to_numpy()/(l*1000), bins=25, alpha=0.7, color='blue')
+        plt.title(f'Distribution of Disorder for {LAT.upper()} {by.capitalize()} {int(i)}', 
+                  fontsize=18, fontname="Times New Roman")
+        plt.xlabel('Normalized Disorder', fontsize=15, fontname="Times New Roman")
+        plt.ylabel('Frequency', fontsize=15, fontname="Times New Roman")
         plt.grid(True)
         plt.show()
 
@@ -210,25 +235,28 @@ def plot_frequency(raw_data, data, test, bins=50):
     fig1.set_figheight(5)
     fig1.set_figwidth(15)
     
-    ax1.set_title('Raw Data')
+    ax1.set_title('Raw Data', fontsize=18, fontname="Times New Roman")
     ax1.axvline(x=raw_data[0]/raw_data[0], color='orangered', label="Perfect")
     ax1.hist(raw_data[1:]/raw_data[0], bins=bins, label='Disordered')
-    ax1.set_ylabel('Frequency')
-    ax1.set_xlabel(x_label)
+    ax1.set_ylabel('Frequency', fontsize=15, fontname="Times New Roman")
+    ax1.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
     ax1.legend()
     
-    ax2.set_title('Without Outliers')
+    ax2.set_title('Without Outliers', fontsize=18, fontname="Times New Roman")
     ax2.axvline(x=data[0]/data[0], color='orangered', label="Perfect")
     ax2.hist(data[1:]/data[0], bins=bins, label='Disordered')
-    ax2.set_ylabel('Frequency')
-    ax2.set_xlabel(x_label)
+    ax2.set_ylabel('Frequency', fontsize=15, fontname="Times New Roman")
+    ax2.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
     ax2.legend()
     
     plt.show()
 
-def plot_properties(x_data, y_data, test):
+def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
     x_data = np.array(x_data)
     y_data = np.array(y_data)
+
+    if compare_ax is not None:
+        include_freq = False
     
     if test == "UT":
         title = "Uniaxial Tension"
@@ -239,35 +267,85 @@ def plot_properties(x_data, y_data, test):
         x_label = 'Normalized Fracture Toughness ($K_{IC}$)'
         y_label = 'Normalized Displacement'
     
-    fig1, ax1 = plt.subplots(1, 1)
-    fig1.set_figheight(5)
-    fig1.set_figwidth(10)
-    
-    ax1.set_title(title)
-    ax1.scatter(x_data[0]/x_data[0], y_data[0]/y_data[0], label='Perfect')
-    ax1.scatter(x_data[1:]/x_data[0], y_data[1:]/y_data[0], label='Disordered')
-    ax1.axvline(x=1, linestyle='--')
-    ax1.axhline(y=1, linestyle='--')
-    ax1.set_ylabel(y_label)
-    ax1.set_xlabel(x_label)
-    ax1.legend()
-    
-    plt.show()
+    x_norm = x_data / x_data[0]
+    y_norm = y_data / y_data[0]
 
-def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15):
-    fig2, (ax1) = plt.subplots(1, 1)
+    if include_freq:
+        fig = plt.figure(figsize=(10, 10))
+        gs = GridSpec(4, 4, figure=fig)
+        ax_scatter = fig.add_subplot(gs[1:4, 0:3])
+        ax_histx = fig.add_subplot(gs[0, 0:3], sharex=ax_scatter)
+        ax_histy = fig.add_subplot(gs[1:4, 3], sharey=ax_scatter)
+        
+        ax_scatter.scatter(x_norm[0], y_norm[0], c="k", marker="*", label="Perfect")
+        ax_scatter.scatter(x_norm[1:], y_norm[1:], c="orangered", alpha=0.7, marker="x", label="Disordered")
+        ax_scatter.axvline(1, linestyle='--', color="k")
+        ax_scatter.axhline(1, linestyle='--', color="k")
+        ax_scatter.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
+        ax_scatter.set_ylabel(y_label, fontsize=15, fontname="Times New Roman")
+        ax_scatter.legend()
+        ax_scatter.set_title(title, fontsize=18, fontname="Times New Roman")
+
+        ax_histx.hist(x_norm[1:], bins=30, color='blue', alpha=0.3)
+        ax_histx.axvline(x=1, linestyle='--', color="k")
+        ax_histy.hist(y_norm[1:], bins=30, color='green', alpha=0.3, orientation='horizontal')
+        ax_histy.axhline(y=1, linestyle='--', color="k")
+
+        plt.setp(ax_histx.get_xticklabels(), visible=False)
+        plt.setp(ax_histy.get_yticklabels(), visible=False)
+
+        ax_histx.set_ylabel('Frequency', fontsize=15, fontname="Times New Roman")
+        ax_histy.set_xlabel('Frequency', fontsize=15, fontname="Times New Roman")
+        
+        fig.tight_layout()
+
+    else:
+        if compare_ax is not None:
+            fig, ax = compare_ax
+            d_label = "Disordered - Mech."
+            col = "blue"
+        else:
+            fig, ax = plt.subplots(figsize=(8, 8))
+            d_label = "Disordered"
+            col = "orangered"
+            ax.scatter(x_norm[0], y_norm[0], label='Perfect', c="k", marker="*")
+        ax.scatter(x_norm[1:], y_norm[1:], label=d_label, c=col, alpha=0.7, marker="x")
+        ax.axvline(x=1, linestyle='--', color="k")
+        ax.axhline(y=1, linestyle='--', color="k")
+        ax.set_title(title, fontsize=18, fontname="Times New Roman")
+        ax.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
+        ax.set_ylabel(y_label, fontsize=15, fontname="Times New Roman")
+        ax.legend()
+        fig.tight_layout()
+
+    return fig, ax
+
+def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
+    if compare_ax is not None:
+        fig2, ax1 = compare_ax
+        d_label = "Disordered - Mech."
+        col = "blue"
+    else:
+        fig2, (ax1) = plt.subplots(1, 1)
+        d_label = "Disordered"
+        col = "orangered"
     fig2.set_figheight(5)
     fig2.set_figwidth(9)
     
     p = OUT_df.loc[pi].tolist()[1:]
     indx = int(OUT_df.loc[pi].tolist()[0])
+    if compare_ax is None:
+        ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Perfect", c='k')
     
     if idx:
-        d = OUT_df.loc[idx].tolist()[1:]
-        indx2 = int(OUT_df.loc[idx].tolist()[0])
-        ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in d], label=f'Disordered{idx}')
-        ax1.axvline(x=xOUT[indx2]/xOUT[indx], ymax=0.2, c='g', linestyle='--')
-        ax1.axhline(y=max(d)/max(p), xmax=0.2, c='g', linestyle='--')
+        if type(idx) is not list:
+            idx = [int(idx)]
+        for i in idx:
+            d = OUT_df.loc[i].values.tolist()[1:]
+            indx2 = int(OUT_df.loc[i].tolist()[0])
+            ax1.plot(xOUT/xOUT[indx], [j/max(p) for j in d], label=f'{d_label} {i}', c=col)
+            ax1.axvline(x=xOUT[indx2]/xOUT[indx], ymax=0.2, c=col, linestyle='--')
+            ax1.axhline(y=max(d)/max(p), xmax=0.2, c=col, linestyle='--')
         
     else:
         idxs = OUT_df.index.tolist()[1:]
@@ -282,22 +360,21 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15):
             ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in d], label=f'Disordered{idxx}')
     
     if mode.lower() == "ut":
-        ax1.set_ylabel('Normalized Stress', fontsize=14, fontname="Times New Roman")
-        ax1.set_xlabel('Normalized Strain', fontsize=14, fontname="Times New Roman")
+        ax1.set_ylabel('Normalized Stress', fontsize=15, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Strain', fontsize=15, fontname="Times New Roman")
     if mode.lower() == "ft":
-        ax1.set_ylabel('Normalized Force', fontsize=14, fontname="Times New Roman")
-        ax1.set_xlabel('Normalized Displacement', fontsize=14, fontname="Times New Roman")
+        ax1.set_ylabel('Normalized Force', fontsize=15, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Displacement', fontsize=15, fontname="Times New Roman")
     
-    ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Perfect", c='k')
-    ax1.axvline(x=1, ymax=0.2, c='r', linestyle='--')
-    ax1.axhline(y=1, xmax=0.2, c='r', linestyle='--')
-    
+    ax1.axvline(x=1, ymax=0.2, c='k', linestyle='--')
+    ax1.axhline(y=1, xmax=0.2, c='k', linestyle='--')
+    ax1.set_ylim(bottom=-0.1, top=1.1)
+
     if idx or q != 'all' and q <= 10:
         ax1.legend()
     ax1.grid()
 
-    plt.show()
-
+    return fig2, ax1
 
 class PCA_:
     def __init__(self):
@@ -448,6 +525,13 @@ class DATA:
             self.mechTest = "Ductile"
         elif mechMode.lower() == "ft":
             self.mechTest = "Fracture"
+        elif mechMode.lower() == "both":
+            self.mechTest = "both"
+        
+        self.geom = geometry(LAT=self.LAT, dN=self.dN)
+        nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM, vol, l, t, LAT = self.geom
+        self.nnx = nnx
+        self.nny = nny
 
         self.get_DataPath()
 
@@ -497,10 +581,10 @@ class DATA:
         self.CSV_testProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testProps.csv'
 
         if self.freq:
+            self.INcsv_f = self.PATH + f'{self.mechTest}-disNodes-INf.csv'
             self.CSV_train_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainINf.csv'
             self.CSV_val_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valINf.csv'
             self.CSV_test_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testINf.csv'
-            self.INcsv_f = self.PATH + f'{self.mechTest}-disNodes-INf.csv'
 
     def load_data(self):
         self.IN_df, self.OUT_df, self.INf_df, self.perINr_df, self.perIN_df, self.perOUT_df, self.dIN_df, self.dOUT_df = load_data(self.INcsv, 
