@@ -21,12 +21,14 @@ def rDthickness(LAT, l, t=None, rD=None):
         t = (l*rD)/A
         return t
 
-def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
+def geometry(LAT, l, nnx=None, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=False, stiffCalc=False, nodeCount=False, UTval=False, mode=None):
     if stiffMatrix or stiffCalc:
         nnx = 10
     t = rDthickness(LAT, l, rD=rD)
     
     if (LAT.lower() == 'fcc' or LAT.lower() == 'fcc2'):
+        if nnx is None:
+            nnx = 16
         L = float(l * nnx)
         H0 = 0.96 * L
         Hs = [l*i for i in range(100)]
@@ -77,6 +79,8 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = 0.5 * np.sqrt(l*l + l*l)
         
     elif (LAT.lower() == 'tri'):
+        if nnx is None:
+            nnx = 30
         if nnx % 2.0 == 1.0:
             nnx = nnx - 1
         L = 0.5 * (3.0**(0.5)) * l * nnx
@@ -133,6 +137,8 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = l
 
     elif (LAT.lower() == 'kagome'):
+        if nnx is None:
+            nnx = 20
         L = l*(2.0*nnx - 1)
         H0 = 0.96 * L
         Hs = [(3.0**0.5)*l*i for i in range(100)]
@@ -186,6 +192,8 @@ def geometry(LAT, l, nnx, rD=0.2, FTcalc=False, brackets=False, stiffMatrix=Fals
         deltaNM = l
         
     elif (LAT.lower() == 'hex'):
+        if nnx is None:
+            nnx = 20
         L = (3.0**(0.5))*l*nnx
         H0 = 0.96 * L
         Hs = [(0.5*l)+(1.5*l*i) for i in range(100)]
@@ -262,50 +270,51 @@ def effProperties(LAT, E_s, rD):
     return E, v
 
 
-def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy053/Documents/", sim=1):
+def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti", sim=1):
+    l = geom[12]
     if mode.lower() == "unit":
         if LAT.lower() == "fcc":
             nodes = np.array([[0,0,0],
-                              [0,geom[11],0],
-                              [geom[11],geom[11],0],
-                              [geom[11],0,0],
-                              [geom[11]/2,geom[11]/2,0]])
+                              [0,l,0],
+                              [l,l,0],
+                              [l,0,0],
+                              [l/2,l/2,0]])
         elif LAT.lower() == "tri":
             nodes = np.array([[0,0,0],
-                              [geom[11],0,0],
-                              [geom[11]/2,geom[11]*(np.sqrt(3)/2),0],
-                              [0,geom[11]*(np.sqrt(3)/2),0],
-                              [geom[11],geom[11]*(np.sqrt(3)/2),0],
-                              [0,2*geom[11]*(np.sqrt(3)/2),0],
-                              [geom[11],2*geom[11]*(np.sqrt(3)/2),0]])
+                              [l,0,0],
+                              [l/2,l*(np.sqrt(3)/2),0],
+                              [0,l*(np.sqrt(3)/2),0],
+                              [l,l*(np.sqrt(3)/2),0],
+                              [0,2*l*(np.sqrt(3)/2),0],
+                              [l,2*l*(np.sqrt(3)/2),0]])
         elif LAT.lower() == "kagome":
-            nodes = np.array([[geom[11]*(np.sqrt(3)/2),0,0],
-                              [geom[11]*(np.sqrt(3)/2),geom[11],0],
-                              [0,1.5*geom[11],0],
-                              [geom[11]*(np.sqrt(3)/2),2*geom[11],0],
-                              [geom[11]*(np.sqrt(3)/2),3*geom[11],0],
-                              [2*geom[11]*(np.sqrt(3)/2),2.5*geom[11],0],
-                              [3*geom[11]*(np.sqrt(3)/2),3*geom[11],0],
-                              [3*geom[11]*(np.sqrt(3)/2),2*geom[11],0],
-                              [4*geom[11]*(np.sqrt(3)/2),1.5*geom[11],0],
-                              [3*geom[11]*(np.sqrt(3)/2),geom[11],0],
-                              [3*geom[11]*(np.sqrt(3)/2),0,0],
-                              [2*geom[11]*(np.sqrt(3)/2),0.5*geom[11],0]])
+            nodes = np.array([[l*(np.sqrt(3)/2),0,0],
+                              [l*(np.sqrt(3)/2),l,0],
+                              [0,1.5*l,0],
+                              [l*(np.sqrt(3)/2),2*l,0],
+                              [l*(np.sqrt(3)/2),3*l,0],
+                              [2*l*(np.sqrt(3)/2),2.5*l,0],
+                              [3*l*(np.sqrt(3)/2),3*l,0],
+                              [3*l*(np.sqrt(3)/2),2*l,0],
+                              [4*l*(np.sqrt(3)/2),1.5*l,0],
+                              [3*l*(np.sqrt(3)/2),l,0],
+                              [3*l*(np.sqrt(3)/2),0,0],
+                              [2*l*(np.sqrt(3)/2),0.5*l,0]])
         elif LAT.lower() == "hex":
-            nodes = np.array([[0,geom[11]*(np.sqrt(3)/2),0],
-                              [0.5*geom[11],geom[11]*(np.sqrt(3)/2),0],
-                              [geom[11],2*geom[11]*(np.sqrt(3)/2),0],
-                              [2*geom[11],2*geom[11]*(np.sqrt(3)/2),0],
-                              [2.5*geom[11],geom[11]*(np.sqrt(3)/2),0],
-                              [3*geom[11],geom[11]*(np.sqrt(3)/2),0],
-                              [2*geom[11],0,0],
-                              [geom[11],0,0]])
+            nodes = np.array([[0,l*(np.sqrt(3)/2),0],
+                              [0.5*l,l*(np.sqrt(3)/2),0],
+                              [l,2*l*(np.sqrt(3)/2),0],
+                              [2*l,2*l*(np.sqrt(3)/2),0],
+                              [2.5*l,l*(np.sqrt(3)/2),0],
+                              [3*l,l*(np.sqrt(3)/2),0],
+                              [2*l,0,0],
+                              [l,0,0]])
         Dnodes = nodes
 
     elif mode.lower() == "lattice":
         pDir = path
         if stiff:
-             pDir = "C:/Users/exy053/Documents/stiffMatrix"
+             pDir = "Z:/p1/sims/Ti/stiffMatrix"
         nodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom[0]) + "-per-1.csv"
         
         nodes_df = pd.read_csv(nodeFile, header=None, usecols=[1, 2])
@@ -314,7 +323,7 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy05
         if stiff:
             if LAT.lower() == "tri":
                 ys = [0, geom[3]]
-                xs = [geom[11]*(np.sqrt(3)/2) + geom[11]*np.sqrt(3)*i for i in range(geom[0])]
+                xs = [l*(np.sqrt(3)/2) + l*np.sqrt(3)*i for i in range(geom[0])]
                 add_nodes = []
                 for y in ys:
                     for x in xs:
@@ -330,7 +339,7 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy05
         Dnodes = nodes
       
         if dis.lower() == "dn":
-            DnodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom[0]) + "-disNodes-" + str(sim) + ".csv"
+            DnodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom[0]) + "-20disNodes-lhs-all-" + str(sim) + ".csv"
             Dnodes_df = pd.read_csv(DnodeFile, header=None, usecols=[1, 2])
             Dnodes = Dnodes_df.to_numpy() / 1000
             if stiff:
@@ -338,15 +347,15 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="C:/Users/exy05
                     Dnodes = np.append(Dnodes, add_nodes, axis=0)
                 elif LAT.lower() == "hex":
                     topNodes_idxs = np.argwhere(nodes[:, 1] == geom[3]).flatten()
-                    DtopNodes_idxs1 = np.argwhere(Dnodes[:, 1] > geom[3]-0.25*geom[11])
-                    DtopNodes_idxs2 = np.argwhere(Dnodes[:, 1] < geom[3]+0.25*geom[11])
+                    DtopNodes_idxs1 = np.argwhere(Dnodes[:, 1] > geom[3]-0.25*geom[12])
+                    DtopNodes_idxs2 = np.argwhere(Dnodes[:, 1] < geom[3]+0.25*geom[12])
                     DtopNodes_idxs = np.intersect1d(DtopNodes_idxs1, DtopNodes_idxs2)
                     Dnodes[DtopNodes_idxs] = nodes[topNodes_idxs]
                 Dnodes = np.delete(Dnodes, del_nodes, axis=0)
     return nodes, Dnodes
 
 def connectivity(LAT, nodes, geom, stiff=False, mode=None):
-    radius = geom[12] + geom[12]*1e-3
+    radius = geom[12]*(1+1e-3)
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
@@ -398,8 +407,143 @@ def plot_lattice(elems, nodes, geom):
     fig, ax = plt.subplots(1,1)
     fig.set_figheight(10)
     fig.set_figwidth(10)
-    for elem, tt in zip(elems, geom[12]):
+    for elem, tt in zip(elems, geom[13]):
         node1 = nodes[elem[1]]
         node2 = nodes[elem[2]]
-        ax.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2500, c='black')
+        ax.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2000, c='black')
     plt.show()
+
+
+### Stiffness matrix calculation functions
+def edgeElems(nodes, elems, geom):
+    t_old = geom[13]
+    t_new = np.array([t_old] * len(elems))
+    min_x, max_x = min(nodes[:,0]), max(nodes[:,0])
+    min_y, max_y = min(nodes[:,1]), max(nodes[:,1])
+    for i, elem in enumerate(elems):
+        node1 = nodes[elem[1]]
+        node2 = nodes[elem[2]]
+        if (node1[0] == max_x and node2[0] == max_x) or (node1[0] == min_x and node2[0] == min_x):
+            t_new[i] = t_old/2
+        elif (node1[1] == max_y and node2[1] == max_y) or (node1[1] == min_y and node2[1] == min_y):
+            t_new[i] = t_old/2
+    geom[13] = t_new
+    return geom
+
+def get_n0s(nodes, realElem):
+    n0s = []
+    for elem in realElem:
+        n0 = nodes[elem[2]] - nodes[elem[1]]
+        n0s.append(n0)
+    n0s = np.array(n0s)
+    return n0s
+
+def get_ns(n0s):
+    ns = []
+    for n0 in n0s:
+        ns.append(n_values(n0))
+    return np.array(ns)
+    
+def n_values(n0):
+    return np.array([np.cos(np.arctan([n0[1]/n0[0]]))[0], np.sin(np.arctan([n0[1]/n0[0]]))[0]])
+
+def get_Nmatrix(ns):
+    N = []
+    for i in range(len(ns)):
+        N.append([ns[i][0]*ns[i][0], ns[i][1]*ns[i][1], ns[i][0]*ns[i][1]])
+    return np.array(N)
+
+def calc_c(n0, geom, mode, i):
+    if mode.lower() == "unit":
+        return (geom[13][i]*(np.sqrt(n0[0]**2 + n0[1]**2))) / (geom[11])
+    elif mode.lower() == "lattice":
+        return (geom[13][i]*(np.sqrt(n0[0]**2 + n0[1]**2))) / (geom[11])
+
+def calc_Kmatrix(LAT, l, nnx, mode, dis='per', count=0, plot=False):
+    rD = 0.2
+    E_s = 123e9
+    v_s = 0.3
+
+    geom = geometry(LAT, l, nnx, stiffCalc=True, mode=mode)
+    
+    nodes, Dnodes = find_nodes(LAT, geom, dis, mode=mode, stiff=True)
+    elems = connectivity(LAT, nodes, stiff=True, geom=geom, mode=mode)
+    geomK = edgeElems(nodes, elems, geom)
+
+    if plot:
+        plot_lattice(elems, nodes, geomK)
+
+    n0s = get_n0s(nodes, elems)
+    ns = get_ns(n0s)
+    Nmatrix = get_Nmatrix(ns)
+
+    c0matrix = np.zeros((len(ns),len(ns)))
+    for i in range(len(ns)):
+        c0matrix[i][i] = calc_c(n0s[i], geomK, mode, i)
+    #print(np.sum(c0matrix))
+    Kmatrix = E_s*np.matmul(np.matmul(Nmatrix.T, c0matrix), Nmatrix).round(10)
+    
+    Ks = []
+    Ks.append(Kmatrix)
+    
+    for jj in range(1, count+1):
+        nodes, Dnodes = find_nodes(LAT, geom, dis, mode=mode, stiff=True, sim=jj)
+        if dis.lower() == 'dn':                                   # import struts thicks from struts.csv file
+            nodes = Dnodes
+        
+        if plot:
+            plot_lattice(elems, nodes, geomK)
+            
+        n0s = get_n0s(nodes, elems)
+        ns = get_ns(n0s)
+        Nmatrix = get_Nmatrix(ns)
+
+        c0matrix = np.zeros((len(ns),len(ns)))
+        for i in range(len(ns)):
+            c0matrix[i][i] = calc_c(n0s[i], geomK, mode, i)
+        #print(np.sum(c0matrix))
+        Kmatrix = E_s*np.matmul(np.matmul(Nmatrix.T, c0matrix), Nmatrix).round(10)
+        Ks.append(Kmatrix)
+
+    return np.array(Ks)
+
+
+def plot_IsotropyVariation(Ks):
+    K11, K33, K13, K23 = [], [], [], []
+    for K in Ks[1:]:
+        K11.append((Ks[0][0][0]-K[0][0])/Ks[0][0][0])
+        K33.append((Ks[0][2][2]-K[2][2])/Ks[0][2][2])
+        K13.append(K[0][2]/Ks[0][0][0])
+        K23.append(K[1][2]/Ks[0][0][0])
+
+
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.set_figheight(6)
+    fig.set_figwidth(18)
+
+    ax1.set_ylabel('$(K-K^{*})/K$ [%]', fontsize=14, fontname="Times New Roman")
+    ax1.set_xlabel('Randomly Generated Model No.', fontsize=14, fontname="Times New Roman")
+
+    ax1.set_ylim([-0.1, 0.1])
+    #ax1.set_xticks([i+1 for i in range(len(K11))])
+
+    ax1.plot([i+1 for i in range(len(K11))], K11, 'bo-', label='$K_{11}$')
+    ax1.plot([i+1 for i in range(len(K33))], K33, 'r^-', label='$K_{33}$')
+
+    # ax1.grid()
+    ax1.legend()
+
+    ax2.set_ylabel('$K^{*}/K_{11}$', fontsize=14, fontname="Times New Roman")
+    ax2.set_xlabel('Randomly Generated Model No.', fontsize=14, fontname="Times New Roman")
+
+    ax2.set_ylim([-0.05, 0.05])
+    #ax2.set_xticks([i+1 for i in range(len(K11))])
+
+    ax2.plot([i+1 for i in range(len(K13))], K13, 'b^-', label='$K^{*}_{13}$')
+    ax2.plot([i+1 for i in range(len(K23))], K23, 'ro-', label='$K^{*}_{23}$')
+
+    # ax2.grid()
+    ax2.legend()
+
+    plt.show()
+

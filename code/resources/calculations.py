@@ -95,7 +95,7 @@ def get_fractureData(outputCSV):
     frac = 0.0
     for indx, row in status_df.iterrows():
         if 0.0 in list(row):
-            frac = F_sm.index(max(F_sm[:indx]))
+            frac = F_sm.index(np.max(F_sm[:indx], initial=0))
             break
     output_df.loc[-1] = [frac, frac, frac]
     output_df.index = output_df.index + 1
