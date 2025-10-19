@@ -376,77 +376,6 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
 
     return fig2, ax1
 
-class PCA_:
-    def __init__(self):
-        self.scaler = StandardScaler()
-
-        self.data = None
-        self.n_components = None
-
-        self.scaled_data = None
-        self.pca = None
-        self.final_pca = None
-        self.reduced_data = None
-        
-    
-    def fit(self, data, scale=False, verbose=False):
-        self.data = data
-        if scale:
-            self.scaled_data = self.scaler.fit_transform(self.data)
-        else:
-            self.scaled_data = self.data
-        self.pca = PCA()
-        self.pca.fit(self.scaled_data)
-        if verbose:
-            plt.figure(figsize=(10, 6))
-            plt.plot(np.cumsum(self.pca.explained_variance_ratio_), 'b-')
-            plt.xlabel('Number of Components')
-            plt.ylabel('Cumulative Explained Variance')
-            plt.title('Explained Variance by PCA Components')
-            plt.grid(True)
-            # plt.axhline(y=0.95, color='teal', linestyle='--', label='95% Threshold')
-            # plt.axhline(y=0.90, color='green', linestyle='--', label='90% Threshold')
-            # plt.axhline(y=0.80, color='orange', linestyle='--', label='80% Threshold')
-            # plt.axhline(y=0.50, color='red', linestyle='--', label='50% Threshold')
-            plt.legend()
-            plt.show()
-
-            n_components_50 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.5)[0][0] + 1
-            n_components_80 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.8)[0][0] + 1
-            n_components_90 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.9)[0][0] + 1
-            n_components_95 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.95)[0][0] + 1
-            n_components_100 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.999999)[0][0] + 1
-            print(f"Number of components to capture 50% variance: {n_components_50}")
-            print(f"Number of components to capture 80% variance: {n_components_80}")
-            print(f"Number of components to capture 90% variance: {n_components_90}")
-            print(f"Number of components to capture 95% variance: {n_components_95}")
-            print(f"Number of components to capture 100% variance: {n_components_100}")
-
-    def reduce(self, data=None, scale=False, accuracy=0.999999, n_components=None, verbose=False):
-        if data is None:
-            data = self.data
-        if scale:
-            scaled_data = self.scaler.transform(data)
-        else:
-            scaled_data = data
-        self.n_components = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= accuracy)[0][0] + 1
-        if n_components is not None:
-            self.n_components = n_components
-        self.final_pca = PCA(n_components=self.n_components)
-        self.reduced_data = self.final_pca.fit_transform(scaled_data)
-
-        if verbose:
-            print(f"Original data shape: {self.data.shape}")
-            print(f"Reduced data shape: {self.reduced_data.shape}")
-        
-        return self.reduced_data
-    
-    def reconstruct(self, data, scale=False):
-        reconstructed_data = self.final_pca.inverse_transform(data)
-        if scale:
-            reconstructed_data = self.scaler.inverse_transform(reconstructed_data)
-        return reconstructed_data
-
 
 def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_trainProps, CSV_val_in, CSV_val_out, CSV_valProps, CSV_test_in, CSV_test_out, CSV_testProps):
     train_in = pd.read_csv(CSV_train_in, index_col=0, header=0).to_numpy()
@@ -477,7 +406,7 @@ def standardize(x, minx, maxx, mode=0):
         return (x - minx)/(maxx - minx)
     if mode == 1:
         return (x*(maxx - minx)) + minx
-    
+
 def normalize(x, mean, std, mode=0):
     if mode == 0:
         return (x - mean)/std
@@ -494,6 +423,91 @@ class Dataset_(Dataset):
     def __len__(self):
         return self.x.shape[0]
     
+class PCA_:
+    def __init__(self, scaler=None):
+        self.scaler = scaler
+        if scaler is not None:
+            if scaler.lower() == "minmax":
+                self.scaler = MinMaxScaler()
+            elif scaler.lower() == "standard":
+                self.scaler = StandardScaler()
+
+        self.data = None
+        self.n_components = None
+
+        self.scaled_data = None
+        self.pca = None
+        self.final_pca = None
+        self.reduced_data = None
+        
+    
+    def fit(self, data, scale=False, verbose=False, plot=False):
+        self.data = data
+        if scale and self.scaler is not None:
+            self.scaled_data = self.scaler.fit_transform(self.data)
+        else:
+            self.scaled_data = self.data
+        self.pca = PCA()
+        self.pca.fit(self.scaled_data)
+
+        n_components_50 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.5)[0][0] + 1
+        n_components_80 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.8)[0][0] + 1
+        n_components_90 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.9)[0][0] + 1
+        n_components_95 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.95)[0][0] + 1
+        n_components_100 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.999999)[0][0] + 1
+
+        if verbose:
+            print(f"Number of components to capture 50% variance: {n_components_50}")
+            print(f"Number of components to capture 80% variance: {n_components_80}")
+            print(f"Number of components to capture 90% variance: {n_components_90}")
+            print(f"Number of components to capture 95% variance: {n_components_95}")
+            print(f"Number of components to capture 100% variance: {n_components_100}")
+        
+        if plot:
+            plt.figure(figsize=(10, 6))
+            plt.plot(np.cumsum(self.pca.explained_variance_ratio_), 'b-')
+            plt.xlabel('Number of Components', fontsize=15, fontname="Times New Roman")
+            plt.ylabel('Cumulative Explained Variance', fontsize=15, fontname="Times New Roman")
+            plt.title('Explained Variance by PCA Components', fontsize=18, fontname="Times New Roman")
+            plt.hlines(y=1, xmin=-10, xmax=n_components_100, color='green', linestyle='--', alpha=0.5, label='100% Threshold')
+            plt.vlines(x=n_components_100, ymin=-1, ymax=1, color='green', linestyle='--', alpha=0.5)
+            plt.hlines(y=0.95, xmin=-10, xmax=n_components_95, color='teal', linestyle='--', alpha=0.5, label='95% Threshold')
+            plt.vlines(x=n_components_95, ymin=-1, ymax=0.95, color='teal', linestyle='--', alpha=0.5)
+            plt.hlines(y=0.90, xmin=-10, xmax=n_components_90, color='orange', linestyle='--', alpha=0.5, label='90% Threshold')
+            plt.vlines(x=n_components_90, ymin=-1, ymax=0.90, color='orange', linestyle='--', alpha=0.5)
+            plt.hlines(y=0.80, xmin=-10, xmax=n_components_80, color='orangered', linestyle='--', alpha=0.5, label='80% Threshold')
+            plt.vlines(x=n_components_80, ymin=-1, ymax=0.80, color='orangered', linestyle='--', alpha=0.5)
+            plt.hlines(y=0.50, xmin=-10, xmax=n_components_50, color='red', linestyle='--', alpha=0.5, label='50% Threshold')
+            plt.vlines(x=n_components_50, ymin=-1, ymax=0.50, color='red', linestyle='--', alpha=0.5)
+            plt.ylim(min(np.cumsum(self.pca.explained_variance_ratio_))-0.02, 1.02)
+            plt.xlim(-5, len(self.pca.explained_variance_ratio_)+10)
+            plt.legend()
+            plt.show()
+
+    def reduce(self, data=None, scale=False, accuracy=0.999999, n_components=None, verbose=False):
+        if data is None:
+            data = self.data
+        if scale and self.scaler is not None:
+            scaled_data = self.scaler.transform(data)
+        else:
+            scaled_data = data
+        self.n_components = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= accuracy)[0][0] + 1
+        if n_components is not None:
+            self.n_components = n_components
+        self.final_pca = PCA(n_components=self.n_components)
+        self.reduced_data = self.final_pca.fit_transform(scaled_data)
+
+        if verbose:
+            print(f"Original data shape: {self.data.shape}")
+            print(f"Reduced data shape: {self.reduced_data.shape}")
+        
+        return self.reduced_data
+    
+    def reconstruct(self, data, scale=False):
+        reconstructed_data = self.final_pca.inverse_transform(data)
+        if scale:
+            reconstructed_data = self.scaler.inverse_transform(reconstructed_data)
+        return reconstructed_data
 
 class DATA:
     def __init__(
