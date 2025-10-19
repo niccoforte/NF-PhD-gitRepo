@@ -528,7 +528,7 @@ class DATA:
         elif mechMode.lower() == "both":
             self.mechTest = "both"
         
-        self.geom = geometry(LAT=self.LAT, dN=self.dN)
+        self.geom = geometry(LAT=self.LAT, l=10)
         nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM, vol, l, t, LAT = self.geom
         self.nnx = nnx
         self.nny = nny
