@@ -16,7 +16,7 @@ nnx = 30
 initial = 1
 numOfJobs = 1
 
-pDir = r"C:\\Users\\exy053\\Documents\\continuum"
+pDir = r"Z:\\p1\\data\\Ti\\disNodes\\"
 os.chdir(pDir)
 
 def rDthickness(LAT, l, t=None, rD=None):
@@ -272,7 +272,7 @@ def export_Udata(job, totalNodes):
             nodeU = [int(val.nodeLabel), val.data[0], val.data[1]]
             nodes_Us.append(nodeU)
         nodes_Us.sort()
-        with open(job.split('\\')[-1].split('.')[0]+"\\"+"frame"+str(count)+".csv", "w") as f:
+        with open(job.split('.odb')[0]+"\\"+"frame"+str(count)+".csv", "w+") as f:
             f.write("Node Label, U1, U2\n")
             for nodeU in nodes_Us:
                 f.write("{}, {}, {}\n".format(nodeU[0], nodeU[1], nodeU[2]))
@@ -288,7 +288,7 @@ def export_nodes(job, totalNodes):
     nodes_end = int(nodes_start + totalNodes)
     nodes = [[float(i.strip().strip('\n')) for i in line.split(",")] for line in lines[nodes_start:nodes_end]]
     
-    with open(job.split('\\')[-1].split('.')[0]+"\\"+"NodesElems.csv", 'w') as f:
+    with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'w+') as f:
         f.write("*Nodes\n")
         for node in nodes:
             f.write("{}, {}, {}\n".format(int(node[0]), node[1], node[2]))
@@ -341,21 +341,22 @@ def connectivity(job, LAT, nodes, geom, stiff=False, mode=None):
     for i in range(len(realElem)):
         realElem[i][0] = i+1
     
-    with open(job.split('\\')[-1].split('.')[0]+"\\"+"NodesElems.csv", 'a') as f:
+    with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
         f.write("*Elems\n")
         for elem in realElem:
             f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
     return realElem
 
-
+skipDirs = "Opt"
 if mode.lower() == 'any':
     for curDirectory, folders, files in os.walk(pDir):
+        folders[:] = [d for d in folders if skipDirs not in d]
         odbs = [f for f in files if f.endswith('.odb')]
         inps = [f for f in files if f.endswith('.inp')]
         for odb in odbs:
             odbPath = os.path.join(curDirectory, odb)
-            if not os.path.exists(odb.split('.')[0]):
-                os.makedirs(odb.split('.')[0])
+            if not os.path.exists(odbPath.split('.odb')[0]):
+                os.makedirs(odbPath.split('.odb')[0])
             
             sim = odb.split('.')[0]
             MechMode = sim.split('-')[0]
@@ -367,8 +368,8 @@ if mode.lower() == 'any':
             
         for inp in inps:
             inpPath = os.path.join(curDirectory, inp)
-            if not os.path.exists(inp.split('.')[0]):
-                os.makedirs(inp.split('.')[0])
+            if not os.path.exists(inpPath.split('.inp')[0]):
+                os.makedirs(inpPath.split('.inp')[0])
                 
             sim = inp.split('.')[0]
             MechMode = sim.split('-')[0]
