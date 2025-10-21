@@ -552,7 +552,8 @@ class DATA:
         mechMode="UT",
         model="MLP", 
         freq=False,
-        scale=False, 
+        scale=False,
+        reduce_dim=False,
         format=0
     ):
         self.path = path
@@ -574,6 +575,13 @@ class DATA:
                 self.scaler = standardize
             elif scale[0].lower() == "normalize":
                 self.scaler = normalize
+
+        self.reduce_dim = reduce_dim
+        if reduce_dim:
+            if reduce_dim[0].lower() == "pca":
+                self.reducer = PCA_()
+            elif reduce_dim[0].lower() == "autoencoder":
+                self.reducer = None
 
         if path_add.lower() == "frequency":
             self.freq = True
@@ -715,7 +723,23 @@ class DATA:
                 self.trainProps = self.PROPscaler.transform(self.trainProps.T).T
                 self.valProps   = self.PROPscaler.transform(self.valProps.T).T
                 self.testProps  = self.PROPscaler.transform(self.testProps.T).T
-
+        
+        if self.reduce_dim:
+            if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
+                self.INreducer = self.reducer
+                self.INreducer.fit(self.all_in)
+                self.all_in   = self.INreducer.reduce(self.all_in, accuracy=self.reduce_dim[2])
+                self.train_in = self.INreducer.reduce(self.train_in, accuracy=self.reduce_dim[2])
+                self.val_in   = self.INreducer.reduce(self.val_in, accuracy=self.reduce_dim[2])
+                self.test_in  = self.INreducer.reduce(self.test_in, accuracy=self.reduce_dim[2])
+            if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
+                self.OUTreducer = self.reducer
+                self.OUTreducer.fit(self.all_out)
+                self.all_out   = self.OUTreducer.reduce(self.all_out, accuracy=self.reduce_dim[2])
+                self.train_out = self.OUTreducer.reduce(self.train_out, accuracy=self.reduce_dim[2])
+                self.val_out   = self.OUTreducer.reduce(self.val_out, accuracy=self.reduce_dim[2])
+                self.test_out  = self.OUTreducer.reduce(self.test_out, accuracy=self.reduce_dim[2])
+    
     def load_DisDist_v1(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
 
