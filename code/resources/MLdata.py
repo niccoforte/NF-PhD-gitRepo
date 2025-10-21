@@ -593,7 +593,7 @@ class DATA:
         if scale:
             if scale[0].lower() == "minmax":
                 self.scaler = MinMaxScaler()
-            elif scale[0].lower() == "standardscaler" or scale.lower() == "standard":
+            elif scale[0].lower() == "standardscaler" or scale[0].lower() == "standard":
                 self.scaler = StandardScaler()
             elif scale[0].lower() == "standardize":
                 self.scaler = standardize
