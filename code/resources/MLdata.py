@@ -591,7 +591,7 @@ class DATA:
         
         self.scale = scale
         if scale:
-            if scale[0].lower() == "minmax":
+            if scale[0].lower() == "minmax" or scale[0].lower() == "maxmin":
                 self.scaler = MinMaxScaler()
             elif scale[0].lower() == "standardscaler" or scale[0].lower() == "standard":
                 self.scaler = StandardScaler()
