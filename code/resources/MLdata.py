@@ -9,29 +9,44 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
 
 
-def load_data(inputs, outputs, f_inputs=None):
-    IN_df = pd.read_csv(inputs, index_col=0)
+def load_data(inputs, outputs, f_inputs=None, no_outliers=False):
+    IN_df   = pd.read_csv(inputs, index_col=0)
     OUTr_df = pd.read_csv(outputs, index_col=0)
-    INf_df = None
+    INf_df  = None
     if f_inputs is not None:
         INf_df = pd.read_csv(f_inputs, index_col=0)
+    if no_outliers:
+        IN_df_noOutliers  = pd.read_csv(no_outliers[0], index_col=0)
+        OUT_df_noOutliers = pd.read_csv(no_outliers[1], index_col=0)
+        INf_df_noOutliers = None
+        if no_outliers[2] is not None:
+            INf_df_noOutliers = pd.read_csv(no_outliers[2], index_col=0)
 
-    dIN_df = IN_df - IN_df.iloc[0].values
+    dIN_df  = IN_df - IN_df.iloc[0].values
     INfixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
-    dIN_df = dIN_df.drop(columns=INfixed_cols) 
+    dIN_df  = dIN_df.drop(columns=INfixed_cols) 
     dOUT_df = OUTr_df - OUTr_df.iloc[1].values
-    dOUT_df = dOUT_df.drop(columns='0')  # dOUT_df['0'] = OUT_df['0']
+    dOUT_df = dOUT_df.drop(columns='0')
     dOUT_df = dOUT_df.iloc[1:].sort_index()
-    OUT_df = OUTr_df.iloc[1:].sort_index()
+    OUT_df  = OUTr_df.iloc[1:].sort_index()
 
     perINr_df = IN_df.loc[:0].T
     perINr_df = perINr_df.rename(columns={0: "in"})
     perINr_df = perINr_df
-    perIN_df = IN_df.loc[:0].drop(columns=INfixed_cols).T
-    perIN_df = perIN_df.rename(columns={0: "in"})
-    perIN_df = perIN_df
+    perIN_df  = IN_df.loc[:0].drop(columns=INfixed_cols).T
+    perIN_df  = perIN_df.rename(columns={0: "in"})
+    perIN_df  = perIN_df
     perOUT_df = OUTr_df.iloc[:2].T.iloc[1:]
     perOUT_df.columns = ["x", "y"]
+
+    if no_outliers:
+        IN_df   = IN_df_noOutliers
+        OUT_df  = OUT_df_noOutliers
+        INf_df  = INf_df_noOutliers
+        dIN_df  = IN_df - IN_df.iloc[0].values
+        dIN_df  = dIN_df.drop(columns=INfixed_cols) 
+        dOUT_df = OUT_df - OUT_df.iloc[1].values
+        dOUT_df = dOUT_df.drop(columns='0')
     
     return IN_df, OUT_df, INf_df, perINr_df, perIN_df, perOUT_df, dIN_df, dOUT_df
 
@@ -170,24 +185,52 @@ def split_data(dIN, dOUT, props, INf, split=0.85):
     
     return train, val, test
 
-def save_MLdata(perIN_df, perOUT_df, train, val, test, PATH, mode, dis):
+def save_MLdata(
+    perIN_df, 
+    perOUT_df, 
+    train, 
+    val, 
+    test, 
+    IN_df, 
+    OUT_df, 
+    dIN_df, 
+    dOUT_df, 
+    INf_df, 
+    props, 
+    PATH, 
+    mode, 
+    dis
+):
+    if mode == "UT":
+        model = "Ductile"
+    elif mode == "FT":
+        model = "Fracture"
     os.makedirs(PATH+"/MLdata", exist_ok=True)
     
     perIN_df.to_csv(PATH + f"MLdata/{mode}-perIN.csv")
     perOUT_df.to_csv(PATH + f"MLdata/{mode}-perOUT.csv")
 
+    IN_df.to_csv(PATH + f"{model}-{dis}-IN-noOutliers.csv")
+    OUT_df.to_csv(PATH + f"{model}-{dis}-OUT-noOutliers.csv")
+
+    dIN_df.to_csv(PATH + f"MLdata/{mode}-{dis}-allIN.csv")
     pd.DataFrame(train[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainIN.csv")
     pd.DataFrame(val[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-valIN.csv")
     pd.DataFrame(test[0]).to_csv(PATH + f"MLdata/{mode}-{dis}-testIN.csv")
+    
+    dOUT_df.to_csv(PATH + f"MLdata/{mode}-{dis}-allOUT.csv")
     pd.DataFrame(train[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainOUT.csv")
     pd.DataFrame(val[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-valOUT.csv")
     pd.DataFrame(test[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-testOUT.csv")
 
+    pd.DataFrame(props).to_csv(PATH + f"MLdata/{mode}-{dis}-allProps.csv")
     pd.DataFrame(train[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainProps.csv")
     pd.DataFrame(val[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-valProps.csv")
     pd.DataFrame(test[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-testProps.csv")
 
     if train[-1] is not None:
+        INf_df.to_csv(PATH + f"{model}-{dis}-INf-noOutliers.csv")
+        INf_df.to_csv(PATH + f"MLdata/{mode}-{dis}-allINf.csv")
         pd.DataFrame(train[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainINf.csv")
         pd.DataFrame(val[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-valINf.csv")
         pd.DataFrame(test[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-testINf.csv")
@@ -377,25 +420,29 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
     return fig2, ax1
 
 
-def load_TrainTestData(CSV_train_in, CSV_train_out, CSV_trainProps, CSV_val_in, CSV_val_out, CSV_valProps, CSV_test_in, CSV_test_out, CSV_testProps):
-    train_in = pd.read_csv(CSV_train_in, index_col=0, header=0).to_numpy()
-    train_out = pd.read_csv(CSV_train_out, index_col=0, header=0).to_numpy()
+def load_TrainTestData(CSV_all_in, CSV_all_out, CSV_all_props, CSV_train_in, CSV_train_out, CSV_trainProps, CSV_val_in, CSV_val_out, CSV_valProps, CSV_test_in, CSV_test_out, CSV_testProps):
+    all_in     = pd.read_csv(CSV_all_in, index_col=0, header=0).to_numpy()
+    all_out    = pd.read_csv(CSV_all_out, index_col=0, header=0).to_numpy()
+    allProps   = pd.read_csv(CSV_all_props, index_col=0, header=0).to_numpy()
+    train_in   = pd.read_csv(CSV_train_in, index_col=0, header=0).to_numpy()
+    train_out  = pd.read_csv(CSV_train_out, index_col=0, header=0).to_numpy()
     trainProps = pd.read_csv(CSV_trainProps, index_col=0, header=0).to_numpy()
-    val_in = pd.read_csv(CSV_val_in, index_col=0, header=0).to_numpy()
-    val_out = pd.read_csv(CSV_val_out, index_col=0, header=0).to_numpy()
-    valProps = pd.read_csv(CSV_valProps, index_col=0, header=0).to_numpy()
-    test_in = pd.read_csv(CSV_test_in, index_col=0, header=0).to_numpy()
-    test_out = pd.read_csv(CSV_test_out, index_col=0, header=0).to_numpy()
-    testProps = pd.read_csv(CSV_testProps, index_col=0, header=0).to_numpy()
+    val_in     = pd.read_csv(CSV_val_in, index_col=0, header=0).to_numpy()
+    val_out    = pd.read_csv(CSV_val_out, index_col=0, header=0).to_numpy()
+    valProps   = pd.read_csv(CSV_valProps, index_col=0, header=0).to_numpy()
+    test_in    = pd.read_csv(CSV_test_in, index_col=0, header=0).to_numpy()
+    test_out   = pd.read_csv(CSV_test_out, index_col=0, header=0).to_numpy()
+    testProps  = pd.read_csv(CSV_testProps, index_col=0, header=0).to_numpy()
 
-    train, val, test = [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
-    return train, val, test
+    all, train, val, test = [all_in, all_out, allProps], [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
+    return all, train, val, test
 
-def load_freqInputData(CSV_train_in_f, CSV_val_in_f, CSV_test_in_f):
+def load_freqInputData(CSV_all_in_f, CSV_train_in_f, CSV_val_in_f, CSV_test_in_f):
+    all_in_f   = pd.read_csv(CSV_all_in_f, index_col=0, header=0).to_numpy()
     train_in_f = pd.read_csv(CSV_train_in_f, index_col=0, header=0).to_numpy()
-    val_in_f = pd.read_csv(CSV_val_in_f, index_col=0, header=0).to_numpy()
-    test_in_f = pd.read_csv(CSV_test_in_f, index_col=0, header=0).to_numpy()
-    return train_in_f, val_in_f, test_in_f
+    val_in_f   = pd.read_csv(CSV_val_in_f, index_col=0, header=0).to_numpy()
+    test_in_f  = pd.read_csv(CSV_test_in_f, index_col=0, header=0).to_numpy()
+    return all_in_f, train_in_f, val_in_f, test_in_f
 
 
 def dataParams(x):
@@ -424,31 +471,19 @@ class Dataset_(Dataset):
         return self.x.shape[0]
     
 class PCA_:
-    def __init__(self, scaler=None):
-        self.scaler = scaler
-        if scaler is not None:
-            if scaler.lower() == "minmax":
-                self.scaler = MinMaxScaler()
-            elif scaler.lower() == "standard":
-                self.scaler = StandardScaler()
-
+    def __init__(self):
         self.data = None
         self.n_components = None
 
-        self.scaled_data = None
         self.pca = None
         self.final_pca = None
         self.reduced_data = None
         
     
-    def fit(self, data, scale=False, verbose=False, plot=False):
+    def fit(self, data, verbose=False, plot=False):
         self.data = data
-        if scale and self.scaler is not None:
-            self.scaled_data = self.scaler.fit_transform(self.data)
-        else:
-            self.scaled_data = self.data
         self.pca = PCA()
-        self.pca.fit(self.scaled_data)
+        self.pca.fit(self.data)
 
         n_components_50 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.5)[0][0] + 1
         n_components_80 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.8)[0][0] + 1
@@ -487,15 +522,11 @@ class PCA_:
     def reduce(self, data=None, scale=False, accuracy=0.999999, n_components=None, verbose=False):
         if data is None:
             data = self.data
-        if scale and self.scaler is not None:
-            scaled_data = self.scaler.transform(data)
-        else:
-            scaled_data = data
         self.n_components = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= accuracy)[0][0] + 1
         if n_components is not None:
             self.n_components = n_components
         self.final_pca = PCA(n_components=self.n_components)
-        self.reduced_data = self.final_pca.fit_transform(scaled_data)
+        self.reduced_data = self.final_pca.fit_transform(data)
 
         if verbose:
             print(f"Original data shape: {self.data.shape}")
@@ -520,7 +551,8 @@ class DATA:
         dN=20, 
         mechMode="UT",
         model="MLP", 
-        freq=False, 
+        freq=False,
+        scale=False, 
         format=0
     ):
         self.path = path
@@ -531,6 +563,17 @@ class DATA:
         self.mechMode = mechMode
         self.model = model
         self.freq = freq
+        
+        self.scale = scale
+        if scale:
+            if scale[0].lower() == "minmax":
+                self.scaler = MinMaxScaler()
+            elif scale[0].lower() == "standardscaler" or scale.lower() == "standard":
+                self.scaler = StandardScaler()
+            elif scale[0].lower() == "standardize":
+                self.scaler = standardize
+            elif scale[0].lower() == "normalize":
+                self.scaler = normalize
 
         if path_add.lower() == "frequency":
             self.freq = True
@@ -580,64 +623,99 @@ class DATA:
             self.PATH  = str(self.path)+"/"
 
     def get_DataFiles(self):
-        self.INcsv = self.PATH + f'{self.mechTest}-disNodes-IN.csv'
-        self.OUTcsv = self.PATH + f'{self.mechTest}-disNodes-OUT.csv'
+        self.INcsv             = self.PATH + f'{self.mechTest}-disNodes-IN.csv'
+        self.INcsv_noOutliers  = self.PATH + f'{self.mechTest}-disNodes-IN-noOutliers.csv'
+        self.OUTcsv            = self.PATH + f'{self.mechTest}-disNodes-OUT.csv'
+        self.OUTcsv_noOutliers = self.PATH + f'{self.mechTest}-disNodes-OUT-noOutliers.csv'
 
+        self.CSV_all_in    = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-allIN.csv'
+        self.CSV_all_out   = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-allOUT.csv'
         self.CSV_train_in  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainIN.csv'
         self.CSV_train_out = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainOUT.csv'
-        self.CSV_val_in  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valIN.csv'
-        self.CSV_val_out = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valOUT.csv'
-        self.CSV_test_in  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testIN.csv'
-        self.CSV_test_out = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testOUT.csv'
+        self.CSV_val_in    = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valIN.csv'
+        self.CSV_val_out   = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valOUT.csv'
+        self.CSV_test_in   = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testIN.csv'
+        self.CSV_test_out  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testOUT.csv'
 
+        self.CSV_allProps   = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-allProps.csv'
         self.CSV_trainProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainProps.csv'
-        self.CSV_valProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valProps.csv'
-        self.CSV_testProps = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testProps.csv'
+        self.CSV_valProps   = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valProps.csv'
+        self.CSV_testProps  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testProps.csv'
 
         if self.freq:
-            self.INcsv_f = self.PATH + f'{self.mechTest}-disNodes-INf.csv'
-            self.CSV_train_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainINf.csv'
-            self.CSV_val_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valINf.csv'
-            self.CSV_test_in_f  = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testINf.csv'
+            self.INcsv_f            = self.PATH + f'{self.mechTest}-disNodes-INf.csv'
+            self.INcsv_f_noOutliers = self.PATH + f'{self.mechTest}-disNodes-INf-noOutliers.csv'
+
+            self.CSV_all_in_f       = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-allINf.csv'
+            self.CSV_train_in_f     = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-trainINf.csv'
+            self.CSV_val_in_f       = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-valINf.csv'
+            self.CSV_test_in_f      = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testINf.csv'
 
     def load_data(self):
         self.IN_df, self.OUT_df, self.INf_df, self.perINr_df, self.perIN_df, self.perOUT_df, self.dIN_df, self.dOUT_df = load_data(self.INcsv, 
                                                                                                                                    self.OUTcsv, 
-                                                                                                                                   self.INcsv_f if self.freq else None)
-        train, val, test = load_TrainTestData(self.CSV_train_in, 
-                                            self.CSV_train_out,
-                                            self.CSV_trainProps, 
-                                            self.CSV_val_in, 
-                                            self.CSV_val_out, 
-                                            self.CSV_valProps,
-                                            self.CSV_test_in, 
-                                            self.CSV_test_out,
-                                            self.CSV_testProps)
+                                                                                                                                   self.INcsv_f if self.freq else None,
+                                                                                                                                   no_outliers=[self.INcsv_noOutliers, 
+                                                                                                                                                self.OUTcsv_noOutliers, 
+                                                                                                                                                self.INcsv_f_noOutliers if self.freq else None])
+        all, train, val, test = load_TrainTestData(self.CSV_all_in,
+                                                   self.CSV_all_out,
+                                                   self.CSV_allProps,
+                                                   self.CSV_train_in, 
+                                                   self.CSV_train_out,
+                                                   self.CSV_trainProps, 
+                                                   self.CSV_val_in, 
+                                                   self.CSV_val_out, 
+                                                   self.CSV_valProps,
+                                                   self.CSV_test_in, 
+                                                   self.CSV_test_out,
+                                                   self.CSV_testProps)
+        all_in, all_out, allProps       = all
         train_in, train_out, trainProps = train
-        val_in, val_out, valProps = val
-        test_in, test_out, testProps = test
+        val_in, val_out, valProps       = val
+        test_in, test_out, testProps    = test
 
         if self.freq:
-            train_in, val_in, test_in = load_freqInputData(self.CSV_train_in_f, 
-                                                            self.CSV_val_in_f, 
-                                                            self.CSV_test_in_f)
+            all_in, train_in, val_in, test_in = load_freqInputData(self.CSV_all_in_f,
+                                                                   self.CSV_train_in_f, 
+                                                                   self.CSV_val_in_f, 
+                                                                   self.CSV_test_in_f)
 
         if self.model.lower() == "mlp" or self.model.lower() == "gpr":
+            self.all_in   = all_in
             self.train_in = train_in
-            self.val_in = val_in
-            self.test_in = test_in
+            self.val_in   = val_in
+            self.test_in  = test_in
         elif self.model.lower() == "gnn":
+            self.all_in   = all_in.reshape(*all_in.shape[:-1], all_in.shape[-1]//2, 2)
             self.train_in = train_in.reshape(*train_in.shape[:-1], train_in.shape[-1]//2, 2)
-            self.val_in = val_in.reshape(*val_in.shape[:-1], val_in.shape[-1]//2, 2)
-            self.test_in = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
+            self.val_in   = val_in.reshape(*val_in.shape[:-1], val_in.shape[-1]//2, 2)
+            self.test_in  = test_in.reshape(*test_in.shape[:-1], test_in.shape[-1]//2, 2)
+        self.all_out, self.allProps     = all_out, allProps
         self.train_out, self.trainProps = train_out, trainProps
-        self.val_out, self.valProps = val_out, valProps
-        self.test_out, self.testProps = test_out, testProps
+        self.val_out, self.valProps     = val_out, valProps
+        self.test_out, self.testProps   = test_out, testProps
 
-        self.all_in = np.concatenate((self.train_in, self.val_in, self.test_in))
-        self.all_out = np.concatenate((self.train_out, self.val_out, self.test_out))
-        self.allProps = np.concatenate((self.trainProps, self.valProps, self.testProps), axis=1)
-    
+        if self.scale:
+            if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.INscaler = self.scaler
+                self.all_in   = self.INscaler.fit_transform(self.all_in)
+                self.train_in = self.INscaler.transform(self.train_in)
+                self.val_in   = self.INscaler.transform(self.val_in)
+                self.test_in  = self.INscaler.transform(self.test_in)
+            if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.OUTscaler = self.scaler
+                self.all_out   = self.OUTscaler.fit_transform(self.all_out)
+                self.train_out = self.OUTscaler.transform(self.train_out)
+                self.val_out   = self.OUTscaler.transform(self.val_out)
+                self.test_out  = self.OUTscaler.transform(self.test_out)
+            if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.PROPscaler = self.scaler
+                self.allProps   = self.PROPscaler.fit_transform(self.allProps.T).T
+                self.trainProps = self.PROPscaler.transform(self.trainProps.T).T
+                self.valProps   = self.PROPscaler.transform(self.valProps.T).T
+                self.testProps  = self.PROPscaler.transform(self.testProps.T).T
+
     def load_DisDist_v1(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
 
