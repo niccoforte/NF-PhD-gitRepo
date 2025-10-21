@@ -99,7 +99,18 @@ def find_outliers(data):
     outlier_idxs = [data.index(x) for x in data if (x < mean - 3*stdev) or (x > mean + 3*stdev) if data.index(x) != 0]
     return np.array(outlier_idxs, dtype="int")
 
-def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, INf_r=None, INf_df=None, manual=None):
+def remove_outliers(
+    dIN_r, 
+    dOUT_r, 
+    props_r, 
+    IN_df, 
+    OUT_df, 
+    dIN_df, 
+    dOUT_df, 
+    INf_r=None, 
+    INf_df=None, 
+    manual=None
+):
     all_outlier_idxs = []
     for prop_r in props_r:
         idxs = find_outliers(data=prop_r)
@@ -420,7 +431,20 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
     return fig2, ax1
 
 
-def load_TrainTestData(CSV_all_in, CSV_all_out, CSV_all_props, CSV_train_in, CSV_train_out, CSV_trainProps, CSV_val_in, CSV_val_out, CSV_valProps, CSV_test_in, CSV_test_out, CSV_testProps):
+def load_TrainTestData(
+    CSV_all_in, 
+    CSV_all_out, 
+    CSV_all_props, 
+    CSV_train_in, 
+    CSV_train_out, 
+    CSV_trainProps, 
+    CSV_val_in, 
+    CSV_val_out, 
+    CSV_valProps, 
+    CSV_test_in, 
+    CSV_test_out, 
+    CSV_testProps
+):
     all_in     = pd.read_csv(CSV_all_in, index_col=0, header=0).to_numpy()
     all_out    = pd.read_csv(CSV_all_out, index_col=0, header=0).to_numpy()
     allProps   = pd.read_csv(CSV_all_props, index_col=0, header=0).to_numpy()
@@ -660,7 +684,14 @@ class DATA:
             self.CSV_test_in_f      = self.PATH + f'MLdata/{self.mechMode}-{self.dis}-testINf.csv'
 
     def load_data(self):
-        self.IN_df, self.OUT_df, self.INf_df, self.perINr_df, self.perIN_df, self.perOUT_df, self.dIN_df, self.dOUT_df = load_data(self.INcsv, 
+        self.IN_df, \
+            self.OUT_df, \
+            self.INf_df, \
+            self.perINr_df, \
+            self.perIN_df, \
+            self.perOUT_df, \
+            self.dIN_df, \
+            self.dOUT_df = load_data(self.INcsv, 
                                                                                                                                    self.OUTcsv, 
                                                                                                                                    self.INcsv_f if self.freq else None,
                                                                                                                                    no_outliers=[self.INcsv_noOutliers, 
