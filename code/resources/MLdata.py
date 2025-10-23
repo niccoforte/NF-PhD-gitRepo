@@ -388,8 +388,10 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
     
     p = OUT_df.loc[pi].tolist()[1:]
     indx = int(OUT_df.loc[pi].tolist()[0])
+
     if compare_ax is None:
         ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Perfect", c='k')
+        plt.legend()
     
     if idx:
         if type(idx) is not list:
@@ -423,6 +425,9 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
     ax1.axvline(x=1, ymax=0.2, c='k', linestyle='--')
     ax1.axhline(y=1, xmax=0.2, c='k', linestyle='--')
     ax1.set_ylim(bottom=-0.1, top=1.1)
+    
+    if compare_ax is None:
+        ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], c='k')
 
     if idx or q != 'all' and q <= 10:
         ax1.legend()
