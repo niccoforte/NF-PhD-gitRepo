@@ -58,16 +58,17 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
     if INf_df is not None:
         INf = INf_df.to_numpy()
     
-    ducts, strens, stiffs = [], [], []
+    ducts, strens, stiffs, WoFs = [], [], [], []
     for _, row in OUT_df.iterrows():
         UT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
-        ductility, strength, stiffness = calcUT(UT_df)
+        ductility, strength, stiffness, WoF = calcUT(UT_df)
         
         ducts.append(ductility)
         strens.append(strength)
         stiffs.append(stiffness)
+        WoFs.append(WoF)
         
-    props = np.array([ducts, strens, stiffs])
+    props = np.array([ducts, strens, stiffs, WoFs])
     return dIN, dOUT, INf, xOUT, props
 
 def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
