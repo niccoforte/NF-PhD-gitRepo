@@ -69,7 +69,8 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
         WoFs.append(WoF)
         
     props = np.array([ducts, strens, stiffs, WoFs])
-    return dIN, dOUT, INf, xOUT, props
+    props_df = pd.DataFrame(props.T, columns=['Ductility', 'Strength', 'Stiffness', 'WoF'], index=OUT_df.index)
+    return dIN, dOUT, INf, xOUT, props, props_df
 
 def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
     dIN = dIN_df.to_numpy()
@@ -90,7 +91,8 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
         ds.append(dd)
     
     props = [Kjs, Ks, Ps, ds]
-    return dIN, dOUT, INf, xOUT, props
+    props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.index)
+    return dIN, dOUT, INf, xOUT, props, props_df
 
 def find_outliers(data):
     mean = np.mean(data)
@@ -108,6 +110,7 @@ def remove_outliers(
     OUT_df, 
     dIN_df, 
     dOUT_df, 
+    props_df,
     INf_r=None, 
     INf_df=None, 
     manual=None
@@ -132,6 +135,7 @@ def remove_outliers(
         OUT_df = OUT_df.drop(OUT_df.iloc[outlier_idxs].index)
         dIN_df = dIN_df.drop(dIN_df.iloc[outlier_idxs].index)
         dOUT_df = dOUT_df.drop(dOUT_df.iloc[outlier_idxs].index)
+        props_df = props_df.drop(props_df.iloc[outlier_idxs].index)
         if INf_df is not None:
             INf_df = INf_df.drop(INf_df.iloc[outlier_idxs].index)
         props1 = []
@@ -151,6 +155,7 @@ def remove_outliers(
             OUT_df = OUT_df.drop(OUT_df.iloc[manual].index)
             dIN_df = dIN_df.drop(dIN_df.iloc[manual].index)
             dOUT_df = dOUT_df.drop(dOUT_df.iloc[manual].index)
+            props_df = props_df.drop(props_df.iloc[manual].index)
             if INf_df is not None:
                 INf_df = INf_df.drop(INf_df.iloc[manual].index)
             props = []
@@ -164,7 +169,7 @@ def remove_outliers(
     else:
         dIN, dOUT, INf, props = dIN_r, dOUT_r, INf_r, props_r
     
-    return dIN, dOUT, INf, props, IN_df, OUT_df, dIN_df, dOUT_df, INf_df
+    return dIN, dOUT, INf, props, IN_df, OUT_df, dIN_df, dOUT_df, props_df, INf_df
 
 def split_data(dIN, dOUT, props, INf, split=0.85):
     idxs = list(range(len(dOUT)))
@@ -208,7 +213,7 @@ def save_MLdata(
     dIN_df, 
     dOUT_df, 
     INf_df, 
-    props, 
+    props_df, 
     PATH, 
     mode, 
     dis
@@ -235,7 +240,7 @@ def save_MLdata(
     pd.DataFrame(val[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-valOUT.csv")
     pd.DataFrame(test[1]).to_csv(PATH + f"MLdata/{mode}-{dis}-testOUT.csv")
 
-    pd.DataFrame(props).to_csv(PATH + f"MLdata/{mode}-{dis}-allProps.csv")
+    props_df.to_csv(PATH + f"MLdata/{mode}-{dis}-allProps.csv")
     pd.DataFrame(train[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainProps.csv")
     pd.DataFrame(val[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-valProps.csv")
     pd.DataFrame(test[2]).to_csv(PATH + f"MLdata/{mode}-{dis}-testProps.csv")
@@ -261,21 +266,14 @@ def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
                   fontsize=18, fontname="Times New Roman")
         plt.xlabel('Normalized Disorder', fontsize=15, fontname="Times New Roman")
         plt.ylabel('Frequency', fontsize=15, fontname="Times New Roman")
-        plt.grid(True)
+        # plt.grid(True)
         plt.show()
 
-def locSims(prop, OUT_df):
-    max_idx, min_idx = prop.tolist().index(max(prop[1:])), prop.tolist().index(min(prop[1:]))
-    nSim_max, nSim_min = OUT_df.iloc[max_idx].name, OUT_df.iloc[min_idx].name
-    return nSim_max, nSim_min
+def locSims(props_df):
+    return pd.DataFrame((props_df.iloc[1:].idxmax(), props_df.iloc[1:].idxmin()), index=['Max', 'Min'])
 
-def get_stats(props):
-    stats = []
-    for prop in props:
-        mean = np.mean(prop[1:])
-        st_dev = np.std(prop[1:])
-        stats.append([mean, st_dev])
-    return stats
+def get_stats(props_df):
+    return pd.DataFrame((props_df.iloc[1:].mean(), props_df.iloc[1:].std()), index=['Mean', 'Std'])
 
 def plot_frequency(raw_data, data, test, bins=50):
     raw_data = np.array(data)
@@ -284,7 +282,9 @@ def plot_frequency(raw_data, data, test, bins=50):
     if test == "UT":
         x_label = 'Normalized Ductility'
     elif test == "FT":
-        x_label = 'Normalized Fracture Toughness ($K_{IC}$)'
+        x_label = 'Normalized Fracture Toughness ($K_{JIC}$)'
+    elif test == "FCL":
+        x_label = 'Normalized Fracto-Cohesive Length ($L_{f}$)'
     
     fig1, (ax1, ax2) = plt.subplots(1, 2)
     fig1.set_figheight(5)
@@ -319,8 +319,12 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
         y_label = 'Normalized Strength'
     elif test == "FT":
         title = "Compact Tension"
-        x_label = 'Normalized Fracture Toughness ($K_{IC}$)'
+        x_label = 'Normalized Fracture Toughness ($K_{JIC}$)'
         y_label = 'Normalized Displacement'
+    elif test == "FCL":
+        title = "Fracto-Cohesive Length"
+        x_label = 'Normalized Fracto-Cohesive Length ($L_{f}$)'
+        y_label = 'Normalized Work of Fracture (WoF)'
     
     x_norm = x_data / x_data[0]
     y_norm = y_data / y_data[0]
@@ -332,8 +336,8 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
         ax_histx = fig.add_subplot(gs[0, 0:3], sharex=ax_scatter)
         ax_histy = fig.add_subplot(gs[1:4, 3], sharey=ax_scatter)
         
-        ax_scatter.scatter(x_norm[0], y_norm[0], c="k", marker="*", label="Perfect")
         ax_scatter.scatter(x_norm[1:], y_norm[1:], c="orangered", alpha=0.7, marker="x", label="Disordered")
+        ax_scatter.scatter(x_norm[0], y_norm[0], c="k", marker="*", label="Perfect")
         ax_scatter.axvline(1, linestyle='--', color="k")
         ax_scatter.axhline(1, linestyle='--', color="k")
         ax_scatter.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
@@ -363,8 +367,10 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
             fig, ax = plt.subplots(figsize=(8, 8))
             d_label = "Disordered"
             col = "orangered"
-            ax.scatter(x_norm[0], y_norm[0], label='Perfect', c="k", marker="*")
         ax.scatter(x_norm[1:], y_norm[1:], label=d_label, c=col, alpha=0.7, marker="x")
+        if compare_ax is None:
+            ax.scatter(x_norm[0], y_norm[0], label='Perfect', c="k", marker="*")
+        ax.scatter(x_norm[0], y_norm[0], c="k", marker="*")
         ax.axvline(x=1, linestyle='--', color="k")
         ax.axhline(y=1, linestyle='--', color="k")
         ax.set_title(title, fontsize=18, fontname="Times New Roman")
