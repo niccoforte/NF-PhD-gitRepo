@@ -19,7 +19,7 @@ starttime = time.time()
 
 unitCellSize = 10.0                             # Strut length
 latticeType = 'FCC'                             # 'FCC', 'tri', 'hex', 'kagome'
-MechanicalModel = 'ductile'                        # 'fracture', 'ductile', 'both'
+MechanicalModel = 'fracture'                        # 'fracture', 'ductile', 'both'
 userMaterial = 'ti'                             # 'al', 'sic', 'ti'
 relDensity = 0.2                                # relative density
 crossSection = 'rect'
@@ -27,9 +27,9 @@ if latticeType.lower() == "tri": nnx = 30
 elif latticeType.lower() == "kagome": nnx = 20
 elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 16
-nnx = nnx #s = [26,30,34]                     # number of Unit cells in X direction (Y automatic)
+nnx = 20  #s = [10,16,20,26,30,36,40]              # number of Unit cells in X direction (Y automatic)
 
-finalRun = 'no'
+finalRun = 'yes'
 numberOfRuns = 1
 initialJob = 1
 cpus = 12
@@ -38,7 +38,7 @@ HistOut_frames = 200
 
 distribution = 'lhs_uniform'                      # uniform, lhs_uniform, frequency, normal, exponential
 targeted_disorder = "all"                       # all, X, nX, D, DD, DDD, v, h, o, oo, xs
-nodeVar = 'yes'                                 # distortion
+nodeVar = 'no'                                 # distortion
 sizeVar = 'no'
 fac = 0.2
 beta = fac
@@ -46,12 +46,12 @@ beta = fac
 stiffMatrix = False
 UTval = False
 
-#pDir = f"C:\\Users\\exy053\\Documents\\ModelChanges"
-#pDir = f"Z:\\p1\sims\\Ti\\Validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
-#pDir = f"Z:\\p1\sims\\Ti\\DSC" #MeshConv" #PSC\\"+str(int(unitCellSize))
-#pDir = f"Z:\\p1\sims\\Ti\\DimReductionData"
-#pDir = f"Z:\\p1\sims\\Ti\\sApp" # \\" + str(int(fac*100))
-#pDir = f"Z:\\p1\\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
+# pDir = f"C:\\Users\\exy053\\Documents\\ModelChanges"
+# pDir = f"Z:\\p1\sims\\Ti\\Validation\\"+str(int(unitCellSize))+"\\"+str(relDensity)
+# pDir = f"Z:\\p1\sims\\Ti\\MeshConv" #PSC\\"+str(int(unitCellSize)) #DSC" #
+# pDir = f"Z:\\p1\sims\\Ti\\DimReductionData"
+# pDir = f"Z:\\p1\sims\\Ti\\sApp" # \\" + str(int(fac*100))
+# pDir = f"Z:\\p1\\sims\\Ti\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
 pDir = "C:\\temp"
 
 global frequencies
@@ -137,7 +137,7 @@ if (latticeType.lower() == "kagome" or latticeType.lower() == "hex"):
 if userMaterial.lower() == "ti":
     if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':     # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
         strainAppUT = 0.060                                               # FINAL 20 - 0.060
-        strainAppFT = 0.000                                               # FINAL 20 - 0.000
+        strainAppFT = 0.080                                               # FINAL 20 - 0.000
     elif latticeType.lower() == "tri":
         strainAppUT = 0.100                                               # FINAL 30 - 0.100
         strainAppFT = 0.085                                               # FINAL 30 - 0.085
@@ -179,8 +179,10 @@ if latticeType.lower() == "fcc" or latticeType.lower() == 'fcc2':
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/5.0
     FineElemSizeUT   = unitCellSize/5.0
-    CoarseElemSizeFT = unitCellSize/1.0
-    FineElemSizeFT   = unitCellSize/1.0
+    CoarseElemSizeFTs = [unitCellSize/1.0, unitCellSize/2.0, unitCellSize/5.0]
+    FineElemSizeFTs   = [unitCellSize/1.0, unitCellSize/2.0, unitCellSize/5.0, unitCellSize/10.0, unitCellSize/15.0, unitCellSize/20.0, unitCellSize/25.0]
+    CoarseElemSizeUTs = CoarseElemSizeFTs
+    FineElemSizeUTs   = FineElemSizeFTs
 elif latticeType.lower() == "tri":
     BracketElemSize  = unitCellSize/1.0
     CoarseElemSizeUT = unitCellSize/2.0
@@ -2011,11 +2013,11 @@ for idNum in range(initial,numOfJobs):
                 delNodes.append(element[ik][0]-1)
             insideTest1 = insidePoint(ridge1[2:],ridge1[2:],point)
             if insideTest1:
-                delNodes.append(nodes[kk][0]-1)
+                delNodes.append(nodes[ik][0]-1)
                 continue
             insideTest2 = insidePoint(ridge2[2:],ridge2[2:],point)
             if insideTest2:
-                delNodes.append(nodes[kk][0]-1)
+                delNodes.append(nodes[ik][0]-1)
                 continue
 
         delNodes = np.array(delNodes, dtype=int)
