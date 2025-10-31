@@ -2,8 +2,6 @@ from resources.imports import *
 
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
-from torchinfo import summary
 from torch_geometric.utils import to_networkx
 import networkx as nx
 import optuna
@@ -114,7 +112,20 @@ def plot_Fsurface(x_values, y_values, val, typ="3d"):
 
 ### NEURAL NETWORK FUNCTIONS
 
-def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataloader=None, scheduler=None, earlyStop=None, verbose=10, optTrial=None, RMSEtarget=False):
+def train_model(
+    typ, 
+    model, 
+    lossf, 
+    n_epochs, 
+    opt, 
+    train_dataloader, 
+    val_dataloader=None, 
+    scheduler=None, 
+    earlyStop=None, 
+    verbose=10, 
+    optTrial=None, 
+    RMSEtarget=False
+):
     train_lossLog = []
     val_lossLog = []
     best_loss, best_rmse, best_epoch, best_model_state = 1000, (False, 1000), 0, None
@@ -184,7 +195,6 @@ def train_model(typ, model, lossf, n_epochs, opt, train_dataloader, val_dataload
                 print("Epoch:", epoch, "- Loss:", lossAvg, "- RMSE Loss:", rmse_lossAvg)
         
         if RMSEtarget:
-
             if RMSEtarget is True:
                 target = 0.1*np.sqrt(1/12)
             else:

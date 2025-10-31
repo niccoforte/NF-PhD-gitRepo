@@ -1,12 +1,13 @@
 from resources.imports import *
 
+from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr
+from resources.MLdata import Dataset_
+
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
-
-from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr
-from resources.MLdata import standardize, MinMaxScaler
 
 from torch.serialization import safe_globals
 from botorch.models import SingleTaskGP
@@ -15,9 +16,27 @@ from botorch.optim import optimize_acqf
 from botorch.acquisition import UpperConfidenceBound
 from gpytorch.mlls import ExactMarginalLogLikelihood
 
+from sklearn.preprocessing import MinMaxScaler
+
 
 class MODEL:
-    def __init__(self, typ, model, lossf, opt, batch, lr, data, train_dataloader, val_dataloader=None, test_dataloader=None, scheduler=None, earlyStop=None, w_init=False, optTrial=None):
+    def __init__(
+        self, 
+        typ, 
+        model, 
+        lossf, 
+        opt, 
+        batch, 
+        lr, 
+        data, 
+        train_dataloader=None, 
+        val_dataloader=None, 
+        test_dataloader=None, 
+        scheduler=None, 
+        earlyStop=None, 
+        w_init=False, 
+        optTrial=None
+    ):
         self.typ = typ
         self.model = model
         self.lossf = lossf
@@ -41,6 +60,17 @@ class MODEL:
         if w_init:
             self.model.apply(w_init)
         self.optTrial = optTrial
+
+        self.trainDS = Dataset_(data.train_in, data.train_out)
+        self.valDS = Dataset_(data.val_in, data.val_out)
+        self.testDS = Dataset_(data.test_in, data.test_out)
+
+        if train_dataloader is None:
+            self.train_dataloader = DataLoader(dataset=self.trainDS, batch_size=self.batch, shuffle=True)
+        if val_dataloader is None:
+            self.val_dataloader = DataLoader(dataset=self.valDS, batch_size=self.batch, shuffle=True)
+        if test_dataloader is None:
+            self.test_dataloader = DataLoader(dataset=self.testDS, batch_size=self.batch, shuffle=False)
         
         self.epoch = None
         self.train_lossLog, self.val_lossLog = None, None
@@ -51,12 +81,12 @@ class MODEL:
     
     def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
         self.model, \
-        self.epoch, \
-        self.train_lossLog, \
-        self.val_lossLog, \
-        self.best_loss, \
-        self.best_rmse, \
-        self.best_epoch = train_model(self.typ, 
+            self.epoch, \
+            self.train_lossLog, \
+            self.val_lossLog, \
+            self.best_loss, \
+            self.best_rmse, \
+            self.best_epoch = train_model(self.typ, 
                                     self.model, 
                                     self.lossf, 
                                     n_epochs, 
@@ -72,27 +102,29 @@ class MODEL:
         if plot:
             plot_loss(self.epoch, self.train_lossLog, self.val_lossLog)
     
-    def predict(self, stand=False, test_dataloader=None, plot=False):
+    def predict(self, test_dataloader=None, plot=False):
         if test_dataloader is None:
             test_dataloader = self.test_dataloader
 
         self.test_outputs, self.truth = predict_model(self.typ,
                                                        self.model, 
                                                        test_dataloader)
-        if stand is True:
-            self.test_outputs = standardize(self.test_outputs, self.data.outParams[0], self.data.outParams[1], mode=1)
-            self.truth = standardize(self.truth, self.data.outParams[0], self.data.outParams[1], mode=1)
-        elif stand == "in":
-            self.test_outputs = standardize(self.test_outputs, self.data.inParams[0], self.data.inParams[1], mode=1)
-            self.truth = standardize(self.truth, self.data.inParams[0], self.data.inParams[1], mode=1)
+        if self.data.scale:
+            if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
+                self.test_outputs = self.data.OUTscaler.inverse_transform(self.test_outputs)
+                self.truth = self.data.OUTscaler.inverse_transform(self.truth) 
+        if self.data.reduce_dim:
+            if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
+                self.test_outputs = self.data.OUTreducer.reconstruct(self.test_outputs)
+                self.truth = self.data.OUTreducer.reconstruct(self.truth)
 
         self.err = absErr(self.test_outputs, self.truth, typ="sum", axis=1)
         self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
         print(f"Best prediction: {self.best}, Worst prediction: {self.worst}")
 
         if plot:
-            plot_StressStrainOUT(self.data.perOUT, self.test_outputs, truth=self.truth, indx=self.best)
-            plot_StressStrainOUT(self.data.perOUT, self.test_outputs, truth=self.truth, indx=self.worst)
+            plot_StressStrainOUT(self.data.perOUT_df.T.to_numpy(), self.test_outputs, truth=self.truth, indx=self.best)
+            plot_StressStrainOUT(self.data.perOUT_df.T.to_numpy(), self.test_outputs, truth=self.truth, indx=self.worst)
         
     def save(self, path, name):
         torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
@@ -169,10 +201,19 @@ class mlpBlock(nn.Module):
         return x
 
 class MLP(nn.Module):
-    def __init__(self, in_size, h_size, out_size, block="mlp", norm=None, bias=True):
+    def __init__(self, in_size, h_size, out_size, act="relu", block="mlp", norm=None, bias=True):
         super(MLP, self).__init__()
         
-        self.act = nn.Sigmoid()
+        if act == "relu":
+            self.act = nn.ReLU()
+        elif act == "sigmoid":
+            self.act = nn.Sigmoid()
+        elif act == "tanh":
+            self.act = nn.Tanh()
+        elif act == "leakyrelu":
+            self.act = nn.LeakyReLU()
+        else:
+            self.act = nn.ReLU()
 
         if len(h_size) > 0:
             self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)

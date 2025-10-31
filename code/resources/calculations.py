@@ -81,7 +81,18 @@ def calcUT(df):
     stiff_rng = range(int(0.1*s_sm.index(strength)))
     stiffness = np.average([s_sm[i+1]-s_sm[i] for i in stiff_rng])/np.average([e[i+1]-e[i] for i in stiff_rng])
     
-    return ductility, strength, stiffness
+    idx_Smax = s_sm.index(strength)
+    idx_WoF = None
+    for si in s_sm[idx_Smax:]:
+        if si <= 0.01*strength:
+            idx_WoF = s_sm.index(si)
+            break
+    if idx_WoF is not None:
+        work_of_frac = np.trapz(s_sm[:idx_WoF], e[:idx_WoF])
+    else:
+        work_of_frac = np.trapz(s_sm, e)
+
+    return ductility, strength, stiffness, work_of_frac
 
 
 def get_fractureData(outputCSV):

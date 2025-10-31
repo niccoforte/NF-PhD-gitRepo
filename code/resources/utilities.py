@@ -81,11 +81,7 @@ def rename_NameConventionChange(root_dir, prefix, mechanical_model, lattice_type
                 os.rename(src, dst)
 
 
-<<<<<<< HEAD
 ROOT_DIR         = os.getcwd() #"Z:\\p1\\data\\Ti\\20disNodes\\tri\\" 
-=======
-ROOT_DIR         = "Z:\\p1\\data\\Ti\\disNodes\\0.2\\kagome\\" 
->>>>>>> e7f0fb45a27b608c80165c929a96af017b67088f
 PREFIX           = r'(?:IN-f|IN-n|OUT-)?'
 MECHANICAL_MODEL = "Ductile"
 LATTICE_TYPE     = "kagome"
