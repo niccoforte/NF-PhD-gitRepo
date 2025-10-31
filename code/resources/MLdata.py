@@ -1,6 +1,6 @@
 from resources.imports import *
 from resources.calculations import calcUT, calcFT
-from resources.lattices import geometry
+from resources.lattices import Geometry
 
 from matplotlib.gridspec import GridSpec
 
@@ -630,7 +630,7 @@ class DATA:
         elif mechMode.lower() == "both":
             self.mechTest = "both"
         
-        self.geom = geometry(LAT=self.LAT, l=10)
+        self.geom = Geometry(LAT=self.LAT, l=10)
         nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM, vol, l, t, LAT = self.geom
         self.nnx = nnx
         self.nny = nny

@@ -140,9 +140,9 @@ def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):
     d = df.x.tolist()
     F_sm = df.y_sm.tolist()
     
-    W = geom[4]
-    B = geom[5]
-    ai = geom[7]
+    W = geom.W
+    B = geom.B
+    ai = geom.ai
     
     if validation == True:
         E_eff = E          # CHECK VAL
