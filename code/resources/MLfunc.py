@@ -6,6 +6,7 @@ from torch_geometric.utils import to_networkx
 import networkx as nx
 import optuna
 import json
+import copy
 
 from sklearn.model_selection import GridSearchCV
 
@@ -120,101 +121,116 @@ def train_model(
     opt, 
     train_dataloader, 
     val_dataloader=None, 
+    device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     scheduler=None, 
     earlyStop=None, 
     verbose=10, 
     optTrial=None, 
     RMSEtarget=False
 ):
-    train_lossLog = []
-    val_lossLog = []
+    train_lossLog, val_lossLog = [], []
     best_loss, best_rmse, best_epoch, best_model_state = 1000, (False, 1000), 0, None
     for epoch in range(1, n_epochs+1):
-        train_lossSum = 0
-        train_rmse = 0
+        train_lossSum, train_sse, train_n = 0, 0, 0
         model.train()
         for batch in train_dataloader:
+            opt.zero_grad(set_to_none=True)
             if typ.lower() == "gnn":
-                x, y = batch.x.float(), batch.y.float()
-                y_predict = model(batch.x, batch.edge_index, batch.batch)
+                x, y = batch.x.float().to(device), batch.y.float().to(device)
+                edge_index = batch.edge_index.to(device)
+                batch = batch.batch.to(device)
+                y_predict = model(x, edge_index, batch)
                 y = batch.y.view(batch.num_graphs, -1)
             else:
-                x, y = batch[:][0].float(), batch[:][1].float()
+                x, y = batch[0].float().to(device), batch[1].float().to(device)
                 y_predict = model(x)
             loss = lossf(y_predict, y)
-            train_lossLog.append(loss.item())
-            train_lossSum += loss.item()
-            train_rmse += np.sqrt(loss.item())
-
-            opt.zero_grad()
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
 
+            train_lossSum += loss.item()
+            train_sse += loss.item()*y.numel()
+            train_n += y.numel()
+            if isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR,
+                          torch.optim.lr_scheduler.CosineAnnealingLR)):
+                scheduler.step()
+
         train_lossAvg = train_lossSum/len(train_dataloader)
-        train_rmseAvg = train_rmse/len(train_dataloader)
+        train_mse = train_sse/train_n
+        train_rmse = math.sqrt(train_mse)
+        train_lossLog.append(train_mse)
         
         if val_dataloader:
             model.eval()
+            val_lossSum, val_sse, val_n = 0, 0, 0
             with torch.no_grad():
-                val_lossSum = 0
-                val_rmse = 0
                 for batch in val_dataloader:
                     if typ.lower() == "gnn":
-                        x, y = batch.x.float(), batch.y.float()
-                        y_predict = model(batch.x, batch.edge_index, batch.batch)
+                        x, y = batch.x.float().to(device), batch.y.float().to(device)
+                        edge_index = batch.edge_index.to(device)
+                        batch = batch.batch.to(device)
+                        y_predict = model(x, edge_index, batch)
                         y = batch.y.view(batch.num_graphs, -1)
                     else:
-                        x, y = batch[:][0].float(), batch[:][1].float()
+                        x, y = batch[0].float().to(device), batch[1].float().to(device)
                         y_predict = model(x)
+                    
                     loss = lossf(y_predict, y)
-
-                    val_lossLog.append(loss.item())
                     val_lossSum += loss.item()
-                    val_rmse += np.sqrt(loss.item())
+                    val_sse += loss.item()*y.numel()
+                    val_n += y.numel()
 
                 val_lossAvg = val_lossSum/len(val_dataloader)
-                val_rmseAvg = val_rmse/len(val_dataloader)
+                val_mse = val_sse/val_n
+                val_rmse = math.sqrt(val_mse)
+                val_lossLog.append(val_mse)
 
         lossAvg = val_lossAvg if val_dataloader else train_lossAvg
-        rmse_lossAvg = val_rmseAvg if val_dataloader else train_rmseAvg
+        mse = val_mse if val_dataloader else train_mse
+        rmse = val_rmse if val_dataloader else train_rmse
 
-        if lossAvg < best_loss:
-            best_loss = lossAvg
-            best_rmse = (False, rmse_lossAvg)
+        if mse < best_loss:
+            best_loss = mse
+            best_rmse = (False, rmse)
             best_epoch = epoch
-            best_model_state = model.state_dict().copy()
+            best_model_state = copy.deepcopy(model.state_dict())
         
         if optTrial:
-            optTrial.report(lossAvg, epoch)
+            optTrial.report(mse, epoch)
             if optTrial.should_prune():
                 raise optuna.exceptions.TrialPruned()
-
-        if verbose:
-            if epoch == 1 or epoch % int(verbose) == 0:
-                print("Epoch:", epoch, "- Loss:", lossAvg, "- RMSE Loss:", rmse_lossAvg)
         
         if RMSEtarget:
             if RMSEtarget is True:
                 target = 0.1*np.sqrt(1/12)
             else:
                 target = float(RMSEtarget)
-            if rmse_lossAvg <= target:
-                best_rmse = (True, best_rmse)
-                print(f"RMSE check passed at epoch {epoch} with RMSE: {rmse_lossAvg:.4f}")
+            if rmse <= target:
+                best_rmse = (True, rmse)
+                print(f"RMSE check passed at epoch {epoch} with RMSE: {rmse:.4f}")
                 break
 
         if scheduler:
-            scheduler.step(lossAvg)
+            if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                scheduler.step(mse)
+        _lr = opt.param_groups[0]['lr']
+
+        if epoch % verbose == 0 or epoch == 1 or epoch == n_epochs:
+            if val_dataloader:
+                print(f"Epoch {epoch}/{n_epochs} => Train MSE: {train_mse:.6f}, Val MSE: {val_mse:.6f}, Train RMSE: {train_rmse:.6f}, Val RMSE: {val_rmse:.6f}, LR: {_lr:.2e}")
+            else:
+                print(f"Epoch {epoch}/{n_epochs} => Train MSE: {train_mse:.6f}, Train RMSE: {train_rmse:.6f}, LR: {_lr:.2e}")
+        
         if earlyStop:
-            earlyStop(lossAvg)
+            earlyStop(mse)
             if earlyStop.early_stop:
                 break
         
     if best_model_state:
         model.load_state_dict(best_model_state)
-
-    print(f"Best Epoch: {best_epoch}, with loss {best_loss}")
+    
+    print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with MSE: {best_loss:.6f} and RMSE: {best_rmse[1]:.6f}")
     return model, epoch, train_lossLog, val_lossLog, best_loss, best_rmse, best_epoch
 
 def predict_model(typ, model, test_dataloader):
@@ -238,9 +254,51 @@ def predict_model(typ, model, test_dataloader):
 def weights_init(m):
     if isinstance(m, nn.Linear):
         #nn.init.xavier_normal_(m.weight)
-        nn.init.kaiming_normal_(m.weight, nonlinearity='sigmoid')
+        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
         if m.bias is not None:
             nn.init.constant_(m.bias, 0.01)
+
+def _activation(act):
+    if act == "relu":
+        act_f = nn.ReLU()
+    elif act == "sigmoid":
+        act_f = nn.Sigmoid()
+    elif act == "tanh":
+        act_f = nn.Tanh()
+    elif act == "leakyrelu":
+        act_f = nn.LeakyReLU()
+    elif act == "softplus":
+        act_f = nn.Softplus()
+    elif act == "elu":
+        act_f = nn.ELU()
+    elif act == "gelu":
+        act_f = nn.GELU()
+    elif act == "selu":
+        act_f = nn.SELU()
+    elif act == "swish":
+        act_f = nn.SiLU()
+    elif act == "hardtanh":
+        act_f = nn.Hardtanh()
+    elif act == "prelu":
+        act_f = nn.PReLU()
+    elif act == "rrelu":
+        act_f = nn.RReLU()
+    elif act == "softsign":
+        act_f = nn.Softsign()
+    elif act == "softshrink":
+        act_f = nn.Softshrink()
+    elif act == "hardswish":
+        act_f = nn.Hardswish()
+    elif act == "mish":
+        act_f = nn.Mish()
+    elif act == "tanhshrink":
+        act_f = nn.Tanhshrink()
+    elif act == "logsigmoid":
+        act_f = nn.LogSigmoid()
+    else:
+        print("[WARNING] Activation function not recognized. Using ReLU as default.")
+        act_f = nn.ReLU()
+    return act_f
 
 class EarlyStopping:
     def __init__(self, patience=5, min_delta=0.0001, verbose=True):
@@ -356,15 +414,15 @@ def physics_loss(target, output):
 
 def plot_loss(epoch, train, val=None):
     fig = plt.figure(figsize=(10, 5))
-    plt.plot(np.linspace(1, epoch, len(train)), train, label="Training")
+    plt.plot(np.linspace(1, epoch, len(train)), train, label="Training", c="darkblue")
     if val:
-        plt.plot(np.linspace(1, epoch, len(val)), val, label="Validation")
+        plt.plot(np.linspace(1, epoch, len(val)), val, label="Validation", c="orangered")
     plt.xlabel("Training Epoch")
     plt.ylabel("Mean Squared Error (MSE)")
     plt.yscale("log")
     plt.title("Training and Validation Loss Vs Epoch")
     plt.legend()
-    plt.grid()
+    # plt.grid()
     plt.show()
 
 def plot_StressStrainOUT(perOUT, test_outputs, truth=None, indx=0):
