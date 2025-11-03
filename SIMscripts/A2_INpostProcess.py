@@ -3,7 +3,7 @@ import numpy as np
 import math
 import sys
 
-stiffMatrix = True
+stiffMatrix = False
 distribution = "lhs_uniform"
 
 pDir = "C:\\temp"
@@ -59,7 +59,6 @@ if stiffMatrix:
     pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix"
 
 os.chdir(pDir)
-
 
 class Geometry:
     def __init__(self, LAT, l, nnx, rD=0.2):
