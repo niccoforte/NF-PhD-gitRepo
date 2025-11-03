@@ -1,12 +1,13 @@
 from resources.imports import *
 
-from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr
+from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr, _activation
 from resources.MLdata import Dataset_
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
+from torchinfo import summary
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 
 from torch.serialization import safe_globals
@@ -35,6 +36,7 @@ class MODEL:
         scheduler=None, 
         earlyStop=None, 
         w_init=False, 
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         optTrial=None
     ):
         self.typ = typ
@@ -48,17 +50,18 @@ class MODEL:
         self.val_dataloader = val_dataloader
         self.test_dataloader = test_dataloader
         self.earlyStop = earlyStop
+        if w_init:
+            self.model.apply(w_init)
+        self.device = device
+        self.model.to(device)
         if scheduler:
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, 
                                                                         mode=scheduler[0], 
                                                                         factor=scheduler[1],
                                                                         patience=scheduler[2], 
-                                                                        threshold=scheduler[3], 
-                                                                        verbose=scheduler[4])
+                                                                        threshold=scheduler[3])
         else:
             self.scheduler = None
-        if w_init:
-            self.model.apply(w_init)
         self.optTrial = optTrial
 
         self.trainDS = Dataset_(data.train_in, data.train_out)
@@ -68,7 +71,7 @@ class MODEL:
         if train_dataloader is None:
             self.train_dataloader = DataLoader(dataset=self.trainDS, batch_size=self.batch, shuffle=True)
         if val_dataloader is None:
-            self.val_dataloader = DataLoader(dataset=self.valDS, batch_size=self.batch, shuffle=True)
+            self.val_dataloader = DataLoader(dataset=self.valDS, batch_size=self.batch, shuffle=False)
         if test_dataloader is None:
             self.test_dataloader = DataLoader(dataset=self.testDS, batch_size=self.batch, shuffle=False)
         
@@ -93,6 +96,7 @@ class MODEL:
                                     self.opt, 
                                     self.train_dataloader, 
                                     val_dataloader=self.val_dataloader, 
+                                    device=self.device,
                                     scheduler=self.scheduler, 
                                     earlyStop=self.earlyStop, 
                                     verbose=verbose,
@@ -109,14 +113,14 @@ class MODEL:
         self.test_outputs, self.truth = predict_model(self.typ,
                                                        self.model, 
                                                        test_dataloader)
-        if self.data.scale:
-            if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
-                self.test_outputs = self.data.OUTscaler.inverse_transform(self.test_outputs)
-                self.truth = self.data.OUTscaler.inverse_transform(self.truth) 
         if self.data.reduce_dim:
             if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
                 self.test_outputs = self.data.OUTreducer.reconstruct(self.test_outputs)
                 self.truth = self.data.OUTreducer.reconstruct(self.truth)
+        if self.data.scale:
+            if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
+                self.test_outputs = self.data.OUTscaler.inverse_transform(self.test_outputs)
+                self.truth = self.data.OUTscaler.inverse_transform(self.truth)
 
         self.err = absErr(self.test_outputs, self.truth, typ="sum", axis=1)
         self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
@@ -126,6 +130,9 @@ class MODEL:
             plot_StressStrainOUT(self.data.perOUT_df.T.to_numpy(), self.test_outputs, truth=self.truth, indx=self.best)
             plot_StressStrainOUT(self.data.perOUT_df.T.to_numpy(), self.test_outputs, truth=self.truth, indx=self.worst)
         
+    def _summary(self):
+        return summary(self.model, input_size=(self.batch, self.model.in_size))
+    
     def save(self, path, name):
         torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
 
@@ -156,7 +163,13 @@ class GPRmodel(GPR):
 
 ### Multi-Layer Perceptron model
 class resBlock(nn.Module):
-    def __init__(self, size, act, norm=None, bias=True):
+    def __init__(
+        self, 
+        size, 
+        act, 
+        norm=None, 
+        bias=True
+    ):
         super(resBlock, self).__init__()
         self.norm = norm
         self.fc1 = nn.Linear(size, size*2, bias=bias)
@@ -183,11 +196,18 @@ class resBlock(nn.Module):
         return x #+ skip
 
 class mlpBlock(nn.Module):
-    def __init__(self, in_size, out_size, act, norm=None, bias=True):
+    def __init__(
+        self, 
+        in_size, 
+        out_size, 
+        act, 
+        norm=None,
+        bias=True
+    ):
         super(mlpBlock, self).__init__()
         self.norm = norm
         self.fc = nn.Linear(in_size, out_size, bias=bias)
-        self.act = act
+        self._act = _activation(act)
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size)
         elif norm == 'batch':
@@ -197,32 +217,38 @@ class mlpBlock(nn.Module):
         x = self.fc(x)
         if self.norm:
             x = self.normL(x)
-        x = self.act(x)
+        x = self._act(x)
         return x
 
 class MLP(nn.Module):
-    def __init__(self, in_size, h_size, out_size, act="relu", block="mlp", norm=None, bias=True):
-        super(MLP, self).__init__()
+    def __init__(
+        self, 
+        in_size, 
+        h_size, 
+        out_size, 
+        act="relu", 
+        block="mlp", 
+        norm=None, 
+        dropout=0.0,
+        bias=True
+    ):
+        super().__init__()
+
+        self.in_size = in_size
+        self.h_size = h_size
+        self.out_size = out_size
         
-        if act == "relu":
-            self.act = nn.ReLU()
-        elif act == "sigmoid":
-            self.act = nn.Sigmoid()
-        elif act == "tanh":
-            self.act = nn.Tanh()
-        elif act == "leakyrelu":
-            self.act = nn.LeakyReLU()
-        else:
-            self.act = nn.ReLU()
+        self._act = _activation(act)
 
         if len(h_size) > 0:
             self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)
             if block == "mlp":
                 self.hlayers = nn.ModuleList([
-                    mlpBlock(i, j, self.act, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])])
+                     mlpBlock(i, j, act, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])
+                ])
             elif block == "res":
                 self.hlayers = nn.ModuleList([
-                    resBlock(i, self.act, norm, bias) for i in h_size])
+                    resBlock(i, act, norm, bias) for i in h_size])
         else:
             self.hlayers = None
             self.fcIN = None
@@ -235,19 +261,24 @@ class MLP(nn.Module):
             self.normL = nn.LayerNorm(h_size[0])
         if norm == 'batch':
             self.normL = nn.BatchNorm1d(h_size[0])
-        self.dropout = nn.Dropout(0.25)
         
+        self.dropout = dropout
+        if dropout > 0.0:
+            self.dropoutL = nn.Dropout(dropout)
 
     def forward(self, x):
         if self.fcIN:
             x = self.fcIN(x)
-        if self.norm:
-            x = self.normL(x)
-        if self.fcIN:
-            x = self.act(x)
+            if self.norm:
+                x = self.normL(x)
+            x = self._act(x)
+            if self.dropout > 0.0:
+                x = self.dropoutL(x)
         if self.hlayers:
-            for layer in self.hlayers:
+            for layer in self.hlayers[:-1]:
                 x = layer(x)
+                x = self.dropoutL(x) if self.dropout > 0.0 else x
+            x = self.hlayers[-1](x)
         x = self.fcOUT(x)
         return x
 

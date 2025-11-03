@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import subprocess
+import matplotlib.pyplot as plt
 
 
 def smooth(y_old):
@@ -139,9 +140,9 @@ def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):
     d = df.x.tolist()
     F_sm = df.y_sm.tolist()
     
-    W = geom[4]
-    B = geom[5]
-    ai = geom[7]
+    W = geom.W
+    B = geom.B
+    ai = geom.ai
     
     if validation == True:
         E_eff = E          # CHECK VAL
@@ -205,3 +206,47 @@ def FEA_run(x_new, iter, path, argv):
         print(f"!!! An unexpected error occurred in the FEA workflow: {e}")
         return 0
 
+
+def plot_curve(df_list, typ, label=None):
+    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig.set_figwidth(15)
+    
+    for l, df in enumerate(df_list):
+        frac = int(df.x.tolist()[0])
+        x = df.x.tolist()[1:]
+        y = df.y.tolist()[1:]
+        y_sm = df.y_sm.tolist()[1:]
+        
+        if label:
+            l = label
+        
+        ax1.plot(x, y, label=l)
+        ax2.plot(x, y_sm, label=l)
+        
+        if len(df_list) <= 1:
+            ax1.axhline(y=y[frac], c='r')
+            ax1.axvline(x=x[frac], ymax=0.6, c='r')
+            ax1.axhline(y=0.25*max(y_sm), c='g')
+            ax2.axhline(y=0.25*max(y_sm), c='g')
+            ax2.axhline(y=y_sm[frac], c='r')
+            ax2.axvline(x=x[frac], ymax=0.6, c='r')
+
+            if typ.lower() == "ft":
+                slope_loc = 0.15*x.index(x[frac])
+                slope_idx = int(slope_loc)
+
+                ax1.axvline(x=0.15*x[frac], ymax=0.6, c='g')
+                ax2.axvline(x=0.15*x[frac], ymax=0.6, c='g')
+
+                ax2.plot([x[0], x[slope_idx]], [y_sm[0], y_sm[slope_idx]], c='r')
+                ax2.plot([x[0], x[slope_idx]], [y[0], y[slope_idx]], c='g')
+
+                slope = np.average([y_sm[i+1]-y_sm[i] for i in range(slope_idx)])/np.average([x[i+1]-x[i] for i in range(slope_idx)])
+                ax1.plot([i for i in x[:slope_idx]], [i*slope for i in x[:slope_idx]], c='b')
+                ax2.plot([i for i in x[:slope_idx]], [i*slope for i in x[:slope_idx]], c='b')
+
+    # ax1.grid()
+    # ax2.grid()
+    ax1.legend()
+    ax2.legend()
+    plt.show()

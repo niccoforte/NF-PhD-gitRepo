@@ -1,12 +1,13 @@
 from resources.imports import *
 from resources.calculations import calcUT, calcFT
-from resources.lattices import geometry
+from resources.lattices import Geometry
 
 from matplotlib.gridspec import GridSpec
 
 from torch.utils.data.dataset import Dataset
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
+from sklearn.base import clone
 
 
 def load_data(inputs, outputs, f_inputs=None, no_outliers=False):
@@ -629,7 +630,7 @@ class DATA:
         elif mechMode.lower() == "both":
             self.mechTest = "both"
         
-        self.geom = geometry(LAT=self.LAT, l=10)
+        self.geom = Geometry(LAT=self.LAT, l=10)
         nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM, vol, l, t, LAT = self.geom
         self.nnx = nnx
         self.nny = nny
@@ -644,7 +645,6 @@ class DATA:
                 self.load_DisDist_v1()
             elif format == 2 and model.lower() == "mlp":
                 self.load_DisDist_v2()
-
 
     def get_DataPath(self):
         pData = 'Z:/p1/data/'
@@ -746,42 +746,42 @@ class DATA:
         self.train_out, self.trainProps = train_out, trainProps
         self.val_out, self.valProps     = val_out, valProps
         self.test_out, self.testProps   = test_out, testProps
+
+        if self.scale:
+            if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.INscaler = clone(self.scaler)
+                self.train_in = self.INscaler.fit_transform(self.train_in)
+                self.all_in   = self.INscaler.transform(self.all_in)
+                self.val_in   = self.INscaler.transform(self.val_in)
+                self.test_in  = self.INscaler.transform(self.test_in)
+            if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.OUTscaler = clone(self.scaler)
+                self.train_out = self.OUTscaler.fit_transform(self.train_out)
+                self.all_out   = self.OUTscaler.transform(self.all_out)
+                self.val_out   = self.OUTscaler.transform(self.val_out)
+                self.test_out  = self.OUTscaler.transform(self.test_out)
+            if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.PROPscaler = clone(self.scaler)
+                self.trainProps = self.PROPscaler.fit_transform(self.trainProps.T).T
+                self.allProps   = self.PROPscaler.transform(self.allProps.T).T
+                self.valProps   = self.PROPscaler.transform(self.valProps.T).T
+                self.testProps  = self.PROPscaler.transform(self.testProps.T).T
         
         if self.reduce_dim:
             if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
                 self.INreducer = self.reducer
-                self.INreducer.fit(self.all_in)
-                self.all_in   = self.INreducer.reduce(self.all_in, accuracy=self.reduce_dim[2])
-                self.train_in = self.INreducer.reduce(self.train_in, accuracy=self.reduce_dim[2])
-                self.val_in   = self.INreducer.reduce(self.val_in, accuracy=self.reduce_dim[2])
-                self.test_in  = self.INreducer.reduce(self.test_in, accuracy=self.reduce_dim[2])
+                self.INreducer.fit(self.train_in)
+                self.all_in   = self.INreducer.reduce(self.all_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.train_in = self.INreducer.reduce(self.train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.val_in   = self.INreducer.reduce(self.val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.test_in  = self.INreducer.reduce(self.test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
             if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
                 self.OUTreducer = self.reducer
-                self.OUTreducer.fit(self.all_out)
-                self.all_out   = self.OUTreducer.reduce(self.all_out, accuracy=self.reduce_dim[2])
-                self.train_out = self.OUTreducer.reduce(self.train_out, accuracy=self.reduce_dim[2])
-                self.val_out   = self.OUTreducer.reduce(self.val_out, accuracy=self.reduce_dim[2])
-                self.test_out  = self.OUTreducer.reduce(self.test_out, accuracy=self.reduce_dim[2])
-
-        if self.scale:
-            if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                self.INscaler = self.scaler
-                self.all_in   = self.INscaler.fit_transform(self.all_in)
-                self.train_in = self.INscaler.transform(self.train_in)
-                self.val_in   = self.INscaler.transform(self.val_in)
-                self.test_in  = self.INscaler.transform(self.test_in)
-            if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                self.OUTscaler = self.scaler
-                self.all_out   = self.OUTscaler.fit_transform(self.all_out)
-                self.train_out = self.OUTscaler.transform(self.train_out)
-                self.val_out   = self.OUTscaler.transform(self.val_out)
-                self.test_out  = self.OUTscaler.transform(self.test_out)
-            if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                self.PROPscaler = self.scaler
-                self.allProps   = self.PROPscaler.fit_transform(self.allProps.T).T
-                self.trainProps = self.PROPscaler.transform(self.trainProps.T).T
-                self.valProps   = self.PROPscaler.transform(self.valProps.T).T
-                self.testProps  = self.PROPscaler.transform(self.testProps.T).T
+                self.OUTreducer.fit(self.train_out)
+                self.all_out   = self.OUTreducer.reduce(self.all_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.train_out = self.OUTreducer.reduce(self.train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.val_out   = self.OUTreducer.reduce(self.val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.test_out  = self.OUTreducer.reduce(self.test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
     
     def load_DisDist_v1(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
