@@ -4,7 +4,7 @@ import sys
 import argparse
 from typing import Tuple, List
 
-run = "INPedit"
+run = "DeleteBackups"  # "BumpSimN"  # "Rename"  # "InpEdit"  # "NameConventionChange"  # 
 
 
 def bump_simN(root_dir=os.getcwd(), bump=500):
@@ -245,8 +245,7 @@ def process_file(path: str, forced_thickness: str, dry_run: bool = False) -> Tup
 def matches_name(filename: str) -> bool:
     return filename.startswith("Ductile") and filename.endswith(".inp")
 
-
-if "run".lower() == "inpedit":
+if run.lower() == "inpedit":
     parser = argparse.ArgumentParser(
         description="Update RECT *Beam Section out-of-plane thickness (first value) and *Elastic properties in Abaqus .inp files."
     )
@@ -284,3 +283,44 @@ if "run".lower() == "inpedit":
     print(f"Elastic props updated:     {total_elastic_updates}")
     if args.dry_run:
         print("No files were modified (dry-run).")
+
+
+def delete_backups(root: str, dry_run: bool = False) -> int:
+    deleted = 0
+    for dirpath, _, filenames in os.walk(root):
+        for fn in filenames:
+            if fn.endswith(".bak"):
+                fullpath = os.path.join(dirpath, fn)
+                if dry_run:
+                    print(f"(dry-run) would delete: {fullpath}")
+                else:
+                    try:
+                        os.remove(fullpath)
+                        print(f"deleted: {fullpath}")
+                        deleted += 1
+                    except Exception as e:
+                        print(f"ERROR deleting {fullpath}: {e}")
+    return deleted
+
+if run.lower() == "deletebackups":
+    parser = argparse.ArgumentParser(
+        description="Delete all .bak backup files created by previous modification scripts."
+    )
+    parser.add_argument(
+        "root",
+        nargs="?",                         # optional
+        default=os.getcwd(),               # walk from current working directory by default
+        help="Root directory to start search (default: current working directory)"
+    )
+    parser.add_argument("--dry-run", action="store_true", help="List .bak files without deleting them")
+    args = parser.parse_args()
+
+    print(f"Scanning from: {args.root}")
+    deleted = delete_backups(args.root, dry_run=args.dry_run)
+
+    print("\nSummary")
+    print("-------")
+    print(f"Total .bak files {'found' if args.dry_run else 'deleted'}: {deleted}")
+    if args.dry_run:
+        print("No files were deleted (dry-run).")
+
