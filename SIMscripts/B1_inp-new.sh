@@ -34,6 +34,7 @@ pDir=None
 
 PATH_EXTRA=
 SKIP=()
+Ffilter=
 BASE_DIR="/data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT"
 OG_JOBS=("$BASE_DIR"/*/)
 
@@ -41,9 +42,9 @@ zip=false
 delete_scratch=true
 
 for OG_JOB in "${OG_JOBS[@]}"; do
-    JOB_NAME=$(basename "$OG_JOB")
-    if [[ " ${SKIP[*]} " == *" $JOB_NAME "* ]]; then
-        echo "Skipping job $JOB_NAME"
+    OLD_JOB_NAME=$(basename "$OG_JOB")
+    if [[ " ${SKIP[*]} " == *" $OLD_JOB_NAME "* ]]; then
+        echo "Skipping job $OLD_JOB_NAME"
         continue
     fi
 
@@ -67,7 +68,7 @@ for OG_JOB in "${OG_JOBS[@]}"; do
     # copy command
     rsync -av /data/home/exy053/p1/p1git-Lattices/SIMscripts/A-HPC-* /data/scratch/$USER/$JOB_ID
     # rsync -av $ORIGIN_DIR/B* /data/scratch/$USER/$JOB_ID
-    rsync -av $ORIGIN_DIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
+    rsync -av $ORIGIN_DIR/$Ffilter*.inp /data/scratch/$USER/$JOB_ID
     cd /data/scratch/$USER/$JOB_ID
 
     /bin/echo Working in directory: `pwd`.
@@ -84,23 +85,23 @@ for OG_JOB in "${OG_JOBS[@]}"; do
     /bin/echo "Found ${#inp_files[@]} input files to process."
 
     for inp_file in "${inp_files[@]}"; do
-        job_name="${inp_file%.inp}"
+        run_job_name="${inp_file%.inp}"
 
         /bin/echo "----------------------------------------------------"
-        /bin/echo "Submitting Abaqus job: $job_name"
+        /bin/echo "Submitting Abaqus job: $run_job_name"
         /bin/echo "Input file: $inp_file"
         /bin/echo "Time: $(date)"
         /bin/echo "----------------------------------------------------"
 
-        abaqus job=$job_name input=$inp_file cpus=$CPUs mp_mode=THREADS interactive
+        abaqus job=$run_job_name input=$inp_file cpus=$CPUs mp_mode=THREADS interactive
 
         /bin/echo "----------------------------------------------------"
-        /bin/echo "Finished job: $job_name"
+        /bin/echo "Finished job: $run_job_name"
         /bin/echo "Time: $(date)"
         /bin/echo "----------------------------------------------------"
     done
 
-    rsync -av $ORIGIN_DIR/Fracture*.inp /data/scratch/$USER/$JOB_ID
+    rsync -av $ORIGIN_DIR/$Ffilter*.inp /data/scratch/$USER/$JOB_ID
 
     /bin/echo Simulation completed at: `date`.
     /bin/echo Processing outputs...
