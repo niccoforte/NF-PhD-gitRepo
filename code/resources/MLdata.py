@@ -584,6 +584,7 @@ class DATA:
         path_add='', 
         load=False, 
         LAT="FCC", 
+        nnx=None,
         dis="disNodes", 
         dN=20, 
         mechMode="UT",
@@ -596,6 +597,7 @@ class DATA:
         self.path = path
         self.path_add = path_add
         self.LAT = LAT
+        self.nnx = nnx
         self.dis = dis
         self.dN = dN
         self.mechMode = mechMode
@@ -630,10 +632,12 @@ class DATA:
         elif mechMode.lower() == "both":
             self.mechTest = "both"
         
-        self.geom = Geometry(LAT=self.LAT, l=10)
-        nnx, nny, L, H, W, B, a0, ai, totalNodes, totalBracketNodes, deltaNM, vol, l, t, LAT = self.geom
-        self.nnx = nnx
-        self.nny = nny
+        if nnx is None:
+            if LAT.lower() in ["fcc", "kagome", "hex"]:
+                self.nnx = 20
+            elif LAT.lower() == "tri":
+                self.nnx = 30
+        self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx)
 
         self.get_DataPath()
 
