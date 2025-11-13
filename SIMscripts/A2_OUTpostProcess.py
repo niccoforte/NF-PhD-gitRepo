@@ -51,6 +51,7 @@ if len(cmdIN) > 0:
             opt_dis_y = opt_disorder[:,1]
     
     stiffMatrix = False
+    Cmatrix = False
     UTval = False
     
     finalRun = 'yes'

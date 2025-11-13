@@ -92,6 +92,7 @@ if len(cmdIN) > 0:
             opt_dis_y = opt_disorder[:,1]
     
     stiffMatrix = False
+    Cmatrix_sim = False
     UTval = False
     
     finalRun = 'yes'
@@ -107,7 +108,7 @@ if len(cmdIN) > 0:
         sizeVar = 'yes'
     else:
         raise Exception("Invalid disorder input.")
-    
+
 if stiffMatrix:
     MechanicalModel = 'ductile'
     pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix\\transfer"
