@@ -73,7 +73,7 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
     props_df = pd.DataFrame(props.T, columns=['Ductility', 'Strength', 'Stiffness', 'WoF'], index=OUT_df.index)
     return dIN, dOUT, INf, xOUT, props, props_df
 
-def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
+def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, v_eff, INf_df=None):
     dIN = dIN_df.to_numpy()
     dOUT = dOUT_df.to_numpy()
     xOUT = np.linspace(0, max(perOUT_df.x.tolist()), len(dOUT[0]))
@@ -84,7 +84,7 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
     Kjs, Ks, Ps, ds = [], [], [], []
     for indx, row in OUT_df.iterrows():
         FT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
-        P, dd, K, Kj = calcFT(FT_df, geom, E_eff, n_Ks=1)
+        P, dd, K, Kj = calcFT(FT_df, geom, E_eff, v_eff, n_Ks=1)
         
         Kjs.append(Kj[0])
         Ks.append(K[0])
@@ -94,6 +94,7 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, INf_df=None):
     props = [Kjs, Ks, Ps, ds]
     props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.index)
     return dIN, dOUT, INf, xOUT, props, props_df
+
 
 def find_outliers(data):
     mean = np.mean(data)
@@ -708,11 +709,11 @@ class DATA:
             self.perOUT_df, \
             self.dIN_df, \
             self.dOUT_df = load_data(self.INcsv, 
-                                                                                                                                   self.OUTcsv, 
-                                                                                                                                   self.INcsv_f if self.freq else None,
-                                                                                                                                   no_outliers=[self.INcsv_noOutliers, 
-                                                                                                                                                self.OUTcsv_noOutliers, 
-                                                                                                                                                self.INcsv_f_noOutliers if self.freq else None])
+                                     self.OUTcsv, 
+                                     self.INcsv_f if self.freq else None)#,
+                                    #  no_outliers=[self.INcsv_noOutliers, 
+                                    #              self.OUTcsv_noOutliers, 
+                                    #              self.INcsv_f_noOutliers if self.freq else None])
         all, train, val, test = load_TrainTestData(self.CSV_all_in,
                                                    self.CSV_all_out,
                                                    self.CSV_allProps,
