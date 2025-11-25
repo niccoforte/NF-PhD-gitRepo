@@ -3,6 +3,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from resources.calculations import get_ductileData
+
 
 class Geometry:
     def __init__(self, LAT, l, nnx, rD=0.2):
@@ -11,7 +13,7 @@ class Geometry:
         self.nnx = nnx
         self.rD = rD
 
-        self.t = self.rDthickness(rD=rD)
+        self.rDthickness(rD=rD)
 
         if LAT.lower() == 'fcc' or LAT.lower() == 'fcc2':
             L = float(l * nnx)
@@ -339,26 +341,37 @@ class Geometry:
                                      2 * (self.nnx / 2.0 + 2))
 
 
-def pStrainProperties(E, v):
-    return E/(1-v**2), v/(1-v)
+def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
+    if typ.lower() == "bulk":
+        return E/(1-v**2), v/(1-v)
+    elif typ.lower() == "lattice":
+        return E/(1 - (B*(rD**(b-1))*(v_s**2))), (v + (B*(rD**(b-1))*(v_s**2)))/(1 - (B*(rD**(b-1))*(v_s**2)))
 
-def effProperties(LAT, E_s, rD):
-    if LAT.lower() == "fcc":
-        E = 1
-        v = 0.3
-    elif LAT.lower() == "tri":
-        E = E_s*(1/3)*(rD**(1))
-        v = 0.25
-    elif LAT.lower() == "kagome":
-        E = E_s*(1/3)*(rD**(1))
-        v = 0.25
-    elif LAT.lower() == "hex":
-        E = E_s*(3/2)*(rD**(3))
-        v = 0.25
-    return E, v
+def effProperties(LAT, E_s=123e9, v_s=0.3, rD=0.2, K=None):
+    if K: 
+        E, v, _ = calc_IsoEffProperties(K)
+        if LAT.lower() == "fcc":
+            E = K[0][0]
+            v = K[0][1]/K[0][0]
+    else:
+        if LAT.lower() == "fcc":
+            B, b = 1, 1
+            v = 1
+        elif LAT.lower() == "tri":
+            B, b = 1/3, 1
+            v = 1/3
+        elif LAT.lower() == "kagome":
+            B, b = 1/3, 1
+            v = 1/3
+        elif LAT.lower() == "hex":
+            B, b = 3/2, 3
+            v = 1
+        E = E_s * B * (rD ** b)
+    E_pe, v_pe = pStrainProperties(E, v, v_s=v_s, B=B, b=b, rD=rD, typ="lattice")
+    return E, v, E_pe, v_pe 
 
 
-def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti", sim=1):
+def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti", sim=1):   
     l = geom.l
     if mode.lower() == "unit":
         if LAT.lower() == "fcc":
@@ -426,7 +439,7 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti"
             nodes = np.delete(nodes, del_nodes, axis=0)
         Dnodes = nodes
       
-        if dis.lower() == "dn":
+        if "disnodes" in dis.lower():
             DnodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom.nnx) + "-20disNodes-lhs-all-" + str(sim) + ".csv"
             Dnodes_df = pd.read_csv(DnodeFile, header=None, usecols=[1, 2])
             Dnodes = Dnodes_df.to_numpy() / 1000
@@ -502,7 +515,7 @@ def plot_lattice(elems, nodes, geom):
     plt.show()
 
 
-### Stiffness matrix calculation functions
+### Stiffness Matrix Calculation Functions
 def edgeElems(nodes, elems, geom):
     t_old = geom.t
     t_new = np.array([t_old] * len(elems))
@@ -544,53 +557,79 @@ def get_Nmatrix(ns):
 def calc_c(n0, geom, i):
     return (geom.t[i]*(np.sqrt(n0[0]**2 + n0[1]**2))) / (geom.vol)
 
-def calc_Kmatrix(LAT, l, nnx, mode, dis='per', count=0, plot=False):
+def calcK_mohr(LAT, l, nnx, mode, dis='per', count=0, plot=False):
     rD = 0.2
-    E_s = 123e9
-    v_s = 0.3
+    E_s, v_s = 123e9, 0.3
 
-    geom = Geometry(LAT, l, nnx, stiffCalc=True, mode=mode)
+    geom = Geometry(LAT, l, nnx, rD=rD)
+    geom.stiffnessMatrix(stiffCalc=mode)
     
-    nodes, Dnodes = find_nodes(LAT, geom, dis, mode=mode, stiff=True)
+    nodes, _ = find_nodes(LAT, geom, dis, mode=mode, stiff=True)
     elems = connectivity(LAT, nodes, stiff=True, geom=geom, mode=mode)
     geomK = edgeElems(nodes, elems, geom)
-
-    if plot:
-        plot_lattice(elems, nodes, geomK)
-
-    n0s = get_n0s(nodes, elems)
-    ns = get_ns(n0s)
-    Nmatrix = get_Nmatrix(ns)
-
-    c0matrix = np.zeros((len(ns),len(ns)))
-    for i in range(len(ns)):
-        c0matrix[i][i] = calc_c(n0s[i], geomK, i)
-    #print(np.sum(c0matrix))
-    Kmatrix = E_s*np.matmul(np.matmul(Nmatrix.T, c0matrix), Nmatrix).round(10)
     
     Ks = []
-    Ks.append(Kmatrix)
-    
-    for jj in range(1, count+1):
-        nodes, Dnodes = find_nodes(LAT, geom, dis, mode=mode, stiff=True, sim=jj)
-        if dis.lower() == 'dn':                                   # import struts thicks from struts.csv file
-            nodes = Dnodes
+    for nSim in range(count+1):
+        if nSim == 0:
+            dis_, nSim_ = "per", 1
+        else:
+            dis_, nSim_ = "20disNodes-lhs-all", nSim
+        _, Dnodes = find_nodes(LAT, geom, dis_, mode=mode, stiff=True, sim=nSim_)
         
         if plot:
-            plot_lattice(elems, nodes, geomK)
+            plot_lattice(elems, Dnodes, geomK)
             
-        n0s = get_n0s(nodes, elems)
+        n0s = get_n0s(Dnodes, elems)
         ns = get_ns(n0s)
         Nmatrix = get_Nmatrix(ns)
 
         c0matrix = np.zeros((len(ns),len(ns)))
         for i in range(len(ns)):
             c0matrix[i][i] = calc_c(n0s[i], geomK, i)
-        #print(np.sum(c0matrix))
+        
         Kmatrix = E_s*np.matmul(np.matmul(Nmatrix.T, c0matrix), Nmatrix).round(10)
         Ks.append(Kmatrix)
 
     return np.array(Ks)
+
+
+def calcC_sims(LAT, nnx, dis="per", count=0, pDir=r"Z:\p1\sims\Ti\stiffMatrix\Cmatrix\\"):
+    Cs = []
+    for nSim in range(count+1):
+        if nSim == 0:
+            dis_, nSim_ = "per", 1
+        else:
+            dis_, nSim_ = "20disNodes-lhs-all", nSim
+        CSVout11 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixA-{dis_}-{nSim_}-0.csv"
+        CSVout12 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixA-{dis_}-{nSim_}-1.csv"
+        CSVout22 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixB-{dis_}-{nSim_}-0.csv"
+        CSVout21 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixB-{dis_}-{nSim_}-1.csv"
+        CSVout33_1 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixC-{dis_}-{nSim_}-0.csv"
+        CSVout33_2 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixC-{dis_}-{nSim_}-1.csv"
+        CSVout33_3 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixC-{dis_}-{nSim_}-3.csv"
+        CSVout33_4 = f"{pDir}transfer\OUT-Ductile-{LAT}-{int(nnx)}-CmatrixC-{dis_}-{nSim_}-4.csv"
+        UTdf11 = get_ductileData(CSVout11, crit=0.25)
+        UTdf12 = get_ductileData(CSVout12, crit=0.25)
+        UTdf22 = get_ductileData(CSVout22, crit=0.25)
+        UTdf21 = get_ductileData(CSVout21, crit=0.25)
+        UTdf33_1 = get_ductileData(CSVout33_1, crit=0.25)
+        UTdf33_2 = get_ductileData(CSVout33_2, crit=0.25)
+
+        C_11 = np.mean(UTdf11.y/UTdf11.x)
+        C_12 = np.mean(UTdf12.y/UTdf12.x)
+        C_22 = np.mean(UTdf22.y/UTdf22.x)
+        C_21 = np.mean(UTdf21.y/UTdf21.x)
+        C_33_1 = np.mean(UTdf33_1.y/(2*UTdf33_1.x))
+        C_33_2 = np.mean(UTdf33_2.y/(2*UTdf33_2.x))
+
+        C = np.array([[(C_11+C_22)/2, (C_12+C_21)/2, 0],
+                      [(C_12+C_21)/2, (C_11+C_22)/2, 0],
+                      [0, 0, ((C_33_1+C_33_2)/2)]])
+                      
+        Cs.append(C)
+
+    return np.array(Cs)
+
 
 def check_isotropy(K):
     if round(K[0][0]/K[0][1], 3) == 3.0 and round(K[0][0]/K[1][1], 3) == 1.0 and round(K[0][1]/K[2][2], 3) == 1.0:
@@ -598,102 +637,183 @@ def check_isotropy(K):
     else:
         return False
 
-def calc_effectiveProperties(K):
+def calc_IsoEffProperties(K):
     iso = check_isotropy(K)
     v = 1/(K[0][0]/K[0][1]+1)
     E = (K[0][0]*((1+v)*(1-2*v)))/(1-v)
     return E, v, iso
 
+def calc_ZenerRatio(K):
+    Z = 2*K[2][2]/(K[0][0]-K[0][1])
+    return Z
 
-def plot_IsotropyVariation(Ks, stiff=True, zener=True, properties=True):
+
+def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zener=False, paper=False):
     if stiff:
         K11, K33, K13, K23 = [], [], [], []
         for K in Ks[1:]:
-            K11.append((Ks[0][0][0]-K[0][0])/Ks[0][0][0])
-            K33.append((Ks[0][2][2]-K[2][2])/Ks[0][2][2])
+            K11.append((K[0][0] - Ks[0][0][0])/Ks[0][0][0])
+            K33.append((K[2][2] - Ks[0][2][2])/Ks[0][2][2])
             K13.append(K[0][2]/Ks[0][0][0])
             K23.append(K[1][2]/Ks[0][0][0])
 
 
         fig1, (ax1, ax2) = plt.subplots(1, 2)
-        fig1.set_figheight(6)
+        fig1.set_figheight(4)
         fig1.set_figwidth(18)
 
-        ax1.set_ylabel('$(K^{p}-K^{d})/K^{p}$ [%]', fontsize=14, fontname="Times New Roman")
-        ax1.set_xlabel('Randomly Generated Model No.', fontsize=14, fontname="Times New Roman")
-
-        ax1.set_ylim([-0.1, 0.1])
-        #ax1.set_xticks([i+1 for i in range(len(K11))])
-
-        ax1.plot([i+1 for i in range(len(K11))], K11, 'bo-', label='$K_{11}$')
-        ax1.plot([i+1 for i in range(len(K33))], K33, 'r^-', label='$K_{33}$')
-
+        ax1.set_ylabel('$(C^{dis}-C^{p})/C^{p}$ [%]', fontsize=14, fontname="Times New Roman")
+        ax1.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax1.set_ylim([-0.1, 0.1])
+        # ax1.set_xticks([i+1 for i in range(len(K11))])
+        ax1.plot([i+1 for i in range(len(K11))], K11, 'bx', label='$C_{11}$')
+        ax1.plot([i+1 for i in range(len(K33))], K33, 'r^', label='$C_{44}$')
         # ax1.grid()
         ax1.legend()
 
-        ax2.set_ylabel('$K^{d}/K^{p}_{11}$', fontsize=14, fontname="Times New Roman")
-        ax2.set_xlabel('Randomly Generated Model No.', fontsize=14, fontname="Times New Roman")
-
-        ax2.set_ylim([-0.05, 0.05])
-        #ax2.set_xticks([i+1 for i in range(len(K11))])
-
-        ax2.plot([i+1 for i in range(len(K13))], K13, 'b^-', label='$K^{d}_{13}$')
-        ax2.plot([i+1 for i in range(len(K23))], K23, 'ro-', label='$K^{d}_{23}$')
-
+        ax2.set_ylabel('$C^{dis}/C^{p}_{11}$', fontsize=14, fontname="Times New Roman")
+        ax2.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax2.set_ylim([-0.05, 0.05])
+        # ax2.set_xticks([i+1 for i in range(len(K11))])
+        ax2.plot([i+1 for i in range(len(K13))], K13, 'bx', label='$C^{dis}_{14}$')
+        ax2.plot([i+1 for i in range(len(K23))], K23, 'r^', label='$C^{dis}_{24}$')
         # ax2.grid()
         ax2.legend()
+    
+    if inplane:
+        K_22_11p = Ks[0][1][1] / Ks[0][0][0]
+        K_11_12p = Ks[0][0][0] / Ks[0][0][1]
+        K_12_33p = Ks[0][0][1] / Ks[0][2][2]
+        K_22_11s, K_11_12s, K_12_33s = [], [], []
+        for K in Ks[1:]:
+            K_22_11s.append(K[1][1] / K[0][0])
+            K_11_12s.append(K[0][0] / K[0][1])
+            K_12_33s.append(K[0][1] / K[2][2])
+    
+        fig2, (ax3, ax4, ax5) = plt.subplots(1, 3)
+        fig2.set_figheight(4)
+        fig2.set_figwidth(22)
 
-    if zener:
-        Zp  = 2*Ks[0][2][2]/(Ks[0][0][0]-Ks[0][0][1])
-        Zs = []
-        for Z in Ks[1:]:
-            Zs.append(2*Z[2][2]/(Z[0][0]-Z[0][1]))
-
-        fig2, ax3 = plt.subplots(1, 1)
-        fig2.set_figheight(5)
-        fig2.set_figwidth(9)
-
-        ax3.set_ylabel('Zener Ratio, $a$', fontsize=15, fontname="Times New Roman")
-        ax3.set_xlabel('Randomly Generated Model No.', fontsize=15, fontname="Times New Roman")
-
-        # ax3.set_ylim([Zp-0.15, Zp+0.15])
+        ax3.set_ylabel('$C_{22}/C_{11}$ [%]', fontsize=14, fontname="Times New Roman")
+        ax3.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax3.set_ylim([-0.1, 0.1])
         # ax3.set_xticks([i+1 for i in range(len(K11))])
-        ax3.axhline(y=Zp, color='k', linestyle='--', label='Perfect Lattice Zener Ratio, $a^{p}$ = %.2f' % Zp)
-        ax3.plot([i+1 for i in range(len(Zs))], Zs, 'bo-', label='Random Lattice Zener Ratio, $a^{d}$')
-
+        ax3.axhline(y=K_22_11p, color='k', linestyle='--', label='Perfect Lattice')
+        ax3.plot([i+1 for i in range(len(K_22_11s))], K_22_11s, 'bx', label='Disordered Lattices')
         # ax3.grid()
         ax3.legend()
 
-    if properties:
-        vp = 1/(Ks[0][0][0]/Ks[0][0][1] + 1)
-        Ep = (Ks[0][0][0]*((1+vp)*(1-2*vp)))/(1-vp)
-        vs, Es = [], []
-        for K in Ks[1:]:
-            vp = 1/(K[0][0]/K[0][1] + 1)
-            Ep = (K[0][0]*((1+vp)*(1-2*vp)))/(1-vp)
-            vs.append(vp)
-            Es.append(Ep)
-        
-        fig3, ax4 = plt.subplots(1, 1)
-        fig3.set_figheight(5)
-        fig3.set_figwidth(9)
-        ax5 = ax4.twinx()
-
-        ax4.set_ylabel("Poisson's Ratio, $\\nu$", fontsize=15, fontname="Times New Roman")
-        ax4.set_xlabel('Randomly Generated Model No.', fontsize=15, fontname="Times New Roman")
-        ax5.set_ylabel("Young's Modulus, $E$ [GPa]", fontsize=15, fontname="Times New Roman")
-
-        # ax4.set_ylim([vp-0.05, vp+0.05])
-        # ax5.set_ylim([min(Es)/1e9 - 5, max(Es)/1e9 + 5])
+        ax4.set_ylabel('$C_{11}/C_{12}$ [%]', fontsize=14, fontname="Times New Roman")
+        ax4.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax4.set_ylim([-0.1, 0.1])
         # ax4.set_xticks([i+1 for i in range(len(K11))])
-        ax4.axhline(y=vp, color='b', linestyle='--', label="Perfect Lattice Poisson's Ratio, $\\nu^{p}$ = %.2f" % vp)
-        ax4.plot([i+1 for i in range(len(vs))], vs, 'bo-', label="Random Lattice Poisson's Ratio, $\\nu^{d}$")
-        ax5.axhline(y=Ep/1e9, color='r', linestyle='--', label="Perfect Lattice Young's Modulus, $E^{p}$ = %.2f GPa" % (Ep/1e9))
-        ax5.plot([i+1 for i in range(len(Es))], np.array(Es)/1e9, 'r^-', label="Random Lattice Young's Modulus, $E^{d}$")
-
+        ax4.axhline(y=K_11_12p, color='k', linestyle='--', label='Perfect Lattice')
+        ax4.plot([i+1 for i in range(len(K_11_12s))], K_11_12s, 'bx', label='Disordered Lattice')
         # ax4.grid()
         ax4.legend()
+
+        ax5.set_ylabel('$C_{12}/C_{33}$ [%]', fontsize=14, fontname="Times New Roman")
+        ax5.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax5.set_ylim([-0.1, 0.1])
+        # ax5.set_xticks([i+1 for i in range(len(K11))])
+        ax5.axhline(y=K_12_33p, color='k', linestyle='--', label='Perfect Lattice')
+        ax5.plot([i+1 for i in range(len(K_12_33s))], K_12_33s, 'bx', label='Disordered Lattice')
+        # ax5.grid()
         ax5.legend()
+
+    if properties:
+        Ep, vp, _ = calc_IsoEffProperties(Ks[0])
+        vs, Es = [], []
+        for K in Ks[1:]:
+            Ed, vd, _ = calc_IsoEffProperties(K)
+            vs.append(vd)
+            Es.append(Ed)
+        
+        fig3, ax6 = plt.subplots(1, 1)
+        fig3.set_figheight(4)
+        fig3.set_figwidth(9)
+        ax7 = ax6.twinx()
+
+        ax6.set_ylabel("Poisson's Ratio, $\\nu$ (blue)", fontsize=15, fontname="Times New Roman")
+        ax6.set_xlabel('Disordered Generated Model No.', fontsize=15, fontname="Times New Roman")
+        ax7.set_ylabel("Young's Modulus, $E$ (red) [GPa]", fontsize=15, fontname="Times New Roman")
+
+        # ax6.set_ylim([vp-0.05, vp+0.05])
+        # ax7.set_ylim([min(Es)/1e9 - 5, max(Es)/1e9 + 5])
+        # ax6.set_xticks([i+1 for i in range(len(K11))])
+        ax6.axhline(y=vp, xmax=0.75, color='b', linestyle='--', label="Perfect Lattice Poisson's Ratio, $\\nu^{p}$ = %.2f" % vp)
+        ax6.plot([i+1 for i in range(len(vs))], vs, 'bx', label="Disordered Lattice Poisson's Ratio, $\\nu^{d}$")
+        ax7.axhline(y=Ep/1e9, xmin=0.25, color='r', linestyle='--', label="Perfect Lattice Young's Modulus, $E^{p}$ = %.2f GPa" % (Ep/1e9))
+        ax7.plot([i+1 for i in range(len(Es))], np.array(Es)/1e9, 'r^', label="Disordered Lattice Young's Modulus, $E^{d}$")
+
+        # ax6.grid()
+        ax6.legend()
+        ax7.legend()
+
+    if zener:
+        Zp  = calc_ZenerRatio(Ks[0])
+        Zs = []
+        for K in Ks[1:]:
+            Zs.append(calc_ZenerRatio(K))
+
+        fig4, ax8 = plt.subplots(1, 1)
+        fig4.set_figheight(4)
+        fig4.set_figwidth(9)
+
+        ax8.set_ylabel('Zener Ratio, $a$', fontsize=15, fontname="Times New Roman")
+        ax8.set_xlabel('Disordered Model No.', fontsize=15, fontname="Times New Roman")
+
+        # ax8.set_ylim([Zp-0.15, Zp+0.15])
+        # ax8.set_xticks([i+1 for i in range(len(K11))])
+        ax8.axhline(y=Zp, color='k', linestyle='--', label='Perfect Lattice Zener Ratio, $a^{p}$ = %.2f' % Zp)
+        ax8.plot([i+1 for i in range(len(Zs))], Zs, 'bx', label='Disordered Lattice Zener Ratio, $a^{d}$')
+
+        # ax8.grid()
+        ax8.legend()
+
+    if paper:
+        K_22_11p = Ks[0][1][1] / Ks[0][0][0]
+        K_13_11p = Ks[0][0][2] / Ks[0][0][0]
+        K_23_11p = Ks[0][1][2] / Ks[0][0][0]
+        Zp = calc_ZenerRatio(Ks[0])
+        K_22_11s, K_13_11s, K_23_11s, Zs = [], [], [], []
+        for K in Ks[1:]:
+            K_22_11s.append(K[1][1] / K[0][0])
+            K_13_11s.append(K[0][2] / K[0][0])
+            K_23_11s.append(K[1][2] / K[0][0])
+            Zs.append(calc_ZenerRatio(K))
+    
+        fig5, (ax9, ax10, ax11) = plt.subplots(1, 3)
+        fig5.set_figheight(4)
+        fig5.set_figwidth(22)
+
+        ax9.set_ylabel('$C_{22}/C_{11}$', fontsize=14, fontname="Times New Roman")
+        ax9.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax9.set_ylim([-0.1, 0.1])
+        # ax9.set_xticks([i+1 for i in range(len(K11))])
+        ax9.axhline(y=K_22_11p, color='k', linestyle='--', label='Perfect Lattice')
+        ax9.plot([i+1 for i in range(len(K_22_11s))], K_22_11s, 'bx', label='Disordered Lattices')
+        # ax9.grid()
+        ax9.legend()
+
+        ax10.set_ylabel('$C^{*}/C_{11}$', fontsize=14, fontname="Times New Roman")
+        ax10.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        # ax10.set_ylim([-0.05, 0.05])
+        # ax10.set_xticks([i+1 for i in range(len(K11))])
+        ax10.axhline(y=K_13_11p, color='k', linestyle='--', label='Perfect Lattice')
+        ax10.plot([i+1 for i in range(len(K_13_11s))], K_13_11s, 'bx', label='$C^{*}=C_{14}$')
+        ax10.plot([i+1 for i in range(len(K_23_11s))], K_23_11s, 'r^', label='$C^{*}=C_{24}$')
+        # ax10.grid()
+        ax10.legend()
+
+        ax11.set_ylabel('Zener Ratio, $a$', fontsize=15, fontname="Times New Roman")
+        ax11.set_xlabel('Disordered Model No.', fontsize=15, fontname="Times New Roman")
+        # ax11.set_ylim([Zp-0.15, Zp+0.15])
+        # ax11.set_xticks([i+1 for i in range(len(K11))])
+        ax11.axhline(y=Zp, color='k', linestyle='--', label='Perfect Lattice, $a^{p}$ = %.2f' % Zp)
+        ax11.plot([i+1 for i in range(len(Zs))], Zs, 'bx', label='Disordered Lattice, $a^{dis}$')
+        # ax11.grid()
+        ax11.legend()
     
     plt.show()
 
