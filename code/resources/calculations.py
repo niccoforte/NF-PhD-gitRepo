@@ -134,7 +134,7 @@ def calc_Apl(d, F_sm, dd, P, frac, n):
         pass
     return A_pl
 
-def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):  
+def calcFT(df, geom, E_eff, v_eff, n_Ks=1, validation=False, E=None):  
     frac = int(df.x.tolist()[0])
     df = df[1:].reset_index(drop=True)
     d = df.x.tolist()
@@ -147,7 +147,7 @@ def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):
     if validation == True:
         E_eff = E          # CHECK VAL
     
-    P = max(F_sm[:frac])
+    P = F_sm[frac]
     frac = F_sm.index(P)
     dd = d[frac]
     
@@ -157,7 +157,7 @@ def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):
         f_a_W = calc_FaW(ai[n], W)
         K = (P/(B*(W**(1/2)))) * f_a_W
         
-        J_el = ((K**2)*(1-(dd**2))) / E_eff
+        J_el = ((K**2)*(1-(v_eff**2))) / E_eff
         A_pl = calc_Apl(d, F_sm, dd, P, frac, n)
         if n == 0:
             J_pl = ((2+(0.522*(W-ai[n])/W))*A_pl) / (B*(W-ai[n]))
@@ -171,6 +171,7 @@ def calcFT(df, geom, E_eff, n_Ks=1, validation=False, E=None):
         Kjs.append(Kj)
     
     return P, dd, Ks, Kjs
+
 
 def FEA_run(x_new, iter, path, argv):
     new_sample_file = f"{path}/Opt/BO_sample{iter}.txt"
