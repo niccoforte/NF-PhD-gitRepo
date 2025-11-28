@@ -134,7 +134,7 @@ def calc_Apl(d, F_sm, dd, P, frac, n):
         pass
     return A_pl
 
-def calcFT(df, geom, E_eff, v_eff, n_Ks=1, validation=False, E=None):  
+def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=None):  
     frac = int(df.x.tolist()[0])
     df = df[1:].reset_index(drop=True)
     d = df.x.tolist()
@@ -145,7 +145,7 @@ def calcFT(df, geom, E_eff, v_eff, n_Ks=1, validation=False, E=None):
     ai = geom.ai
     
     if validation == True:
-        E_eff = E          # CHECK VAL
+        E_eff_pe = E          # CHECK VAL
     
     P = F_sm[frac]
     frac = F_sm.index(P)
@@ -157,7 +157,7 @@ def calcFT(df, geom, E_eff, v_eff, n_Ks=1, validation=False, E=None):
         f_a_W = calc_FaW(ai[n], W)
         K = (P/(B*(W**(1/2)))) * f_a_W
         
-        J_el = ((K**2)*(1-(v_eff**2))) / E_eff
+        J_el = (K**2) / E_eff_pe
         A_pl = calc_Apl(d, F_sm, dd, P, frac, n)
         if n == 0:
             J_pl = ((2+(0.522*(W-ai[n])/W))*A_pl) / (B*(W-ai[n]))
@@ -165,7 +165,7 @@ def calcFT(df, geom, E_eff, v_eff, n_Ks=1, validation=False, E=None):
             pass
 
         J = J_el + J_pl
-        Kj = (E_eff*J)**0.5
+        Kj = (E_eff_pe*J)**0.5
                 
         Ks.append(K)
         Kjs.append(Kj)
