@@ -639,8 +639,8 @@ def check_isotropy(K):
 
 def calc_IsoEffProperties(K):
     iso = check_isotropy(K)
-    v = 1/(K[0][0]/K[0][1]+1)
-    E = (K[0][0]*((1+v)*(1-2*v)))/(1-v)
+    v = K[0][1]/K[0][0]  #1/(K[0][0]/K[0][1]+1)
+    E = (K[0][0]**2 - K[0][1]**2)/K[0][0]  #(K[0][0]*((1+v)*(1-2*v)))/(1-v)
     return E, v, iso
 
 def calc_ZenerRatio(K):
