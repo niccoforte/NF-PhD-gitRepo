@@ -73,7 +73,7 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
     props_df = pd.DataFrame(props.T, columns=['Ductility', 'Strength', 'Stiffness', 'WoF'], index=OUT_df.index)
     return dIN, dOUT, INf, xOUT, props, props_df
 
-def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, v_eff, INf_df=None):
+def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None):
     dIN = dIN_df.to_numpy()
     dOUT = dOUT_df.to_numpy()
     xOUT = np.linspace(0, max(perOUT_df.x.tolist()), len(dOUT[0]))
@@ -84,7 +84,7 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff, v_eff, INf_df=N
     Kjs, Ks, Ps, ds = [], [], [], []
     for indx, row in OUT_df.iterrows():
         FT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
-        P, dd, K, Kj = calcFT(FT_df, geom, E_eff, v_eff, n_Ks=1)
+        P, dd, K, Kj = calcFT(FT_df, geom, E_eff_pe, n_Ks=1)
         
         Kjs.append(Kj[0])
         Ks.append(K[0])
