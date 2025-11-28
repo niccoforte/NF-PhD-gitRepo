@@ -95,6 +95,13 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None)
     props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.index)
     return dIN, dOUT, INf, xOUT, props, props_df
 
+def prep_FCLdata(UT_props_df, FT_props_df, E_eff_pe):
+    common_idxs = UT_props_df.index.intersection(FT_props_df.index)
+    common_props_df = pd.concat([UT_props_df.loc[common_idxs], FT_props_df.loc[common_idxs]], axis=1)
+    common_props_df["FCL"] = (common_props_df["K_JIC"]**2 / E_eff_pe) / (common_props_df["WoF"] * 1e6)
+    common_props_df = common_props_df.replace([np.inf, -np.inf], np.nan).dropna()
+    return common_props_df
+
 
 def find_outliers(data):
     mean = np.mean(data)
