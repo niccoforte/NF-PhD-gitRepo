@@ -1456,9 +1456,11 @@ for idNum in range(initial,numOfJobs):
             ################################ Radius Calculation #########################################
             #############################################################################################
             
-            outofPlaneThick = B
+            outofPlaneThick = 0.01
             if UTval:
                 outofPlaneThick = 2.0
+            if pStrainUT:
+                outofPlaneThick = B
             
             length = zeros(shape=(len(element),1))
             for ik in range(0,len(element)-1):
@@ -2449,9 +2451,11 @@ for idNum in range(initial,numOfJobs):
         ############################################################################################
 
         if (userMaterial.lower() == 'al'):
+            E, nu = 70000.0, 0.3
+            E, nu  = pStrainProperties(E, nu)
             mdb.models[ModelName].Material(name=userMaterial)
             mdb.models[ModelName].materials[userMaterial].Density(table=((2.7e-09, ), ))
-            mdb.models[ModelName].materials[userMaterial].Elastic(table=((70000.0, 0.3), ))
+            mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
             mdb.models[ModelName].materials[userMaterial].Plastic(table=((
                 134.0, 0.0), (134.3, 0.001996429), (134.5, 0.002835692), (135.0, 
                 0.004015369), (135.5, 0.005678497), (136.0, 0.008020233), (136.5, 
@@ -2484,9 +2488,11 @@ for idNum in range(initial,numOfJobs):
                 (1.0,    FineElemSizeFT*0.03547)))
 
         elif (userMaterial.lower() == 'sic'):
+            E, nu = 410000, 0.14
+            E, nu  = pStrainProperties(E, nu)
             mdb.models[ModelName].Material(name=userMaterial)
             mdb.models[ModelName].materials[userMaterial].Density(table=((3.21e-09, ), ))
-            mdb.models[ModelName].materials[userMaterial].Elastic(table=((418196.654, 0.163), ))
+            mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
             mdb.models[ModelName].materials[userMaterial].Plastic(table=
                 ((550, 0.0),
                 (550.1,	0.00001)))
@@ -2502,9 +2508,11 @@ for idNum in range(initial,numOfJobs):
                 (1.0, FineElemSizeUT*0.00005)))
 
         elif (userMaterial.lower() == 'ti'):
+            E, nu = 123000, 0.3
+            E, nu  = pStrainProperties(E, nu)
             mdb.models[ModelName].Material(name=userMaterial)
             mdb.models[ModelName].materials[userMaterial].Density(table=((4.43e-09, ), ))
-            mdb.models[ModelName].materials[userMaterial].Elastic(table=((135164.8352, 0.428571429), ))
+            mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
             mdb.models[ModelName].materials[userMaterial].Plastic(table=
                 ((932,	        0),
                 (947.411802,    0.003453491),
