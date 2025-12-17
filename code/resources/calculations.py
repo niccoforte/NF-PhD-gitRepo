@@ -3,6 +3,8 @@ import pandas as pd
 import subprocess
 import matplotlib.pyplot as plt
 
+from resources.lattices import calc_anisoParams, calcK_mohr
+
 
 def smooth(y_old):
     y_new = []
@@ -134,7 +136,49 @@ def calc_Apl(d, F_sm, dd, P, frac, n):
         pass
     return A_pl
 
-def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=None):  
+def calc_p_poly(lam_bar, rho_bar, a_W):
+    v_lr = np.array([
+        1.0,
+        lam_bar,
+        rho_bar,
+        lam_bar**2,
+        lam_bar * rho_bar,
+        rho_bar**2,
+        lam_bar**3,
+        lam_bar**2 * rho_bar,
+        lam_bar * rho_bar**2,
+    ])
+
+    C = np.array([
+        [ 0.30817 ,  2.1609  , -5.72   ,  6.2711 , -2.4512  ],
+        [ 0.61118 , -4.5341  , 12.698  , -14.428 ,  5.5896  ],
+        [ 0.098042,  2.3871  , -8.6206 , 10.742  , -4.3791  ],
+        [ 0.1443  ,  0.098426,  0.47793, -2.5788 ,  1.9266  ],
+        [-1.2451  ,  8.9848  , -22.996 , 26.09   , -11.037  ],
+        [ 0.85309 , -3.104   ,  7.3777 , -9.0334 ,  4.0197  ],
+        [-0.14716 ,  1.752   , -6.0346 ,  7.7217 , -3.3098  ],
+        [-0.16912 ,  0.82943 , -2.7216 ,  4.5667 , -2.6053  ],
+        [ 0.12556 , -0.35037 , -0.53346,  0.90753, -0.042327],
+    ])
+
+    v_a = np.array([1.0, a_W, a_W**2, a_W**3, a_W**4])
+
+    p = v_lr @ C @ v_a
+    return float(p)
+
+def calc_FaW_aniso(geom, a, W, K=None):
+    if K is None:
+        K = calcK_mohr(geom.LAT, geom.l, geom.nnx, mode="unit")[0]
+    lambda_aniso, rho_aniso = calc_anisoParams(K=K)
+    a_bar = np.log10(a/W)
+    lambda_bar = np.log10(lambda_aniso)
+    rho_bar = np.log10(rho_aniso+1)
+    D = -0.066112 + 0.75681*a_bar - 0.015*rho_bar + 0.58136*(a_bar**2) - 0.08451*a_bar*rho_bar
+
+    f_a_W = calc_p_poly(lambda_bar, rho_bar, a/W)*(lambda_aniso**D)*((1+0.006689*rho_aniso)**0.47151)*((2*(2+(a/W)))/((1-(a/W))**(3/2)))*(((2*(lambda_aniso**(3/2)))/(1+rho_aniso))**(1/4))
+    return f_a_W, lambda_aniso, rho_aniso
+
+def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=None):  
     frac = int(df.x.tolist()[0])
     df = df[1:].reset_index(drop=True)
     d = df.x.tolist()
@@ -154,9 +198,14 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=None):
     Ks = []
     Kjs = []
     for n in range(n_Ks):
-        f_a_W = calc_FaW(ai[n], W)
+        if iso == True:
+            f_a_W = calc_FaW(ai[n], W)
+        elif iso == False:
+            f_a_W, lambda_aniso, rho_aniso = calc_FaW_aniso(geom, ai[n], W)
         K = (P/(B*(W**(1/2)))) * f_a_W
-        
+
+        if iso == False:
+            E_eff_pe = calcK_mohr(geom.LAT, geom.l, geom.nnx, mode="unit")[0,0,0] * np.sqrt((2*(lambda_aniso**(3/2)))/(1+rho_aniso))
         J_el = (K**2) / E_eff_pe
         A_pl = calc_Apl(d, F_sm, dd, P, frac, n)
         if n == 0:
