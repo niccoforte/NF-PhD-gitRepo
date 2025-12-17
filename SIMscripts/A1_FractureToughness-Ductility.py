@@ -17,12 +17,12 @@ starttime = time.time()
 ####################################### INPUT ##############################################
 ############################################################################################
 
-unitCellSize = 1.459                             # Strut length
-thickness = 0.127                               # Strut thickness
-outofPlaneThick = 20.0                          # Out of plane thickness
-latticeType = '45square'                             # 'FCC', 'tri', 'hex', 'kagome'
-MechanicalModel = 'fracture'                        # 'fracture', 'ductile', 'both'
-userMaterial = 'SiC'                             # 'al', 'sic', 'ti'
+unitCellSize = 10.0                             # Strut length
+thickness = None                                # Strut thickness
+outofPlaneThick = None                          # Out of plane thickness
+latticeType = 'FCC'                             # 'FCC', 'tri', 'hex', 'kagome'
+MechanicalModel = 'both'                        # 'fracture', 'ductile', 'both'
+userMaterial = 'Ti'                             # 'al', 'sic', 'ti'
 relDensity = 0.2                                # relative density
 crossSection = 'rect'
 if latticeType.lower() == "tri": nnx = 30
@@ -2514,7 +2514,7 @@ for idNum in range(initial,numOfJobs):
         ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
         if imper == 'per':
             ModelName = f"Fracture-{latticeType}-{int(nnx)}-per-{idNum}"
-        ModelName = f"Ductile-{latticeType}-{int(nnx)}-E-per-{idNum}"
+        # ModelName = f"Ductile-{latticeType}-{int(nnx)}-E-per-{idNum}"
         Job = ModelName
         
         #############################################################################################
@@ -2952,8 +2952,8 @@ for idNum in range(initial,numOfJobs):
         all_elements = mdb.models[ModelName].rootAssembly.instances['Part-1-1'].elements
         cracktip_elements = []
         for e in all_elements:
-            connected_node1 = e.connectivity[0]
-            connected_node2 = e.connectivity[1]
+            connected_node1 = e.connectivity[0]+1
+            connected_node2 = e.connectivity[1]+1
             if connected_node1 in cracktip_node_labels or connected_node2 in cracktip_node_labels:
                 cracktip_elements.append(e)
         
