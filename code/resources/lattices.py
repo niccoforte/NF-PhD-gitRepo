@@ -13,9 +13,9 @@ class Geometry:
         self.nnx = nnx
         self.rD = rD
 
-        self.rDthickness(rD=rD)
+        self.t = self.rDthickness(rD=rD)
 
-        if LAT.lower() == 'fcc' or LAT.lower() == 'fcc2':
+        if LAT.lower() == 'fcc':
             L = float(l * nnx)
             Lmin = L
             H0 = 0.96 * L
@@ -41,6 +41,60 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
             deltaNM = 0.5 * np.sqrt(l * l + l * l)
+
+        elif LAT.lower() == 'square':
+            L = float(l * nnx)
+            Lmin = L
+            H0 = 0.96 * L
+            Hs = [l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / l
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.96:
+                    H = H - l
+                    nny = H / l
+                elif H / L < 0.96:
+                    H = H + l
+                    nny = H / l
+
+            W = L / 1.25
+            a = [L / nnx * i for i in range(nnx + 1)]
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + ((l / 2) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round((nnx + 1) * (nny + 1)))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
+            deltaNM = l
+
+        elif LAT.lower() == '45square':
+            L = float(2**(1/2) * l * nnx)
+            Lmin = L
+            H0 = 0.96 * L
+            Hs = [2**(1/2) * l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / ((2**(1/2))*l)
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.96:
+                    H = H - ((2**(1/2))*l)
+                    nny = H / ((2**(1/2))*l)
+                elif H / L < 0.96:
+                    H = H + ((2**2)*l)
+                    nny = H / ((2**(1/2))*l)
+
+            W = L / 1.25
+            a = [L / nnx * i for i in range(nnx + 1)]
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + (((2**(1/2))*l) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
+            deltaNM = l
 
         elif LAT.lower() == 'tri':
             if nnx % 2.0 == 1.0:
@@ -160,8 +214,10 @@ class Geometry:
         self.B = 0.5 * self.W
 
     def rDthickness(self, t=None, rD=None):
-        if self.LAT.lower() == "fcc" or self.LAT.lower() == 'fcc2':
+        if self.LAT.lower() == "fcc":
             A = 2*(1+np.sqrt(2))
+        elif "square" in self.LAT.lower():
+            A = 2
         elif self.LAT.lower() == "tri":
             A = 2*np.sqrt(3)
         elif self.LAT.lower() == "kagome":
@@ -176,7 +232,7 @@ class Geometry:
 
     def stiffnessMatrix(self, stiffCalc=False):
         nnx = 10
-        if self.LAT.lower() == "fcc" or self.LAT.lower() == "fcc2":
+        if self.LAT.lower() == "fcc":
             nny = nnx
             L = float(self.l * nnx)
             H = float(self.l * nny)
@@ -233,55 +289,20 @@ class Geometry:
         self.vol = vol
 
     def FTcalc(self):
-        if self.LAT.lower() == "fcc" or self.LAT.lower() == "fcc2":
-            self.a0 = self.a0 - 0.25 * self.W
+        self.a0 = self.a0 - 0.25 * self.W
+        if self.LAT.lower() == "fcc":
             self.ai = [self.a0 + ((self.l / 2) * (i)) for i in range(self.nnx)]
+        elif "square" in self.LAT.lower():
+            self.ai = [self.a0 + ((self.l * 2**(1/2)) * (i)) for i in range(self.nnx)]
         elif self.LAT.lower() == "tri":
-            self.a0 = self.a0 - 0.25 * self.W
             self.ai = [self.a0 + ((0.5 * (3.0 ** 0.5) * self.l) * (i)) for i in range(self.nnx)]
         elif self.LAT.lower() == "kagome":
-            self.a0 = self.a0 - 0.25 * self.W
             self.ai = [self.a0 + ((2 * self.l) * (i)) for i in range(self.nnx)]
         elif self.LAT.lower() == "hex":
-            self.a0 = self.a0 - 0.25 * self.W
             self.ai = [self.a0 + (((3.0 ** 0.5) * (self.l / 2)) * (i)) for i in range(self.nnx)]
 
-    # def brackets(self): # add vol if don't delete
-    #     nnx = self.nnx + 4
-    #     nny = self.nny + 6
-    #     H = self.l * nny
-    #     if self.LAT.lower() == "fcc" or self.LAT.lower() == "fcc2":
-    #         L = float(self.l * nnx)
-    #         totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
-    #         totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
-    #     elif self.LAT.lower() == "tri":
-    #         L = 0.5 * (3.0 ** 0.5) * self.l * nnx         
-    #         totalNodes = int(round(((nnx / 1.99999) + 1) * (nny + 1)) + round((nnx / 1.99999) * nny))
-    #         totalBracketNodes = int(round(((nnx / 1.99999) + 3) * 3 * 2) +
-    #                                 round(((nnx / 1.99999) + 2) * 3 * 2) +
-    #                                 2 * (nnx / 2.0 + 2))
-    #     elif self.LAT.lower() == "kagome":
-    #         nnx = self.nnx + 2
-    #         L = self.l * (2.0 * nnx - 1)
-    #         H = (3.0 ** 0.5) * self.l * nny
-    #         totalNodes = int(round((2*nnx*(nny+1)) + (nnx-1)*math.ceil(nny/2.0) + (nnx)*math.floor(nny/2)))
-    #         totalBracketNodes = int(round(((2 * nnx + 4) * 3 + (nnx + 2) * 2 + (nnx + 1)) * 2))
-    #     elif self.LAT.lower() == "hex":
-    #         nny = self.nny + 8
-    #         L = (3.0 ** 0.5) * self.l * nnx
-    #         H = (0.5 * self.l) + (1.5 * self.l * nny)
-    #         totalNodes = int(round(2*(nnx)*math.ceil(nny/2.0) + 2*(nnx+1)*math.ceil(nny/2.0)))
-    #         totalBracketNodes = int(round(((nnx + 5) * 4 + (nnx + 4) * 4) * 2 + 4))
-    #     self.nnx = nnx
-    #     self.nny = int(round(nny))
-    #     self.L = L
-    #     self.H = H
-    #     self.totalNodes = totalNodes
-    #     self.totalBracketNodes = totalBracketNodes
-    #     self.B = 0.5 * self.W
-
     def nodeCount(self, mode=False, stiffMatrix=False):
-        if self.LAT.lower() == "fcc" or self.LAT.lower() == "fcc2":
+        if self.LAT.lower() == "fcc" or self.LAT.lower() == "45square":
             totalNodes = int(round((self.nnx + 1) * (self.nny + 1) + self.nnx * self.nny))
             totalBracketNodes = int(round((self.nnx + 5) * 3 * 2 + (self.nnx + 4) * 3 * 2))
             if mode and mode.lower() == "fracture":
@@ -291,6 +312,16 @@ class Geometry:
             if stiffMatrix:
                 nnx, nny = 10, 10
                 self.totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
+        elif self.LAT.lower() == "square":
+            totalNodes = int(round((nnx + 1) * (nny + 1)))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
+            if mode and mode.lower() == "fracture":
+                self.totalNodes = totalNodes
+            elif mode and mode.lower() == "ductile":
+                self.totalNodes = totalNodes + totalBracketNodes - 4
+            if stiffMatrix:
+                nnx, nny = 10, 10
+                self.totalNodes = int((nnx + 1) * (nny + 1))
         elif self.LAT.lower() == "tri":
             totalNodes = int(round(((self.nnx / 1.99999) + 1) * (self.nny + 1)) +
                              round((self.nnx / 1.99999) * self.nny))
@@ -340,6 +371,40 @@ class Geometry:
                                      round(((self.nnx / 1.99999) + 2) * 3 * 2) +
                                      2 * (self.nnx / 2.0 + 2))
 
+    def brackets(self): # DELETE? add vol if don't delete
+        nnx = self.nnx + 4
+        nny = self.nny + 6
+        H = self.l * nny
+        if self.LAT.lower() == "fcc" or self.LAT.lower() == "fcc2":
+            L = float(self.l * nnx)
+            totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
+        elif self.LAT.lower() == "tri":
+            L = 0.5 * (3.0 ** 0.5) * self.l * nnx         
+            totalNodes = int(round(((nnx / 1.99999) + 1) * (nny + 1)) + round((nnx / 1.99999) * nny))
+            totalBracketNodes = int(round(((nnx / 1.99999) + 3) * 3 * 2) +
+                                    round(((nnx / 1.99999) + 2) * 3 * 2) +
+                                    2 * (nnx / 2.0 + 2))
+        elif self.LAT.lower() == "kagome":
+            nnx = self.nnx + 2
+            L = self.l * (2.0 * nnx - 1)
+            H = (3.0 ** 0.5) * self.l * nny
+            totalNodes = int(round((2*nnx*(nny+1)) + (nnx-1)*math.ceil(nny/2.0) + (nnx)*math.floor(nny/2)))
+            totalBracketNodes = int(round(((2 * nnx + 4) * 3 + (nnx + 2) * 2 + (nnx + 1)) * 2))
+        elif self.LAT.lower() == "hex":
+            nny = self.nny + 8
+            L = (3.0 ** 0.5) * self.l * nnx
+            H = (0.5 * self.l) + (1.5 * self.l * nny)
+            totalNodes = int(round(2*(nnx)*math.ceil(nny/2.0) + 2*(nnx+1)*math.ceil(nny/2.0)))
+            totalBracketNodes = int(round(((nnx + 5) * 4 + (nnx + 4) * 4) * 2 + 4))
+        self.nnx = nnx
+        self.nny = int(round(nny))
+        self.L = L
+        self.H = H
+        self.totalNodes = totalNodes
+        self.totalBracketNodes = totalBracketNodes
+        self.B = 0.5 * self.W
+
 
 def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
     if typ.lower() == "bulk":
@@ -347,15 +412,21 @@ def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
     elif typ.lower() == "lattice":
         return E/(1 - (B*(rD**(b-1))*(v_s**2))), (v + (B*(rD**(b-1))*(v_s**2)))/(1 - (B*(rD**(b-1))*(v_s**2)))
 
-def effProperties(LAT, E_s=123e9, v_s=0.3, rD=0.2, K=None):
+def effProperties(LAT, E_s=123e9, v_s=0.3, rD=0.2, K=None, ortho=False):
     if K: 
         E, v, _ = calc_IsoEffProperties(K)
-        if LAT.lower() == "fcc":
+        if ortho:
             E = K[0][0]
             v = K[0][1]/K[0][0]
     else:
         if LAT.lower() == "fcc":
-            B, b = 1, 1
+            B, b = 0, 0
+            v = 0
+        elif LAT.lower() == "square":
+            B, b = 1/2, 1
+            v = 0
+        elif LAT.lower() == "45square":
+            B, b = 1/4, 3
             v = 1
         elif LAT.lower() == "tri":
             B, b = 1/3, 1
@@ -631,6 +702,10 @@ def calcC_sims(LAT, nnx, dis="per", count=0, pDir=r"Z:\p1\sims\Ti\stiffMatrix\Cm
     return np.array(Cs)
 
 
+def calc_Compliance(K):
+    return np.linalg.inv(K)
+
+
 def check_isotropy(K):
     if round(K[0][0]/K[0][1], 3) == 3.0 and round(K[0][0]/K[1][1], 3) == 1.0 and round(K[0][1]/K[2][2], 3) == 1.0:
         return True
@@ -646,6 +721,13 @@ def calc_IsoEffProperties(K):
 def calc_ZenerRatio(K):
     Z = 2*K[2][2]/(K[0][0]-K[0][1])
     return Z
+
+def calc_anisoParams(K=None, S=None):
+    if K is not None:
+        S = calc_Compliance(K)
+    lambda_aniso = S[0,0]/S[1,1]
+    rho_aniso = (2*S[0,1] + S[2,2])/(2*np.sqrt(S[0,0]*S[1,1]))
+    return lambda_aniso, rho_aniso
 
 
 def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zener=False, paper=False):
