@@ -3,9 +3,6 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-if __name__ == "__main__":
-    from resources.calculations import get_ductileData
-
 
 class Geometry:
     def __init__(self, LAT, l, nnx, rD=0.2,  t=None):
@@ -672,6 +669,7 @@ def calcK_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
 
 
 def calcC_sims(LAT, nnx, dis="per", count=0, pDir=r"Z:\p1\sims\Ti\stiffMatrix\Cmatrix\\"):
+    from resources.calculations import get_ductileData
     Cs = []
     for nSim in range(count+1):
         if nSim == 0:
