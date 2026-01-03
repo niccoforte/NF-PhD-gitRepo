@@ -167,7 +167,7 @@ def calc_p_poly(lam_bar, rho_bar, a_W):
 
 def calc_FaW_aniso(a, W, C):
     from resources.lattices import calc_anisoParams
-    lambda_aniso, rho_aniso = calc_anisoParams(K=C)
+    lambda_aniso, rho_aniso = calc_anisoParams(C)
     if lambda_aniso < 0.03162 or lambda_aniso > 10.0 or rho_aniso < 0.1 or rho_aniso > 10.0:
         print(f"WARNING: lambda: {lambda_aniso} or rho: {rho_aniso} out of bounds for f(a/W) calculation.")
 
@@ -202,9 +202,9 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=123e9, C=No
         if iso == True:
             f_a_W = calc_FaW(ai[n], W)
         elif iso == False:
-            from resources.lattices import calcK_mohr
+            from resources.lattices import calcC_mohr
             if C is None:
-                C = calcK_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]
+                C = calcC_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]
             f_a_W, lambda_aniso, rho_aniso = calc_FaW_aniso(ai[n], W, C)
         K = (P/(B*(W**(1/2)))) * f_a_W
 

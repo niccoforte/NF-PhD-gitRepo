@@ -2,6 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import copy
 
 
 class Geometry:
@@ -635,15 +636,15 @@ def get_Nmatrix(ns):
 def calc_c(n0, geom, i):
     return (geom.t[i]*(np.sqrt(n0[0]**2 + n0[1]**2))) / (geom.vol)
 
-def calcK_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
+def calcC_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
     LAT  = geom.LAT
     geom.stiffnessMatrix(stiffCalc=mode)
     
     nodes, _ = find_nodes(LAT, geom, dis, mode=mode, stiff=True)
     elems = connectivity(LAT, nodes, stiff=True, geom=geom, mode=mode)
-    geomK = edgeElems(nodes, elems, geom)
+    geomC = edgeElems(nodes, elems, copy.deepcopy(geom))
     
-    Ks = []
+    Cs = []
     for nSim in range(count+1):
         if nSim == 0:
             dis_, nSim_ = "per", 1
@@ -652,7 +653,7 @@ def calcK_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
         _, Dnodes = find_nodes(LAT, geom, dis_, mode=mode, stiff=True, sim=nSim_)
         
         if plot:
-            plot_lattice(elems, Dnodes, geomK)
+            plot_lattice(elems, Dnodes, geomC)
             
         n0s = get_n0s(Dnodes, elems)
         ns = get_ns(n0s)
@@ -660,12 +661,12 @@ def calcK_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
 
         c0matrix = np.zeros((len(ns),len(ns)))
         for i in range(len(ns)):
-            c0matrix[i][i] = calc_c(n0s[i], geomK, i)
+            c0matrix[i][i] = calc_c(n0s[i], geomC, i)
         
-        Kmatrix = E_s*np.matmul(np.matmul(Nmatrix.T, c0matrix), Nmatrix).round(10)
-        Ks.append(Kmatrix)
+        Cmatrix = E_s*np.matmul(np.matmul(Nmatrix.T, c0matrix), Nmatrix).round(10)
+        Cs.append(Cmatrix)
 
-    return np.array(Ks)
+    return np.array(Cs)
 
 
 def calcC_sims(LAT, nnx, dis="per", count=0, pDir=r"Z:\p1\sims\Ti\stiffMatrix\Cmatrix\\"):
@@ -707,29 +708,29 @@ def calcC_sims(LAT, nnx, dis="per", count=0, pDir=r"Z:\p1\sims\Ti\stiffMatrix\Cm
     return np.array(Cs)
 
 
-def calc_Compliance(K):
-    return np.linalg.inv(K)
+def calc_Compliance(C):
+    return np.linalg.inv(C)
 
 
-def check_isotropy(K):
-    if round(K[0][0]/K[0][1], 3) == 3.0 and round(K[0][0]/K[1][1], 3) == 1.0 and round(K[0][1]/K[2][2], 3) == 1.0:
+def check_isotropy(C):
+    if round(C[0][0]/C[0][1], 3) == 3.0 and round(C[0][0]/C[1][1], 3) == 1.0 and round(C[0][1]/C[2][2], 3) == 1.0:
         return True
     else:
         return False
 
-def calc_IsoEffProperties(K):
-    iso = check_isotropy(K)
-    v = K[0][1]/K[0][0]  #1/(K[0][0]/K[0][1]+1)
-    E = (K[0][0]**2 - K[0][1]**2)/K[0][0]  #(K[0][0]*((1+v)*(1-2*v)))/(1-v)
+def calc_IsoEffProperties(C):
+    iso = check_isotropy(C)
+    v = C[0][1]/C[0][0]  #1/(K[0][0]/K[0][1]+1)
+    E = (C[0][0]**2 - C[0][1]**2)/C[0][0]  #(K[0][0]*((1+v)*(1-2*v)))/(1-v)
     return E, v, iso
 
-def calc_ZenerRatio(K):
-    Z = 2*K[2][2]/(K[0][0]-K[0][1])
+def calc_ZenerRatio(C):
+    Z = 2*C[2][2]/(C[0][0]-C[0][1])
     return Z
 
-def calc_anisoParams(K=None, S=None):
-    if K is not None:
-        S = calc_Compliance(K)
+def calc_anisoParams(C=None, S=None):
+    if C is not None:
+        S = calc_Compliance(C)
     lambda_aniso = S[0,0]/S[1,1]
     rho_aniso = (2*S[0,1] + S[2,2])/(2*np.sqrt(S[0,0]*S[1,1]))
     return lambda_aniso, rho_aniso
