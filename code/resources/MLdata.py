@@ -84,7 +84,7 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None)
     Kjs, Ks, Ps, ds = [], [], [], []
     for indx, row in OUT_df.iterrows():
         FT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
-        P, dd, K, Kj = calcFT(FT_df, geom, E_eff_pe, n_Ks=1)
+        P, dd, K, Kj = calcFT(FT_df, geom, E_eff_pe, n_Ks=1, iso="auto")
         
         Kjs.append(Kj[0])
         Ks.append(K[0])
