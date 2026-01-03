@@ -3,17 +3,21 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-from resources.calculations import get_ductileData
+if __name__ == "__main__":
+    from resources.calculations import get_ductileData
 
 
 class Geometry:
-    def __init__(self, LAT, l, nnx, rD=0.2):
+    def __init__(self, LAT, l, nnx, rD=0.2,  t=None):
         self.LAT = LAT
         self.l = l
         self.nnx = nnx
         self.rD = rD
-
-        self.t = self.rDthickness(rD=rD)
+        self.t = t
+        if t is None:
+            self.rDthickness(rD=rD)
+        else:
+            self.rDthickness(t=t)
 
         if LAT.lower() == 'fcc':
             L = float(l * nnx)
@@ -211,7 +215,7 @@ class Geometry:
         self.totalNodes = totalNodes
         self.totalBracketNodes = totalBracketNodes
         self.deltaNM = deltaNM
-        self.B = 0.5 * self.W
+        self.B = 0.020 #0.5 * self.W
 
     def rDthickness(self, t=None, rD=None):
         if self.LAT.lower() == "fcc":
@@ -413,31 +417,37 @@ def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
         return E/(1 - (B*(rD**(b-1))*(v_s**2))), (v + (B*(rD**(b-1))*(v_s**2)))/(1 - (B*(rD**(b-1))*(v_s**2)))
 
 def effProperties(LAT, E_s=123e9, v_s=0.3, rD=0.2, K=None, ortho=False):
-    if K: 
+    if LAT.lower() == "fcc":
+        B, b = 0, 0
+    elif LAT.lower() == "square":
+        B, b = 1/2, 1
+    elif LAT.lower() == "45square":
+        B, b = 1/4, 3
+    elif LAT.lower() == "tri":
+        B, b = 1/3, 1
+    elif LAT.lower() == "kagome":
+        B, b = 1/3, 1
+    elif LAT.lower() == "hex":
+        B, b = 3/2, 3
+    if K is not None:
         E, v, _ = calc_IsoEffProperties(K)
         if ortho:
-            E = K[0][0]
             v = K[0][1]/K[0][0]
+            E = K[0][0]*(1 - v**2)
     else:
+        E = E_s * B * (rD ** b)
         if LAT.lower() == "fcc":
-            B, b = 0, 0
             v = 0
         elif LAT.lower() == "square":
-            B, b = 1/2, 1
             v = 0
         elif LAT.lower() == "45square":
-            B, b = 1/4, 3
             v = 1
         elif LAT.lower() == "tri":
-            B, b = 1/3, 1
             v = 1/3
         elif LAT.lower() == "kagome":
-            B, b = 1/3, 1
             v = 1/3
         elif LAT.lower() == "hex":
-            B, b = 3/2, 3
             v = 1
-        E = E_s * B * (rD ** b)
     E_pe, v_pe = pStrainProperties(E, v, v_s=v_s, B=B, b=b, rD=rD, typ="lattice")
     return E, v, E_pe, v_pe 
 
@@ -628,11 +638,8 @@ def get_Nmatrix(ns):
 def calc_c(n0, geom, i):
     return (geom.t[i]*(np.sqrt(n0[0]**2 + n0[1]**2))) / (geom.vol)
 
-def calcK_mohr(LAT, l, nnx, mode, dis='per', count=0, plot=False):
-    rD = 0.2
-    E_s, v_s = 123e9, 0.3
-
-    geom = Geometry(LAT, l, nnx, rD=rD)
+def calcK_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
+    LAT  = geom.LAT
     geom.stiffnessMatrix(stiffCalc=mode)
     
     nodes, _ = find_nodes(LAT, geom, dis, mode=mode, stiff=True)
