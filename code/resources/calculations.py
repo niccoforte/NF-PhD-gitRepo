@@ -204,8 +204,7 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=123e9, C=No
             f_a_W = calc_FaW(ai[n], W)
         elif iso == False:
             if C is None:
-                geomOG = copy.deepcopy(geom)
-                C = calcK_mohr(geomOG, "unit", E_s=E)[0]
+                C = calcK_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]
             f_a_W, lambda_aniso, rho_aniso = calc_FaW_aniso(ai[n], W, C)
         K = (P/(B*(W**(1/2)))) * f_a_W
 
