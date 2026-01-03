@@ -414,7 +414,7 @@ def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
     elif typ.lower() == "lattice":
         return E/(1 - (B*(rD**(b-1))*(v_s**2))), (v + (B*(rD**(b-1))*(v_s**2)))/(1 - (B*(rD**(b-1))*(v_s**2)))
 
-def effProperties(LAT, E_s=123e9, v_s=0.3, rD=0.2, K=None, ortho=False):
+def effProperties(LAT, geom, E_s=123e9, v_s=0.3, rD=0.2, mode="stiff", C=None, ortho=False):
     if LAT.lower() == "fcc":
         B, b = 0, 0
     elif LAT.lower() == "square":
@@ -427,11 +427,13 @@ def effProperties(LAT, E_s=123e9, v_s=0.3, rD=0.2, K=None, ortho=False):
         B, b = 1/3, 1
     elif LAT.lower() == "hex":
         B, b = 3/2, 3
-    if K is not None:
-        E, v, _ = calc_IsoEffProperties(K)
+    if mode == "stiff":
+        if C is None:
+            C = calcC_mohr(geom, "unit", E_s)[0]
+        E, v, _ = calc_IsoEffProperties(C)
         if ortho:
-            v = K[0][1]/K[0][0]
-            E = K[0][0]*(1 - v**2)
+            v = C[0][1]/C[0][0]
+            E = C[0][0]*(1 - v**2)
     else:
         E = E_s * B * (rD ** b)
         if LAT.lower() == "fcc":
