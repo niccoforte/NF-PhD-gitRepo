@@ -146,7 +146,7 @@ def train_model(
                 y_predict = model(x)
             loss = lossf(y_predict, y)
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
 
             train_lossSum += loss.item()
@@ -400,8 +400,71 @@ def load_bestParams(path="models/etc", name="sample"):
 # TODO: GPU integration
 # TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
-def QuantileLoss():
-    pass
+class CustomQuantileLoss(nn.Module):
+    """
+    This loss is an average of three "tilted" L2 losses, each corresponding to a
+    different quantile, which allows the model to capture different parts of the
+    response distribution.
+
+    This implementation corrects a likely typo in the original paper's formula,
+    using (1 - lambda) for overestimation penalties to ensure the loss is always positive.
+    The original formula uses (lambda - 1), which would result in negative loss values.
+
+    Args:
+        quantiles (list or tuple of floats): A list of three quantile values (lambda_i)
+                                            to be used for the loss calculation.
+                                            Default is [0.5, 0.45, 0.1] as mentioned in the paper.
+    """
+    def __init__(self, quantiles=[0.5, 0.45, 0.1]):
+        super().__init__()
+        # Store quantiles as a buffer. This makes sure it's moved to the correct
+        # device, e.g., .to('cuda'), along with the model.
+        self.register_buffer('quantiles', torch.tensor(quantiles))
+        if len(self.quantiles) != 3:
+            print("Warning: The paper specifies 3 quantiles, but a different number was provided.")
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        """
+        Calculates the forward pass of the loss function.
+
+        Args:
+            y_pred (torch.Tensor): The predicted values from the model.
+            y_true (torch.Tensor): The ground truth values.
+
+        Returns:
+            torch.Tensor: The computed scalar loss value.
+        """
+        # Ensure the shapes match
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+
+        # Calculate the error
+        error = y_pred - y_true
+        squared_error = error ** 2
+        
+        total_loss = 0.0
+
+        # Loop through each quantile and calculate its contribution to the loss
+        for lmbda in self.quantiles:
+            # This is the core of the quantile loss logic, implemented efficiently
+            # using torch.where.
+            # Case 1 (Overestimation): error > 0. Penalty is (1 - lmbda).
+            # Case 2 (Underestimation): error <= 0. Penalty is lmbda.
+            quantile_loss = torch.where(
+                error > 0,
+                (1 - lmbda) * squared_error,
+                lmbda * squared_error
+            )
+            total_loss += torch.sum(quantile_loss)
+            
+        # Get the total number of elements for normalization
+        n = y_true.numel()
+        num_quantiles = len(self.quantiles)
+
+        # Normalize by the number of quantiles and the number of samples, as in Eq. C.5
+        final_loss = total_loss / (num_quantiles * n)
+
+        return final_loss
 
 def custom_loss(target, output):
     return torch.mean((output - target)**2)

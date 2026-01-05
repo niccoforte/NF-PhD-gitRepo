@@ -215,9 +215,9 @@ class mlpBlock(nn.Module):
     
     def forward(self, x):
         x = self.fc(x)
+        x = self._act(x)
         if self.norm:
             x = self.normL(x)
-        x = self._act(x)
         return x
 
 class MLP(nn.Module):
@@ -269,9 +269,9 @@ class MLP(nn.Module):
     def forward(self, x):
         if self.fcIN:
             x = self.fcIN(x)
+            x = self._act(x)
             if self.norm:
                 x = self.normL(x)
-            x = self._act(x)
             if self.dropout > 0.0:
                 x = self.dropoutL(x)
         if self.hlayers:
