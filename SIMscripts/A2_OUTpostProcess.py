@@ -7,18 +7,20 @@ import math
 import os
 
 mode = "any"                             # "ductile", "fracture", "both", "any"
-unitCellSize = 10.0
+unitCellSize = 1.459 #10.0
 Cmatrix = False
 
 LAT = "FCC"
-DIS = "disNodes"
-nnx = 16
+DIS = "per"
+nnx = 20
+simN = 1
+odbName = f"{LAT}-{nnx}-{DIS}-{simN}"
 
 initial = 1
 numberOfRuns = 1
 expected_steps = 201
 
-pDir = "C:\\temp"
+pDir = "Z:\p1\sims\SiC\Validation" #C:\\temp"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -657,8 +659,8 @@ if (mode.lower() == 'ductile' or mode.lower() == 'both'):
     H, L, B = geom.H, geom.L, geom.B
     MechMode = 'Ductile'
     for kk in range(initial, initial+numberOfRuns):
-        Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
-        data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
+        Job = f"{MechMode}-{odbName}.odb"
+        data = f"transfer/OUT-{MechMode}-{odbName}.csv"
         OUT = get_DuctData(Job, H, L, B)
         np.savetxt(data, OUT, delimiter=",")
 
@@ -669,7 +671,7 @@ if (mode.lower() == 'fracture' or mode.lower() == 'both'):
     
     MechMode = 'Fracture'
     for kk in range(initial, initial+numberOfRuns):
-        Job = MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".odb"
-        data = "transfer/OUT-" + MechMode + "-" + LAT + "-" + str(nnx) + "-" + DIS + "-" + str(kk) + ".csv"
+        Job = f"{MechMode}-{odbName}.odb"
+        data = f"transfer/OUT-{MechMode}-{odbName}.csv"
         OUT = get_FracData(Job)
         np.savetxt(data, OUT, delimiter=",")

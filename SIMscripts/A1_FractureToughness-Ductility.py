@@ -33,7 +33,7 @@ elif "square" in latticeType.lower(): nnx = 20
 nnx = nnx  #s = [10,16,20,26,30,36,40]          # number of Unit cells in X direction (Y automatic)
 
 finalRun = 'no'
-numberOfRuns = 5
+numberOfRuns = 1
 initialJob = 1
 cpus = 12
 FieldOut_frames = 100
