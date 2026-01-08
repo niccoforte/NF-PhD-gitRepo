@@ -7,8 +7,9 @@ import math
 import os
 
 mode = "any"                             # "ductile", "fracture", "both", "any"
-unitCellSize = 1.459 #10.0
+unitCellSize = 10.0
 Cmatrix = False
+ffilter = None
 
 LAT = "FCC"
 DIS = "per"
@@ -20,7 +21,7 @@ initial = 1
 numberOfRuns = 1
 expected_steps = 201
 
-pDir = "Z:\p1\sims\SiC\Validation" #C:\\temp"
+pDir = r"C:\\temp"
 
 cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
@@ -623,6 +624,8 @@ def get_FracData(Job):
 if mode.lower() == 'any':
     for curDirectory, folders, files in os.walk(pDir):
         odbs = [f for f in files if f.endswith('.odb')]
+        if ffilter is not None:
+            odbs = [f for f in odbs if ffilter in f]
         for odb in odbs:
             odbPath = os.path.join(curDirectory, odb)
             if not os.path.exists(curDirectory + "/transfer"):
