@@ -195,7 +195,6 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=123e9, C=No
         E_eff_pe = E          # CHECK VAL
     
     P = F_sm[frac]
-    frac = F_sm.index(P)
     dd = d[frac]
     
     Ks = []
