@@ -299,19 +299,23 @@ def plot_frequency(raw_data, data, test, bins=50):
     fig1.set_figheight(5)
     fig1.set_figwidth(15)
     
-    ax1.set_title('Raw Data', fontsize=18, fontname="Times New Roman")
+    ax1.set_title('Raw Data', fontsize=25, fontname="Times New Roman")
     ax1.axvline(x=raw_data[0]/raw_data[0], color='orangered', label="Perfect")
     ax1.hist(raw_data[1:]/raw_data[0], bins=bins, label='Disordered')
-    ax1.set_ylabel('Frequency', fontsize=15, fontname="Times New Roman")
-    ax1.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
-    ax1.legend()
+    ax1.set_ylabel('Frequency', fontsize=20, fontname="Times New Roman")
+    ax1.set_xlabel(x_label, fontsize=20, fontname="Times New Roman")
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    ax1.tick_params(axis='both', which='minor', labelsize=10)
+    ax1.legend(prop={'size':11})
     
-    ax2.set_title('Without Outliers', fontsize=18, fontname="Times New Roman")
+    ax2.set_title('Without Outliers', fontsize=25, fontname="Times New Roman")
     ax2.axvline(x=data[0]/data[0], color='orangered', label="Perfect")
     ax2.hist(data[1:]/data[0], bins=bins, label='Disordered')
-    ax2.set_ylabel('Frequency', fontsize=15, fontname="Times New Roman")
-    ax2.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
-    ax2.legend()
+    ax2.set_ylabel('Frequency', fontsize=20, fontname="Times New Roman")
+    ax2.set_xlabel(x_label, fontsize=20, fontname="Times New Roman")
+    ax2.tick_params(axis='both', which='major', labelsize=12)
+    ax2.tick_params(axis='both', which='minor', labelsize=10)
+    ax2.legend(prop={'size':11})
     
     plt.show()
 
@@ -349,10 +353,10 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
         ax_scatter.scatter(x_norm[0], y_norm[0], c="k", marker="*", label="Perfect")
         ax_scatter.axvline(1, linestyle='--', color="k")
         ax_scatter.axhline(1, linestyle='--', color="k")
-        ax_scatter.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
-        ax_scatter.set_ylabel(y_label, fontsize=15, fontname="Times New Roman")
+        ax_scatter.set_xlabel(x_label, fontsize=20, fontname="Times New Roman")
+        ax_scatter.set_ylabel(y_label, fontsize=20, fontname="Times New Roman")
         ax_scatter.legend()
-        ax_scatter.set_title(title, fontsize=18, fontname="Times New Roman")
+        # ax_scatter.set_title(title, fontsize=25, fontname="Times New Roman")
 
         ax_histx.hist(x_norm[1:], bins=30, color='blue', alpha=0.3)
         ax_histx.axvline(x=1, linestyle='--', color="k")
@@ -362,8 +366,8 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
         plt.setp(ax_histx.get_xticklabels(), visible=False)
         plt.setp(ax_histy.get_yticklabels(), visible=False)
 
-        ax_histx.set_ylabel('Frequency', fontsize=15, fontname="Times New Roman")
-        ax_histy.set_xlabel('Frequency', fontsize=15, fontname="Times New Roman")
+        ax_histx.set_ylabel('Frequency', fontsize=20, fontname="Times New Roman")
+        ax_histy.set_xlabel('Frequency', fontsize=20, fontname="Times New Roman")
         
         fig.tight_layout()
 
@@ -382,10 +386,12 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
         ax.scatter(x_norm[0], y_norm[0], c="k", marker="*")
         ax.axvline(x=1, linestyle='--', color="k")
         ax.axhline(y=1, linestyle='--', color="k")
-        ax.set_title(title, fontsize=18, fontname="Times New Roman")
-        ax.set_xlabel(x_label, fontsize=15, fontname="Times New Roman")
-        ax.set_ylabel(y_label, fontsize=15, fontname="Times New Roman")
-        ax.legend()
+        # ax.set_title(title, fontsize=25, fontname="Times New Roman")
+        ax.set_xlabel(x_label, fontsize=30, fontname="Times New Roman")
+        ax.set_ylabel(y_label, fontsize=30, fontname="Times New Roman")
+        ax.tick_params(axis='both', which='major', labelsize=20)
+        ax.tick_params(axis='both', which='minor', labelsize=20)
+        ax.legend(prop={'size':20})
         fig.tight_layout()
 
     return fig, ax
@@ -432,11 +438,11 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
             ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in d], label=f'Disordered{idxx}')
     
     if mode.lower() == "ut":
-        ax1.set_ylabel('Normalized Stress', fontsize=15, fontname="Times New Roman")
-        ax1.set_xlabel('Normalized Strain', fontsize=15, fontname="Times New Roman")
+        ax1.set_ylabel('Normalized Stress', fontsize=20, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Strain', fontsize=20, fontname="Times New Roman")
     if mode.lower() == "ft":
-        ax1.set_ylabel('Normalized Force', fontsize=15, fontname="Times New Roman")
-        ax1.set_xlabel('Normalized Displacement', fontsize=15, fontname="Times New Roman")
+        ax1.set_ylabel('Normalized Force', fontsize=20, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Displacement', fontsize=20, fontname="Times New Roman")
     
     ax1.axvline(x=1, ymax=0.2, c='k', linestyle='--')
     ax1.axhline(y=1, xmax=0.2, c='k', linestyle='--')
@@ -446,7 +452,10 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
         ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], c='k')
 
     if idx or q != 'all' and q <= 10:
-        ax1.legend()
+        ax1.legend(prop={'size':11})
+        
+    ax1.tick_params(axis='both', which='major', labelsize=12)
+    ax1.tick_params(axis='both', which='minor', labelsize=10)
     ax1.grid()
 
     return fig2, ax1
