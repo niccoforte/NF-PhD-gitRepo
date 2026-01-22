@@ -98,6 +98,8 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None)
 def prep_FCLdata(UT_props_df, FT_props_df, E_eff_pe):
     common_idxs = UT_props_df.index.intersection(FT_props_df.index)
     common_props_df = pd.concat([UT_props_df.loc[common_idxs], FT_props_df.loc[common_idxs]], axis=1)
+    norm_df = (common_props_df/common_props_df.iloc[0])
+    common_props_df["Multi"] = norm_df["Ductility"]**2 + norm_df["K_JIC"]**2 + norm_df["WoF"] + norm_df["Displacement"] + norm_df["Strength"]
     common_props_df["FCL"] = (common_props_df["K_JIC"]**2 / E_eff_pe) / (common_props_df["WoF"] * 1e6)
     common_props_df = common_props_df.replace([np.inf, -np.inf], np.nan).dropna()
     return common_props_df
@@ -319,9 +321,9 @@ def plot_frequency(raw_data, data, test, bins=50):
     
     plt.show()
 
-def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
-    x_data = np.array(x_data)
-    y_data = np.array(y_data)
+def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, highlight=None):
+    x_data_np = np.array(x_data)
+    y_data_np = np.array(y_data)
 
     if compare_ax is not None:
         include_freq = False
@@ -332,15 +334,19 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
         y_label = 'Normalized Strength'
     elif test == "FT":
         title = "Compact Tension"
-        x_label = 'Normalized Fracture Toughness ($K_{JIC}$)'
+        x_label = 'Normalized $K_{JIC}$'
         y_label = 'Normalized Displacement'
+    elif test == "MULTI":
+        title = "Multiple Properties"
+        x_label = 'Normalized Ductility'
+        y_label = 'Normalized $K_{JIC}$'
     elif test == "FCL":
         title = "Fracto-Cohesive Length"
-        x_label = 'Normalized Fracto-Cohesive Length ($L_{f}$)'
-        y_label = 'Normalized Work of Fracture (WoF)'
+        x_label = 'Normalized $L_{f}$'
+        y_label = 'Normalized WoF'
     
-    x_norm = x_data / x_data[0]
-    y_norm = y_data / y_data[0]
+    x_norm = x_data_np / x_data_np[0]
+    y_norm = y_data_np / y_data_np[0]
 
     if include_freq:
         fig = plt.figure(figsize=(10, 10))
@@ -381,17 +387,20 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None):
             d_label = "Disordered"
             col = "orangered"
         ax.scatter(x_norm[1:], y_norm[1:], label=d_label, c=col, alpha=0.7, marker="x")
+        if highlight is not None:
+            for idx in highlight:
+                ax.plot(x_data.loc[idx]/x_data[0], y_data.loc[idx]/y_data[0], c="lime", marker="o", markersize=18, markerfacecolor='none', markeredgewidth=3)
         if compare_ax is None:
             ax.scatter(x_norm[0], y_norm[0], label='Perfect', c="k", marker="*")
         ax.scatter(x_norm[0], y_norm[0], c="k", marker="*")
         ax.axvline(x=1, linestyle='--', color="k")
         ax.axhline(y=1, linestyle='--', color="k")
         # ax.set_title(title, fontsize=25, fontname="Times New Roman")
-        ax.set_xlabel(x_label, fontsize=30, fontname="Times New Roman")
-        ax.set_ylabel(y_label, fontsize=30, fontname="Times New Roman")
-        ax.tick_params(axis='both', which='major', labelsize=20)
-        ax.tick_params(axis='both', which='minor', labelsize=20)
-        ax.legend(prop={'size':20})
+        ax.set_xlabel(x_label, fontsize=32, fontname="Times New Roman")
+        ax.set_ylabel(y_label, fontsize=32, fontname="Times New Roman")
+        ax.tick_params(axis='both', which='major', labelsize=25)
+        ax.tick_params(axis='both', which='minor', labelsize=25)
+        # ax.legend(prop={'size':20})
         fig.tight_layout()
 
     return fig, ax
@@ -413,7 +422,7 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
 
     if compare_ax is None:
         ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Perfect", c='k')
-        plt.legend()
+        # plt.legend()
     
     if idx:
         if type(idx) is not list:
@@ -438,11 +447,11 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
             ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in d], label=f'Disordered{idxx}')
     
     if mode.lower() == "ut":
-        ax1.set_ylabel('Normalized Stress', fontsize=20, fontname="Times New Roman")
-        ax1.set_xlabel('Normalized Strain', fontsize=20, fontname="Times New Roman")
+        ax1.set_ylabel('Normalized Stress', fontsize=32, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Strain', fontsize=32, fontname="Times New Roman")
     if mode.lower() == "ft":
-        ax1.set_ylabel('Normalized Force', fontsize=20, fontname="Times New Roman")
-        ax1.set_xlabel('Normalized Displacement', fontsize=20, fontname="Times New Roman")
+        ax1.set_ylabel('Normalized Force', fontsize=32, fontname="Times New Roman")
+        ax1.set_xlabel('Normalized Displacement', fontsize=32, fontname="Times New Roman")
     
     ax1.axvline(x=1, ymax=0.2, c='k', linestyle='--')
     ax1.axhline(y=1, xmax=0.2, c='k', linestyle='--')
@@ -451,11 +460,11 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
     if compare_ax is None:
         ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], c='k')
 
-    if idx or q != 'all' and q <= 10:
-        ax1.legend(prop={'size':11})
+    # if idx or q != 'all' and q <= 10:
+    #     ax1.legend(prop={'size':11})
         
-    ax1.tick_params(axis='both', which='major', labelsize=12)
-    ax1.tick_params(axis='both', which='minor', labelsize=10)
+    ax1.tick_params(axis='both', which='major', labelsize=25)
+    ax1.tick_params(axis='both', which='minor', labelsize=25)
     ax1.grid()
 
     return fig2, ax1
