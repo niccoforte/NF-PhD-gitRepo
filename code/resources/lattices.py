@@ -213,7 +213,7 @@ class Geometry:
         self.totalNodes = totalNodes
         self.totalBracketNodes = totalBracketNodes
         self.deltaNM = deltaNM
-        self.B = 0.020 #0.5 * self.W
+        self.B = 0.5 * self.W
 
     def rDthickness(self, t=None, rD=None):
         if self.LAT.lower() == "fcc":
