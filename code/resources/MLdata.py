@@ -421,7 +421,7 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
     indx = int(OUT_df.loc[pi].tolist()[0])
 
     if compare_ax is None:
-        ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Perfect", c='k')
+        ax1.plot(xOUT/xOUT[indx], [i/max(p) for i in p], label="Periodic", c='k')
         # plt.legend()
     
     if idx:
