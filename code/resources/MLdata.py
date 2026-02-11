@@ -465,7 +465,7 @@ def plot_curve(OUT_df, xOUT, mode, pi=0, idx=None, q=15, compare_ax=None):
         
     ax1.tick_params(axis='both', which='major', labelsize=25)
     ax1.tick_params(axis='both', which='minor', labelsize=25)
-    ax1.grid()
+    # ax1.grid()
 
     return fig2, ax1
 
