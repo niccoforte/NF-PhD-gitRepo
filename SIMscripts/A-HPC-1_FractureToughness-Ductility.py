@@ -55,7 +55,7 @@ UTval = False
 global frequencies
 frequencies = []
 
-cmdIN = sys.argv[8:]
+cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     nnx = int(cmdIN[1])
