@@ -43,6 +43,7 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
             deltaNM = 0.5 * np.sqrt(l * l + l * l)
+            iso = False
 
         elif LAT.lower() == 'square':
             L = float(l * nnx)
@@ -70,6 +71,7 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1)))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2))
             deltaNM = l
+            iso = False
 
         elif LAT.lower() == '45square':
             L = float(2**(1/2) * l * nnx)
@@ -97,6 +99,7 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
             deltaNM = l
+            iso = False
 
         elif LAT.lower() == 'tri':
             if nnx % 2.0 == 1.0:
@@ -129,6 +132,7 @@ class Geometry:
                                     round(((nnx / 1.99999) + 2) * 3 * 2) +
                                     2 * (nnx / 2.0 + 2))
             deltaNM = l
+            iso = True
 
         elif LAT.lower() == 'kagome':
             L = l * (2.0 * nnx - 1)
@@ -164,6 +168,7 @@ class Geometry:
                                    (nnx) * math.floor(nny / 2)))
             totalBracketNodes = int(round(((2 * nnx + 4) * 3 + (nnx + 2) * 2 + (nnx + 1)) * 2))
             deltaNM = l
+            iso = True
 
         elif LAT.lower() == 'hex':
             L = (3.0 ** 0.5) * l * nnx
@@ -200,6 +205,7 @@ class Geometry:
                                    2 * (nnx + 1) * math.ceil(nny / 2.0)))
             totalBracketNodes = int(round(((nnx + 5) * 4 + (nnx + 4) * 4) * 2 + 4))
             deltaNM = l
+            iso = True
 
         self.nnx = nnx
         self.nny = nny
@@ -214,6 +220,7 @@ class Geometry:
         self.totalBracketNodes = totalBracketNodes
         self.deltaNM = deltaNM
         self.B = 0.5 * self.W
+        self.iso = iso
 
     def rDthickness(self, t=None, rD=None):
         if self.LAT.lower() == "fcc":
@@ -739,171 +746,188 @@ def calc_anisoParams(C=None, S=None):
 
 
 def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zener=False, paper=False):
+    K11, K33, K13, K23 = [], [], [], []
+    for K in Ks[1:]:
+        K11.append((K[0][0] - Ks[0][0][0])/Ks[0][0][0])
+        K33.append((K[2][2] - Ks[0][2][2])/Ks[0][2][2])
+        K13.append(K[0][2]/Ks[0][0][0])
+        K23.append(K[1][2]/Ks[0][0][0])
+    
+    K_22_11p = Ks[0][1][1] / Ks[0][0][0]
+    K_11_12p = Ks[0][0][0] / Ks[0][0][1]
+    K_12_33p = Ks[0][0][1] / Ks[0][2][2]
+    K_13_11p = Ks[0][0][2] / Ks[0][0][0]
+    K_23_11p = Ks[0][1][2] / Ks[0][0][0]
+    Zp = calc_ZenerRatio(Ks[0])
+    K_22_11s, K_11_12s, K_12_33s, K_13_11s, K_23_11s, Zs = [], [], [], [], [], []
+    for K in Ks[1:]:
+        K_22_11s.append(K[1][1] / K[0][0])
+        K_11_12s.append(K[0][0] / K[0][1])
+        K_12_33s.append(K[0][1] / K[2][2])
+        K_13_11s.append(K[0][2] / K[0][0])
+        K_23_11s.append(K[1][2] / K[0][0])
+        Zs.append(calc_ZenerRatio(K))
+    
+    Ep, vp, _ = calc_IsoEffProperties(Ks[0])
+    vs, Es = [], []
+    for K in Ks[1:]:
+        Ed, vd, _ = calc_IsoEffProperties(K)
+        vs.append(vd)
+        Es.append(Ed)
+    
+
     if stiff:
-        K11, K33, K13, K23 = [], [], [], []
-        for K in Ks[1:]:
-            K11.append((K[0][0] - Ks[0][0][0])/Ks[0][0][0])
-            K33.append((K[2][2] - Ks[0][2][2])/Ks[0][2][2])
-            K13.append(K[0][2]/Ks[0][0][0])
-            K23.append(K[1][2]/Ks[0][0][0])
-
-
         fig1, (ax1, ax2) = plt.subplots(1, 2)
-        fig1.set_figheight(4)
+        fig1.set_figheight(5)
         fig1.set_figwidth(18)
 
-        ax1.set_ylabel('$(C^{dis}-C^{p})/C^{p}$ [%]', fontsize=14, fontname="Times New Roman")
-        ax1.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        ax1.set_ylabel('$(C^{dis}-C^{p})/C^{p}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax1.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         # ax1.set_ylim([-0.1, 0.1])
         # ax1.set_xticks([i+1 for i in range(len(K11))])
-        ax1.plot([i+1 for i in range(len(K11))], K11, 'bx', label='$C_{11}$')
-        ax1.plot([i+1 for i in range(len(K33))], K33, 'r^', label='$C_{44}$')
+        ax1.plot([i+1 for i in range(len(K11))], K11, 'bx', markersize=10, label='$C_{11}$')
+        ax1.plot([i+1 for i in range(len(K33))], K33, 'r^', markersize=10, label='$C_{44}$')
+        ax1.tick_params(axis='both', which='major', labelsize=20)
+        ax1.tick_params(axis='both', which='minor', labelsize=20)
         # ax1.grid()
-        ax1.legend()
+        ax1.legend(prop={'size':18})
 
-        ax2.set_ylabel('$C^{dis}/C^{p}_{11}$', fontsize=14, fontname="Times New Roman")
-        ax2.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        ax2.set_ylabel('$C^{dis}/C^{p}_{11}$', fontsize=26, fontname="Times New Roman")
+        ax2.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         # ax2.set_ylim([-0.05, 0.05])
         # ax2.set_xticks([i+1 for i in range(len(K11))])
-        ax2.plot([i+1 for i in range(len(K13))], K13, 'bx', label='$C^{dis}_{14}$')
-        ax2.plot([i+1 for i in range(len(K23))], K23, 'r^', label='$C^{dis}_{24}$')
+        ax2.plot([i+1 for i in range(len(K13))], K13, 'bx', markersize=10, label='$C^{dis}_{14}$')
+        ax2.plot([i+1 for i in range(len(K23))], K23, 'r^', markersize=10, label='$C^{dis}_{24}$')
+        ax2.tick_params(axis='both', which='major', labelsize=20)
+        ax2.tick_params(axis='both', which='minor', labelsize=20)
         # ax2.grid()
-        ax2.legend()
+        ax2.legend(prop={'size':18})
+        fig1.tight_layout()
     
-    if inplane:
-        K_22_11p = Ks[0][1][1] / Ks[0][0][0]
-        K_11_12p = Ks[0][0][0] / Ks[0][0][1]
-        K_12_33p = Ks[0][0][1] / Ks[0][2][2]
-        K_22_11s, K_11_12s, K_12_33s = [], [], []
-        for K in Ks[1:]:
-            K_22_11s.append(K[1][1] / K[0][0])
-            K_11_12s.append(K[0][0] / K[0][1])
-            K_12_33s.append(K[0][1] / K[2][2])
-    
+    if inplane:    
         fig2, (ax3, ax4, ax5) = plt.subplots(1, 3)
-        fig2.set_figheight(4)
+        fig2.set_figheight(5)
         fig2.set_figwidth(22)
 
-        ax3.set_ylabel('$C_{22}/C_{11}$ [%]', fontsize=14, fontname="Times New Roman")
-        ax3.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        ax3.set_ylabel('$C_{22}/C_{11}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax3.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax3.tick_params(axis='both', which='major', labelsize=20)
+        ax3.tick_params(axis='both', which='minor', labelsize=20)
         # ax3.set_ylim([-0.1, 0.1])
         # ax3.set_xticks([i+1 for i in range(len(K11))])
-        ax3.axhline(y=K_22_11p, color='k', linestyle='--', label='Perfect Lattice')
-        ax3.plot([i+1 for i in range(len(K_22_11s))], K_22_11s, 'bx', label='Disordered Lattices')
+        ax3.axhline(y=K_22_11p, color='k', linestyle='--', label='Per')
+        ax3.plot([i+1 for i in range(len(K_22_11s))], K_22_11s, 'bx', label='Dis')
         # ax3.grid()
-        ax3.legend()
+        ax3.legend(prop={'size':18})
 
-        ax4.set_ylabel('$C_{11}/C_{12}$ [%]', fontsize=14, fontname="Times New Roman")
-        ax4.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        ax4.set_ylabel('$C_{11}/C_{12}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax4.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax4.tick_params(axis='both', which='major', labelsize=20)
+        ax4.tick_params(axis='both', which='minor', labelsize=20)
         # ax4.set_ylim([-0.1, 0.1])
         # ax4.set_xticks([i+1 for i in range(len(K11))])
-        ax4.axhline(y=K_11_12p, color='k', linestyle='--', label='Perfect Lattice')
-        ax4.plot([i+1 for i in range(len(K_11_12s))], K_11_12s, 'bx', label='Disordered Lattice')
+        ax4.axhline(y=K_11_12p, color='k', linestyle='--', label='Per')
+        ax4.plot([i+1 for i in range(len(K_11_12s))], K_11_12s, 'bx', label='Dis')
         # ax4.grid()
-        ax4.legend()
+        ax4.legend(prop={'size':18})
 
-        ax5.set_ylabel('$C_{12}/C_{33}$ [%]', fontsize=14, fontname="Times New Roman")
-        ax5.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
+        ax5.set_ylabel('$C_{12}/C_{33}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax5.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax5.tick_params(axis='both', which='major', labelsize=20)
+        ax5.tick_params(axis='both', which='minor', labelsize=20)
         # ax5.set_ylim([-0.1, 0.1])
         # ax5.set_xticks([i+1 for i in range(len(K11))])
-        ax5.axhline(y=K_12_33p, color='k', linestyle='--', label='Perfect Lattice')
-        ax5.plot([i+1 for i in range(len(K_12_33s))], K_12_33s, 'bx', label='Disordered Lattice')
+        ax5.axhline(y=K_12_33p, color='k', linestyle='--', label='Per')
+        ax5.plot([i+1 for i in range(len(K_12_33s))], K_12_33s, 'bx', label='Dis')
         # ax5.grid()
-        ax5.legend()
+        ax5.legend(prop={'size':18})
+        fig2.tight_layout()
 
-    if properties:
-        Ep, vp, _ = calc_IsoEffProperties(Ks[0])
-        vs, Es = [], []
-        for K in Ks[1:]:
-            Ed, vd, _ = calc_IsoEffProperties(K)
-            vs.append(vd)
-            Es.append(Ed)
-        
+    if properties:        
         fig3, ax6 = plt.subplots(1, 1)
-        fig3.set_figheight(4)
+        fig3.set_figheight(5)
         fig3.set_figwidth(9)
-        ax7 = ax6.twinx()
+        ax6_ = ax6.twinx()
 
-        ax6.set_ylabel("Poisson's Ratio, $\\nu$ (blue)", fontsize=15, fontname="Times New Roman")
-        ax6.set_xlabel('Disordered Generated Model No.', fontsize=15, fontname="Times New Roman")
-        ax7.set_ylabel("Young's Modulus, $E$ (red) [GPa]", fontsize=15, fontname="Times New Roman")
+        ax6.set_ylabel("Poisson's Ratio, $\\nu$ (blue)", fontsize=26, fontname="Times New Roman")
+        ax6.set_xlabel('Dis Generated Model No.', fontsize=26, fontname="Times New Roman")
+        ax6.tick_params(axis='both', which='major', labelsize=20)
+        ax6.tick_params(axis='both', which='minor', labelsize=20)
+        ax6_.set_ylabel("Young's Modulus, $E$ (red) [GPa]", fontsize=26, fontname="Times New Roman")
+        ax6_.tick_params(axis='both', which='major', labelsize=20)
+        ax6_.tick_params(axis='both', which='minor', labelsize=20)
 
         # ax6.set_ylim([vp-0.05, vp+0.05])
-        # ax7.set_ylim([min(Es)/1e9 - 5, max(Es)/1e9 + 5])
+        # ax6_.set_ylim([min(Es)/1e9 - 5, max(Es)/1e9 + 5])
         # ax6.set_xticks([i+1 for i in range(len(K11))])
-        ax6.axhline(y=vp, xmax=0.75, color='b', linestyle='--', label="Perfect Lattice Poisson's Ratio, $\\nu^{p}$ = %.2f" % vp)
-        ax6.plot([i+1 for i in range(len(vs))], vs, 'bx', label="Disordered Lattice Poisson's Ratio, $\\nu^{d}$")
-        ax7.axhline(y=Ep/1e9, xmin=0.25, color='r', linestyle='--', label="Perfect Lattice Young's Modulus, $E^{p}$ = %.2f GPa" % (Ep/1e9))
-        ax7.plot([i+1 for i in range(len(Es))], np.array(Es)/1e9, 'r^', label="Disordered Lattice Young's Modulus, $E^{d}$")
+        ax6.axhline(y=vp, xmax=0.75, color='b', linestyle='--', label="Per Poisson's Ratio, $\\nu^{p}$ = %.2f" % vp)
+        ax6.plot([i+1 for i in range(len(vs))], vs, 'bx', label="Dis Poisson's Ratio, $\\nu^{d}$")
+        ax6_.axhline(y=Ep/1e9, xmin=0.25, color='r', linestyle='--', label="Per Young's Modulus, $E^{p}$ = %.2f GPa" % (Ep/1e9))
+        ax6_.plot([i+1 for i in range(len(Es))], np.array(Es)/1e9, 'r^', label="Dis Young's Modulus, $E^{d}$")
 
         # ax6.grid()
-        ax6.legend()
-        ax7.legend()
+        ax6.legend(prop={'size':18})
+        ax6_.legend(prop={'size':18})
+        fig3.tight_layout()
 
     if zener:
-        Zp  = calc_ZenerRatio(Ks[0])
-        Zs = []
-        for K in Ks[1:]:
-            Zs.append(calc_ZenerRatio(K))
-
-        fig4, ax8 = plt.subplots(1, 1)
-        fig4.set_figheight(4)
+        fig4, ax7 = plt.subplots(1, 1)
+        fig4.set_figheight(5)
         fig4.set_figwidth(9)
 
-        ax8.set_ylabel('Zener Ratio, $a$', fontsize=15, fontname="Times New Roman")
-        ax8.set_xlabel('Disordered Model No.', fontsize=15, fontname="Times New Roman")
+        ax7.set_ylabel('Zener Ratio, $a$', fontsize=26, fontname="Times New Roman")
+        ax7.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax7.tick_params(axis='both', which='major', labelsize=20)
+        ax7.tick_params(axis='both', which='minor', labelsize=20)
 
-        # ax8.set_ylim([Zp-0.15, Zp+0.15])
-        # ax8.set_xticks([i+1 for i in range(len(K11))])
-        ax8.axhline(y=Zp, color='k', linestyle='--', label='Perfect Lattice Zener Ratio, $a^{p}$ = %.2f' % Zp)
-        ax8.plot([i+1 for i in range(len(Zs))], Zs, 'bx', label='Disordered Lattice Zener Ratio, $a^{d}$')
+        # ax7.set_ylim([Zp-0.15, Zp+0.15])
+        # ax7.set_xticks([i+1 for i in range(len(K11))])
+        ax7.axhline(y=Zp, color='k', linestyle='--', label='Per, $a^{p}$ = %.2f' % Zp)
+        ax7.plot([i+1 for i in range(len(Zs))], Zs, 'bx', label='Dis, $a^{dis}$')
 
-        # ax8.grid()
-        ax8.legend()
+        # ax7.grid()
+        ax7.legend(prop={'size':18})
+        fig4.tight_layout()
 
     if paper:
-        K_22_11p = Ks[0][1][1] / Ks[0][0][0]
-        K_13_11p = Ks[0][0][2] / Ks[0][0][0]
-        K_23_11p = Ks[0][1][2] / Ks[0][0][0]
-        Zp = calc_ZenerRatio(Ks[0])
-        K_22_11s, K_13_11s, K_23_11s, Zs = [], [], [], []
-        for K in Ks[1:]:
-            K_22_11s.append(K[1][1] / K[0][0])
-            K_13_11s.append(K[0][2] / K[0][0])
-            K_23_11s.append(K[1][2] / K[0][0])
-            Zs.append(calc_ZenerRatio(K))
-    
-        fig5, (ax9, ax10, ax11) = plt.subplots(1, 3)
-        fig5.set_figheight(4)
-        fig5.set_figwidth(22)
+        fig5, (ax8, ax9, ax10) = plt.subplots(1, 3)
+        fig5.set_figheight(5)
+        fig5.set_figwidth(23)
 
-        ax9.set_ylabel('$C_{22}/C_{11}$', fontsize=14, fontname="Times New Roman")
-        ax9.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
-        # ax9.set_ylim([-0.1, 0.1])
+        ax8.set_ylabel('$C_{22}/C_{11}$', fontsize=26, fontname="Times New Roman")
+        ax8.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax8.tick_params(axis='both', which='major', labelsize=20)
+        ax8.tick_params(axis='both', which='minor', labelsize=20)
+        # ax8.set_ylim([-0.1, 0.1])
+        # ax8.set_xticks([i+1 for i in range(len(K11))])
+        ax8.axhline(y=K_22_11p, color='k', linestyle='--', linewidth=2.5, label='Per')
+        ax8.plot([i+1 for i in range(len(K_22_11s))], K_22_11s, 'bx', markersize=10, label='Dis')
+        # ax8.grid()
+        ax8.legend(prop={'size':18})
+
+        ax9.set_ylabel('$C^{*}/C_{11}$', fontsize=26, fontname="Times New Roman")
+        ax9.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax9.tick_params(axis='both', which='major', labelsize=20)
+        ax9.tick_params(axis='both', which='minor', labelsize=20)
+        # ax9.set_ylim([-0.05, 0.05])
         # ax9.set_xticks([i+1 for i in range(len(K11))])
-        ax9.axhline(y=K_22_11p, color='k', linestyle='--', label='Perfect Lattice')
-        ax9.plot([i+1 for i in range(len(K_22_11s))], K_22_11s, 'bx', label='Disordered Lattices')
+        ax9.axhline(y=K_13_11p, color='k', linestyle='--', linewidth=2.5, label='Per')
+        ax9.plot([i+1 for i in range(len(K_13_11s))], K_13_11s, 'bx', markersize=10, label='$C^{*}=C_{14}$')
+        ax9.plot([i+1 for i in range(len(K_23_11s))], K_23_11s, 'r^', markersize=10, label='$C^{*}=C_{24}$')
         # ax9.grid()
-        ax9.legend()
+        ax9.legend(prop={'size':18})
 
-        ax10.set_ylabel('$C^{*}/C_{11}$', fontsize=14, fontname="Times New Roman")
-        ax10.set_xlabel('Disordered Model No.', fontsize=14, fontname="Times New Roman")
-        # ax10.set_ylim([-0.05, 0.05])
+        ax10.set_ylabel('Zener Ratio, $a$', fontsize=26, fontname="Times New Roman")
+        ax10.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
+        ax10.tick_params(axis='both', which='major', labelsize=20)
+        ax10.tick_params(axis='both', which='minor', labelsize=20)
+        # ax10.set_ylim([Zp-0.15, Zp+0.15])
         # ax10.set_xticks([i+1 for i in range(len(K11))])
-        ax10.axhline(y=K_13_11p, color='k', linestyle='--', label='Perfect Lattice')
-        ax10.plot([i+1 for i in range(len(K_13_11s))], K_13_11s, 'bx', label='$C^{*}=C_{14}$')
-        ax10.plot([i+1 for i in range(len(K_23_11s))], K_23_11s, 'r^', label='$C^{*}=C_{24}$')
+        ax10.axhline(y=Zp, color='k', linestyle='--', linewidth=2.5, label='Per, $a^{p}$ = %.2f' % Zp)
+        ax10.plot([i+1 for i in range(len(Zs))], Zs, 'bx', markersize=10, label='Dis, $a^{dis}$')
         # ax10.grid()
-        ax10.legend()
-
-        ax11.set_ylabel('Zener Ratio, $a$', fontsize=15, fontname="Times New Roman")
-        ax11.set_xlabel('Disordered Model No.', fontsize=15, fontname="Times New Roman")
-        # ax11.set_ylim([Zp-0.15, Zp+0.15])
-        # ax11.set_xticks([i+1 for i in range(len(K11))])
-        ax11.axhline(y=Zp, color='k', linestyle='--', label='Perfect Lattice, $a^{p}$ = %.2f' % Zp)
-        ax11.plot([i+1 for i in range(len(Zs))], Zs, 'bx', label='Disordered Lattice, $a^{dis}$')
-        # ax11.grid()
-        ax11.legend()
+        ax10.legend(prop={'size':18})
+        fig5.tight_layout()
     
     plt.show()
 
