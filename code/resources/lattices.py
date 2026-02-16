@@ -43,6 +43,7 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
             deltaNM = 0.5 * np.sqrt(l * l + l * l)
+            iso = False
 
         elif LAT.lower() == 'square':
             L = float(l * nnx)
@@ -70,6 +71,7 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1)))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2))
             deltaNM = l
+            iso = False
 
         elif LAT.lower() == '45square':
             L = float(2**(1/2) * l * nnx)
@@ -97,6 +99,7 @@ class Geometry:
             totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
             totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
             deltaNM = l
+            iso = False
 
         elif LAT.lower() == 'tri':
             if nnx % 2.0 == 1.0:
@@ -129,6 +132,7 @@ class Geometry:
                                     round(((nnx / 1.99999) + 2) * 3 * 2) +
                                     2 * (nnx / 2.0 + 2))
             deltaNM = l
+            iso = True
 
         elif LAT.lower() == 'kagome':
             L = l * (2.0 * nnx - 1)
@@ -164,6 +168,7 @@ class Geometry:
                                    (nnx) * math.floor(nny / 2)))
             totalBracketNodes = int(round(((2 * nnx + 4) * 3 + (nnx + 2) * 2 + (nnx + 1)) * 2))
             deltaNM = l
+            iso = True
 
         elif LAT.lower() == 'hex':
             L = (3.0 ** 0.5) * l * nnx
@@ -200,6 +205,7 @@ class Geometry:
                                    2 * (nnx + 1) * math.ceil(nny / 2.0)))
             totalBracketNodes = int(round(((nnx + 5) * 4 + (nnx + 4) * 4) * 2 + 4))
             deltaNM = l
+            iso = True
 
         self.nnx = nnx
         self.nny = nny
@@ -214,6 +220,7 @@ class Geometry:
         self.totalBracketNodes = totalBracketNodes
         self.deltaNM = deltaNM
         self.B = 0.5 * self.W
+        self.iso = iso
 
     def rDthickness(self, t=None, rD=None):
         if self.LAT.lower() == "fcc":
