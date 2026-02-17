@@ -95,14 +95,29 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None)
     props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.index)
     return dIN, dOUT, INf, xOUT, props, props_df
 
-def prep_FCLdata(UT_props_df, FT_props_df, E_eff_pe):
+def prep_MULTIdata(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe):
+    UT_props_df, FT_props_df = props_dfs
+    UT_IN_df, FT_IN_df = IN_dfs
+    UT_OUT_df, FT_OUT_df = OUT_dfs
+    UT_dIN_df, FT_dIN_df = dIN_dfs
+    UT_dOUT_df, FT_dOUT_df = dOUT_dfs
+    if INf_dfs[0] is not None and INf_dfs[1] is not None:
+        UT_INf_df, FT_INf_df = INf_dfs
+
     common_idxs = UT_props_df.index.intersection(FT_props_df.index)
     common_props_df = pd.concat([UT_props_df.loc[common_idxs], FT_props_df.loc[common_idxs]], axis=1)
+    UT_IN_df, FT_IN_df = UT_IN_df.loc[common_idxs], FT_IN_df.loc[common_idxs]
+    UT_OUT_df, FT_OUT_df = UT_OUT_df.loc[common_idxs], FT_OUT_df.loc[common_idxs]
+    UT_dIN_df, FT_dIN_df = UT_dIN_df.loc[common_idxs], FT_dIN_df.loc[common_idxs]
+    UT_dOUT_df, FT_dOUT_df = UT_dOUT_df.loc[common_idxs], FT_dOUT_df.loc[common_idxs]
+    if INf_dfs[0] is not None and INf_dfs[1] is not None:
+        UT_INf_df, FT_INf_df = UT_INf_df.loc[common_idxs], FT_INf_df.loc[common_idxs]
+
     norm_df = (common_props_df/common_props_df.iloc[0])
     common_props_df["Multi"] = norm_df["Ductility"]**2 + norm_df["K_JIC"]**2 + norm_df["WoF"] + norm_df["Displacement"] + norm_df["Strength"]
     common_props_df["FCL"] = (common_props_df["K_JIC"]**2 / E_eff_pe) / (common_props_df["WoF"] * 1e6)
     common_props_df = common_props_df.replace([np.inf, -np.inf], np.nan).dropna()
-    return common_props_df
+    return common_props_df, [UT_IN_df, FT_IN_df], [UT_OUT_df, FT_OUT_df], [UT_dIN_df, FT_dIN_df], [UT_dOUT_df, FT_dOUT_df], [UT_INf_df, FT_INf_df] if INf_dfs[0] is not None and INf_dfs[1] is not None else INf_dfs
 
 
 def find_outliers(data):
@@ -113,19 +128,7 @@ def find_outliers(data):
     outlier_idxs = [data.index(x) for x in data if (x < mean - 3*stdev) or (x > mean + 3*stdev) if data.index(x) != 0]
     return np.array(outlier_idxs, dtype="int")
 
-def remove_outliers(
-    dIN_r, 
-    dOUT_r, 
-    props_r, 
-    IN_df, 
-    OUT_df, 
-    dIN_df, 
-    dOUT_df, 
-    props_df,
-    INf_r=None, 
-    INf_df=None, 
-    manual=None
-):
+def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, props_df,INf_r=None, INf_df=None, manual=None):
     all_outlier_idxs = []
     for prop_r in props_r:
         idxs = find_outliers(data=prop_r)
@@ -182,12 +185,15 @@ def remove_outliers(
     
     return dIN, dOUT, INf, props, IN_df, OUT_df, dIN_df, dOUT_df, props_df, INf_df
 
-def split_data(dIN, dOUT, props, INf, split=0.85):
-    idxs = list(range(len(dOUT)))
-    random.shuffle(idxs)
-    train_idxs = idxs[:int(split*len(dOUT))]
-    test_idxs = [i for i in idxs if i not in train_idxs]
-    train_idxs, val_idxs = train_idxs[:int(split*len(train_idxs))], train_idxs[int(split*len(train_idxs)):]
+def split_data(dIN, dOUT, props, INf, split=0.85, split_idxs=None):
+    if split_idxs is None:
+        idxs = list(range(len(dOUT)))
+        random.shuffle(idxs)
+        train_idxs = idxs[:int(split*len(dOUT))]
+        test_idxs = [i for i in idxs if i not in train_idxs]
+        train_idxs, val_idxs = train_idxs[:int(split*len(train_idxs))], train_idxs[int(split*len(train_idxs)):]
+    else:
+        train_idxs, val_idxs, test_idxs = split_idxs
     
     train_in = dIN[train_idxs]
     val_in = dIN[val_idxs]
@@ -210,25 +216,11 @@ def split_data(dIN, dOUT, props, INf, split=0.85):
     train = [train_in, train_out, train_props, train_in_f]
     val = [val_in, val_out, val_props, val_in_f]
     test = [test_in, test_out, test_props, test_in_f]
+    split_idxs = [train_idxs, val_idxs, test_idxs]
     
-    return train, val, test
+    return train, val, test, split_idxs
 
-def save_MLdata(
-    perIN_df, 
-    perOUT_df, 
-    train, 
-    val, 
-    test, 
-    IN_df, 
-    OUT_df, 
-    dIN_df, 
-    dOUT_df, 
-    INf_df, 
-    props_df, 
-    PATH, 
-    mode, 
-    dis
-):
+def save_MLdata(perIN_df, perOUT_df, train, val, test, IN_df, OUT_df, dIN_df, dOUT_df, INf_df, props_df, PATH, mode, dis):
     if mode == "UT":
         model = "Ductile"
     elif mode == "FT":
@@ -262,6 +254,60 @@ def save_MLdata(
         pd.DataFrame(train[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-trainINf.csv")
         pd.DataFrame(val[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-valINf.csv")
         pd.DataFrame(test[3]).to_csv(PATH + f"MLdata/{mode}-{dis}-testINf.csv")
+
+def save_MULTIdata(dIN_dfs, dOUT_dfs, common_props_df, INf_dfs, PATH, dis):
+    os.makedirs(PATH+"/MLdata/multi", exist_ok=True)
+
+    UT_dIN = dIN_dfs[0].to_numpy()
+    UT_dOUT = dOUT_dfs[0].to_numpy()
+    
+    FT_dIN = dIN_dfs[1].to_numpy()
+    FT_dOUT = dOUT_dfs[1].to_numpy()
+
+    common_props = common_props_df.to_numpy().T
+
+    UT_INf = None
+    FT_INf = None
+    if INf_dfs[0] is not None and INf_dfs[1] is not None:
+        UT_INf = INf_dfs[0].to_numpy()
+        FT_INf = INf_dfs[1].to_numpy()
+
+    UT_train, UT_val, UT_test, UT_split_idxs = split_data(UT_dIN, UT_dOUT, common_props, UT_INf, split_idxs=None)
+    FT_train, FT_val, FT_test, FT_split_idxs = split_data(FT_dIN, FT_dOUT, common_props, FT_INf, split_idxs=UT_split_idxs)
+
+    dIN_dfs[0].to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-allIN.csv")
+    dIN_dfs[1].to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-allIN.csv")
+    pd.DataFrame(UT_train[0]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-trainIN.csv")
+    pd.DataFrame(UT_val[0]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-valIN.csv")
+    pd.DataFrame(UT_test[0]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-testIN.csv")
+    pd.DataFrame(FT_train[0]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-trainIN.csv")
+    pd.DataFrame(FT_val[0]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-valIN.csv")
+    pd.DataFrame(FT_test[0]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-testIN.csv")
+
+    dOUT_dfs[0].to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-allOUT.csv")
+    dOUT_dfs[1].to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-allOUT.csv")
+    pd.DataFrame(UT_train[1]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-trainOUT.csv")
+    pd.DataFrame(UT_val[1]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-valOUT.csv")
+    pd.DataFrame(UT_test[1]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-testOUT.csv")
+    pd.DataFrame(FT_train[1]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-trainOUT.csv")
+    pd.DataFrame(FT_val[1]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-valOUT.csv")
+    pd.DataFrame(FT_test[1]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-testOUT.csv")
+
+    common_props_df.to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-allProps.csv")
+    pd.DataFrame(UT_train[2]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-trainProps.csv")
+    pd.DataFrame(UT_val[2]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-valProps.csv")
+    pd.DataFrame(UT_test[2]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-testProps.csv")
+
+    if UT_INf is not None and FT_INf is not None:
+        INf_dfs[0].to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-allINf.csv")
+        INf_dfs[1].to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-allINf.csv")
+        pd.DataFrame(UT_train[3]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-trainINf.csv")
+        pd.DataFrame(UT_val[3]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-valINf.csv")
+        pd.DataFrame(UT_test[3]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-UT-testINf.csv")
+        pd.DataFrame(FT_train[3]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-trainINf.csv")
+        pd.DataFrame(FT_val[3]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-valINf.csv")
+        pd.DataFrame(FT_test[3]).to_csv(PATH + f"MLdata/multi/MULTI-{dis}-FT-testINf.csv")
+    
 
 def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
     if by.lower() == "node":
@@ -958,11 +1004,11 @@ class DATA:
                     self.FT_val_out   = self.FT_OUTreducer.reduce(self.FT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.FT_test_out  = self.FT_OUTreducer.reduce(self.FT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
     
-        if self.UTmechTest and self.FTmechTest:
-            self.common_allProps_df = prep_FCLdata(self.UT_allProps_df, self.FT_allProps_df, self.E_eff_pe)
-            self.common_trainProps_df = prep_FCLdata(self.UT_trainProps_df, self.FT_trainProps_df, self.E_eff_pe)
-            self.common_valProps_df = prep_FCLdata(self.UT_valProps_df, self.FT_valProps_df, self.E_eff_pe)
-            self.common_testProps_df = prep_FCLdata(self.UT_testProps_df, self.FT_testProps_df, self.E_eff_pe)
+        # if self.UTmechTest and self.FTmechTest:
+        #     self.common_allProps_df = prep_FCLdata(self.UT_allProps_df, self.FT_allProps_df, self.E_eff_pe)
+        #     self.common_trainProps_df = prep_FCLdata(self.UT_trainProps_df, self.FT_trainProps_df, self.E_eff_pe)
+        #     self.common_valProps_df = prep_FCLdata(self.UT_valProps_df, self.FT_valProps_df, self.E_eff_pe)
+        #     self.common_testProps_df = prep_FCLdata(self.UT_testProps_df, self.FT_testProps_df, self.E_eff_pe)
 
     def load_DisDist_v1(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
