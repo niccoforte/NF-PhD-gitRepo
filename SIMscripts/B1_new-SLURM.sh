@@ -1,15 +1,16 @@
 #!/bin/bash
-# -j y
 #SBATCH -n 8
 #SBATCH -p compute
 #SBATCH -t 240:0:0
 #SBATCH --mem-per-cpu=5G
-# -l gpu=2
-# -l cluster=andrena
-# -l highmem
-#SBATCH -N JobNameOG
-#SBATCH -l abaqus=12
-# -l avx512
+# -gres=gpu:2
+# -gres=cluster:andrena
+# -gres=highmem
+#SBATCH --job-name=JobNameOG
+#SBATCH -o %x.o%j      
+#SBATCH -e %x.e%j
+#SBATCH -gres=abaqus:12
+# -gres=avx512
 
 set -e
 USER=exy053
@@ -27,7 +28,7 @@ distribution=lhs_uniform
 target=all
 initial=1
 nJobs=1
-CPUs=$NSLOTS
+CPUs=$SLURM_NTASKS
 Fout=20
 Hout=200
 pDir=None
@@ -55,7 +56,7 @@ mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/transfer/
 
 # copy command
 rsync -av /data/home/exy053/p1/p1git-Lattices/SIMscripts/A-HPC-* /gpfs/scratch/$USER/$SLURM_JOB_ID
-rsync -av $SGE_O_WORKDIR/B* /gpfs/scratch/$USER/$SLURM_JOB_ID
+rsync -av $SLURM_SUBMIT_DIR/B* /gpfs/scratch/$USER/$SLURM_JOB_ID
 cd /gpfs/scratch/$USER/$SLURM_JOB_ID
 
 /bin/echo Working in directory: `pwd`.
@@ -86,8 +87,8 @@ rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/transfer/* /gpfs/scratch/$USER/$SLUR
 
 
 # clean up and compression
-rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/
-rsync -av $SGE_O_WORKDIR/$JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
+rsync -av $SLURM_SUBMIT_DIR/$JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/
+rsync -av $SLURM_SUBMIT_DIR/$JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
 
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$SLURM_JOB_ID/
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$SLURM_JOB_ID/zip/
@@ -96,13 +97,13 @@ rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/* /data/SEMS-TaoLab/Niccolo-Fort
 if [ "$zip" = true ] ; then
     tar -czf C1_transfer-$LAT-$DIS-$SLURM_JOB_ID.tgz /gpfs/scratch/$USER/$SLURM_JOB_ID/transfer/
     tar -czf C2_zip-$LAT-$DIS-$SLURM_JOB_ID.tgz /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
-    rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/C1_transfer-$LAT-$DIS-$JOB_ID.tgz $SGE_O_WORKDIR
-    rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/C2_zip-$LAT-$DIS-$JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/
+    rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/C1_transfer-$LAT-$DIS-$SLURM_JOB_ID.tgz $SLURM_SUBMIT_DIR
+    rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/C2_zip-$LAT-$DIS-$SLURM_JOB_ID.tgz /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/
 fi
 
 if [ "$delete_scratch" = true ] ; then
-    rm -rf /gpfs/scratch/$USER/$JOB_ID
+    rm -rf /gpfs/scratch/$USER/$SLURM_JOB_ID
 fi
 
 /bin/echo Job completed at: `date`.
-/bin/echo Finished. Data saved in $SGE_O_WORKDIR and /data/SEMS-TaoLab/Niccolo-Forte/
+/bin/echo Finished. Data saved in $SLURM_SUBMIT_DIR and /data/SEMS-TaoLab/Niccolo-Forte/
