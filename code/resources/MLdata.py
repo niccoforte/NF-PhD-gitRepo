@@ -653,6 +653,7 @@ class DATA:
         dN=20, 
         mechMode="both",
         multi=False,
+        nsims=None,
         model="MLP", 
         freq=False,
         scale=False,
@@ -668,6 +669,7 @@ class DATA:
         self.dN = dN
         self.mechMode = mechMode
         self.multi = multi
+        self.nsims = nsims
         self.model = model
         self.freq = freq
         
@@ -952,6 +954,18 @@ class DATA:
             self.UT_val_out, self.UT_valProps, self.UT_valProps_df       = UT_val_out, UT_valProps, pd.DataFrame(UT_valProps.T, columns=cols)
             self.UT_test_out, self.UT_testProps, self.UT_testProps_df    = UT_test_out, UT_testProps, pd.DataFrame(UT_testProps.T, columns=cols)
 
+            if self.nsims is not None:
+                self.UT_all_in, self.UT_train_in, self.UT_val_in, self.UT_test_in = self.UT_all_in[:self.nsims], self.UT_train_in[:self.nsims], self.UT_val_in[:self.nsims], self.UT_test_in[:self.nsims]
+                self.UT_all_out, self.UT_train_out, self.UT_val_out, self.UT_test_out = self.UT_all_out[:self.nsims], self.UT_train_out[:self.nsims], self.UT_val_out[:self.nsims], self.UT_test_out[:self.nsims]
+                self.UT_allProps, self.UT_trainProps, self.UT_valProps, self.UT_testProps = self.UT_allProps[:self.nsims], self.UT_trainProps[:self.nsims], self.UT_valProps[:self.nsims], self.UT_testProps[:self.nsims]
+                self.UT_allProps_df, self.UT_trainProps_df, self.UT_valProps_df, self.UT_testProps_df = self.UT_allProps_df[:self.nsims], self.UT_trainProps_df[:self.nsims], self.UT_valProps_df[:self.nsims], self.UT_testProps_df[:self.nsims]
+                self.UT_OUT_df = self.UT_OUT_df[:self.nsims]
+                self.UT_IN_df = self.UT_IN_df[:self.nsims]
+                self.UT_dIN_df = self.UT_dIN_df[:self.nsims]
+                self.UT_dOUT_df = self.UT_dOUT_df[:self.nsims]
+                if self.freq:
+                    self.UT_INf_df = self.UT_INf_df[:self.nsims]
+
             if self.scale:
                 if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                     self.UT_INscaler = clone(self.scaler)
@@ -1045,6 +1059,18 @@ class DATA:
             self.FT_val_out, self.FT_valProps, self.FT_valProps_df       = FT_val_out, FT_valProps, pd.DataFrame(FT_valProps.T, columns=cols)
             self.FT_test_out, self.FT_testProps, self.FT_testProps_df    = FT_test_out, FT_testProps, pd.DataFrame(FT_testProps.T, columns=cols)
 
+            if self.nsims is not None:
+                self.FT_all_in, self.FT_train_in, self.FT_val_in, self.FT_test_in = self.FT_all_in[:self.nsims], self.FT_train_in[:self.nsims], self.FT_val_in[:self.nsims], self.FT_test_in[:self.nsims]
+                self.FT_all_out, self.FT_train_out, self.FT_val_out, self.FT_test_out = self.FT_all_out[:self.nsims], self.FT_train_out[:self.nsims], self.FT_val_out[:self.nsims], self.FT_test_out[:self.nsims]
+                self.FT_allProps, self.FT_trainProps, self.FT_valProps, self.FT_testProps = self.FT_allProps[:self.nsims], self.FT_trainProps[:self.nsims], self.FT_valProps[:self.nsims], self.FT_testProps[:self.nsims]
+                self.FT_allProps_df, self.FT_trainProps_df, self.FT_valProps_df, self.FT_testProps_df = self.FT_allProps_df[:self.nsims], self.FT_trainProps_df[:self.nsims], self.FT_valProps_df[:self.nsims], self.FT_testProps_df[:self.nsims]
+                self.FT_OUT_df = self.FT_OUT_df[:self.nsims]
+                self.FT_IN_df = self.FT_IN_df[:self.nsims]
+                self.FT_dIN_df = self.FT_dIN_df[:self.nsims]
+                self.FT_dOUT_df = self.FT_dOUT_df[:self.nsims]
+                if self.freq:
+                    self.FT_INf_df = self.FT_INf_df[:self.nsims]
+
             if self.scale:
                 if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                     self.FT_INscaler = clone(self.scaler)
@@ -1086,6 +1112,12 @@ class DATA:
             self.common_trainProps, self.common_trainProps_df = self.UT_trainProps, self.UT_trainProps_df
             self.common_valProps, self.common_valProps_df = self.UT_valProps, self.UT_valProps_df
             self.common_testProps, self.common_testProps_df = self.UT_testProps, self.UT_testProps_df
+
+            if self.nsims is not None:
+                self.common_allProps, self.common_allProps_df = self.common_allProps[:self.nsims], self.common_allProps_df[:self.nsims]
+                self.common_trainProps, self.common_trainProps_df = self.common_trainProps[:self.nsims], self.common_trainProps_df[:self.nsims]
+                self.common_valProps, self.common_valProps_df = self.common_valProps[:self.nsims], self.common_valProps_df[:self.nsims]
+                self.common_testProps, self.common_testProps_df = self.common_testProps[:self.nsims], self.common_testProps_df[:self.nsims]
 
     def load_DisDist_v1(self):
         self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
