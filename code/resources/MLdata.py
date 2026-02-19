@@ -548,37 +548,6 @@ def load_freqInputData(CSV_all_in_f, CSV_train_in_f, CSV_val_in_f, CSV_test_in_f
     test_in_f  = pd.read_csv(CSV_test_in_f, index_col=0, header=0).to_numpy()
     return all_in_f, train_in_f, val_in_f, test_in_f
 
-# def load_MULTIdata(CSV_UTall_in, CSV_UTall_out, CSV_UTtrain_in, CSV_UTtrain_out, CSV_UTval_in, CSV_UTval_out, CSV_UTtest_in, CSV_UTtest_out,
-#                    CSV_FTall_in, CSV_FTall_out, CSV_FTtrain_in, CSV_FTtrain_out, CSV_FTval_in, CSV_FTval_out, CSV_FTtest_in, CSV_FTtest_out,
-#                    CSV_all_props, CSV_trainProps, CSV_valProps, CSV_testProps): 
-#     UT_all_in = pd.read_csv(CSV_UTall_in, index_col=0, header=0).to_numpy()
-#     UT_all_out = pd.read_csv(CSV_UTall_out, index_col=0, header=0).to_numpy()
-#     UT_train_in = pd.read_csv(CSV_UTtrain_in, index_col=0, header=0).to_numpy()
-#     UT_train_out = pd.read_csv(CSV_UTtrain_out, index_col=0, header=0).to_numpy()
-#     UT_val_in = pd.read_csv(CSV_UTval_in, index_col=0, header=0).to_numpy()
-#     UT_val_out = pd.read_csv(CSV_UTval_out, index_col=0, header=0).to_numpy()
-#     UT_test_in = pd.read_csv(CSV_UTtest_in, index_col=0, header=0).to_numpy()
-#     UT_test_out = pd.read_csv(CSV_UTtest_out, index_col=0, header=0).to_numpy()
-    
-#     FT_all_in = pd.read_csv(CSV_FTall_in, index_col=0, header=0).to_numpy()
-#     FT_all_out = pd.read_csv(CSV_FTall_out, index_col=0, header=0).to_numpy()
-#     FT_train_in = pd.read_csv(CSV_FTtrain_in, index_col=0, header=0).to_numpy()
-#     FT_train_out = pd.read_csv(CSV_FTtrain_out, index_col=0, header=0).to_numpy()
-#     FT_val_in = pd.read_csv(CSV_FTval_in, index_col=0, header=0).to_numpy()
-#     FT_val_out = pd.read_csv(CSV_FTval_out, index_col=0, header=0).to_numpy()
-#     FT_test_in = pd.read_csv(CSV_FTtest_in, index_col=0, header=0).to_numpy()
-#     FT_test_out = pd.read_csv(CSV_FTtest_out, index_col=0, header=0).to_numpy()
-
-#     allProps = pd.read_csv(CSV_all_props, index_col=0, header=0).to_numpy()
-#     trainProps = pd.read_csv(CSV_trainProps, index_col=0, header=0).to_numpy()
-#     valProps = pd.read_csv(CSV_valProps, index_col=0, header=0).to_numpy()
-#     testProps = pd.read_csv(CSV_testProps, index_col=0, header=0).to_numpy()
-
-#     all, test, val, train = [UT_all_in, UT_all_out, FT_all_in, FT_all_out, allProps], [UT_test_in, UT_test_out, FT_test_in, FT_test_out, testProps], [UT_val_in, UT_val_out, FT_val_in, FT_val_out, valProps], [UT_train_in, UT_train_out, FT_train_in, FT_train_out, trainProps]    
-#     return all, train, val, test
-
-# def dataParams(x):
-#     return [np.min(x), np.max(x), np.mean(x), np.std(x)]
 
 def standardize(x, minx, maxx, mode=0):
     if mode == 0:
