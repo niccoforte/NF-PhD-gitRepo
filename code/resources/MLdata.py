@@ -988,14 +988,14 @@ class DATA:
             
             if self.reduce_dim:
                 if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                    self.UT_INreducer = self.reducer
+                    self.UT_INreducer = copy.deepcopy(self.reducer)
                     self.UT_INreducer.fit(self.UT_train_in)
                     self.UT_all_in   = self.UT_INreducer.reduce(self.UT_all_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.UT_train_in = self.UT_INreducer.reduce(self.UT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.UT_val_in   = self.UT_INreducer.reduce(self.UT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.UT_test_in  = self.UT_INreducer.reduce(self.UT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                 if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                    self.UT_OUTreducer = self.reducer
+                    self.UT_OUTreducer = copy.deepcopy(self.reducer)
                     self.UT_OUTreducer.fit(self.UT_train_out)
                     self.UT_all_out   = self.UT_OUTreducer.reduce(self.UT_all_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.UT_train_out = self.UT_OUTreducer.reduce(self.UT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
@@ -1093,14 +1093,14 @@ class DATA:
             
             if self.reduce_dim:
                 if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                    self.FT_INreducer = self.reducer
+                    self.FT_INreducer = copy.deepcopy(self.reducer)
                     self.FT_INreducer.fit(self.FT_train_in)
                     self.FT_all_in   = self.FT_INreducer.reduce(self.FT_all_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.FT_train_in = self.FT_INreducer.reduce(self.FT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.FT_val_in   = self.FT_INreducer.reduce(self.FT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.FT_test_in  = self.FT_INreducer.reduce(self.FT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                 if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                    self.FT_OUTreducer = self.reducer
+                    self.FT_OUTreducer = copy.deepcopy(self.reducer)
                     self.FT_OUTreducer.fit(self.FT_train_out)
                     self.FT_all_out   = self.FT_OUTreducer.reduce(self.FT_all_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                     self.FT_train_out = self.FT_OUTreducer.reduce(self.FT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
