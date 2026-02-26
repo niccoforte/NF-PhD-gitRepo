@@ -937,6 +937,17 @@ class DATA:
             self.UT_val_in, self.UT_val_out = UT_val
             self.UT_test_in, self.UT_test_out = UT_test
 
+            if self.scale:
+                    if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                        self.UT_INscaler = clone(self.scaler)
+                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
+                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
+                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
+                    if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                        self.UT_OUTscaler = clone(self.scaler)
+                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
+                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
+                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
 
         else:
             if self.UTmechTest:
