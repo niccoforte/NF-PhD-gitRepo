@@ -3,14 +3,14 @@
 #SBATCH -p compute
 #SBATCH -t 240:0:0
 #SBATCH --mem-per-cpu=5G
-# -gres=gpu:2
-# -gres=cluster:andrena
-# -gres=highmem
+# --gres=gpu:2
+# --gres=cluster:andrena
+# --gres=highmem
 #SBATCH --job-name=JobNameOG
 #SBATCH -o %x.o%j      
 #SBATCH -e %x.e%j
-#SBATCH -gres=abaqus:12
-# -gres=avx512
+#SBATCH -L abaqus:12
+# --gres=avx512
 
 set -e
 USER=exy053
