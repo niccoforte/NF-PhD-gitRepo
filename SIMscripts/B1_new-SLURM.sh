@@ -7,8 +7,7 @@
 # --gres=cluster:andrena
 # --gres=highmem
 #SBATCH --job-name=JobNameOG
-#SBATCH -o %x.o%j      
-#SBATCH -e %x.e%j
+#SBATCH -o %x.o%j
 #SBATCH -L abaqus:12
 # --gres=avx512
 
@@ -87,8 +86,8 @@ rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/transfer/* /gpfs/scratch/$USER/$SLUR
 
 
 # clean up and compression
-rsync -av $SLURM_SUBMIT_DIR/$JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/
-rsync -av $SLURM_SUBMIT_DIR/$JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
+rsync -av $SLURM_SUBMIT_DIR/$SLURM_JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/
+rsync -av $SLURM_SUBMIT_DIR/$SLURM_JOB_NAME.o$SLURM_JOB_ID /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
 
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$SLURM_JOB_ID/
 mkdir /data/SEMS-TaoLab/Niccolo-Forte/Ti/data/$DIS/$PATH_EXTRA/$fac/$LAT/$SLURM_JOB_ID/zip/
