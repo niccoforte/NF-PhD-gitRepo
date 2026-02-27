@@ -129,75 +129,82 @@ def train_model(
     RMSEtarget=False
 ):
     train_lossLog, val_lossLog = [], []
-    best_loss, best_rmse, best_epoch, best_model_state = 1000, (False, 1000), 0, None
+    best_loss, best_mse, best_rmse, best_epoch, best_model_state = 1000, 1000, (False, 1000), 0, None
     for epoch in range(1, n_epochs+1):
-        train_lossSum, train_sse, train_n = 0, 0, 0
+        train_lossSum, train_metric_sse, train_n = 0, 0, 0
         model.train()
         for batch in train_dataloader:
             opt.zero_grad(set_to_none=True)
             if typ.lower() == "gnn":
-                x, y = batch.x.float().to(device), batch.y.float().to(device)
-                edge_index = batch.edge_index.to(device)
-                batch = batch.batch.to(device)
-                y_predict = model(x, edge_index, batch)
-                y = batch.y.view(batch.num_graphs, -1)
+                data_batch = batch.to(device)
+                x, y = data_batch.x.float(), data_batch.y.float()
+                edge_index = data_batch.edge_index
+                batch_vec = data_batch.batch
+                y_predict = model(x, edge_index, batch_vec)
+                y = data_batch.y.view(data_batch.num_graphs, -1)
             else:
                 x, y = batch[0].float().to(device), batch[1].float().to(device)
                 y_predict = model(x)
-            loss = lossf(y_predict, y)
-            loss.backward()
+            opt_loss = lossf(y_predict, y)
+            opt_loss.backward()
             #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
 
-            train_lossSum += loss.item()
-            train_sse += loss.item()*y.numel()
+            train_lossSum += opt_loss.item()
+            metric_mse_batch = torch.mean((y_predict - y) ** 2)
+            train_metric_sse += metric_mse_batch.item()*y.numel()
             train_n += y.numel()
             if isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR,
                           torch.optim.lr_scheduler.CosineAnnealingLR)):
                 scheduler.step()
 
         train_lossAvg = train_lossSum/len(train_dataloader)
-        train_mse = train_sse/train_n
-        train_rmse = math.sqrt(train_mse)
-        train_lossLog.append(train_mse)
+        train_metric_mse = train_metric_sse/train_n
+        train_metric_rmse = math.sqrt(train_metric_mse)
+        train_lossLog.append(train_lossAvg)
         
         if val_dataloader:
             model.eval()
-            val_lossSum, val_sse, val_n = 0, 0, 0
+            val_lossSum, val_metric_sse, val_n = 0, 0, 0
             with torch.no_grad():
                 for batch in val_dataloader:
                     if typ.lower() == "gnn":
-                        x, y = batch.x.float().to(device), batch.y.float().to(device)
-                        edge_index = batch.edge_index.to(device)
-                        batch = batch.batch.to(device)
-                        y_predict = model(x, edge_index, batch)
-                        y = batch.y.view(batch.num_graphs, -1)
+                        data_batch = batch.to(device)
+                        x = data_batch.x.float()
+                        y = data_batch.y.float()
+                        edge_index = data_batch.edge_index
+                        batch_vec = data_batch.batch
+                        y_predict = model(x, edge_index, batch_vec)
+                        y = data_batch.y.view(data_batch.num_graphs, -1)
+
                     else:
                         x, y = batch[0].float().to(device), batch[1].float().to(device)
                         y_predict = model(x)
                     
-                    loss = lossf(y_predict, y)
-                    val_lossSum += loss.item()
-                    val_sse += loss.item()*y.numel()
+                    val_opt_loss = lossf(y_predict, y)
+                    val_lossSum += val_opt_loss.item()
+                    val_metric_mse_batch = torch.mean((y_predict - y) ** 2)
+                    val_metric_sse += val_metric_mse_batch.item()*y.numel()
                     val_n += y.numel()
 
                 val_lossAvg = val_lossSum/len(val_dataloader)
-                val_mse = val_sse/val_n
-                val_rmse = math.sqrt(val_mse)
-                val_lossLog.append(val_mse)
+                val_metric_mse = val_metric_sse/val_n
+                val_metric_rmse = math.sqrt(val_metric_mse)
+                val_lossLog.append(val_lossAvg)
 
         lossAvg = val_lossAvg if val_dataloader else train_lossAvg
-        mse = val_mse if val_dataloader else train_mse
-        rmse = val_rmse if val_dataloader else train_rmse
+        mse = val_metric_mse if val_dataloader else train_metric_mse
+        rmse = val_metric_rmse if val_dataloader else train_metric_rmse
 
-        if mse < best_loss:
-            best_loss = mse
+        if lossAvg < best_loss:
+            best_loss = lossAvg
+            best_mse = mse
             best_rmse = (False, rmse)
             best_epoch = epoch
             best_model_state = copy.deepcopy(model.state_dict())
         
         if optTrial:
-            optTrial.report(mse, epoch)
+            optTrial.report(lossAvg, epoch)
             if optTrial.should_prune():
                 raise optuna.exceptions.TrialPruned()
         
@@ -213,25 +220,25 @@ def train_model(
 
         if scheduler:
             if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                scheduler.step(mse)
+                scheduler.step(lossAvg)
         _lr = opt.param_groups[0]['lr']
 
         if epoch % verbose == 0 or epoch == 1 or epoch == n_epochs:
             if val_dataloader:
-                print(f"Epoch {epoch}/{n_epochs} => Train MSE: {train_mse:.6f}, Val MSE: {val_mse:.6f}, Train RMSE: {train_rmse:.6f}, Val RMSE: {val_rmse:.6f}, LR: {_lr:.2e}")
+                print(f" -> Epoch {epoch}/{n_epochs} || LOSS - train: {train_lossAvg:.6f}, val: {val_lossAvg:.6f} | MSE - train: {train_metric_mse:.6f}, val: {val_metric_mse:.6f} | RMSE - train: {train_metric_rmse:.6f}, val: {val_metric_rmse:.6f} | LR: {_lr:.2e}")
             else:
-                print(f"Epoch {epoch}/{n_epochs} => Train MSE: {train_mse:.6f}, Train RMSE: {train_rmse:.6f}, LR: {_lr:.2e}")
+                print(f" -> Epoch {epoch}/{n_epochs} || LOSS - train: {train_lossAvg:.6f} | MSE - train: {train_metric_mse:.6f} | RMSE - train: {train_metric_rmse:.6f} | LR: {_lr:.2e}")
         
         if earlyStop:
-            earlyStop(mse)
+            earlyStop(lossAvg)
             if earlyStop.early_stop:
                 break
         
     if best_model_state:
         model.load_state_dict(best_model_state)
     
-    print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with MSE: {best_loss:.6f} and RMSE: {best_rmse[1]:.6f}")
-    return model, epoch, train_lossLog, val_lossLog, best_loss, best_rmse, best_epoch
+    print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with LOSS: {best_loss:.6f}, MSE: {best_mse:.6f} and RMSE: {best_rmse[1]:.6f} ==================")
+    return model, epoch, train_lossLog, val_lossLog, best_loss, best_mse, best_rmse, best_epoch
 
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
@@ -239,9 +246,10 @@ def predict_model(typ, model, test_dataloader):
     with torch.no_grad():
         for batch in test_dataloader:
             if typ.lower() == "gnn":
-                x, y = batch.x.float(), batch.y.float()
-                y_predict = model(x, batch.edge_index, batch.batch)  # CHECK
-                y = batch.y.view(batch.num_graphs, -1)
+                device = next(model.parameters()).device
+                data_batch = batch.to(device)
+                y_predict = model(data_batch.x.float(), data_batch.edge_index, data_batch.batch)
+                y = data_batch.y.view(data_batch.num_graphs, -1)
             else:
                 x, y = batch[:][0].float(), batch[:][1].float()
                 y_predict = model(x)
@@ -318,8 +326,9 @@ class EarlyStopping:
         
         if self.counter >= self.patience:
             if self.verbose:
-                print(f"Early stopping triggered after {self.patience} epochs without improvement.")
+                print(f" !!! Early stopping triggered after {self.patience} epochs without improvement !!!")
             self.early_stop = True  # Set flag for stopping
+
 
 ### HYPERPARAMETER OPTIMIZATION
 
@@ -401,73 +410,113 @@ def load_bestParams(path="models/etc", name="sample"):
 # TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
 class CustomQuantileLoss(nn.Module):
-    """
-    This loss is an average of three "tilted" L2 losses, each corresponding to a
-    different quantile, which allows the model to capture different parts of the
-    response distribution.
-
-    This implementation corrects a likely typo in the original paper's formula,
-    using (1 - lambda) for overestimation penalties to ensure the loss is always positive.
-    The original formula uses (lambda - 1), which would result in negative loss values.
-
-    Args:
-        quantiles (list or tuple of floats): A list of three quantile values (lambda_i)
-                                            to be used for the loss calculation.
-                                            Default is [0.5, 0.45, 0.1] as mentioned in the paper.
-    """
-    def __init__(self, quantiles=[0.5, 0.45, 0.1]):
+    def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=(50,130), err_type="L2"):
         super().__init__()
-        # Store quantiles as a buffer. This makes sure it's moved to the correct
-        # device, e.g., .to('cuda'), along with the model.
-        self.register_buffer('quantiles', torch.tensor(quantiles))
-        if len(self.quantiles) != 3:
-            print("Warning: The paper specifies 3 quantiles, but a different number was provided.")
+        self.register_buffer("quantiles", torch.tensor(quantiles, dtype=torch.float32))
+        self.zone_boundaries = zone_boundaries
+        self.err_type = err_type
+
+    def _zone_slices(self, n_points):
+        if self.zone_boundaries is None:
+            b1 = n_points // 3
+            b2 = (2 * n_points) // 3
+        else:
+            if len(self.zone_boundaries) != 2:
+                raise ValueError("zone_boundaries must be a tuple/list of length 2.")
+            b1, b2 = int(self.zone_boundaries[0]), int(self.zone_boundaries[1])
+        if not (0 < b1 < b2 < n_points):
+            raise ValueError(f"Invalid zone boundaries ({b1}, {b2}) for n_points={n_points}.")
+        return (
+            (slice(None), slice(0, b1)),
+            (slice(None), slice(b1, b2)),
+            (slice(None), slice(b2, n_points)),
+        )
 
     def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
         """
-        Calculates the forward pass of the loss function.
-
-        Args:
-            y_pred (torch.Tensor): The predicted values from the model.
-            y_true (torch.Tensor): The ground truth values.
-
-        Returns:
-            torch.Tensor: The computed scalar loss value.
+        Calculates the forward pass of the squared quantile (expectile) loss function.
+        Corrects a mathematical typo found in Eq C.5 of the reference paper.
         """
-        # Ensure the shapes match
         if y_pred.shape != y_true.shape:
             raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
 
-        # Calculate the error
-        error = y_pred - y_true
-        squared_error = error ** 2
-        
-        total_loss = 0.0
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
 
-        # Loop through each quantile and calculate its contribution to the loss
-        for lmbda in self.quantiles:
-            # This is the core of the quantile loss logic, implemented efficiently
-            # using torch.where.
-            # Case 1 (Overestimation): error > 0. Penalty is (1 - lmbda).
-            # Case 2 (Underestimation): error <= 0. Penalty is lmbda.
-            quantile_loss = torch.where(
-                error > 0,
-                (1 - lmbda) * squared_error,
-                lmbda * squared_error
-            )
-            total_loss += torch.sum(quantile_loss)
-            
-        # Get the total number of elements for normalization
-        n = y_true.numel()
-        num_quantiles = len(self.quantiles)
+        zones = self._zone_slices(y_true.shape[-1])
+        total_loss = y_true.new_tensor(0.0)
 
-        # Normalize by the number of quantiles and the number of samples, as in Eq. C.5
-        final_loss = total_loss / (num_quantiles * n)
+        for i, zone in enumerate(zones):
+            # 1. Use Squared Error as intended by Eq C.5
+            err = y_true[zone] - y_pred[zone]
+            err_sq = (err) ** 2
+            lmbda = self.quantiles[i].to(y_true.device, dtype=y_true.dtype)
 
-        return final_loss
+            # 2. Fix the typo: Use (1 - lambda) for overestimations
+            if self.err_type.lower() == "l1":
+                zone_loss = torch.where(err < 0, (1 - lmbda) * torch.abs(err), lmbda * torch.abs(err))
+            elif self.err_type.lower() == "l2":
+                zone_loss = torch.where(err < 0, (1 - lmbda) * err_sq, lmbda * err_sq)
+            total_loss = total_loss + zone_loss.sum()
 
-def custom_loss(target, output):
-    return torch.mean((output - target)**2)
+        # Average out the loss over all points in the batch 
+        # (Mathematically maps to the 1/(3n) normalization from the paper)
+        return total_loss / y_true.numel()
+
+class CustomQuantileLossMATLAB(nn.Module):
+    """
+    MATLAB-compatible forward loss matching qlmseRegressionLayerCustom.forwardLoss.
+    Uses the same class style/signature as CustomQuantileLoss for pipeline compatibility.
+    """
+    def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=None, err_type="L2"):
+        super().__init__()
+        self.register_buffer("quantiles", torch.tensor(quantiles, dtype=torch.float32))
+        self.zone_boundaries = zone_boundaries
+        self.err_type = err_type
+
+    def _zone_slices(self, n_points):
+        # MATLAB behavior: seg = R./3; vec1=1:round(seg); vec2=round(seg)+1:2*round(seg); vec3=...
+        if self.zone_boundaries is None:
+            b1 = int(round(n_points / 3.0))
+            b2 = int(2 * round(n_points / 3.0))
+        else:
+            if len(self.zone_boundaries) != 2:
+                raise ValueError("zone_boundaries must be a tuple/list of length 2.")
+            b1, b2 = int(self.zone_boundaries[0]), int(self.zone_boundaries[1])
+        if not (0 < b1 < b2 <= n_points):
+            raise ValueError(f"Invalid zone boundaries ({b1}, {b2}) for n_points={n_points}.")
+        return (
+            (slice(None), slice(0, b1)),
+            (slice(None), slice(b1, b2)),
+            (slice(None), slice(b2, n_points)),
+        )
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+
+        zones = self._zone_slices(y_true.shape[-1])
+        total_loss = y_true.new_tensor(0.0)
+
+        for i, zone in enumerate(zones):
+            err_sq = (y_pred[zone] - y_true[zone]) ** 2
+            lmbda = self.quantiles[i].to(y_true.device, dtype=y_true.dtype)
+            # MATLAB: mean(sum(max(lambda*e, (lambda-1)*e)))
+            zone_term = torch.maximum(lmbda * err_sq, (lmbda - 1.0) * err_sq)
+            zone_loss = zone_term.sum(dim=1).mean()
+            total_loss = total_loss + zone_loss
+
+        # MATLAB: loss = (loss1 + loss2 + loss3) / 3
+        return total_loss / 3.0
 
 def physics_loss(target, output):
     return torch.abs(torch.sum(target) - torch.sum(output))
@@ -481,21 +530,25 @@ def plot_loss(epoch, train, val=None):
     if val:
         plt.plot(np.linspace(1, epoch, len(val)), val, label="Validation", c="orangered")
     plt.xlabel("Training Epoch")
-    plt.ylabel("Mean Squared Error (MSE)")
+    plt.ylabel("Loss")
     plt.yscale("log")
     plt.title("Training and Validation Loss Vs Epoch")
     plt.legend()
     # plt.grid()
     plt.show()
 
-def plot_StressStrainOUT(perOUT, test_outputs, truth=None, indx=0):
+def plot_predictions(perOUT, test_outputs, truth=None, mode="ut", indx=0):
     fig = plt.figure(figsize=(10, 5))
     plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label=f"Prediction-{indx}", c="orangered")
     if truth is not None:
         plt.scatter(perOUT[0], truth[indx]+perOUT[1], s=5, label=f"Truth-{indx}", c="darkgreen")
         plt.bar(perOUT[0], absErr(truth[indx], test_outputs[indx]), width=(max(perOUT[0])-min(perOUT[0]))/(len(perOUT[0])), alpha=0.25, label="Error", color="gray")
-    plt.ylabel("Stress ($\sigma$) [MPa]")
-    plt.xlabel("Strain ($\epsilon$)")
+    if mode.lower() == "ut":
+        plt.ylabel("Macroscopic Stress ($\sigma$) [MPa]")
+        plt.xlabel("Macroscopic Strain ($\epsilon$)")
+    elif mode.lower() == "ft":
+        plt.ylabel("Load-line Force ($F$) [N]")
+        plt.xlabel("Load-line Dispalcement ($d$)")
     plt.legend()
     # plt.grid()
     plt.show()
