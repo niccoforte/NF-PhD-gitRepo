@@ -2,7 +2,7 @@ from resources.imports import *
 
 from dataclasses import dataclass
 from sklearn.cluster import KMeans
-from sklearn.cross_decomposition import PLSRegression
+from sklearn.decomposition import PCA
 from sklearn.feature_selection import mutual_info_regression
 from sklearn.neighbors import NearestNeighbors
 
@@ -14,6 +14,36 @@ class TokenizationConfig:
     elite_quantile: float = 0.90
     embedding_dim: int = 8
     random_state: int = 42
+
+
+class OutputInformedEmbedder:
+    """
+    Lightweight supervised embedder:
+    - computes feature-score correlation weights (output-informed),
+    - applies PCA on weighted patch features.
+    """
+    def __init__(self, n_components=8):
+        self.n_components = n_components
+        self.w = None
+        self.pca = None
+
+    def fit(self, X, y):
+        y = y.reshape(-1)
+        Xc = X - np.mean(X, axis=0, keepdims=True)
+        yc = y - np.mean(y)
+        denom = (np.std(Xc, axis=0) * (np.std(yc) + 1e-12)) + 1e-12
+        corr = np.mean(Xc * yc[:, None], axis=0) / denom
+        self.w = np.abs(corr) + 1e-3
+
+        Xw = X * self.w[None, :]
+        n_comp = min(self.n_components, X.shape[1], X.shape[0])
+        self.pca = PCA(n_components=max(1, n_comp))
+        self.pca.fit(Xw)
+        return self
+
+    def transform(self, X):
+        Xw = X * self.w[None, :]
+        return self.pca.transform(Xw)
 
 
 def _normalized_score(props_df, objectives, weights=None, baseline_index=0):
@@ -98,8 +128,8 @@ class OutputInformedTokenizer:
         Xp = patch_feats.reshape(-1, patch_feats.shape[-1])
         yp = np.repeat(score, X_nodes.shape[1]).reshape(-1, 1)
 
-        emb_dim = min(self.config.embedding_dim, Xp.shape[1], max(1, len(np.unique(score)) - 1))
-        self.embedding_model = PLSRegression(n_components=emb_dim)
+        emb_dim = min(self.config.embedding_dim, Xp.shape[1], Xp.shape[0])
+        self.embedding_model = OutputInformedEmbedder(n_components=emb_dim)
         self.embedding_model.fit(Xp, yp)
         Z = self.embedding_model.transform(Xp)
 
