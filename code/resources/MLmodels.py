@@ -1,11 +1,14 @@
 from resources.imports import *
 
-from resources.MLfunc import train_model, predict_model, plot_loss, plot_StressStrainOUT, absErr, _activation
+from resources.lattices import connectivity
+from resources.MLfunc import train_model, predict_model, plot_loss, plot_predictions, absErr, _activation, visualize_graphNetwork
 from resources.MLdata import Dataset_
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader as gDataLoader
+from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
 from torchinfo import summary
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
@@ -29,10 +32,10 @@ class MODEL:
         opt, 
         batch, 
         lr, 
-        data, 
-        train_dataloader=None, 
-        val_dataloader=None, 
-        test_dataloader=None, 
+        data,
+        mechMode="both",
+        UT_dataloaders=None, 
+        FT_dataloaders=None,
         scheduler=None, 
         earlyStop=None, 
         w_init=False, 
@@ -42,96 +45,237 @@ class MODEL:
         self.typ = typ
         self.model = model
         self.lossf = lossf
-        self.opt = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=opt[1])
+        # self.opt = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=opt[1])
         self.batch = batch
         self.lr = lr
-        self.data = data 
-        self.train_dataloader = train_dataloader
-        self.val_dataloader = val_dataloader
-        self.test_dataloader = test_dataloader
+        self.data = data
+        if mechMode.lower() not in ["ut", "ft", "both"]:
+            mechMode = data.mechMode
+        if mechMode.lower() == "ut":
+            self.UTmechTest = True
+            self.FTmechTest = False
+        elif mechMode.lower() == "ft":
+            self.UTmechTest = False
+            self.FTmechTest = True
+        elif mechMode.lower() == "both":
+            self.UTmechTest = True
+            self.FTmechTest = True
+        self.UT_dataloaders = UT_dataloaders
+        self.FT_dataloaders = FT_dataloaders
         self.earlyStop = earlyStop
         if w_init:
             self.model.apply(w_init)
         self.device = device
         self.model.to(device)
-        if scheduler:
-            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.opt, 
-                                                                        mode=scheduler[0], 
-                                                                        factor=scheduler[1],
-                                                                        patience=scheduler[2], 
-                                                                        threshold=scheduler[3])
-        else:
-            self.scheduler = None
         self.optTrial = optTrial
 
-        self.trainDS = Dataset_(data.train_in, data.train_out)
-        self.valDS = Dataset_(data.val_in, data.val_out)
-        self.testDS = Dataset_(data.test_in, data.test_out)
+        if self.UTmechTest:
+            self.UT_model = copy.deepcopy(model)
+            self.UT_opt = torch.optim.Adam(self.UT_model.parameters(), lr=lr, weight_decay=opt[1])
+            
+            if typ.lower() == "gnn":
+                self.UT_nodes = data.UT_perIN_df["in"].to_numpy().reshape(int(len(data.UT_perIN_df)/2), 2) / 1000.0
+                self.UT_edges = connectivity(data.LAT, self.UT_nodes, data.geom)[:, 1:] - 1
+                self.UT_edge_index = torch.tensor(self.UT_edges, dtype=torch.long).t().contiguous()
 
-        if train_dataloader is None:
-            self.train_dataloader = DataLoader(dataset=self.trainDS, batch_size=self.batch, shuffle=True)
-        if val_dataloader is None:
-            self.val_dataloader = DataLoader(dataset=self.valDS, batch_size=self.batch, shuffle=False)
-        if test_dataloader is None:
-            self.test_dataloader = DataLoader(dataset=self.testDS, batch_size=self.batch, shuffle=False)
+                self.UT_trainDS = [Data(x=torch.tensor(i, dtype=torch.float), edge_index=self.UT_edge_index, y=torch.tensor(j, dtype=torch.float)) for i,j in zip(data.UT_train_in, data.UT_train_out)]
+                self.UT_valDS = [Data(x=torch.tensor(i, dtype=torch.float), edge_index=self.UT_edge_index, y=torch.tensor(j, dtype=torch.float)) for i,j in zip(data.UT_val_in, data.UT_val_out)]
+                self.UT_testDS = [Data(x=torch.tensor(i, dtype=torch.float), edge_index=self.UT_edge_index, y=torch.tensor(j, dtype=torch.float)) for i,j in zip(data.UT_test_in, data.UT_test_out)]
+            
+                if UT_dataloaders is None:
+                    self.UT_train_dataloader = gDataLoader(dataset=self.UT_trainDS, batch_size=self.batch, shuffle=True)
+                    self.UT_val_dataloader = gDataLoader(dataset=self.UT_valDS, batch_size=self.batch, shuffle=False)
+                    self.UT_test_dataloader = gDataLoader(dataset=self.UT_testDS, batch_size=self.batch, shuffle=False)
+                else:
+                    self.UT_train_dataloader = UT_dataloaders[0]
+                    self.UT_val_dataloader = UT_dataloaders[1]
+                    self.UT_test_dataloader = UT_dataloaders[2]
+            else:
+                self.UT_trainDS = Dataset_(data.UT_train_in, data.UT_train_out)
+                self.UT_valDS = Dataset_(data.UT_val_in, data.UT_val_out)
+                self.UT_testDS = Dataset_(data.UT_test_in, data.UT_test_out)
+            
+                if UT_dataloaders is None:
+                    self.UT_train_dataloader = DataLoader(dataset=self.UT_trainDS, batch_size=self.batch, shuffle=True)
+                    self.UT_val_dataloader = DataLoader(dataset=self.UT_valDS, batch_size=self.batch, shuffle=False)
+                    self.UT_test_dataloader = DataLoader(dataset=self.UT_testDS, batch_size=self.batch, shuffle=False)
+                else:
+                    self.UT_train_dataloader = UT_dataloaders[0]
+                    self.UT_val_dataloader = UT_dataloaders[1]
+                    self.UT_test_dataloader = UT_dataloaders[2]
+
+        if self.FTmechTest:
+            self.FT_model = copy.deepcopy(model)
+            self.FT_opt = torch.optim.Adam(self.FT_model.parameters(), lr=lr, weight_decay=opt[1])
+            
+            if typ.lower() == "gnn":
+                self.FT_nodes = data.FT_perIN_df["in"].to_numpy().reshape(int(len(data.FT_perIN_df)/2), 2) / 1000.0
+                self.FT_edges = connectivity(data.LAT, self.FT_nodes, data.geom)[:, 1:] - 1
+                self.FT_edge_index = torch.tensor(self.FT_edges, dtype=torch.long).t().contiguous()
+
+                self.FT_trainDS = [Data(x=torch.tensor(i, dtype=torch.float), edge_index=self.FT_edge_index, y=torch.tensor(j, dtype=torch.float)) for i,j in zip(data.FT_train_in, data.FT_train_out)]
+                self.FT_valDS = [Data(x=torch.tensor(i, dtype=torch.float), edge_index=self.FT_edge_index, y=torch.tensor(j, dtype=torch.float)) for i,j in zip(data.FT_val_in, data.FT_val_out)]
+                self.FT_testDS = [Data(x=torch.tensor(i, dtype=torch.float), edge_index=self.FT_edge_index, y=torch.tensor(j, dtype=torch.float)) for i,j in zip(data.FT_test_in, data.FT_test_out)]
+            
+                if FT_dataloaders is None:
+                    self.FT_train_dataloader = gDataLoader(dataset=self.FT_trainDS, batch_size=self.batch, shuffle=True)
+                    self.FT_val_dataloader = gDataLoader(dataset=self.FT_valDS, batch_size=self.batch, shuffle=False)
+                    self.FT_test_dataloader = gDataLoader(dataset=self.FT_testDS, batch_size=self.batch, shuffle=False)
+                else:
+                    self.FT_train_dataloader = FT_dataloaders[0]
+                    self.FT_val_dataloader = FT_dataloaders[1]
+                    self.FT_test_dataloader = FT_dataloaders[2]
+            else:
+                if self.UTmechTest:
+                    self.FT_trainDS = Dataset_(data.UT_train_in, data.FT_train_out)
+                    self.FT_valDS = Dataset_(data.UT_val_in, data.FT_val_out)
+                    self.FT_testDS = Dataset_(data.UT_test_in, data.FT_test_out)
+                else:
+                    self.FT_trainDS = Dataset_(data.FT_train_in, data.FT_train_out)
+                    self.FT_valDS = Dataset_(data.FT_val_in, data.FT_val_out)
+                    self.FT_testDS = Dataset_(data.FT_test_in, data.FT_test_out)
+
+                if FT_dataloaders is None:
+                    self.FT_train_dataloader = DataLoader(dataset=self.FT_trainDS, batch_size=self.batch, shuffle=True)
+                    self.FT_val_dataloader = DataLoader(dataset=self.FT_valDS, batch_size=self.batch, shuffle=False)
+                    self.FT_test_dataloader = DataLoader(dataset=self.FT_testDS, batch_size=self.batch, shuffle=False)
+                else:
+                    self.FT_train_dataloader = FT_dataloaders[0]
+                    self.FT_val_dataloader = FT_dataloaders[1]
+                    self.FT_test_dataloader = FT_dataloaders[2]
         
-        self.epoch = None
-        self.train_lossLog, self.val_lossLog = None, None
-        self.best_loss, self.best_rmse, self.best_epoch = None, None, None
-
-        self.test_outputs, self.truth, self.err = None, None, None
-        self.best, self.worst = None, None
+        if scheduler:
+            if self.UTmechTest:
+                self.UTscheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.UT_opt, 
+                                                                            mode=scheduler[0], 
+                                                                            factor=scheduler[1],
+                                                                            patience=scheduler[2], 
+                                                                            threshold=scheduler[3],
+                                                                            threshold_mode="abs")
+            if self.FTmechTest:
+                self.FTscheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.FT_opt, 
+                                                                            mode=scheduler[0], 
+                                                                            factor=scheduler[1],
+                                                                            patience=scheduler[2], 
+                                                                            threshold=scheduler[3],
+                                                                            threshold_mode="abs")
+        else:
+            self.UTscheduler = None
+            self.FTscheduler = None
     
     def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
-        self.model, \
-            self.epoch, \
-            self.train_lossLog, \
-            self.val_lossLog, \
-            self.best_loss, \
-            self.best_rmse, \
-            self.best_epoch = train_model(self.typ, 
-                                    self.model, 
-                                    self.lossf, 
-                                    n_epochs, 
-                                    self.opt, 
-                                    self.train_dataloader, 
-                                    val_dataloader=self.val_dataloader, 
-                                    device=self.device,
-                                    scheduler=self.scheduler, 
-                                    earlyStop=self.earlyStop, 
-                                    verbose=verbose,
-                                    optTrial=self.optTrial,
-                                    RMSEtarget=RMSEtarget)
+        if self.UTmechTest:
+            self.UT_model, \
+                self.UT_epoch, \
+                self.UT_train_lossLog, \
+                self.UT_val_lossLog, \
+                self.UT_best_loss, \
+                self.UT_best_mse, \
+                self.UT_best_rmse, \
+                self.UT_best_epoch = train_model(self.typ, 
+                                                 self.UT_model, 
+                                                 self.lossf, 
+                                                 n_epochs, 
+                                                 self.UT_opt, 
+                                                 self.UT_train_dataloader, 
+                                                 val_dataloader=self.UT_val_dataloader, 
+                                                 device=self.device,
+                                                 scheduler=self.UTscheduler, 
+                                                 earlyStop=copy.deepcopy(self.earlyStop), 
+                                                 verbose=verbose,
+                                                 optTrial=self.optTrial,
+                                                 RMSEtarget=RMSEtarget)
         
-        if plot:
-            plot_loss(self.epoch, self.train_lossLog, self.val_lossLog)
+            if plot:
+                plot_loss(self.UT_epoch, self.UT_train_lossLog, self.UT_val_lossLog)
+
+        if self.FTmechTest:
+            self.FT_model, \
+                self.FT_epoch, \
+                self.FT_train_lossLog, \
+                self.FT_val_lossLog, \
+                self.FT_best_loss, \
+                self.FT_best_mse, \
+                self.FT_best_rmse, \
+                self.FT_best_epoch = train_model(self.typ, 
+                                                 self.FT_model, 
+                                                 self.lossf, 
+                                                 n_epochs, 
+                                                 self.FT_opt, 
+                                                 self.FT_train_dataloader, 
+                                                 val_dataloader=self.FT_val_dataloader, 
+                                                 device=self.device,
+                                                 scheduler=self.FTscheduler, 
+                                                 earlyStop=copy.deepcopy(self.earlyStop), 
+                                                 verbose=verbose,
+                                                 optTrial=self.optTrial,
+                                                 RMSEtarget=RMSEtarget)
+        
+            if plot:
+                plot_loss(self.FT_epoch, self.FT_train_lossLog, self.FT_val_lossLog)
     
     def predict(self, test_dataloader=None, plot=False):
-        if test_dataloader is None:
-            test_dataloader = self.test_dataloader
+        new_loader = test_dataloader
+        if self.UTmechTest:
+            if new_loader is None:
+                test_dataloader = self.UT_test_dataloader
 
-        self.test_outputs, self.truth = predict_model(self.typ,
-                                                       self.model, 
-                                                       test_dataloader)
-        if self.data.reduce_dim:
-            if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
-                self.test_outputs = self.data.OUTreducer.reconstruct(self.test_outputs)
-                self.truth = self.data.OUTreducer.reconstruct(self.truth)
-        if self.data.scale:
-            if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
-                self.test_outputs = self.data.OUTscaler.inverse_transform(self.test_outputs)
-                self.truth = self.data.OUTscaler.inverse_transform(self.truth)
+            self.UT_test_outputs, self.UT_truth = predict_model(self.typ,
+                                                                self.UT_model,
+                                                                test_dataloader)
+            if self.data.reduce_dim:
+                if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
+                    self.UT_test_outputs = self.data.UT_OUTreducer.reconstruct(self.UT_test_outputs)
+                    self.UT_truth = self.data.UT_OUTreducer.reconstruct(self.UT_truth)
+            if self.data.scale:
+                if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
+                    self.UT_test_outputs = self.data.UT_OUTscaler.inverse_transform(self.UT_test_outputs)
+                    self.UT_truth = self.data.UT_OUTscaler.inverse_transform(self.UT_truth)
 
-        self.err = absErr(self.test_outputs, self.truth, typ="sum", axis=1)
-        self.best, self.worst = self.err.tolist().index(min(self.err)), self.err.tolist().index(max(self.err))
-        print(f"Best prediction: {self.best}, Worst prediction: {self.worst}")
+            self.UT_err = absErr(self.UT_test_outputs, self.UT_truth, typ="sum", axis=1)
+            self.UT_best, self.UT_worst = self.UT_err.tolist().index(min(self.UT_err)), self.UT_err.tolist().index(max(self.UT_err))
+            print(f"Best prediction: {self.UT_best}, Worst prediction: {self.UT_worst}")
 
-        if plot:
-            plot_StressStrainOUT(self.data.perOUT_df.T.to_numpy(), self.test_outputs, truth=self.truth, indx=self.best)
-            plot_StressStrainOUT(self.data.perOUT_df.T.to_numpy(), self.test_outputs, truth=self.truth, indx=self.worst)
+            if plot:
+                plot_predictions(self.data.UT_perOUT_df.T.to_numpy(), self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_best)
+                plot_predictions(self.data.UT_perOUT_df.T.to_numpy(), self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_worst)
+        
+        if self.FTmechTest:
+            if new_loader is None:
+                test_dataloader = self.FT_test_dataloader
+
+            self.FT_test_outputs, self.FT_truth = predict_model(self.typ,
+                                                                self.FT_model,
+                                                                test_dataloader)
+            if self.data.reduce_dim:
+                if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
+                    self.FT_test_outputs = self.data.FT_OUTreducer.reconstruct(self.FT_test_outputs)
+                    self.FT_truth = self.data.FT_OUTreducer.reconstruct(self.FT_truth)
+            if self.data.scale:
+                if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
+                    self.FT_test_outputs = self.data.FT_OUTscaler.inverse_transform(self.FT_test_outputs)
+                    self.FT_truth = self.data.FT_OUTscaler.inverse_transform(self.FT_truth)
+
+            self.FT_err = absErr(self.FT_test_outputs, self.FT_truth, typ="sum", axis=1)
+            self.FT_best, self.FT_worst = self.FT_err.tolist().index(min(self.FT_err)), self.FT_err.tolist().index(max(self.FT_err))
+            print(f"Best prediction: {self.FT_best}, Worst prediction: {self.FT_worst}")
+
+            if plot:
+                plot_predictions(self.data.FT_perOUT_df.T.to_numpy(), self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_best)
+                plot_predictions(self.data.FT_perOUT_df.T.to_numpy(), self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_worst)
         
     def _summary(self):
-        return summary(self.model, input_size=(self.batch, self.model.in_size))
+        if self.typ.lower() == "gnn":
+            if self.UTmechTest or (self.UTmechTest and self.FTmechTest):
+                sample_batch = next(iter(self.UT_train_dataloader)).to(self.device)
+                visualize_graphNetwork(self.UT_train_dataloader, pos=self.UT_nodes, colors=None, layout="kk")
+                return summary(self.model, input_data=(sample_batch.x, self.UT_edge_index, sample_batch.batch))
+            elif self.FTmechTest:
+                sample_batch = next(iter(self.FT_train_dataloader)).to(self.device)
+                visualize_graphNetwork(self.FT_train_dataloader, pos=self.FT_nodes, colors=None, layout="kk")
+                return summary(self.model, input_data=(sample_batch.x, self.FT_edge_index, sample_batch.batch))
+        else:
+            return summary(self.model, input_size=(self.batch, self.model.in_size))
     
     def save(self, path, name):
         torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
@@ -215,9 +359,9 @@ class mlpBlock(nn.Module):
     
     def forward(self, x):
         x = self.fc(x)
-        x = self._act(x)
         if self.norm:
             x = self.normL(x)
+        x = self._act(x)
         return x
 
 class MLP(nn.Module):
@@ -242,11 +386,11 @@ class MLP(nn.Module):
 
         if len(h_size) > 0:
             self.fcIN = nn.Linear(in_size, h_size[0], bias=bias)
-            if block == "mlp":
+            if block.lower() == "mlp":
                 self.hlayers = nn.ModuleList([
                      mlpBlock(i, j, act, norm, bias) for i, j in zip(h_size[:-1], h_size[1:])
                 ])
-            elif block == "res":
+            elif block.lower() == "res":
                 self.hlayers = nn.ModuleList([
                     resBlock(i, act, norm, bias) for i in h_size])
         else:
@@ -269,9 +413,9 @@ class MLP(nn.Module):
     def forward(self, x):
         if self.fcIN:
             x = self.fcIN(x)
-            x = self._act(x)
             if self.norm:
                 x = self.normL(x)
+            x = self._act(x)
             if self.dropout > 0.0:
                 x = self.dropoutL(x)
         if self.hlayers:
@@ -283,14 +427,14 @@ class MLP(nn.Module):
         return x
 
 
-### Graph Convolutional Network model  # TODO : Fix GNN predictions.
+### Graph Neural Network models
 class gcnBlock(nn.Module):
-    def __init__(self, in_size, out_size, act, norm=None):
+    def __init__(self, in_size, out_size, act, norm=None, bias=True):
         super(gcnBlock, self).__init__()
         self.norm = norm
         
-        self.Gconv = GCNConv(in_size, out_size)
-        self.act = nn.ReLU()
+        self.Gconv = GCNConv(in_size, out_size, bias=bias)
+        self.act = _activation(act)
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size)
         if norm == 'batch':
@@ -303,46 +447,14 @@ class gcnBlock(nn.Module):
         x = self.act(x)
         return x
 
-class GCN(nn.Module):
-    def __init__(self, in_size, h_size, out_size, norm=None, pool="mean"):
-        super(GCN, self).__init__()
-        self.norm = norm
-        self.pool = pool
-        
-        self.GconvIN = GCNConv(in_size, h_size[0])
-        # self.GconvOUT = GCNConv(h_size[-1], out_size)
-        self.fcOUT = nn.Linear(h_size[-1], out_size)
-        self.act = nn.Sigmoid()
-        if norm == 'layer':
-            self.normIN = nn.LayerNorm(h_size[0])
-        if norm == 'batch':
-            self.normIN = nn.BatchNorm1d(h_size[0])
-        self.dropout = nn.Dropout(0.25)
-        self.hlayers = nn.ModuleList([gcnBlock(i, j, self.act, norm) for i, j in zip(h_size[:-1], h_size[1:])])
-
-    def forward(self, x, edge_index, batch):
-        x = self.GconvIN(x, edge_index)
-        if self.norm: 
-            x = self.normIN(x)
-        x = self.act(x)
-        for layer in self.hlayers:
-            x = layer(x, edge_index)
-        if self.pool == "mean":
-            x = global_mean_pool(x, batch)
-        elif self.pool == "add":
-            x = global_add_pool(x, batch)
-        x = self.fcOUT(x)
-        return x
-
-### Graph Attetion Network model
 class gatBlock(nn.Module):
-    def __init__(self, in_size, out_size, act, heads=1, norm=None):
+    def __init__(self, in_size, out_size, act, heads=1, norm=None, bias=True):
         super(gatBlock, self).__init__()
         self.norm = norm
         self.heads = heads
-        self.act = act
+        self.act = _activation(act)
         
-        self.GATconv = GATConv(in_size, out_size, heads=heads, concat=True)
+        self.GATconv = GATConv(in_size, out_size, heads=heads, concat=True, bias=bias)
         if norm == 'layer':
             self.normL = nn.LayerNorm(out_size * heads)
         elif norm == 'batch':
@@ -355,47 +467,82 @@ class gatBlock(nn.Module):
         x = self.act(x)
         return x
 
-class GAT(nn.Module):
-    def __init__(self, in_size, h_size, out_size, heads=1, norm=None, pool="mean"):
-        super(GAT, self).__init__()
+class GNN(nn.Module):
+    def __init__(
+        self,
+        in_size,
+        h_size,
+        out_size,
+        act="relu",
+        block="gcn",
+        norm=None,
+        dropout=0.0,
+        bias=True,
+        heads=1,
+        pool="mean"
+    ):
+        super(GNN, self).__init__()
+
+        self.in_size = in_size
+        self.h_size = h_size
+        self.out_size = out_size
+        self.block = block.lower()
         self.norm = norm
-        self.heads = heads
+        self.dropout = dropout
         self.pool = pool.lower()
-        self.act = nn.ReLU()
+        self.heads = heads
+        self.act = _activation(act)
 
-        ## ENCODER
-        self.GATconvIN = GATConv(in_size, h_size[0], heads=heads, concat=True)
-        self.hlayers = nn.ModuleList([gatBlock(i*heads, j, self.act, heads=heads, norm=norm) 
-                                      for i, j in zip(h_size[:-1], h_size[1:])])
-        # self.GATconvOUT = GATConv(h_size[-1], out_size // heads, heads=heads)
+        if len(h_size) == 0:
+            raise ValueError("h_size must contain at least one hidden dimension for GNN.")
+        if self.block not in ["gcn", "gat"]:
+            raise ValueError("block must be either 'gcn' or 'gat'.")
 
-        ## DECODER
-        self.decoder = nn.Sequential(
-            nn.Linear(h_size[-1]*heads, 2*h_size[-1]*heads),
-            self.act,
-            nn.Linear(2*h_size[-1]*heads, out_size),
-        )
+        if self.block.lower() == "gcn":
+            self.GconvIN = GCNConv(in_size, h_size[0], bias=bias)
+            hidden_out_dim = h_size[-1]
+            self.hlayers = nn.ModuleList([
+                gcnBlock(i, j, act, norm, bias=bias) for i, j in zip(h_size[:-1], h_size[1:])
+            ])
+            norm_in_dim = h_size[0]
+        elif self.block.lower():
+            self.GconvIN = GATConv(in_size, h_size[0], heads=heads, concat=True, bias=bias)
+            hidden_out_dim = h_size[-1] * heads
+            self.hlayers = nn.ModuleList([
+                gatBlock(i * heads, j, act, heads=heads, norm=norm, bias=bias)
+                for i, j in zip(h_size[:-1], h_size[1:])
+            ])
+            norm_in_dim = h_size[0] * heads
 
         if norm == 'layer':
-            self.normIN = nn.LayerNorm(h_size[0] * heads)
+            self.normIN = nn.LayerNorm(norm_in_dim)
         elif norm == 'batch':
-            self.normIN = nn.BatchNorm1d(h_size[0] * heads)
+            self.normIN = nn.BatchNorm1d(norm_in_dim)
 
-        self.dropout = nn.Dropout(0.25)
-        self.fcOUT = nn.Linear(h_size[-1], out_size)
+        self.dropoutL = nn.Dropout(dropout) if dropout > 0.0 else None
+        self.fcOUT = nn.Linear(hidden_out_dim, out_size, bias=bias)
 
     def forward(self, x, edge_index, batch):
-        x = self.GATconvIN(x, edge_index)
+        x = self.GconvIN(x, edge_index)
         if self.norm:
             x = self.normIN(x)
         x = self.act(x)
+        if self.dropoutL is not None:
+            x = self.dropoutL(x)
+
         for layer in self.hlayers:
             x = layer(x, edge_index)
+            if self.dropoutL is not None:
+                x = self.dropoutL(x)
+
         if self.pool == "mean":
             x = global_mean_pool(x, batch)
         elif self.pool == "add":
             x = global_add_pool(x, batch)
-        x = self.decoder(x)
+        else:
+            raise ValueError("pool must be either 'mean' or 'add'.")
+
+        x = self.fcOUT(x)
         return x
 
 

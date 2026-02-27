@@ -67,6 +67,13 @@ def get_ductileData(CSVout, crit=0.25, delimiter=',', typ='n'):
         if row[2] <= crit*max(s_sm):
             frac = indx
             break
+    final = None
+    for indx, row in output_df[s_max_indx:].iterrows():
+        if row[2] <= 0.01*max(s_sm):
+            final = indx-1
+            break
+    if final is not None:
+        output_df.y_sm = s_sm[:final+1] + [0]*(len(output_df)-final-1)
     output_df.loc[-1] = [frac, frac, frac]
     output_df.index = output_df.index + 1
     output_df.sort_index(inplace=True)
@@ -87,7 +94,7 @@ def calcUT(df):
     idx_WoF = None
     for si in s_sm[idx_Smax:]:
         if si <= 0.01*strength:
-            idx_WoF = s_sm.index(si)
+            idx_WoF = s_sm[1:].index(si)+1
             break
     if idx_WoF is not None:
         work_of_frac = np.trapz(s_sm[:idx_WoF], e[:idx_WoF])
@@ -109,7 +116,15 @@ def get_fractureData(outputCSV):
     for indx, row in status_df.iterrows():
         if 0.0 in list(row):
             frac = F_sm.index(np.max(F_sm[:indx], initial=0))
+            break    
+    F_max_indx = F_sm.index(max(F_sm))
+    final = None
+    for indx, row in output_df[F_max_indx:].iterrows():
+        if row[2] <= 0.01*max(F_sm):
+            final = indx-1
             break
+    if final is not None:
+        output_df.y_sm = F_sm[:final+1] + [0]*(len(output_df)-final-1)
     output_df.loc[-1] = [frac, frac, frac]
     output_df.index = output_df.index + 1
     output_df.sort_index(inplace=True)
