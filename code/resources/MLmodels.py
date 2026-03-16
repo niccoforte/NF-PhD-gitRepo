@@ -6,6 +6,7 @@ from resources.MLdata import Dataset_
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch_geometric.loader import DataLoader as gDataLoader
 from torch_geometric.data import Data
@@ -44,8 +45,23 @@ class MODEL:
     ):
         self.typ = typ
         self.model = model
-        self.lossf = lossf
-        # self.opt = torch.optim.Adam(self.model.parameters(), lr=lr, weight_decay=opt[1])
+        if isinstance(lossf, (list, tuple)):
+            if len(lossf) == 0:
+                raise ValueError("lossf list/tuple must contain at least one loss function.")
+            self.losses = list(lossf)
+            if len(self.losses) == 1:
+                self.lossf = self.losses[0]
+            else:
+                def _combined_loss(y_pred, y_true):
+                    total = self.losses[0](y_pred, y_true)
+                    for lf in self.losses[1:]:
+                        total = total + lf(y_pred, y_true)
+                    return total
+                self.lossf = _combined_loss
+        else:
+            self.losses = [lossf]
+            self.lossf = lossf
+        
         self.batch = batch
         self.lr = lr
         self.data = data
@@ -74,7 +90,7 @@ class MODEL:
             self.UT_opt = torch.optim.Adam(self.UT_model.parameters(), lr=lr, weight_decay=opt[1])
             
             if typ.lower() == "gnn":
-                self.UT_nodes = data.UT_perIN_df["in"].to_numpy().reshape(int(len(data.UT_perIN_df)/2), 2) / 1000.0
+                self.UT_nodes = data.UT_perIN_df["in"].to_numpy().reshape(int(len(data.UT_perIN_df)/2), 2)
                 self.UT_edges = connectivity(data.LAT, self.UT_nodes, data.geom)[:, 1:] - 1
                 self.UT_edge_index = torch.tensor(self.UT_edges, dtype=torch.long).t().contiguous()
 
@@ -109,7 +125,7 @@ class MODEL:
             self.FT_opt = torch.optim.Adam(self.FT_model.parameters(), lr=lr, weight_decay=opt[1])
             
             if typ.lower() == "gnn":
-                self.FT_nodes = data.FT_perIN_df["in"].to_numpy().reshape(int(len(data.FT_perIN_df)/2), 2) / 1000.0
+                self.FT_nodes = data.FT_perIN_df["in"].to_numpy().reshape(int(len(data.FT_perIN_df)/2), 2)
                 self.FT_edges = connectivity(data.LAT, self.FT_nodes, data.geom)[:, 1:] - 1
                 self.FT_edge_index = torch.tensor(self.FT_edges, dtype=torch.long).t().contiguous()
 
@@ -280,6 +296,8 @@ class MODEL:
     def save(self, path, name):
         torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
 
+    def load(self, path, name):
+        self.model.load_state_dict(torch.load(f"{path}/{name}.mdl", map_location=self.device))
 
 ### Gaussian Process Regression model
 class GPRmodel(GPR):
@@ -423,6 +441,186 @@ class MLP(nn.Module):
                 x = layer(x)
                 x = self.dropoutL(x) if self.dropout > 0.0 else x
             x = self.hlayers[-1](x)
+        x = self.fcOUT(x)
+        return x
+
+
+### Transformer model
+class SinusoidalPositionEncoding(nn.Module):
+    def __init__(self, seq_len, d_model):
+        super().__init__()
+        position = torch.arange(seq_len).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model))
+
+        pe = torch.zeros(seq_len, d_model)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer("pe", pe.unsqueeze(0), persistent=False)
+
+    def forward(self, x):
+        return x + self.pe[:, :x.size(1), :]
+
+
+class Transformer(nn.Module):
+    def __init__(
+        self,
+        in_size,
+        h_size,
+        out_size,
+        d_model=128,
+        n_heads=8,
+        n_layers=3,
+        ff_mult=4,
+        token_size=2,
+        act="gelu",
+        block="mlp",
+        norm="layer",
+        dropout=0.1,
+        bias=True,
+        pool="mean",
+        use_cls_token=True,
+        pos_encoding="learned"
+    ):
+        super().__init__()
+
+        if token_size < 1:
+            raise ValueError("token_size must be >= 1.")
+        if d_model < 4:
+            raise ValueError("d_model must be >= 4.")
+
+        self.in_size = in_size
+        self.h_size = h_size
+        self.out_size = out_size
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.n_layers = n_layers
+        self.ff_mult = ff_mult
+        self.token_size = token_size
+        self.pool = pool.lower()
+        self.use_cls_token = use_cls_token
+        self.pos_encoding = pos_encoding.lower()
+        self.norm = norm
+        self.dropout = dropout
+
+        self.pad_size = (token_size - (in_size % token_size)) % token_size
+        self.seq_len = (in_size + self.pad_size) // token_size
+        self.total_len = self.seq_len + (1 if use_cls_token else 0)
+
+        if d_model % n_heads != 0:
+            raise ValueError("d_model must be divisible by n_heads.")
+
+        self.input_proj = nn.Linear(token_size, d_model, bias=bias)
+        self.cls_token = nn.Parameter(torch.zeros(1, 1, d_model)) if use_cls_token else None
+
+        if self.pos_encoding == "learned":
+            self.pos_embed = nn.Parameter(torch.zeros(1, self.total_len, d_model))
+            nn.init.normal_(self.pos_embed, mean=0.0, std=0.02)
+            self.pos_encoder = None
+        elif self.pos_encoding == "sinusoidal":
+            self.pos_embed = None
+            self.pos_encoder = SinusoidalPositionEncoding(self.total_len, d_model)
+        else:
+            raise ValueError("pos_encoding must be 'learned' or 'sinusoidal'.")
+
+        tr_act = act.lower() if act.lower() in ["relu", "gelu"] else "gelu"
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=d_model * ff_mult,
+            dropout=dropout,
+            activation=tr_act,
+            batch_first=True
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=n_layers)
+
+        if norm == "layer":
+            self.head_norm = nn.LayerNorm(d_model)
+        elif norm == "batch":
+            self.head_norm = nn.BatchNorm1d(d_model)
+        else:
+            self.head_norm = None
+
+        self._act = _activation(act)
+        self.dropoutL = nn.Dropout(dropout) if dropout > 0.0 else None
+
+        if len(h_size) > 0:
+            self.fcIN = nn.Linear(d_model, h_size[0], bias=bias)
+            if block.lower() == "mlp":
+                self.hlayers = nn.ModuleList([
+                    mlpBlock(i, j, act, norm, bias=bias) for i, j in zip(h_size[:-1], h_size[1:])
+                ])
+            elif block.lower() == "res":
+                if len(set(h_size)) > 1:
+                    raise ValueError("For block='res', all entries in h_size must be the same.")
+                self.hlayers = nn.ModuleList([
+                    resBlock(i, act, norm, bias=bias) for i in h_size
+                ])
+            else:
+                raise ValueError("block must be either 'mlp' or 'res'.")
+            self.fcOUT = nn.Linear(h_size[-1], out_size, bias=bias)
+        else:
+            self.fcIN = None
+            self.hlayers = None
+            self.fcOUT = nn.Linear(d_model, out_size, bias=bias)
+
+    def _pool_tokens(self, x):
+        if self.pool == "cls":
+            if not self.use_cls_token:
+                raise ValueError("pool='cls' requires use_cls_token=True.")
+            return x[:, 0, :]
+
+        tokens = x[:, 1:, :] if self.use_cls_token else x
+        if self.pool == "mean":
+            return tokens.mean(dim=1)
+        if self.pool == "max":
+            return tokens.max(dim=1).values
+        raise ValueError("pool must be one of ['mean', 'max', 'cls'].")
+
+    def _apply_head_norm(self, x):
+        if self.head_norm is None:
+            return x
+        if isinstance(self.head_norm, nn.BatchNorm1d):
+            return self.head_norm(x)
+        return self.head_norm(x)
+
+    def forward(self, x):
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+        if x.dim() != 2:
+            raise ValueError("Transformer expects input shape [batch, features].")
+        if x.size(-1) != self.in_size:
+            raise ValueError(f"Expected input feature size {self.in_size}, got {x.size(-1)}.")
+
+        if self.pad_size > 0:
+            x = F.pad(x, (0, self.pad_size), mode="constant", value=0.0)
+        x = x.view(x.size(0), self.seq_len, self.token_size)
+        x = self.input_proj(x)
+
+        if self.use_cls_token:
+            cls_tok = self.cls_token.expand(x.size(0), -1, -1)
+            x = torch.cat([cls_tok, x], dim=1)
+
+        if self.pos_embed is not None:
+            x = x + self.pos_embed[:, :x.size(1), :]
+        else:
+            x = self.pos_encoder(x)
+
+        x = self.encoder(x)
+        x = self._pool_tokens(x)
+        x = self._apply_head_norm(x)
+
+        if self.fcIN is not None:
+            x = self.fcIN(x)
+            x = self._act(x)
+            if self.dropoutL is not None:
+                x = self.dropoutL(x)
+            if self.hlayers:
+                for layer in self.hlayers[:-1]:
+                    x = layer(x)
+                    if self.dropoutL is not None:
+                        x = self.dropoutL(x)
+                x = self.hlayers[-1](x)
+
         x = self.fcOUT(x)
         return x
 
