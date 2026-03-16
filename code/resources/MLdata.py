@@ -706,10 +706,12 @@ class DATA:
             self.freq = True
 
         if mechMode.lower() == "ut":
+            self.mechTest = "Ductile"
             self.UTmechTest = True
             self.FTmechTest = False
             self.multi = False
         elif mechMode.lower() == "ft":
+            self.mechTest = "Fracture"
             self.UTmechTest = False
             self.FTmechTest = True
             self.multi = False
@@ -723,8 +725,7 @@ class DATA:
                 self.nnx = 20
             elif LAT.lower() == "tri":
                 self.nnx = 30
-        self.geom = Geometry(LAT=self.LAT, l=0.010, nnx=self.nnx)
-        
+        self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx)
         self.E_s = 123e9  ## Pa
         self.v_s = 0.3
         self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom, self.E_s, self.v_s, self.geom.rD, mode="stiff", C=None, ortho=not self.geom.iso)
@@ -742,6 +743,27 @@ class DATA:
                 self.load_DisDist_v1()
             elif format == 2 and model.lower() == "mlp":
                 self.load_DisDist_v2()
+
+    def _prepare_for_scaler(self, data):
+        arr = np.asarray(data)
+        if arr.ndim <= 2:
+            return arr, arr.shape
+        return arr.reshape(arr.shape[0], -1), arr.shape
+
+    def _restore_from_scaler(self, data, original_shape):
+        if len(original_shape) <= 2:
+            return data
+        return data.reshape(original_shape)
+
+    def _fit_transform_scaled(self, scaler, data):
+        data_2d, original_shape = self._prepare_for_scaler(data)
+        scaled = scaler.fit_transform(data_2d)
+        return self._restore_from_scaler(scaled, original_shape)
+
+    def _transform_scaled(self, scaler, data):
+        data_2d, original_shape = self._prepare_for_scaler(data)
+        scaled = scaler.transform(data_2d)
+        return self._restore_from_scaler(scaled, original_shape)
 
     def get_DataPath(self):
         pData = 'Z:/p1/data/'
@@ -940,14 +962,14 @@ class DATA:
             if self.scale:
                     if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_INscaler = clone(self.scaler)
-                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
+                        self.UT_train_in = self._fit_transform_scaled(self.UT_INscaler, self.UT_train_in)
+                        self.UT_val_in   = self._transform_scaled(self.UT_INscaler, self.UT_val_in)
+                        self.UT_test_in  = self._transform_scaled(self.UT_INscaler, self.UT_test_in)
                     if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_OUTscaler = clone(self.scaler)
-                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+                        self.UT_train_out = self._fit_transform_scaled(self.UT_OUTscaler, self.UT_train_out)
+                        self.UT_val_out   = self._transform_scaled(self.UT_OUTscaler, self.UT_val_out)
+                        self.UT_test_out  = self._transform_scaled(self.UT_OUTscaler, self.UT_test_out)
 
         else:
             if self.UTmechTest:
@@ -988,7 +1010,7 @@ class DATA:
                                                                                         self.UT_CSV_val_in_f, 
                                                                                         self.UT_CSV_test_in_f)
 
-                if self.model.lower() == "mlp" or self.model.lower() == "gpr":
+                if self.model.lower() in ["mlp", "gpr", "transformer", "trans"]:
                     self.UT_all_in   = UT_all_in
                     self.UT_train_in = UT_train_in
                     self.UT_val_in   = UT_val_in
@@ -1022,16 +1044,16 @@ class DATA:
                 if self.scale:
                     if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_INscaler = clone(self.scaler)
-                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                        self.UT_all_in   = self.UT_INscaler.transform(self.UT_all_in)
-                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
+                        self.UT_train_in = self._fit_transform_scaled(self.UT_INscaler, self.UT_train_in)
+                        self.UT_all_in   = self._transform_scaled(self.UT_INscaler, self.UT_all_in)
+                        self.UT_val_in   = self._transform_scaled(self.UT_INscaler, self.UT_val_in)
+                        self.UT_test_in  = self._transform_scaled(self.UT_INscaler, self.UT_test_in)
                     if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_OUTscaler = clone(self.scaler)
-                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                        self.UT_all_out   = self.UT_OUTscaler.transform(self.UT_all_out)
-                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+                        self.UT_train_out = self._fit_transform_scaled(self.UT_OUTscaler, self.UT_train_out)
+                        self.UT_all_out   = self._transform_scaled(self.UT_OUTscaler, self.UT_all_out)
+                        self.UT_val_out   = self._transform_scaled(self.UT_OUTscaler, self.UT_val_out)
+                        self.UT_test_out  = self._transform_scaled(self.UT_OUTscaler, self.UT_test_out)
                     if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_PROPscaler = clone(self.scaler)
                         self.UT_trainProps = self.UT_PROPscaler.fit_transform(self.UT_trainProps.T).T
@@ -1054,6 +1076,7 @@ class DATA:
                         self.UT_train_out = self.UT_OUTreducer.reduce(self.UT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                         self.UT_val_out   = self.UT_OUTreducer.reduce(self.UT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                         self.UT_test_out  = self.UT_OUTreducer.reduce(self.UT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+
 
             if self.FTmechTest:
                 self.FT_IN_df, \
@@ -1093,7 +1116,7 @@ class DATA:
                                                                         self.FT_CSV_val_in_f, 
                                                                         self.FT_CSV_test_in_f)
 
-                if self.model.lower() == "mlp" or self.model.lower() == "gpr":
+                if self.model.lower() in ["mlp", "gpr", "transformer", "trans"]:
                     self.FT_all_in   = FT_all_in
                     self.FT_train_in = FT_train_in
                     self.FT_val_in   = FT_val_in
@@ -1127,16 +1150,16 @@ class DATA:
                 if self.scale:
                     if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.FT_INscaler = clone(self.scaler)
-                        self.FT_train_in = self.FT_INscaler.fit_transform(self.FT_train_in)
-                        self.FT_all_in   = self.FT_INscaler.transform(self.FT_all_in)
-                        self.FT_val_in   = self.FT_INscaler.transform(self.FT_val_in)
-                        self.FT_test_in  = self.FT_INscaler.transform(self.FT_test_in)
+                        self.FT_train_in = self._fit_transform_scaled(self.FT_INscaler, self.FT_train_in)
+                        self.FT_all_in   = self._transform_scaled(self.FT_INscaler, self.FT_all_in)
+                        self.FT_val_in   = self._transform_scaled(self.FT_INscaler, self.FT_val_in)
+                        self.FT_test_in  = self._transform_scaled(self.FT_INscaler, self.FT_test_in)
                     if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.FT_OUTscaler = clone(self.scaler)
-                        self.FT_train_out = self.FT_OUTscaler.fit_transform(self.FT_train_out)
-                        self.FT_all_out   = self.FT_OUTscaler.transform(self.FT_all_out)
-                        self.FT_val_out   = self.FT_OUTscaler.transform(self.FT_val_out)
-                        self.FT_test_out  = self.FT_OUTscaler.transform(self.FT_test_out)
+                        self.FT_train_out = self._fit_transform_scaled(self.FT_OUTscaler, self.FT_train_out)
+                        self.FT_all_out   = self._transform_scaled(self.FT_OUTscaler, self.FT_all_out)
+                        self.FT_val_out   = self._transform_scaled(self.FT_OUTscaler, self.FT_val_out)
+                        self.FT_test_out  = self._transform_scaled(self.FT_OUTscaler, self.FT_test_out)
                     if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.FT_PROPscaler = clone(self.scaler)
                         self.FT_trainProps = self.FT_PROPscaler.fit_transform(self.FT_trainProps.T).T
