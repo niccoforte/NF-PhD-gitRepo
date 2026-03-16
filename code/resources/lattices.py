@@ -436,7 +436,7 @@ def effProperties(LAT, geom, E_s=123e9, v_s=0.3, rD=0.2, mode="stiff", C=None, o
         B, b = 3/2, 3
     if mode == "stiff":
         if C is None:
-            C = calcC_mohr(geom, "unit", E_s)[0]
+            C = calcC_mohr(copy.deepcopy(geom), "unit", E_s)[0]
         E, v, _ = calc_IsoEffProperties(C)
         if ortho:
             v = C[0][1]/C[0][0]
