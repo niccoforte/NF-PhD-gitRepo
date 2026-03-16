@@ -543,14 +543,20 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti"
                 Dnodes = np.delete(Dnodes, del_nodes, axis=0)
     return nodes, Dnodes
 
-def connectivity(LAT, nodes, geom, stiff=False, mode=None):
-    radius = geom.l*(1+1e-3)
+def insidePoint(bl, tr, p) :
+   if (p[0] > bl[0] and p[0] < tr[0] and p[1] > bl[1] and p[1] < tr[1]) :
+      return True
+   else :
+      return False
+
+def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
+    radius = geom.l + geom.l*1e-3
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (LAT.lower() == "fcc" and nodes[ii][0]*1000)%2 == 1.0 and (nodes[ii][1]*1000)%2 == 1.0:
+        if (LAT.lower() == "fcc" and nodes[ii][int(nodes.shape[-1]-2)])%2 == 1.0 and (nodes[ii][int(nodes.shape[-1]-1)])%2 == 1.0:
             continue
-        distance = np.sqrt(np.array(nodes[ii, 0] - nodes[:, 0])**2 + np.array(nodes[ii, 1] - nodes[:, 1])**2)
+        distance = np.sqrt(np.array(nodes[ii, int(nodes.shape[-1]-2)] - nodes[:, int(nodes.shape[-1]-2)])**2 + np.array(nodes[ii, int(nodes.shape[-1]-1)] - nodes[:, int(nodes.shape[-1]-1)])**2)
         inside = np.argwhere(distance <= radius)
         nearNodes = np.setdiff1d(inside.astype(int), [ii])
         for jj in range(len(nearNodes)):
@@ -587,8 +593,35 @@ def connectivity(LAT, nodes, geom, stiff=False, mode=None):
         realElem = realElem
     else:
         realElem = realElem + 1
+
+    if mode and mode.lower() == "fracture":
+        xCrS = [-0.1*geom.W, geom.H/2-geom.l*0.2]                                         # crack starting point bottomLeft
+        xCrE = [geom.a0 - 0.2*geom.l, geom.H/2+geom.l*0.2]
+    
+        delElems = []
+        for ik in range(0,len(realElem)):
+            x1 = nodes[int(realElem[ik][1]-1)][1]
+            x2 = nodes[int(realElem[ik][2]-1)][1]
+            y1 = nodes[int(realElem[ik][1]-1)][2]
+            y2 = nodes[int(realElem[ik][2]-1)][2]
+            midPointX = (x1+x2)/2
+            midPointY = (y1+y2)/2
+            point = (midPointX,midPointY)
+            insideTest = insidePoint(xCrS,xCrE,point)
+            if insideTest:
+                delElems.append(realElem[ik][0])
+
+        delElems = np.array(delElems, dtype=int)
+        realElem = np.delete(realElem, delElems, 0)
+    
     for i in range(len(realElem)):
         realElem[i][0] = i+1
+
+    if job is not None:
+        with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
+            f.write("*Elems\n")
+            for elem in realElem:
+                f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
     return realElem
 
 
