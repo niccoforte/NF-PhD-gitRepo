@@ -1118,16 +1118,16 @@ def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, dist
     
     return nodes, nodesR, bracket_nodes
 
-def connectivity(latticeType, unitCellSize, nodes):
-    radius = unitCellSize + unitCellSize*1e-3
+def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
+    radius = geom.l + geom.l*1e-3
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (latticeType.lower() == "fcc" and nodes[ii][1])%2 == 1.0 and (nodes[ii][2])%2 == 1.0:
+        if (LAT.lower() == "fcc" and nodes[ii][int(nodes.shape[-1]-2)])%2 == 1.0 and (nodes[ii][int(nodes.shape[-1]-1)])%2 == 1.0:
             continue
-        distance = sqrt(array(nodes[ii, 1] - nodes[:, 1])**2 + array(nodes[ii, 2] - nodes[:, 2])**2)
-        inside = argwhere(distance <= radius)
-        nearNodes = setdiff1d(inside.astype(int), [ii])
+        distance = np.sqrt(np.array(nodes[ii, int(nodes.shape[-1]-2)] - nodes[:, int(nodes.shape[-1]-2)])**2 + np.array(nodes[ii, int(nodes.shape[-1]-1)] - nodes[:, int(nodes.shape[-1]-1)])**2)
+        inside = np.argwhere(distance <= radius)
+        nearNodes = np.setdiff1d(inside.astype(int), [ii])
         for jj in range(len(nearNodes)):
             dummyElem.append([count,ii,nearNodes[jj]])
             count = count + 1            
@@ -1141,10 +1141,56 @@ def connectivity(latticeType, unitCellSize, nodes):
     for i in range(0,len(dummyElem)):
         if (dummyElem[i][0] == 0 and dummyElem[i][1] == 0 and dummyElem[i][2] == 0):
             indexRemove.append(i)
-    realElem = delete(dummyElem, [indexRemove], axis=0)
-    realElem = realElem + 1
+        if stiff:
+            if LAT.lower() == "tri" and mode.lower() == "unit":
+                if (dummyElem[i][1] == 3 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 3):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 0 and dummyElem[i][2] == 3) or (dummyElem[i][1] == 3 and dummyElem[i][2] == 0):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 3 and dummyElem[i][2] == 5) or (dummyElem[i][1] == 5 and dummyElem[i][2] == 3):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 1 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 1):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 4 and dummyElem[i][2] == 6) or (dummyElem[i][1] == 6 and dummyElem[i][2] == 4):
+                    indexRemove.append(i)
+            elif LAT.lower() == "tri" and mode.lower() == "lattice":
+                if ((nodes[dummyElem[i][1]][1] == 0 and nodes[dummyElem[i][2]][1] == 0) or 
+                    (nodes[dummyElem[i][1]][1] == geom.H and nodes[dummyElem[i][2]][1] == geom.H)):
+                    indexRemove.append(i)
+    realElem = np.delete(dummyElem, [indexRemove], axis=0)
+    if stiff:
+        realElem = realElem
+    else:
+        realElem = realElem + 1
+
+    if mode and mode.lower() == "fracture":
+        xCrS = [-0.1*geom.W, geom.H/2-geom.l*0.2]                                         # crack starting point bottomLeft
+        xCrE = [geom.a0 - 0.2*geom.l, geom.H/2+geom.l*0.2]
+    
+        delElems = []
+        for ik in range(0,len(realElem)):
+            x1 = nodes[int(realElem[ik][1]-1)][1]
+            x2 = nodes[int(realElem[ik][2]-1)][1]
+            y1 = nodes[int(realElem[ik][1]-1)][2]
+            y2 = nodes[int(realElem[ik][2]-1)][2]
+            midPointX = (x1+x2)/2
+            midPointY = (y1+y2)/2
+            point = (midPointX,midPointY)
+            insideTest = insidePoint(xCrS,xCrE,point)
+            if insideTest:
+                delElems.append(realElem[ik][0])
+
+        delElems = np.array(delElems, dtype=int)
+        realElem = np.delete(realElem, delElems, 0)
+    
     for i in range(len(realElem)):
         realElem[i][0] = i+1
+
+    if job is not None:
+        with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
+            f.write("*Elems\n")
+            for elem in realElem:
+                f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
     return realElem
 
 def insidePoint(bl, tr, p) :
@@ -1687,8 +1733,8 @@ for idNum in range(initial,numOfJobs):
             #################################### Strut Elements #########################################
             #############################################################################################
             
-            element = connectivity(latticeType, unitCellSize, nodes)
-            element_duct = connectivity(latticeType, unitCellSize, nodes_duct)
+            element = connectivity(latticeType, nodes, geom)
+            element_duct = connectivity(latticeType, nodes_duct, geom)
             
             #############################################################################################
             ################################ Radius Calculation #########################################
@@ -2576,7 +2622,7 @@ for idNum in range(initial,numOfJobs):
         #################################### Strut Elements #########################################
         #############################################################################################
                 
-        element = connectivity(latticeType, unitCellSize, nodes)
+        element = connectivity(latticeType, nodes, geom)
         
         delNodes = []
         for ik in range(0,len(element)):

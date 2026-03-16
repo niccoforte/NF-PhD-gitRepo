@@ -429,14 +429,14 @@ def export_nodes(job, totalNodes):
             f.write("{}, {}, {}\n".format(int(node[0]), node[1], node[2]))
     return np.array(nodes)
 
-def connectivity(job, LAT, nodes, geom, stiff=False, mode=None):
+def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
     radius = geom.l + geom.l*1e-3
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (LAT.lower() == "fcc" and nodes[ii][1])%2 == 1.0 and (nodes[ii][2])%2 == 1.0:
+        if (LAT.lower() == "fcc" and nodes[ii][int(nodes.shape[-1]-2)])%2 == 1.0 and (nodes[ii][int(nodes.shape[-1]-1)])%2 == 1.0:
             continue
-        distance = np.sqrt(np.array(nodes[ii, 1] - nodes[:, 1])**2 + np.array(nodes[ii, 2] - nodes[:, 2])**2)
+        distance = np.sqrt(np.array(nodes[ii, int(nodes.shape[-1]-2)] - nodes[:, int(nodes.shape[-1]-2)])**2 + np.array(nodes[ii, int(nodes.shape[-1]-1)] - nodes[:, int(nodes.shape[-1]-1)])**2)
         inside = np.argwhere(distance <= radius)
         nearNodes = np.setdiff1d(inside.astype(int), [ii])
         for jj in range(len(nearNodes)):
@@ -475,8 +475,8 @@ def connectivity(job, LAT, nodes, geom, stiff=False, mode=None):
         realElem = realElem + 1
 
     if mode and mode.lower() == "fracture":
-        xCrS = [-0.1*geom.W, geom.H/2-unitCellSize*0.2]                                         # crack starting point bottomLeft
-        xCrE = [geom.a0 - 0.2*unitCellSize, geom.H/2+unitCellSize*0.2]
+        xCrS = [-0.1*geom.W, geom.H/2-geom.l*0.2]                                         # crack starting point bottomLeft
+        xCrE = [geom.a0 - 0.2*geom.l, geom.H/2+geom.l*0.2]
     
         delElems = []
         for ik in range(0,len(realElem)):
@@ -497,11 +497,13 @@ def connectivity(job, LAT, nodes, geom, stiff=False, mode=None):
     for i in range(len(realElem)):
         realElem[i][0] = i+1
 
-    with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
-        f.write("*Elems\n")
-        for elem in realElem:
-            f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
+    if job is not None:
+        with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
+            f.write("*Elems\n")
+            for elem in realElem:
+                f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
     return realElem
+
 
 skipDirs = "Opt"
 if mode.lower() == 'any':
@@ -536,8 +538,7 @@ if mode.lower() == 'any':
             geom.nodeCount(mode=MechMode)
             
             nodes = export_nodes(inpPath, geom.totalNodes)
-            elems = connectivity(inpPath, LAT, nodes, geom)
-
+            elems = connectivity(LAT, nodes, geom, job=inpPath)
 
 if (mode.lower() == 'ductile' or mode.lower() == 'both'):
     MechMode = 'Ductile'
@@ -569,4 +570,4 @@ if (mode.lower() == 'fracture' or mode.lower() == 'both'):
         
         export_Udata(odbPath, geom.totalNodes, mode=MechMode)
         nodes = export_nodes(inpPath, geom.totalNodes)
-        elems = connectivity(inpPath, LAT, nodes, geom)
+        elems = connectivity(LAT, nodes, geom, job=inpPath)
