@@ -962,14 +962,14 @@ class DATA:
             if self.scale:
                     if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_INscaler = clone(self.scaler)
-                        self.UT_train_in = self._fit_transform_scaled(self.UT_INscaler, self.UT_train_in)
-                        self.UT_val_in   = self._transform_scaled(self.UT_INscaler, self.UT_val_in)
-                        self.UT_test_in  = self._transform_scaled(self.UT_INscaler, self.UT_test_in)
+                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
+                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
+                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
                     if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_OUTscaler = clone(self.scaler)
-                        self.UT_train_out = self._fit_transform_scaled(self.UT_OUTscaler, self.UT_train_out)
-                        self.UT_val_out   = self._transform_scaled(self.UT_OUTscaler, self.UT_val_out)
-                        self.UT_test_out  = self._transform_scaled(self.UT_OUTscaler, self.UT_test_out)
+                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
+                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
+                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
 
         else:
             if self.UTmechTest:
@@ -999,61 +999,47 @@ class DATA:
                                                                         self.UT_CSV_test_in, 
                                                                         self.UT_CSV_test_out,
                                                                         self.UT_CSV_testProps)
-                UT_all_in, UT_all_out, UT_allProps       = UT_all
-                UT_train_in, UT_train_out, UT_trainProps = UT_train
-                UT_val_in, UT_val_out, UT_valProps       = UT_val
-                UT_test_in, UT_test_out, UT_testProps    = UT_test
+                self.UT_all_in, self.UT_all_out, self.UT_allProps       = UT_all
+                self.UT_train_in, self.UT_train_out, self.UT_trainProps = UT_train
+                self.UT_val_in, self.UT_val_out, self.UT_valProps       = UT_val
+                self.UT_test_in, self.UT_test_out, self.UT_testProps    = UT_test
 
                 if self.freq:
-                    UT_all_in, UT_train_in, UT_val_in, UT_test_in = load_freqInputData(self.UT_CSV_all_in_f,
+                    self.UT_all_in, self.UT_train_in, self.UT_val_in, self.UT_test_in = load_freqInputData(self.UT_CSV_all_in_f,
                                                                                         self.UT_CSV_train_in_f, 
                                                                                         self.UT_CSV_val_in_f, 
                                                                                         self.UT_CSV_test_in_f)
-
-                if self.model.lower() in ["mlp", "gpr", "transformer", "trans"]:
-                    self.UT_all_in   = UT_all_in
-                    self.UT_train_in = UT_train_in
-                    self.UT_val_in   = UT_val_in
-                    self.UT_test_in  = UT_test_in
-                elif self.model.lower() == "gnn":
-                    self.UT_all_in   = UT_all_in.reshape(*UT_all_in.shape[:-1], UT_all_in.shape[-1]//2, 2)
-                    self.UT_train_in = UT_train_in.reshape(*UT_train_in.shape[:-1], UT_train_in.shape[-1]//2, 2)
-                    self.UT_val_in   = UT_val_in.reshape(*UT_val_in.shape[:-1], UT_val_in.shape[-1]//2, 2)
-                    self.UT_test_in  = UT_test_in.reshape(*UT_test_in.shape[:-1], UT_test_in.shape[-1]//2, 2)
                 
                 cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
                 if self.multi:
                     cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.UT_all_out, self.UT_allProps, self.UT_allProps_df       = UT_all_out, UT_allProps, pd.DataFrame(UT_allProps, columns=cols, index=self.UT_OUT_df.index)
-                self.UT_train_out, self.UT_trainProps, self.UT_trainProps_df = UT_train_out, UT_trainProps, pd.DataFrame(UT_trainProps.T, columns=cols)
-                self.UT_val_out, self.UT_valProps, self.UT_valProps_df       = UT_val_out, UT_valProps, pd.DataFrame(UT_valProps.T, columns=cols)
-                self.UT_test_out, self.UT_testProps, self.UT_testProps_df    = UT_test_out, UT_testProps, pd.DataFrame(UT_testProps.T, columns=cols)
+                self.UT_allProps_df   = pd.DataFrame(self.UT_allProps, columns=cols, index=self.UT_OUT_df.index)
+                self.UT_trainProps_df = pd.DataFrame(self.UT_trainProps.T, columns=cols)
+                self.UT_valProps_df   = pd.DataFrame(self.UT_valProps.T, columns=cols)
+                self.UT_testProps_df  = pd.DataFrame(self.UT_testProps.T, columns=cols)
 
                 if self.nsims is not None:
                     self.UT_all_in, self.UT_train_in, self.UT_val_in, self.UT_test_in = self.UT_all_in[:self.nsims], self.UT_train_in[:self.nsims], self.UT_val_in[:self.nsims], self.UT_test_in[:self.nsims]
                     self.UT_all_out, self.UT_train_out, self.UT_val_out, self.UT_test_out = self.UT_all_out[:self.nsims], self.UT_train_out[:self.nsims], self.UT_val_out[:self.nsims], self.UT_test_out[:self.nsims]
                     self.UT_allProps, self.UT_trainProps, self.UT_valProps, self.UT_testProps = self.UT_allProps[:self.nsims], self.UT_trainProps[:self.nsims], self.UT_valProps[:self.nsims], self.UT_testProps[:self.nsims]
                     self.UT_allProps_df, self.UT_trainProps_df, self.UT_valProps_df, self.UT_testProps_df = self.UT_allProps_df[:self.nsims], self.UT_trainProps_df[:self.nsims], self.UT_valProps_df[:self.nsims], self.UT_testProps_df[:self.nsims]
-                    self.UT_OUT_df = self.UT_OUT_df[:self.nsims]
-                    self.UT_IN_df = self.UT_IN_df[:self.nsims]
-                    self.UT_dIN_df = self.UT_dIN_df[:self.nsims]
-                    self.UT_dOUT_df = self.UT_dOUT_df[:self.nsims]
+                    self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
                     if self.freq:
                         self.UT_INf_df = self.UT_INf_df[:self.nsims]
 
                 if self.scale:
                     if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_INscaler = clone(self.scaler)
-                        self.UT_train_in = self._fit_transform_scaled(self.UT_INscaler, self.UT_train_in)
-                        self.UT_all_in   = self._transform_scaled(self.UT_INscaler, self.UT_all_in)
-                        self.UT_val_in   = self._transform_scaled(self.UT_INscaler, self.UT_val_in)
-                        self.UT_test_in  = self._transform_scaled(self.UT_INscaler, self.UT_test_in)
+                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
+                        self.UT_all_in   = self.UT_INscaler.transform(self.UT_all_in)
+                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
+                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
                     if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_OUTscaler = clone(self.scaler)
-                        self.UT_train_out = self._fit_transform_scaled(self.UT_OUTscaler, self.UT_train_out)
-                        self.UT_all_out   = self._transform_scaled(self.UT_OUTscaler, self.UT_all_out)
-                        self.UT_val_out   = self._transform_scaled(self.UT_OUTscaler, self.UT_val_out)
-                        self.UT_test_out  = self._transform_scaled(self.UT_OUTscaler, self.UT_test_out)
+                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
+                        self.UT_all_out   = self.UT_OUTscaler.transform(self.UT_all_out)
+                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
+                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
                     if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.UT_PROPscaler = clone(self.scaler)
                         self.UT_trainProps = self.UT_PROPscaler.fit_transform(self.UT_trainProps.T).T
@@ -1076,6 +1062,12 @@ class DATA:
                         self.UT_train_out = self.UT_OUTreducer.reduce(self.UT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                         self.UT_val_out   = self.UT_OUTreducer.reduce(self.UT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                         self.UT_test_out  = self.UT_OUTreducer.reduce(self.UT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+
+                if self.model.lower() == "gnn":
+                    self.UT_all_in   = self.UT_all_in.reshape(*self.UT_all_in.shape[:-1], self.UT_all_in.shape[-1]//2, 2)
+                    self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
+                    self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
+                    self.UT_test_in  = self.UT_test_in.reshape(*self.UT_test_in.shape[:-1], self.UT_test_in.shape[-1]//2, 2)
 
 
             if self.FTmechTest:
@@ -1105,35 +1097,24 @@ class DATA:
                                                         self.FT_CSV_test_in, 
                                                         self.FT_CSV_test_out,
                                                         self.FT_CSV_testProps)
-                FT_all_in, FT_all_out, FT_allProps       = FT_all
-                FT_train_in, FT_train_out, FT_trainProps = FT_train
-                FT_val_in, FT_val_out, FT_valProps       = FT_val
-                FT_test_in, FT_test_out, FT_testProps    = FT_test
+                self.FT_all_in, self.FT_all_out, self.FT_allProps       = FT_all
+                self.FT_train_in, self.FT_train_out, self.FT_trainProps = FT_train
+                self.FT_val_in, self.FT_val_out, self.FT_valProps       = FT_val
+                self.FT_test_in, self.FT_test_out, self.FT_testProps    = FT_test
 
                 if self.freq:
-                    FT_all_in, FT_train_in, FT_val_in, FT_test_in = load_freqInputData(self.FT_CSV_all_in_f,
+                    self.FT_all_in, self.FT_train_in, self.FT_val_in, self.FT_test_in = load_freqInputData(self.FT_CSV_all_in_f,
                                                                         self.FT_CSV_train_in_f, 
                                                                         self.FT_CSV_val_in_f, 
                                                                         self.FT_CSV_test_in_f)
-
-                if self.model.lower() in ["mlp", "gpr", "transformer", "trans"]:
-                    self.FT_all_in   = FT_all_in
-                    self.FT_train_in = FT_train_in
-                    self.FT_val_in   = FT_val_in
-                    self.FT_test_in  = FT_test_in
-                elif self.model.lower() == "gnn":
-                    self.FT_all_in   = FT_all_in.reshape(*FT_all_in.shape[:-1], FT_all_in.shape[-1]//2, 2)
-                    self.FT_train_in = FT_train_in.reshape(*FT_train_in.shape[:-1], FT_train_in.shape[-1]//2, 2)
-                    self.FT_val_in   = FT_val_in.reshape(*FT_val_in.shape[:-1], FT_val_in.shape[-1]//2, 2)
-                    self.FT_test_in  = FT_test_in.reshape(*FT_test_in.shape[:-1], FT_test_in.shape[-1]//2, 2)
                 
                 cols = ['K_JIC', 'K_IC', 'Force', 'Displacement']
                 if self.multi:
                     cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.FT_all_out, self.FT_allProps, self.FT_allProps_df       = FT_all_out, FT_allProps, pd.DataFrame(FT_allProps, columns=cols, index=self.FT_OUT_df.index)
-                self.FT_train_out, self.FT_trainProps, self.FT_trainProps_df = FT_train_out, FT_trainProps, pd.DataFrame(FT_trainProps.T, columns=cols)
-                self.FT_val_out, self.FT_valProps, self.FT_valProps_df       = FT_val_out, FT_valProps, pd.DataFrame(FT_valProps.T, columns=cols)
-                self.FT_test_out, self.FT_testProps, self.FT_testProps_df    = FT_test_out, FT_testProps, pd.DataFrame(FT_testProps.T, columns=cols)
+                self.FT_allProps_df   = pd.DataFrame(self.FT_allProps, columns=cols, index=self.FT_OUT_df.index)
+                self.FT_trainProps_df = pd.DataFrame(self.FT_trainProps.T, columns=cols)
+                self.FT_valProps_df   = pd.DataFrame(self.FT_valProps.T, columns=cols)
+                self.FT_testProps_df  = pd.DataFrame(self.FT_testProps.T, columns=cols)
 
                 if self.nsims is not None:
                     self.FT_all_in, self.FT_train_in, self.FT_val_in, self.FT_test_in = self.FT_all_in[:self.nsims], self.FT_train_in[:self.nsims], self.FT_val_in[:self.nsims], self.FT_test_in[:self.nsims]
@@ -1150,16 +1131,16 @@ class DATA:
                 if self.scale:
                     if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.FT_INscaler = clone(self.scaler)
-                        self.FT_train_in = self._fit_transform_scaled(self.FT_INscaler, self.FT_train_in)
-                        self.FT_all_in   = self._transform_scaled(self.FT_INscaler, self.FT_all_in)
-                        self.FT_val_in   = self._transform_scaled(self.FT_INscaler, self.FT_val_in)
-                        self.FT_test_in  = self._transform_scaled(self.FT_INscaler, self.FT_test_in)
+                        self.FT_train_in = self.FT_INscaler.fit_transform(self.FT_train_in)
+                        self.FT_all_in   = self.FT_INscaler.transform(self.FT_all_in)
+                        self.FT_val_in   = self.FT_INscaler.transform(self.FT_val_in)
+                        self.FT_test_in  = self.FT_INscaler.transform(self.FT_test_in)
                     if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.FT_OUTscaler = clone(self.scaler)
-                        self.FT_train_out = self._fit_transform_scaled(self.FT_OUTscaler, self.FT_train_out)
-                        self.FT_all_out   = self._transform_scaled(self.FT_OUTscaler, self.FT_all_out)
-                        self.FT_val_out   = self._transform_scaled(self.FT_OUTscaler, self.FT_val_out)
-                        self.FT_test_out  = self._transform_scaled(self.FT_OUTscaler, self.FT_test_out)
+                        self.FT_train_out = self.FT_OUTscaler.fit_transform(self.FT_train_out)
+                        self.FT_all_out   = self.FT_OUTscaler.transform(self.FT_all_out)
+                        self.FT_val_out   = self.FT_OUTscaler.transform(self.FT_val_out)
+                        self.FT_test_out  = self.FT_OUTscaler.transform(self.FT_test_out)
                     if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
                         self.FT_PROPscaler = clone(self.scaler)
                         self.FT_trainProps = self.FT_PROPscaler.fit_transform(self.FT_trainProps.T).T
@@ -1182,7 +1163,14 @@ class DATA:
                         self.FT_train_out = self.FT_OUTreducer.reduce(self.FT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                         self.FT_val_out   = self.FT_OUTreducer.reduce(self.FT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
                         self.FT_test_out  = self.FT_OUTreducer.reduce(self.FT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-        
+                        
+                if self.model.lower() == "gnn":
+                    self.FT_all_in   = self.FT_all_in.reshape(*self.FT_all_in.shape[:-1], self.FT_all_in.shape[-1]//2, 2)
+                    self.FT_train_in = self.FT_train_in.reshape(*self.FT_train_in.shape[:-1], self.FT_train_in.shape[-1]//2, 2)
+                    self.FT_val_in   = self.FT_val_in.reshape(*self.FT_val_in.shape[:-1], self.FT_val_in.shape[-1]//2, 2)
+                    self.FT_test_in  = self.FT_test_in.reshape(*self.FT_test_in.shape[:-1], self.FT_test_in.shape[-1]//2, 2)
+                
+
             if self.UTmechTest and self.FTmechTest and self.multi:
                 self.common_allProps, self.common_allProps_df = self.UT_allProps, self.UT_allProps_df
                 self.common_trainProps, self.common_trainProps_df = self.UT_trainProps, self.UT_trainProps_df
@@ -1195,22 +1183,25 @@ class DATA:
                     self.common_valProps, self.common_valProps_df = self.common_valProps[:self.nsims], self.common_valProps_df[:self.nsims]
                     self.common_testProps, self.common_testProps_df = self.common_testProps[:self.nsims], self.common_testProps_df[:self.nsims]
 
-    def load_DisDist_v1(self):
-        self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
 
-        train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
-        self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
-        self.dy_out1 = train_out1[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2,1)
+
+
+    # def load_DisDist_v1(self):
+    #     self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
+
+    #     train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
+    #     self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
+    #     self.dy_out1 = train_out1[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2,1)
     
-    def load_DisDist_v2(self):
-        self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
-        self.train_in2 = np.array([self.train_in1.flatten()]*2)
+    # def load_DisDist_v2(self):
+    #     self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
+    #     self.train_in2 = np.array([self.train_in1.flatten()]*2)
 
-        train_out2 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
-        dx_out2 = train_out2[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2)
-        self.dx_out2 = np.stack((dx_out2, dx_out2), axis=1)
-        dy_out2 = train_out2[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2)
-        self.dy_out2 = np.stack((dy_out2, dy_out2), axis=1)
+    #     train_out2 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
+    #     dx_out2 = train_out2[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2)
+    #     self.dx_out2 = np.stack((dx_out2, dx_out2), axis=1)
+    #     dy_out2 = train_out2[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2)
+    #     self.dy_out2 = np.stack((dy_out2, dy_out2), axis=1)
 
 
 
