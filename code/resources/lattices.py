@@ -421,7 +421,7 @@ def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
     elif typ.lower() == "lattice":
         return E/(1 - (B*(rD**(b-1))*(v_s**2))), (v + (B*(rD**(b-1))*(v_s**2)))/(1 - (B*(rD**(b-1))*(v_s**2)))
 
-def effProperties(LAT, geom, E_s=123e9, v_s=0.3, rD=0.2, mode="stiff", C=None, ortho=False):
+def effProperties(LAT, geom, E_s=123e9, v_s=0.3, mode="stiff", C=None):
     if LAT.lower() == "fcc":
         B, b = 0, 0
     elif LAT.lower() == "square":
@@ -438,11 +438,11 @@ def effProperties(LAT, geom, E_s=123e9, v_s=0.3, rD=0.2, mode="stiff", C=None, o
         if C is None:
             C = calcC_mohr(copy.deepcopy(geom), "unit", E_s)[0]
         E, v, _ = calc_IsoEffProperties(C)
-        if ortho:
-            v = C[0][1]/C[0][0]
-            E = C[0][0]*(1 - v**2)
+        if not geom.iso:
+            lambda_aniso, rho_aniso = calc_anisoParams(C=C)
+            E = (C[0,0]*(1-v**2)) * np.sqrt((2*(lambda_aniso**(3/2)))/(1+rho_aniso))
     else:
-        E = E_s * B * (rD ** b)
+        E = E_s * B * (geom.rD ** b)
         if LAT.lower() == "fcc":
             v = 0
         elif LAT.lower() == "square":
@@ -455,8 +455,8 @@ def effProperties(LAT, geom, E_s=123e9, v_s=0.3, rD=0.2, mode="stiff", C=None, o
             v = 1/3
         elif LAT.lower() == "hex":
             v = 1
-    E_pe, v_pe = pStrainProperties(E, v, v_s=v_s, B=B, b=b, rD=rD, typ="lattice")
-    return E, v, E_pe, v_pe 
+    E_pe, v_pe = pStrainProperties(E, v, v_s=v_s, B=B, b=b, rD=geom.rD, typ="lattice")
+    return E, v, E_pe, v_pe
 
 
 def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti", sim=1):   
@@ -507,7 +507,7 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti"
         nodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom.nnx) + "-per-1.csv"
         
         nodes_df = pd.read_csv(nodeFile, header=None, usecols=[1, 2])
-        nodes = nodes_df.to_numpy() / 1000
+        nodes = nodes_df.to_numpy()
     
         if stiff:
             if LAT.lower() == "tri":
@@ -530,7 +530,7 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti"
         if "disnodes" in dis.lower():
             DnodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom.nnx) + "-20disNodes-lhs-all-" + str(sim) + ".csv"
             Dnodes_df = pd.read_csv(DnodeFile, header=None, usecols=[1, 2])
-            Dnodes = Dnodes_df.to_numpy() / 1000
+            Dnodes = Dnodes_df.to_numpy()
             if stiff:
                 if LAT.lower() == "tri":
                     Dnodes = np.append(Dnodes, add_nodes, axis=0)
@@ -554,9 +554,11 @@ def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (LAT.lower() == "fcc" and nodes[ii][int(nodes.shape[-1]-2)])%2 == 1.0 and (nodes[ii][int(nodes.shape[-1]-1)])%2 == 1.0:
+        x_coord = nodes.shape[-1]-3 if stiff else nodes.shape[-1]-2
+        y_coord = nodes.shape[-1]-2 if stiff else nodes.shape[-1]-1
+        if (LAT.lower() == "fcc" and nodes[ii][int(x_coord)])%2 == 1.0 and (nodes[ii][int(y_coord)])%2 == 1.0:
             continue
-        distance = np.sqrt(np.array(nodes[ii, int(nodes.shape[-1]-2)] - nodes[:, int(nodes.shape[-1]-2)])**2 + np.array(nodes[ii, int(nodes.shape[-1]-1)] - nodes[:, int(nodes.shape[-1]-1)])**2)
+        distance = np.sqrt(np.array(nodes[ii, int(x_coord)] - nodes[:, int(x_coord)])**2 + np.array(nodes[ii, int(y_coord)] - nodes[:, int(y_coord)])**2)
         inside = np.argwhere(distance <= radius)
         nearNodes = np.setdiff1d(inside.astype(int), [ii])
         for jj in range(len(nearNodes)):
@@ -632,7 +634,7 @@ def plot_lattice(elems, nodes, geom):
     for elem, tt in zip(elems, geom.t):
         node1 = nodes[elem[1]]
         node2 = nodes[elem[2]]
-        ax.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2000, c='black')
+        ax.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2, c='black')
     plt.show()
 
 
@@ -683,7 +685,7 @@ def calcC_mohr(geom, mode, E_s=123e9, dis='per', count=0, plot=False):
     geom.stiffnessMatrix(stiffCalc=mode)
     
     nodes, _ = find_nodes(LAT, geom, dis, mode=mode, stiff=True)
-    elems = connectivity(LAT, nodes, stiff=True, geom=geom, mode=mode)
+    elems = connectivity(LAT, nodes, geom, stiff=True, mode=mode)
     geomC = edgeElems(nodes, elems, copy.deepcopy(geom))
     
     Cs = []
