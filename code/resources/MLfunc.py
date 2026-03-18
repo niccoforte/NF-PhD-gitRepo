@@ -518,8 +518,132 @@ class CustomQuantileLossMATLAB(nn.Module):
         # MATLAB: loss = (loss1 + loss2 + loss3) / 3
         return total_loss / 3.0
 
-def physics_loss(target, output):
-    return torch.abs(torch.sum(target) - torch.sum(output))
+class CustomPhysicalRegularizationLoss(nn.Module):
+    """
+    Penalizes high point-to-point oscillations in predicted output curves.
+    - Oscillation penalty starts once |y_j - y_{j-1}| exceeds delta_tolerance.
+    - Penalty weight decays after epsilon_tolerance as epsilon increases.
+    """
+    def __init__(
+        self,
+        delta_tolerance=0.0,
+        epsilon_tolerance=1.0,
+        epsilon_decay=2.0,
+        oscillation_power=2.0,
+        reduction="mean",
+    ):
+        super().__init__()
+        self.delta_tolerance = float(delta_tolerance)
+        self.epsilon_tolerance = float(epsilon_tolerance)
+        self.epsilon_decay = float(epsilon_decay)
+        self.oscillation_power = float(oscillation_power)
+        self.reduction = reduction.lower()
+
+    def _epsilon_weights(self, n_diffs, y_pred):
+        # Differences are defined between consecutive points; use mid-point epsilon.
+        eps = torch.linspace(0.0, 1.0, steps=n_diffs + 1, device=y_pred.device, dtype=y_pred.dtype)
+        eps_mid = 0.5 * (eps[1:] + eps[:-1])
+        weights = torch.where(
+            eps_mid <= self.epsilon_tolerance,
+            torch.ones_like(eps_mid),
+            torch.exp(-self.epsilon_decay * (eps_mid - self.epsilon_tolerance)),
+        )
+        return weights
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+        if y_pred.shape[1] < 2:
+            return y_pred.new_tensor(0.0)
+
+        diffs = torch.abs(y_pred[:, 1:] - y_pred[:, :-1])
+        excess = torch.relu(diffs - self.delta_tolerance)
+        if self.oscillation_power != 1.0:
+            excess = excess ** self.oscillation_power
+        weights = self._epsilon_weights(diffs.shape[1], y_pred).unsqueeze(0)
+        penalty = excess * weights
+
+        if self.reduction == "sum":
+            return penalty.sum()
+        if self.reduction == "none":
+            return penalty
+        return penalty.mean()
+
+class CustomStrainEnergyLoss(nn.Module):
+    """
+    Squared error between integrated predicted and target curves up to fracture index.
+    fracture_indices can be:
+    - None: integrate full curve
+    - 1D tensor/list/ndarray of per-sample indices
+    - callable(batch_size, n_points, device) -> indices
+    """
+    def __init__(self, x_values=None, fracture_indices=None, reduction="mean"):
+        super().__init__()
+        self.fracture_indices = fracture_indices
+        self.reduction = reduction.lower()
+        if x_values is None:
+            self.register_buffer("x_values", torch.tensor([], dtype=torch.float32), persistent=False)
+        else:
+            self.register_buffer("x_values", torch.tensor(x_values, dtype=torch.float32), persistent=False)
+
+    def _get_fracture_indices(self, batch_size, n_points, device):
+        if self.fracture_indices is None:
+            return torch.full((batch_size,), n_points - 1, dtype=torch.long, device=device)
+        if callable(self.fracture_indices):
+            idx = self.fracture_indices(batch_size=batch_size, n_points=n_points, device=device)
+            return torch.as_tensor(idx, dtype=torch.long, device=device).view(-1)
+        idx = torch.as_tensor(self.fracture_indices, dtype=torch.long, device=device).view(-1)
+        if idx.numel() == 1:
+            idx = idx.repeat(batch_size)
+        if idx.numel() != batch_size:
+            raise ValueError(
+                f"fracture_indices length ({idx.numel()}) must match batch size ({batch_size}) "
+                "or be a single scalar."
+            )
+        return idx.clamp(min=0, max=n_points - 1)
+
+    def _integral_up_to(self, y_row, idx):
+        end = int(idx.item()) + 1
+        if end <= 1:
+            return y_row.new_tensor(0.0)
+        if self.x_values.numel() > 0:
+            if self.x_values.numel() != y_row.numel():
+                raise ValueError(
+                    f"x_values length ({self.x_values.numel()}) does not match output length ({y_row.numel()})."
+                )
+            return torch.trapz(y_row[:end], self.x_values[:end].to(y_row.device, y_row.dtype))
+        return torch.trapz(y_row[:end])
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+
+        batch_size, n_points = y_pred.shape
+        fracture_idx = self._get_fracture_indices(batch_size, n_points, y_pred.device)
+
+        err_sq_terms = []
+        for i in range(batch_size):
+            pred_int = self._integral_up_to(y_pred[i], fracture_idx[i])
+            true_int = self._integral_up_to(y_true[i], fracture_idx[i])
+            err_sq_terms.append((pred_int - true_int) ** 2)
+        err_sq = torch.stack(err_sq_terms)
+
+        if self.reduction == "sum":
+            return err_sq.sum()
+        if self.reduction == "none":
+            return err_sq
+        return err_sq.mean()
 
 
 ### Plotting Functions
