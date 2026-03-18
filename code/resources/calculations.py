@@ -192,9 +192,9 @@ def calc_FaW_aniso(a, W, C):
     D = -0.066112 + 0.75681*a_bar - 0.015*rho_bar + 0.58136*(a_bar**2) - 0.08451*a_bar*rho_bar
 
     f_a_W = calc_p_poly(lambda_bar, rho_bar, a/W)*(lambda_aniso**D)*((1+0.006689*rho_aniso)**0.47151)*((2*(2+(a/W)))/((1-(a/W))**(3/2)))*(((2*(lambda_aniso**(3/2)))/(1+rho_aniso))**(1/4))
-    return f_a_W, lambda_aniso, rho_aniso
+    return f_a_W
 
-def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=123e9, C=None):  
+def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):  
     frac = int(df.x.tolist()[0])
     df = df[1:].reset_index(drop=True)
     d = df.x.tolist()
@@ -203,11 +203,8 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=123e9, C=No
     W = geom.W
     B = geom.B
     ai = geom.ai
-    if iso == "auto":
-        iso = False if geom.LAT.lower() == "fcc" else True
-    
     if validation == True:
-        E_eff_pe = E          # CHECK VAL
+        E_eff_pe = E          # TODO: CHECK FT VAL
     
     P = F_sm[frac]
     dd = d[frac]
@@ -215,18 +212,15 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, iso=True, validation=False, E=123e9, C=No
     Ks = []
     Kjs = []
     for n in range(n_Ks):
-        if iso == True:
+        if geom.iso == True:
             f_a_W = calc_FaW(ai[n], W)
-        elif iso == False:
-            from resources.lattices import calcC_mohr
+        elif geom.iso == False:
             if C is None:
+                from resources.lattices import calcC_mohr
                 C = calcC_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]
-            f_a_W, lambda_aniso, rho_aniso = calc_FaW_aniso(ai[n], W, C)
+            f_a_W = calc_FaW_aniso(ai[n], W, C)
         K = (P/(B*(W**(1/2)))) * f_a_W
 
-        if iso == False:
-            v = C[1,0] / C[0,0]
-            E_eff_pe = (C[0,0]*(1-v**2)) * np.sqrt((2*(lambda_aniso**(3/2)))/(1+rho_aniso))
         J_el = (K**2) / E_eff_pe
         A_pl = calc_Apl(d, F_sm, dd, P, frac, n)
         if n == 0:
