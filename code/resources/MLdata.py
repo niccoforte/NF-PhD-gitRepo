@@ -29,7 +29,7 @@ def load_data(inputs, outputs, f_inputs=None, no_outliers=False):
     dOUT_df = OUTr_df - OUTr_df.iloc[1].values
     dOUT_df = dOUT_df.drop(columns='0')
     dOUT_df = dOUT_df.iloc[1:].sort_index()
-    OUT_df  = OUTr_df.iloc[1:].sort_index()
+    OUT_df  = OUTr_df.iloc[0].to_frame().T.append(OUTr_df.iloc[1:].sort_index())
 
     perINr_df = IN_df.loc[:0].T
     perINr_df = perINr_df.rename(columns={0: "in"})
@@ -46,7 +46,7 @@ def load_data(inputs, outputs, f_inputs=None, no_outliers=False):
         INf_df  = INf_df_noOutliers
         dIN_df  = IN_df - IN_df.iloc[0].values
         dIN_df  = dIN_df.drop(columns=INfixed_cols) 
-        dOUT_df = OUT_df - OUT_df.iloc[1].values
+        dOUT_df = OUT_df.iloc[1:] - OUT_df.iloc[1].values
         dOUT_df = dOUT_df.drop(columns='0')
     
     return IN_df, OUT_df, INf_df, perINr_df, perIN_df, perOUT_df, dIN_df, dOUT_df
@@ -60,7 +60,7 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
         INf = INf_df.to_numpy()
     
     ducts, strens, stiffs, WoFs = [], [], [], []
-    for _, row in OUT_df.iterrows():
+    for _, row in OUT_df.iloc[1:].iterrows():
         UT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
         ductility, strength, stiffness, WoF = calcUT(UT_df)
         
@@ -70,7 +70,7 @@ def prep_UTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, INf_df=None):
         WoFs.append(WoF)
         
     props = np.array([ducts, strens, stiffs, WoFs])
-    props_df = pd.DataFrame(props.T, columns=['Ductility', 'Strength', 'Stiffness', 'WoF'], index=OUT_df.index)
+    props_df = pd.DataFrame(props.T, columns=['Ductility', 'Strength', 'Stiffness', 'WoF'], index=OUT_df.iloc[1:].index)
     return dIN, dOUT, INf, xOUT, props, props_df
 
 def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None):
@@ -82,9 +82,9 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None)
         INf = INf_df.to_numpy()
     
     Kjs, Ks, Ps, ds = [], [], [], []
-    for indx, row in OUT_df.iterrows():
+    for indx, row in OUT_df.iloc[1:].iterrows():
         FT_df = pd.DataFrame({'x':np.insert(xOUT,0,row[0]), 'y_sm':row})
-        P, dd, K, Kj = calcFT(FT_df, geom, E_eff_pe, n_Ks=1, iso="auto")
+        P, dd, K, Kj = calcFT(FT_df, geom, E_eff_pe, n_Ks=1)
         
         Kjs.append(Kj[0])
         Ks.append(K[0])
@@ -92,7 +92,7 @@ def prep_FTdata(dIN_df, dOUT_df, perOUT_df, OUT_df, geom, E_eff_pe, INf_df=None)
         ds.append(dd)
     
     props = [Kjs, Ks, Ps, ds]
-    props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.index)
+    props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.iloc[1:].index)
     return dIN, dOUT, INf, xOUT, props, props_df
 
 def prep_MULTIdata(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe):
@@ -146,7 +146,7 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, prop
             INf = np.delete(INf_r, outlier_idxs, axis=0)
 
         IN_df = IN_df.drop(IN_df.iloc[outlier_idxs].index)
-        OUT_df = OUT_df.drop(OUT_df.iloc[outlier_idxs].index)
+        OUT_df = OUT_df.iloc[0].to_frame().T.append(OUT_df.iloc[1:].drop(OUT_df.iloc[1:].iloc[outlier_idxs].index))
         dIN_df = dIN_df.drop(dIN_df.iloc[outlier_idxs].index)
         dOUT_df = dOUT_df.drop(dOUT_df.iloc[outlier_idxs].index)
         props_df = props_df.drop(props_df.iloc[outlier_idxs].index)
@@ -166,7 +166,7 @@ def remove_outliers(dIN_r, dOUT_r, props_r, IN_df, OUT_df, dIN_df, dOUT_df, prop
                 INf = np.delete(INf, manual, axis=0)
 
             IN_df = IN_df.drop(IN_df.iloc[manual].index)
-            OUT_df = OUT_df.drop(OUT_df.iloc[manual].index)
+            OUT_df = OUT_df.iloc[0].to_frame().T.append(OUT_df.iloc[1:].drop(OUT_df.iloc[1:].iloc[manual].index))
             dIN_df = dIN_df.drop(dIN_df.iloc[manual].index)
             dOUT_df = dOUT_df.drop(dOUT_df.iloc[manual].index)
             props_df = props_df.drop(props_df.iloc[manual].index)
@@ -728,7 +728,7 @@ class DATA:
         self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx)
         self.E_s = 123e9  ## Pa
         self.v_s = 0.3
-        self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom, self.E_s, self.v_s, self.geom.rD, mode="stiff", C=None, ortho=not self.geom.iso)
+        self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom)
 
         self.get_DataPath()
 
@@ -743,27 +743,6 @@ class DATA:
                 self.load_DisDist_v1()
             elif format == 2 and model.lower() == "mlp":
                 self.load_DisDist_v2()
-
-    def _prepare_for_scaler(self, data):
-        arr = np.asarray(data)
-        if arr.ndim <= 2:
-            return arr, arr.shape
-        return arr.reshape(arr.shape[0], -1), arr.shape
-
-    def _restore_from_scaler(self, data, original_shape):
-        if len(original_shape) <= 2:
-            return data
-        return data.reshape(original_shape)
-
-    def _fit_transform_scaled(self, scaler, data):
-        data_2d, original_shape = self._prepare_for_scaler(data)
-        scaled = scaler.fit_transform(data_2d)
-        return self._restore_from_scaler(scaled, original_shape)
-
-    def _transform_scaled(self, scaler, data):
-        data_2d, original_shape = self._prepare_for_scaler(data)
-        scaled = scaler.transform(data_2d)
-        return self._restore_from_scaler(scaled, original_shape)
 
     def get_DataPath(self):
         pData = 'Z:/p1/data/'
@@ -1013,7 +992,7 @@ class DATA:
                 cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
                 if self.multi:
                     cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.UT_allProps_df   = pd.DataFrame(self.UT_allProps, columns=cols, index=self.UT_OUT_df.index)
+                self.UT_allProps_df   = pd.DataFrame(self.UT_allProps, columns=cols, index=self.UT_OUT_df.iloc[1:].index)
                 self.UT_trainProps_df = pd.DataFrame(self.UT_trainProps.T, columns=cols)
                 self.UT_valProps_df   = pd.DataFrame(self.UT_valProps.T, columns=cols)
                 self.UT_testProps_df  = pd.DataFrame(self.UT_testProps.T, columns=cols)
@@ -1111,7 +1090,7 @@ class DATA:
                 cols = ['K_JIC', 'K_IC', 'Force', 'Displacement']
                 if self.multi:
                     cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.FT_allProps_df   = pd.DataFrame(self.FT_allProps, columns=cols, index=self.FT_OUT_df.index)
+                self.FT_allProps_df   = pd.DataFrame(self.FT_allProps, columns=cols, index=self.FT_OUT_df.iloc[1:].index)
                 self.FT_trainProps_df = pd.DataFrame(self.FT_trainProps.T, columns=cols)
                 self.FT_valProps_df   = pd.DataFrame(self.FT_valProps.T, columns=cols)
                 self.FT_testProps_df  = pd.DataFrame(self.FT_testProps.T, columns=cols)
