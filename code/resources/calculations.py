@@ -80,7 +80,7 @@ def get_ductileData(CSVout, crit=0.25, delimiter=',', typ='n'):
     return output_df
 
 def calcUT(df):
-    frac = int(df.x.tolist()[0])
+    frac = int(df.y_sm.tolist()[0])
     df = df[1:].reset_index(drop=True)
     e = df.x.tolist()
     s_sm = df.y_sm.tolist()
@@ -195,7 +195,7 @@ def calc_FaW_aniso(a, W, C):
     return f_a_W
 
 def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):  
-    frac = int(df.x.tolist()[0])
+    frac = int(df.y_sm.tolist()[0])
     df = df[1:].reset_index(drop=True)
     d = df.x.tolist()
     F_sm = df.y_sm.tolist()
