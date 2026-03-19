@@ -1123,9 +1123,11 @@ def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
     dummyElem = []
     count = 0
     for ii in range(len(nodes)):
-        if (LAT.lower() == "fcc" and nodes[ii][int(nodes.shape[-1]-2)])%2 == 1.0 and (nodes[ii][int(nodes.shape[-1]-1)])%2 == 1.0:
+        x_coord = nodes.shape[-1]-3 if stiff else nodes.shape[-1]-2
+        y_coord = nodes.shape[-1]-2 if stiff else nodes.shape[-1]-1
+        if (LAT.lower() == "fcc" and nodes[ii][int(x_coord)])%2 == 1.0 and (nodes[ii][int(y_coord)])%2 == 1.0:
             continue
-        distance = np.sqrt(np.array(nodes[ii, int(nodes.shape[-1]-2)] - nodes[:, int(nodes.shape[-1]-2)])**2 + np.array(nodes[ii, int(nodes.shape[-1]-1)] - nodes[:, int(nodes.shape[-1]-1)])**2)
+        distance = np.sqrt(np.array(nodes[ii, int(x_coord)] - nodes[:, int(x_coord)])**2 + np.array(nodes[ii, int(y_coord)] - nodes[:, int(y_coord)])**2)
         inside = np.argwhere(distance <= radius)
         nearNodes = np.setdiff1d(inside.astype(int), [ii])
         for jj in range(len(nearNodes)):
