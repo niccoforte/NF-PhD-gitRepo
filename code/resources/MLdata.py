@@ -15,9 +15,9 @@ def load_data(inputs, outputs, f_inputs=None, props=None):
     IN_df   = pd.read_csv(inputs, index_col=0, header=0)
     OUTr_df = pd.read_csv(outputs, index_col=0, header=0)
     INf_df  = None
-    props_df = None
     if f_inputs is not None:
         INf_df = pd.read_csv(f_inputs, index_col=0, header=0)
+    props_df = None
     if props is not None:
         props_df = pd.read_csv(props, index_col=0, header=0)
 
@@ -345,20 +345,16 @@ def plot_curve(OUT_df, mode, idx=None, q=15, compare_ax=None):
     return fig2, ax1
 
 
-def load_splitData(PATH, mechMode, dis, split_name="Final", freq=False):
-    train_in   = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-trainIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    train_out  = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-trainOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    trainProps = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-trainProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    val_in     = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-valIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    val_out    = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-valOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    valProps   = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-valProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    test_in    = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-testIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    test_out   = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-testOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    testProps  = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-testProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    if freq is not None:
-        train_in = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-trainIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-        val_in   = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-valIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-        test_in  = pd.read_csv(f"{PATH}{mechMode}/splits/{mechMode}-{dis}-testIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+def load_splitData(PATH, mechMode, dis, split_name="Final"):
+    train_in   = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-trainIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+    train_out  = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-trainOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
+    trainProps = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-trainProps-{split_name}.csv", index_col=0, header=0).to_numpy()
+    val_in     = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-valIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+    val_out    = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-valOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
+    valProps   = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-valProps-{split_name}.csv", index_col=0, header=0).to_numpy()
+    test_in    = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-testIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+    test_out   = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-testOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
+    testProps  = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-testProps-{split_name}.csv", index_col=0, header=0).to_numpy()
 
     train, val, test = [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
     return train, val, test
@@ -595,25 +591,22 @@ class DATA:
             self.PATH = pTiLAT
         else:
             self.PATH = str(self.path)+"/"
-
+    
     def load_data(self, typ="n"):
-        if typ.lower() == "a":  # TODO: fix
+        if typ.lower() == "a":
             self.UT_IN_df, \
             self.UT_OUT_df, \
             self.UT_INf_df, \
-            self.UT_perINr_df, \
-            self.UT_perIN_df, \
-            self.UT_perOUT_df, \
             self.UT_dIN_df, \
-            self.UT_dOUT_df = load_data(self.UT_INcsv, 
-                                        self.UT_OUTcsv)
-            self.UT_xOUT = np.linspace(0, max(self.UT_perOUT_df.x.tolist()), len(self.UT_dOUT_df.to_numpy()[0]))
-            UT_train, UT_val, UT_test = load_akData(self.UT_CSV_train_in, 
-                                                    self.UT_CSV_train_out,
-                                                    self.UT_CSV_val_in, 
-                                                    self.UT_CSV_val_out, 
-                                                    self.UT_CSV_test_in, 
-                                                    self.UT_CSV_test_out)
+            self.UT_dOUT_df, \
+            self.UT_props_df = load_data(self.PATH+f"{self.mechTest}-{self.dis}-IN.csv", 
+                                        self.PATH+f"{self.mechTest}-{self.dis}-OUT.csv")
+            UT_train, UT_val, UT_test = load_akData(self.PATH+f"NN-{self.mechMode}-{self.dis}-trainIN.csv", 
+                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-trainOUT.csv",
+                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-valIN.csv", 
+                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-valOUT.csv", 
+                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-testIN.csv", 
+                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-testOUT.csv")
 
             self.UT_train_in, self.UT_train_out = UT_train
             self.UT_val_in, self.UT_val_out = UT_val
