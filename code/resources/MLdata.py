@@ -345,16 +345,16 @@ def plot_curve(OUT_df, mode, idx=None, q=15, compare_ax=None):
     return fig2, ax1
 
 
-def load_splitData(PATH, mechMode, dis, split_name="Final"):
-    train_in   = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-trainIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    train_out  = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-trainOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    trainProps = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-trainProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    val_in     = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-valIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    val_out    = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-valOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    valProps   = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-valProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    test_in    = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-testIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    test_out   = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-testOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    testProps  = pd.read_csv(f"{PATH}splits/{mechMode}-{dis}-testProps-{split_name}.csv", index_col=0, header=0).to_numpy()
+def load_splitData(PATH, mechMode, orgMode, dis, split_name=datetime.datetime.now()):
+    train_in   = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+    train_out  = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
+    trainProps = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainProps-{split_name}.csv", index_col=0, header=0).to_numpy()
+    val_in     = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+    val_out    = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
+    valProps   = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valProps-{split_name}.csv", index_col=0, header=0).to_numpy()
+    test_in    = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testIN-{split_name}.csv", index_col=0, header=0).to_numpy()
+    test_out   = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
+    testProps  = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testProps-{split_name}.csv", index_col=0, header=0).to_numpy()
 
     train, val, test = [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
     return train, val, test
@@ -382,8 +382,23 @@ def split_data(dIN, dOUT, props, split=0.8):
     
     return train, val, test
 
-def save_splitData(): # TODO: finish
-    pass
+def save_splitData(train, val, test, PATH, mechMode, orgMode, dis, split_name=datetime.datetime.now()):
+    os.makedirs(PATH+f"/splits", exist_ok=True)
+
+    train_in, train_out, train_props = train
+    val_in, val_out, val_props       = val
+    test_in, test_out, test_props    = test
+
+    pd.DataFrame(train_in).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainIN-{split_name}.csv")
+    pd.DataFrame(train_out).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainOUT-{split_name}.csv")
+    pd.DataFrame(train_props).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainProps-{split_name}.csv")
+    pd.DataFrame(val_in).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valIN-{split_name}.csv")
+    pd.DataFrame(val_out).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valOUT-{split_name}.csv")
+    pd.DataFrame(val_props).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valProps-{split_name}.csv")
+    pd.DataFrame(test_in).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testIN-{split_name}.csv")
+    pd.DataFrame(test_out).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testOUT-{split_name}.csv")
+    pd.DataFrame(test_props).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testProps-{split_name}.csv")
+
 
 def standardize(x, minx, maxx, mode=0):
     if mode == 0:
@@ -396,16 +411,6 @@ def normalize(x, mean, std, mode=0):
         return (x - mean)/std
     if mode == 1:
         return (x*std) + mean
-
-class Dataset_(Dataset): # TODO: check if this is needed or if we can just use the standard PyTorch Dataset class
-    def __init__(self, x, y, edge_index=None):
-        self.x = x
-        self.y = y
-        self.edge_index=edge_index
-    def __getitem__(self, index):
-        return self.x[index], self.y[index]
-    def __len__(self):
-        return self.x.shape[0]
     
 class PCA_:
     def __init__(self):
@@ -495,14 +500,14 @@ class DATA:
         model="MLP", 
         freq=False,
         scale=False,
-        reduce_dim=False,
-        format=0
+        reduce_dim=False
     ):
         self.path = path
         self.path_add = path_add
         self.load = load
         self.load_split = load_split
         self.split_frac = split_frac
+        self.save_split = save_split
         self.LAT = LAT
         self.nnx = nnx
         self.dis = dis
@@ -551,28 +556,28 @@ class DATA:
             elif LAT.lower() == "tri":
                 self.nnx = 30
         
-        self.calc_geom()
-        self.get_DataPath()
-
+        self._calcGeom()
+        self._getDataPath()
         if load:
-            # self.get_DataFiles()
             if path == 0:
-                self.load_data(typ="a")
+                self._loadData(typ="a")
             else:
-                self.load_data()
+                self._loadData()
+                self._splitData()
+                if self.scale:
+                    self._scaleData()
+                if self.reduce_dim:
+                    self._reduceData()
+                if self.model.lower() == "gnn":
+                    self._GNNreshapeData()
 
-            if format == 1 and model.lower() == "mlp" or model.lower() == "gpr":
-                self.load_DisDist_v1()
-            elif format == 2 and model.lower() == "mlp":
-                self.load_DisDist_v2()
-
-    def calc_geom(self):
+    def _calcGeom(self):
         self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx)
         self.E_s = 123e9  ## Pa
         self.v_s = 0.3
         self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom)
 
-    def get_DataPath(self):
+    def _getDataPath(self):
         pData = 'Z:/p1/data/'
 
         pAl          = pData + 'Al/'
@@ -592,7 +597,7 @@ class DATA:
         else:
             self.PATH = str(self.path)+"/"
     
-    def load_data(self, typ="n"):
+    def _loadData(self, typ="n"):
         if typ.lower() == "a":
             self.UT_IN_df, \
             self.UT_OUT_df, \
@@ -613,28 +618,29 @@ class DATA:
             self.UT_test_in, self.UT_test_out = UT_test
 
             if self.scale:
-                    if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.UT_INscaler = clone(self.scaler)
-                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
-                    if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.UT_OUTscaler = clone(self.scaler)
-                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+                if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                    self.UT_INscaler = clone(self.scaler)
+                    self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
+                    self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
+                    self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
+                if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                    self.UT_OUTscaler = clone(self.scaler)
+                    self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
+                    self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
+                    self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
 
         else:
             if self.UTmechTest:
                 self.UT_IN_df, \
                 self.UT_OUT_df, \
-                self.UT_dIN_df, \
                 self.UT_INf_df, \
+                self.UT_dIN_df, \
                 self.UT_dOUT_df, \
                 self.UT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allIN.csv", 
                                              self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allOUT.csv", 
                                              self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allINf.csv" if self.freq else None,
                                              self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
+                
                 cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
                 if self.mechMode.lower() == "multi":
                     cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
@@ -644,55 +650,6 @@ class DATA:
                     self.UT_props_df, self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_props_df[:self.nsims], self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
                     if self.freq:
                         self.UT_INf_df = self.UT_INf_df[:self.nsims]
-                
-                if self.load_split:
-                    UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, self.dis, self.load_split, self.freq)
-                else:
-                    UT_train, UT_val, UT_test = split_data(self.UT_dIN_df, self.UT_dOUT_df, self.UT_props_df, split=self.split_frac)
-                self.UT_train_in, self.UT_train_out, self.UT_trainProps = UT_train
-                self.UT_val_in, self.UT_val_out, self.UT_valProps       = UT_val
-                self.UT_test_in, self.UT_test_out, self.UT_testProps    = UT_test
-
-                # self.UT_trainProps_df = pd.DataFrame(self.UT_trainProps.T, columns=cols)
-                # self.UT_valProps_df   = pd.DataFrame(self.UT_valProps.T, columns=cols)
-                # self.UT_testProps_df  = pd.DataFrame(self.UT_testProps.T, columns=cols)
-
-                if self.scale:
-                    if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.UT_INscaler = clone(self.scaler)
-                        self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                        self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                        self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
-                    if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.UT_OUTscaler = clone(self.scaler)
-                        self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                        self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                        self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
-                    if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.UT_PROPscaler = clone(self.scaler)
-                        self.UT_trainProps = self.UT_PROPscaler.fit_transform(self.UT_trainProps.T).T
-                        self.UT_valProps   = self.UT_PROPscaler.transform(self.UT_valProps.T).T
-                        self.UT_testProps  = self.UT_PROPscaler.transform(self.UT_testProps.T).T
-                
-                if self.reduce_dim:
-                    if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                        self.UT_INreducer = copy.deepcopy(self.reducer)
-                        self.UT_INreducer.fit(self.UT_train_in)
-                        self.UT_train_in = self.UT_INreducer.reduce(self.UT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.UT_val_in   = self.UT_INreducer.reduce(self.UT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.UT_test_in  = self.UT_INreducer.reduce(self.UT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                    if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                        self.UT_OUTreducer = copy.deepcopy(self.reducer)
-                        self.UT_OUTreducer.fit(self.UT_train_out)
-                        self.UT_train_out = self.UT_OUTreducer.reduce(self.UT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.UT_val_out   = self.UT_OUTreducer.reduce(self.UT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.UT_test_out  = self.UT_OUTreducer.reduce(self.UT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-
-                if self.model.lower() == "gnn":
-                    self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
-                    self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
-                    self.UT_test_in  = self.UT_test_in.reshape(*self.UT_test_in.shape[:-1], self.UT_test_in.shape[-1]//2, 2)
-
 
             if self.FTmechTest:
                 self.FT_IN_df, \
@@ -714,212 +671,129 @@ class DATA:
                     if self.freq:
                         self.FT_INf_df = self.FT_INf_df[:self.nsims]
 
-                if self.load_split:
-                    FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, self.dis, self.load_split, self.freq)
-                else:
-                    FT_train, FT_val, FT_test = split_data(self.FT_dIN_df, self.FT_dOUT_df, self.FT_props_df, split=self.split_frac)
-                self.FT_train_in, self.FT_train_out, self.FT_trainProps = FT_train
-                self.FT_val_in, self.FT_val_out, self.FT_valProps       = FT_val
-                self.FT_test_in, self.FT_test_out, self.FT_testProps    = FT_test                
-                
-                # self.FT_trainProps_df = pd.DataFrame(self.FT_trainProps.T, columns=cols)
-                # self.FT_valProps_df   = pd.DataFrame(self.FT_valProps.T, columns=cols)
-                # self.FT_testProps_df  = pd.DataFrame(self.FT_testProps.T, columns=cols)
-
-                if self.scale:
-                    if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.FT_INscaler = clone(self.scaler)
-                        self.FT_train_in = self.FT_INscaler.fit_transform(self.FT_train_in)
-                        self.FT_val_in   = self.FT_INscaler.transform(self.FT_val_in)
-                        self.FT_test_in  = self.FT_INscaler.transform(self.FT_test_in)
-                    if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.FT_OUTscaler = clone(self.scaler)
-                        self.FT_train_out = self.FT_OUTscaler.fit_transform(self.FT_train_out)
-                        self.FT_val_out   = self.FT_OUTscaler.transform(self.FT_val_out)
-                        self.FT_test_out  = self.FT_OUTscaler.transform(self.FT_test_out)
-                    if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                        self.FT_PROPscaler = clone(self.scaler)
-                        self.FT_trainProps = self.FT_PROPscaler.fit_transform(self.FT_trainProps.T).T
-                        self.FT_valProps   = self.FT_PROPscaler.transform(self.FT_valProps.T).T
-                        self.FT_testProps  = self.FT_PROPscaler.transform(self.FT_testProps.T).T
-                
-                if self.reduce_dim:
-                    if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                        self.FT_INreducer = copy.deepcopy(self.reducer)
-                        self.FT_INreducer.fit(self.FT_train_in)
-                        self.FT_train_in = self.FT_INreducer.reduce(self.FT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.FT_val_in   = self.FT_INreducer.reduce(self.FT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.FT_test_in  = self.FT_INreducer.reduce(self.FT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                    if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                        self.FT_OUTreducer = copy.deepcopy(self.reducer)
-                        self.FT_OUTreducer.fit(self.FT_train_out)
-                        self.FT_train_out = self.FT_OUTreducer.reduce(self.FT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.FT_val_out   = self.FT_OUTreducer.reduce(self.FT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        self.FT_test_out  = self.FT_OUTreducer.reduce(self.FT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                        
-                if self.model.lower() == "gnn":
-                    self.FT_train_in = self.FT_train_in.reshape(*self.FT_train_in.shape[:-1], self.FT_train_in.shape[-1]//2, 2)
-                    self.FT_val_in   = self.FT_val_in.reshape(*self.FT_val_in.shape[:-1], self.FT_val_in.shape[-1]//2, 2)
-                    self.FT_test_in  = self.FT_test_in.reshape(*self.FT_test_in.shape[:-1], self.FT_test_in.shape[-1]//2, 2)
-                
-
-            if self.UTmechTest and self.FTmechTest:  # TODO: remove?
+            if self.UTmechTest and self.FTmechTest:
                 self.common_props_df = self.UT_props_df
 
+    def _splitData(self, split_name=None):
+        if split_name is None:
+            split_name = self.load_split if self.load_split else datetime.datetime.now()
+        if self.UTmechTest:
+            if self.load_split:
+                UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
+            else:
+                UT_train, UT_val, UT_test = split_data(self.UT_dIN_df, self.UT_dOUT_df, self.UT_props_df, split=self.split_frac)
+            self.UT_train_in, self.UT_train_out, self.UT_trainProps = UT_train
+            self.UT_val_in, self.UT_val_out, self.UT_valProps       = UT_val
+            self.UT_test_in, self.UT_test_out, self.UT_testProps    = UT_test
+        
+        if self.FTmechTest:
+            if self.load_split:
+                FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
+            else:
+                FT_train, FT_val, FT_test = split_data(self.FT_dIN_df, self.FT_dOUT_df, self.FT_props_df, split=self.split_frac)
+            self.FT_train_in, self.FT_train_out, self.FT_trainProps = FT_train
+            self.FT_val_in, self.FT_val_out, self.FT_valProps       = FT_val
+            self.FT_test_in, self.FT_test_out, self.FT_testProps    = FT_test
+    
+    def _saveSplitData(self, split_name=None):
+        if split_name is None:
+            split_name = self.save_split if self.save_split else datetime.datetime.now()
+        if self.UTmechTest:
+            save_splitData([self.FT_train_in, self.FT_train_out, self.FT_trainProps], 
+                            [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
+                            [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
+                            self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
+        if self.FTmechTest:
+            save_splitData([self.FT_train_in, self.FT_train_out, self.FT_trainProps], 
+                            [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
+                            [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
+                            self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
+
+    def _scaleData(self):
+        if self.UTmechTest:
+            if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.UT_INscaler = clone(self.scaler)
+                self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
+                self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
+                self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
+            if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.UT_OUTscaler = clone(self.scaler)
+                self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
+                self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
+                self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+            if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.UT_PROPscaler = clone(self.scaler)
+                self.UT_trainProps = self.UT_PROPscaler.fit_transform(self.UT_trainProps.T).T
+                self.UT_valProps   = self.UT_PROPscaler.transform(self.UT_valProps.T).T
+                self.UT_testProps  = self.UT_PROPscaler.transform(self.UT_testProps.T).T
+        
+        if self.FTmechTest:
+            if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.FT_INscaler = clone(self.scaler)
+                self.FT_train_in = self.FT_INscaler.fit_transform(self.FT_train_in)
+                self.FT_val_in   = self.FT_INscaler.transform(self.FT_val_in)
+                self.FT_test_in  = self.FT_INscaler.transform(self.FT_test_in)
+            if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.FT_OUTscaler = clone(self.scaler)
+                self.FT_train_out = self.FT_OUTscaler.fit_transform(self.FT_train_out)
+                self.FT_val_out   = self.FT_OUTscaler.transform(self.FT_val_out)
+                self.FT_test_out  = self.FT_OUTscaler.transform(self.FT_test_out)
+            if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
+                self.FT_PROPscaler = clone(self.scaler)
+                self.FT_trainProps = self.FT_PROPscaler.fit_transform(self.FT_trainProps.T).T
+                self.FT_valProps   = self.FT_PROPscaler.transform(self.FT_valProps.T).T
+                self.FT_testProps  = self.FT_PROPscaler.transform(self.FT_testProps.T).T 
+    
+    def _reduceData(self):
+        if self.UTmechTest:
+            if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
+                self.UT_INreducer = copy.deepcopy(self.reducer)
+                self.UT_INreducer.fit(self.UT_train_in)
+                self.UT_train_in = self.UT_INreducer.reduce(self.UT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.UT_val_in   = self.UT_INreducer.reduce(self.UT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.UT_test_in  = self.UT_INreducer.reduce(self.UT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+            if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
+                self.UT_OUTreducer = copy.deepcopy(self.reducer)
+                self.UT_OUTreducer.fit(self.UT_train_out)
+                self.UT_train_out = self.UT_OUTreducer.reduce(self.UT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.UT_val_out   = self.UT_OUTreducer.reduce(self.UT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.UT_test_out  = self.UT_OUTreducer.reduce(self.UT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+        
+        if self.FTmechTest:
+            if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
+                self.FT_INreducer = copy.deepcopy(self.reducer)
+                self.FT_INreducer.fit(self.FT_train_in)
+                self.FT_train_in = self.FT_INreducer.reduce(self.FT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.FT_val_in   = self.FT_INreducer.reduce(self.FT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.FT_test_in  = self.FT_INreducer.reduce(self.FT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+            if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
+                self.FT_OUTreducer = copy.deepcopy(self.reducer)
+                self.FT_OUTreducer.fit(self.FT_train_out)
+                self.FT_train_out = self.FT_OUTreducer.reduce(self.FT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.FT_val_out   = self.FT_OUTreducer.reduce(self.FT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.FT_test_out  = self.FT_OUTreducer.reduce(self.FT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+
+    def _GNNreshapeData(self):
+        if self.UTmechTest:
+            self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
+            self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
+            self.UT_test_in  = self.UT_test_in.reshape(*self.UT_test_in.shape[:-1], self.UT_test_in.shape[-1]//2, 2)
+        
+        if self.FTmechTest:
+            self.FT_train_in = self.FT_train_in.reshape(*self.FT_train_in.shape[:-1], self.FT_train_in.shape[-1]//2, 2)
+            self.FT_val_in   = self.FT_val_in.reshape(*self.FT_val_in.shape[:-1], self.FT_val_in.shape[-1]//2, 2)
+            self.FT_test_in  = self.FT_test_in.reshape(*self.FT_test_in.shape[:-1], self.FT_test_in.shape[-1]//2, 2)
 
 
 
 
-    # def get_DataFiles(self):
-    #     if self.UTmechTest and not self.multi:
-    #         if self.path == 1:
-    #             MLpath = self.PATH + "MLdata/UT/"
-    #         elif self.path == 0:
-    #             MLpath = self.PATH + "NN-"
-    #         self.UT_INcsv             = self.PATH + f'Ductile-disNodes-IN.csv'
-    #         self.UT_INcsv_noOutliers  = self.PATH + f'Ductile-disNodes-IN-noOutliers.csv'
-    #         self.UT_OUTcsv            = self.PATH + f'Ductile-disNodes-OUT.csv'
-    #         self.UT_OUTcsv_noOutliers = self.PATH + f'Ductile-disNodes-OUT-noOutliers.csv'
 
-    #         self.UT_CSV_all_in    = f'{MLpath}UT-{self.dis}-allIN.csv'
-    #         self.UT_CSV_all_out   = f'{MLpath}UT-{self.dis}-allOUT.csv'
-    #         self.UT_CSV_train_in  = f'{MLpath}UT-{self.dis}-trainIN.csv'
-    #         self.UT_CSV_train_out = f'{MLpath}UT-{self.dis}-trainOUT.csv'
-    #         self.UT_CSV_val_in    = f'{MLpath}UT-{self.dis}-valIN.csv'
-    #         self.UT_CSV_val_out   = f'{MLpath}UT-{self.dis}-valOUT.csv'
-    #         self.UT_CSV_test_in   = f'{MLpath}UT-{self.dis}-testIN.csv'
-    #         self.UT_CSV_test_out  = f'{MLpath}UT-{self.dis}-testOUT.csv'
 
-    #         self.UT_CSV_allProps   = f'{MLpath}UT-{self.dis}-allProps.csv'
-    #         self.UT_CSV_trainProps = f'{MLpath}UT-{self.dis}-trainProps.csv'
-    #         self.UT_CSV_valProps   = f'{MLpath}UT-{self.dis}-valProps.csv'
-    #         self.UT_CSV_testProps  = f'{MLpath}UT-{self.dis}-testProps.csv'
-            
-    #         self.UT_INcsv_f            = None
-    #         self.UT_INcsv_f_noOutliers = None
+# if format == 1 and model.lower() == "mlp" or model.lower() == "gpr":
+#     self.load_DisDist_v1()
+# elif format == 2 and model.lower() == "mlp":
+#     self.load_DisDist_v2()
 
-    #         self.UT_CSV_all_in_f       = None
-    #         self.UT_CSV_train_in_f     = None
-    #         self.UT_CSV_val_in_f       = None
-    #         self.UT_CSV_test_in_f      = None
-
-    #         if self.freq:
-    #             self.UT_INcsv_f            = self.PATH + f'Ductile-disNodes-INf.csv'
-    #             self.UT_INcsv_f_noOutliers = self.PATH + f'Ductile-disNodes-INf-noOutliers.csv'
-
-    #             self.UT_CSV_all_in_f       = f'{MLpath}UT-{self.dis}-allINf.csv'
-    #             self.UT_CSV_train_in_f     = f'{MLpath}UT-{self.dis}-trainINf.csv'
-    #             self.UT_CSV_val_in_f       = f'{MLpath}UT-{self.dis}-valINf.csv'
-    #             self.UT_CSV_test_in_f      = f'{MLpath}UT-{self.dis}-testINf.csv'
-
-    #     if self.FTmechTest and not self.multi:
-    #         self.FT_INcsv             = self.PATH + f'Fracture-disNodes-IN.csv'
-    #         self.FT_INcsv_noOutliers  = self.PATH + f'Fracture-disNodes-IN-noOutliers.csv'
-    #         self.FT_OUTcsv            = self.PATH + f'Fracture-disNodes-OUT.csv'
-    #         self.FT_OUTcsv_noOutliers = self.PATH + f'Fracture-disNodes-OUT-noOutliers.csv'
-
-    #         self.FT_CSV_all_in    = self.PATH + f'MLdata/FT/FT-{self.dis}-allIN.csv'
-    #         self.FT_CSV_all_out   = self.PATH + f'MLdata/FT/FT-{self.dis}-allOUT.csv'
-    #         self.FT_CSV_train_in  = self.PATH + f'MLdata/FT/FT-{self.dis}-trainIN.csv'
-    #         self.FT_CSV_train_out = self.PATH + f'MLdata/FT/FT-{self.dis}-trainOUT.csv'
-    #         self.FT_CSV_val_in    = self.PATH + f'MLdata/FT/FT-{self.dis}-valIN.csv'
-    #         self.FT_CSV_val_out   = self.PATH + f'MLdata/FT/FT-{self.dis}-valOUT.csv'
-    #         self.FT_CSV_test_in   = self.PATH + f'MLdata/FT/FT-{self.dis}-testIN.csv'
-    #         self.FT_CSV_test_out  = self.PATH + f'MLdata/FT/FT-{self.dis}-testOUT.csv'
-
-    #         self.FT_CSV_allProps   = self.PATH + f'MLdata/FT/FT-{self.dis}-allProps.csv'
-    #         self.FT_CSV_trainProps = self.PATH + f'MLdata/FT/FT-{self.dis}-trainProps.csv'
-    #         self.FT_CSV_valProps   = self.PATH + f'MLdata/FT/FT-{self.dis}-valProps.csv'
-    #         self.FT_CSV_testProps  = self.PATH + f'MLdata/FT/FT-{self.dis}-testProps.csv'
-            
-    #         self.FT_INcsv_f            = None
-    #         self.FT_INcsv_f_noOutliers = None
-
-    #         self.FT_CSV_all_in_f       = None
-    #         self.FT_CSV_train_in_f     = None
-    #         self.FT_CSV_val_in_f       = None
-    #         self.FT_CSV_test_in_f      = None
-
-    #         if self.freq:
-    #             self.FT_INcsv_f            = self.PATH + f'Fracture-disNodes-INf.csv'
-    #             self.FT_INcsv_f_noOutliers = self.PATH + f'Fracture-disNodes-INf-noOutliers.csv'
-
-    #             self.FT_CSV_all_in_f       = self.PATH + f'MLdata/FT/FT-{self.dis}-allINf.csv'
-    #             self.FT_CSV_train_in_f     = self.PATH + f'MLdata/FT/FT-{self.dis}-trainINf.csv'
-    #             self.FT_CSV_val_in_f       = self.PATH + f'MLdata/FT/FT-{self.dis}-valINf.csv'
-    #             self.FT_CSV_test_in_f      = self.PATH + f'MLdata/FT/FT-{self.dis}-testINf.csv'
-
-    #     if self.UTmechTest and self.FTmechTest and self.multi:
-    #         self.UT_CSV_allProps   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-allProps.csv'
-    #         self.UT_CSV_trainProps = self.PATH + f'MLdata/multi/MULTI-{self.dis}-trainProps.csv'
-    #         self.UT_CSV_valProps   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-valProps.csv'
-    #         self.UT_CSV_testProps  = self.PATH + f'MLdata/multi/MULTI-{self.dis}-testProps.csv'
-    #         self.FT_CSV_allProps   = self.UT_CSV_allProps
-    #         self.FT_CSV_trainProps = self.UT_CSV_trainProps
-    #         self.FT_CSV_valProps   = self.UT_CSV_valProps
-    #         self.FT_CSV_testProps  = self.UT_CSV_testProps
-
-    #         self.UT_INcsv             = self.PATH + f'Ductile-disNodes-IN.csv'
-    #         self.UT_INcsv_noOutliers  = self.PATH + f'MULTI-Ductile-disNodes-IN-noOutliers.csv'
-    #         self.UT_OUTcsv            = self.PATH + f'Ductile-disNodes-OUT.csv'
-    #         self.UT_OUTcsv_noOutliers = self.PATH + f'MULTI-Ductile-disNodes-OUT-noOutliers.csv'
-
-    #         self.UT_CSV_all_in    = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-allIN.csv'
-    #         self.UT_CSV_all_out   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-allOUT.csv'
-    #         self.UT_CSV_train_in  = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-trainIN.csv'
-    #         self.UT_CSV_train_out = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-trainOUT.csv'
-    #         self.UT_CSV_val_in    = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-valIN.csv'
-    #         self.UT_CSV_val_out   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-valOUT.csv'
-    #         self.UT_CSV_test_in   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-testIN.csv'
-    #         self.UT_CSV_test_out  = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-testOUT.csv'
-            
-    #         self.UT_INcsv_f            = None
-    #         self.UT_INcsv_f_noOutliers = None
-
-    #         self.UT_CSV_all_in_f       = None
-    #         self.UT_CSV_train_in_f     = None
-    #         self.UT_CSV_val_in_f       = None
-    #         self.UT_CSV_test_in_f      = None
-
-    #         if self.freq:
-    #             self.UT_INcsv_f            = self.PATH + f'Ductile-disNodes-INf.csv'
-    #             self.UT_INcsv_f_noOutliers = self.PATH + f'MULTI-Ductile-disNodes-INf-noOutliers.csv'
-
-    #             self.UT_CSV_all_in_f       = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-allINf.csv'
-    #             self.UT_CSV_train_in_f     = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-trainINf.csv'
-    #             self.UT_CSV_val_in_f       = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-valINf.csv'
-    #             self.UT_CSV_test_in_f      = self.PATH + f'MLdata/multi/MULTI-{self.dis}-UT-testINf.csv'
-
-    #         self.FT_INcsv             = self.PATH + f'Fracture-disNodes-IN.csv'
-    #         self.FT_INcsv_noOutliers  = self.PATH + f'MULTI-Fracture-disNodes-IN-noOutliers.csv'
-    #         self.FT_OUTcsv            = self.PATH + f'Fracture-disNodes-OUT.csv'
-    #         self.FT_OUTcsv_noOutliers = self.PATH + f'MULTI-Fracture-disNodes-OUT-noOutliers.csv'
-
-    #         self.FT_CSV_all_in    = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-allIN.csv'
-    #         self.FT_CSV_all_out   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-allOUT.csv'
-    #         self.FT_CSV_train_in  = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-trainIN.csv'
-    #         self.FT_CSV_train_out = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-trainOUT.csv'
-    #         self.FT_CSV_val_in    = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-valIN.csv'
-    #         self.FT_CSV_val_out   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-valOUT.csv'
-    #         self.FT_CSV_test_in   = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-testIN.csv'
-    #         self.FT_CSV_test_out  = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-testOUT.csv'
-            
-    #         self.FT_INcsv_f            = None
-    #         self.FT_INcsv_f_noOutliers = None
-
-    #         self.FT_CSV_all_in_f       = None
-    #         self.FT_CSV_train_in_f     = None
-    #         self.FT_CSV_val_in_f       = None
-    #         self.FT_CSV_test_in_f      = None
-
-    #         if self.freq:
-    #             self.FT_INcsv_f            = self.PATH + f'Fracture-disNodes-INf.csv'
-    #             self.FT_INcsv_f_noOutliers = self.PATH + f'MULTI-Fracture-disNodes-INf-noOutliers.csv'
-
-    #             self.FT_CSV_all_in_f       = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-allINf.csv'
-    #             self.FT_CSV_train_in_f     = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-trainINf.csv'
-    #             self.FT_CSV_val_in_f       = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-valINf.csv'
-    #             self.FT_CSV_test_in_f      = self.PATH + f'MLdata/multi/MULTI-{self.dis}-FT-testINf.csv
 
     # def load_DisDist_v1(self):
     #     self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
