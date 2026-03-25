@@ -8,7 +8,7 @@ from torch.utils.data.dataset import Dataset
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
-from sklearn.base import clone
+from sklearn.base import clone, BaseEstimator, TransformerMixin
 
 
 def load_data(inputs, outputs, f_inputs=None, props=None):
@@ -345,16 +345,19 @@ def plot_curve(OUT_df, mode, idx=None, q=15, compare_ax=None):
     return fig2, ax1
 
 
-def load_splitData(PATH, mechMode, orgMode, dis, split_name=datetime.datetime.now()):
-    train_in   = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    train_out  = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    trainProps = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    val_in     = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    val_out    = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    valProps   = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valProps-{split_name}.csv", index_col=0, header=0).to_numpy()
-    test_in    = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testIN-{split_name}.csv", index_col=0, header=0).to_numpy()
-    test_out   = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testOUT-{split_name}.csv", index_col=0, header=0).to_numpy()
-    testProps  = pd.read_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testProps-{split_name}.csv", index_col=0, header=0).to_numpy()
+def load_splitData(PATH, mechMode, orgMode, dis, split_name=None):
+    if split_name is None:
+        split_name = datetime.datetime.now()
+
+    train_in   = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-trainIN.csv", index_col=0, header=0).to_numpy()
+    train_out  = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-trainOUT.csv", index_col=0, header=0).to_numpy()
+    trainProps = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-trainProps.csv", index_col=0, header=0).to_numpy()
+    val_in     = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-valIN.csv", index_col=0, header=0).to_numpy()
+    val_out    = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-valOUT.csv", index_col=0, header=0).to_numpy()
+    valProps   = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-valProps.csv", index_col=0, header=0).to_numpy()
+    test_in    = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testIN.csv", index_col=0, header=0).to_numpy()
+    test_out   = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testOUT.csv", index_col=0, header=0).to_numpy()
+    testProps  = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testProps.csv", index_col=0, header=0).to_numpy()
 
     train, val, test = [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
     return train, val, test
@@ -382,22 +385,25 @@ def split_data(dIN, dOUT, props, split=0.8):
     
     return train, val, test
 
-def save_splitData(train, val, test, PATH, mechMode, orgMode, dis, split_name=datetime.datetime.now()):
-    os.makedirs(PATH+f"/splits", exist_ok=True)
+def save_splitData(train, val, test, PATH, mechMode, orgMode, dis, split_name=None):
+    if split_name is None:
+        split_name = datetime.datetime.now()
+
+    os.makedirs(PATH+f"MLdata/split-{split_name}", exist_ok=True)
 
     train_in, train_out, train_props = train
     val_in, val_out, val_props       = val
     test_in, test_out, test_props    = test
 
-    pd.DataFrame(train_in).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainIN-{split_name}.csv")
-    pd.DataFrame(train_out).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainOUT-{split_name}.csv")
-    pd.DataFrame(train_props).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-trainProps-{split_name}.csv")
-    pd.DataFrame(val_in).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valIN-{split_name}.csv")
-    pd.DataFrame(val_out).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valOUT-{split_name}.csv")
-    pd.DataFrame(val_props).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-valProps-{split_name}.csv")
-    pd.DataFrame(test_in).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testIN-{split_name}.csv")
-    pd.DataFrame(test_out).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testOUT-{split_name}.csv")
-    pd.DataFrame(test_props).to_csv(f"{PATH}MLdata/splits/{mechMode}-{orgMode}-{dis}-testProps-{split_name}.csv")
+    pd.DataFrame(train_in).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-trainIN.csv")
+    pd.DataFrame(train_out).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-trainOUT.csv")
+    pd.DataFrame(train_props).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-trainProps.csv")
+    pd.DataFrame(val_in).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-valIN.csv")
+    pd.DataFrame(val_out).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-valOUT.csv")
+    pd.DataFrame(val_props).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-valProps.csv")
+    pd.DataFrame(test_in).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testIN.csv")
+    pd.DataFrame(test_out).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testOUT.csv")
+    pd.DataFrame(test_props).to_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testProps.csv")
 
 
 def standardize(x, minx, maxx, mode=0):
@@ -412,20 +418,34 @@ def normalize(x, mean, std, mode=0):
     if mode == 1:
         return (x*std) + mean
     
-class PCA_:
-    def __init__(self):
+class PCA_(BaseEstimator, TransformerMixin):
+    def __init__(self, accuracy=0.999999, n_components=None):
+        self.accuracy = accuracy
+        self.n_components = n_components
+
         self.data = None
-        self.n_components = None
 
         self.pca = None
         self.final_pca = None
         self.reduced_data = None
         
     
-    def fit(self, data, verbose=False, plot=False):
+    def fit(self, data, y=None, verbose=False, plot=False, accuracy=None, n_components=None):
         self.data = data
         self.pca = PCA()
         self.pca.fit(self.data)
+
+        selected_n_components = self.n_components
+        if accuracy is not None:
+            selected_n_components = accuracy
+        if n_components is not None:
+            selected_n_components = n_components
+        if selected_n_components is None:
+            selected_n_components = self.accuracy
+
+        self.final_pca = PCA(n_components=selected_n_components)
+        self.final_pca.fit(self.data)
+        self.n_components_ = self.final_pca.n_components_
 
         n_components_50 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.5)[0][0] + 1
         n_components_80 = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= 0.8)[0][0] + 1
@@ -439,6 +459,7 @@ class PCA_:
             print(f"Number of components to capture 90% variance: {n_components_90}")
             print(f"Number of components to capture 95% variance: {n_components_95}")
             print(f"Number of components to capture 100% variance: {n_components_100}")
+            print(f"Selected PCA components: {self.n_components_}")
         
         if plot:
             plt.figure(figsize=(10, 6))
@@ -460,15 +481,24 @@ class PCA_:
             plt.xlim(-5, len(self.pca.explained_variance_ratio_)+10)
             plt.legend()
             plt.show()
+        
+        return self
 
-    def reduce(self, data=None, scale=False, accuracy=0.999999, n_components=None, verbose=False):
+    def transform(self, data):
+        if self.final_pca is None:
+            raise RuntimeError("PCA_ is not fitted. Call fit() before transform().")
+        return self.final_pca.transform(data)
+
+    def reduce(self, data=None, scale=False, accuracy=None, n_components=None, verbose=False):
         if data is None:
             data = self.data
-        self.n_components = np.where(np.cumsum(self.pca.explained_variance_ratio_) >= accuracy)[0][0] + 1
-        if n_components is not None:
-            self.n_components = n_components
-        self.final_pca = PCA(n_components=self.n_components)
-        self.reduced_data = self.final_pca.fit_transform(data)
+
+        if self.final_pca is None:
+            self.fit(data, accuracy=accuracy, n_components=n_components)
+        elif accuracy is not None or n_components is not None:
+            fit_data = self.data if self.data is not None else data
+            self.fit(fit_data, accuracy=accuracy, n_components=n_components)
+        self.reduced_data = self.transform(data)
 
         if verbose:
             print(f"Original data shape: {self.data.shape}")
@@ -477,9 +507,9 @@ class PCA_:
         return self.reduced_data
     
     def reconstruct(self, data, scale=False):
+        if self.final_pca is None:
+            raise RuntimeError("PCA_ is not fitted. Call fit() before reconstruct().")
         reconstructed_data = self.final_pca.inverse_transform(data)
-        if scale:
-            reconstructed_data = self.scaler.inverse_transform(reconstructed_data)
         return reconstructed_data
 
 class DATA:
@@ -516,23 +546,16 @@ class DATA:
         self.model = model
         self.freq = freq
         
+        self._validatePreprocessConfig(scale=scale, reduce_dim=reduce_dim)
+
         self.scale = scale
+        self.scale_reduced = bool(reduce_dim[4]) if isinstance(reduce_dim, (list, tuple)) and len(reduce_dim) > 4 else False
         if scale:
-            if scale[0].lower() == "minmax" or scale[0].lower() == "maxmin":
-                self.scaler = MinMaxScaler()
-            elif scale[0].lower() == "standardscaler" or scale[0].lower() == "standard":
-                self.scaler = StandardScaler()
-            elif scale[0].lower() == "standardize":
-                self.scaler = standardize
-            elif scale[0].lower() == "normalize":
-                self.scaler = normalize
+            self._initScaler(scale)
 
         self.reduce_dim = reduce_dim
         if reduce_dim:
-            if reduce_dim[0].lower() == "pca":
-                self.reducer = PCA_()
-            elif reduce_dim[0].lower() == "autoencoder":
-                self.reducer = None
+            self._initReducer(reduce_dim)
 
         if path_add.lower() == "frequency":
             self.freq = True
@@ -564,6 +587,8 @@ class DATA:
             else:
                 self._loadData()
                 self._splitData()
+                if self.save_split:
+                    self._saveSplitData()
                 if self.scale:
                     self._scaleData()
                 if self.reduce_dim:
@@ -677,39 +702,204 @@ class DATA:
     def _splitData(self, split_name=None):
         if split_name is None:
             split_name = self.load_split if self.load_split else datetime.datetime.now()
+
+        def _to_numpy(x):
+            if hasattr(x, "to_numpy"):
+                return x.to_numpy(copy=True)
+            return np.asarray(x).copy()
+
+        UT_train = UT_val = UT_test = None
+        FT_train = FT_val = FT_test = None
+
+        shared_multi_split = (not self.load_split and self.UTmechTest and self.FTmechTest)
+        if shared_multi_split:
+            common_idx = self.UT_dIN_df.index
+            for idx in [self.UT_dOUT_df.index, self.UT_props_df.index, self.FT_dIN_df.index, self.FT_dOUT_df.index, self.FT_props_df.index]:
+                self.common_idx = common_idx.intersection(idx)
+
+            train_idx, test_idx = train_test_split(common_idx.to_numpy(), train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
+            train_idx, val_idx  = train_test_split(train_idx, train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
+
+            UT_train = [self.UT_dIN_df.loc[train_idx], self.UT_dOUT_df.loc[train_idx], self.UT_props_df.loc[train_idx]]
+            UT_val   = [self.UT_dIN_df.loc[val_idx], self.UT_dOUT_df.loc[val_idx], self.UT_props_df.loc[val_idx]]
+            UT_test  = [self.UT_dIN_df.loc[test_idx], self.UT_dOUT_df.loc[test_idx], self.UT_props_df.loc[test_idx]]
+
+            FT_train = [self.FT_dIN_df.loc[train_idx], self.FT_dOUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
+            FT_val   = [self.FT_dIN_df.loc[val_idx], self.FT_dOUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
+            FT_test  = [self.FT_dIN_df.loc[test_idx], self.FT_dOUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
+
         if self.UTmechTest:
             if self.load_split:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
-            else:
+            elif UT_train is None:
                 UT_train, UT_val, UT_test = split_data(self.UT_dIN_df, self.UT_dOUT_df, self.UT_props_df, split=self.split_frac)
-            self.UT_train_in, self.UT_train_out, self.UT_trainProps = UT_train
-            self.UT_val_in, self.UT_val_out, self.UT_valProps       = UT_val
-            self.UT_test_in, self.UT_test_out, self.UT_testProps    = UT_test
+            self.UT_train_in_df, self.UT_train_out_df, self.UT_trainProps_df = UT_train
+            self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
+            self.UT_test_in_df, self.UT_test_out_df, self.UT_testProps_df    = UT_test
+
+            self.UT_train_in = np.round(_to_numpy(self.UT_train_in_df), 2)
+            self.UT_train_out = np.round(_to_numpy(self.UT_train_out_df), 2)
+            self.UT_trainProps = np.round(_to_numpy(self.UT_trainProps_df), 2)
+            self.UT_val_in = np.round(_to_numpy(self.UT_val_in_df), 2)
+            self.UT_val_out = np.round(_to_numpy(self.UT_val_out_df), 2)
+            self.UT_valProps = np.round(_to_numpy(self.UT_valProps_df), 2)
+            self.UT_test_in = np.round(_to_numpy(self.UT_test_in_df), 2)
+            self.UT_test_out = np.round(_to_numpy(self.UT_test_out_df), 2)
+            self.UT_testProps = np.round(_to_numpy(self.UT_testProps_df), 2)
         
         if self.FTmechTest:
             if self.load_split:
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
-            else:
+            elif FT_train is None:
                 FT_train, FT_val, FT_test = split_data(self.FT_dIN_df, self.FT_dOUT_df, self.FT_props_df, split=self.split_frac)
-            self.FT_train_in, self.FT_train_out, self.FT_trainProps = FT_train
-            self.FT_val_in, self.FT_val_out, self.FT_valProps       = FT_val
-            self.FT_test_in, self.FT_test_out, self.FT_testProps    = FT_test
+            self.FT_train_in_df, self.FT_train_out_df, self.FT_trainProps_df = FT_train
+            self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
+            self.FT_test_in_df, self.FT_test_out_df, self.FT_testProps_df    = FT_test
+
+            self.FT_train_in = np.round(_to_numpy(self.FT_train_in_df), 2)
+            self.FT_train_out = np.round(_to_numpy(self.FT_train_out_df), 2)
+            self.FT_trainProps = np.round(_to_numpy(self.FT_trainProps_df), 2)
+            self.FT_val_in = np.round(_to_numpy(self.FT_val_in_df), 2)
+            self.FT_val_out = np.round(_to_numpy(self.FT_val_out_df), 2)
+            self.FT_valProps = np.round(_to_numpy(self.FT_valProps_df), 2)
+            self.FT_test_in = np.round(_to_numpy(self.FT_test_in_df), 2)
+            self.FT_test_out = np.round(_to_numpy(self.FT_test_out_df), 2)
+            self.FT_testProps = np.round(_to_numpy(self.FT_testProps_df), 2)
+
+        self._updateReconstructors()
     
     def _saveSplitData(self, split_name=None):
         if split_name is None:
             split_name = self.save_split if self.save_split else datetime.datetime.now()
         if self.UTmechTest:
-            save_splitData([self.FT_train_in, self.FT_train_out, self.FT_trainProps], 
-                            [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
-                            [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
-                            self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
+            save_splitData([self.UT_train_in, self.UT_train_out, self.UT_trainProps], 
+                            [self.UT_val_in, self.UT_val_out, self.UT_valProps], 
+                            [self.UT_test_in, self.UT_test_out, self.UT_testProps], 
+                            self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
         if self.FTmechTest:
             save_splitData([self.FT_train_in, self.FT_train_out, self.FT_trainProps], 
                             [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
                             [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
                             self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
+    
+    def _targetConfigured(self, cfg, target):
+        if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
+            return False
+        scope = str(cfg[1]).lower()
+        return ("all" in scope) or (target in scope)
 
-    def _scaleData(self):
+    def _apply_inverse_steps(self, data, inverse_steps):
+        out = data
+        for inverse_step in inverse_steps:
+            out = inverse_step(out)
+        return out
+    
+    def _updateReconstructors(self):
+        for mode, enabled in [("UT", self.UTmechTest), ("FT", self.FTmechTest)]:
+            if not enabled:
+                continue
+
+            for target in ["in", "out"]:
+                target_token = target.upper()
+                inverse_steps = []
+
+                if (
+                    getattr(self, "scale_reduced", False)
+                    and self._targetConfigured(self.reduce_dim, target)
+                    and self._targetConfigured(self.scale, target)
+                ):
+                    pca_scaler_attr = f"{mode}_{target_token}PCAscaler"
+                    if hasattr(self, pca_scaler_attr):
+                        inverse_steps.append(getattr(self, pca_scaler_attr).inverse_transform)
+
+                if self._targetConfigured(self.reduce_dim, target):
+                    reducer_attr = f"{mode}_{target_token}reducer"
+                    if hasattr(self, reducer_attr):
+                        reducer = getattr(self, reducer_attr)
+                        if reducer is not None and hasattr(reducer, "inverse_transform"):
+                            inverse_steps.append(reducer.inverse_transform)
+
+                if self._targetConfigured(self.scale, target):
+                    scaler_attr = f"{mode}_{target_token}scaler"
+                    if hasattr(self, scaler_attr):
+                        inverse_steps.append(getattr(self, scaler_attr).inverse_transform)
+
+                reconstructor_attr = f"{mode}_{target_token}reconstructor"
+                setattr(
+                    self,
+                    reconstructor_attr,
+                    lambda data, inverse_steps=tuple(inverse_steps): self._apply_inverse_steps(data, inverse_steps),
+                )
+
+    def _validatePreprocessConfig(self, scale, reduce_dim):
+        if scale:
+            if not isinstance(scale, (list, tuple)) or len(scale) < 2:
+                raise ValueError("scale must be False/None or tuple/list like ('maxmin', 'in|out|props|all').")
+            if not isinstance(scale[0], str) or not isinstance(scale[1], str):
+                raise ValueError("scale entries must be strings, e.g. ('maxmin', 'inout').")
+
+            scale_method = scale[0].lower()
+            valid_scale_methods = {"minmax", "maxmin", "standardscaler", "standard", "standardize", "normalize"}
+            if scale_method not in valid_scale_methods:
+                raise ValueError(f"Unsupported scale method '{scale[0]}'. Valid options: {sorted(valid_scale_methods)}")
+
+            scale_scope = scale[1].lower()
+            if not any(k in scale_scope for k in ["in", "out", "props", "all"]):
+                raise ValueError("scale target must include one of: 'in', 'out', 'props', 'all'.")
+
+        if reduce_dim:
+            if not isinstance(reduce_dim, (list, tuple)) or len(reduce_dim) < 2:
+                raise ValueError("reduce_dim must be False/None or tuple/list like ('PCA', 'in|out|all', ...).")
+            if len(reduce_dim) > 5:
+                raise ValueError("reduce_dim supports at most 5 entries: (method, scope, accuracy, n_components, scale_reduced).")
+            if not isinstance(reduce_dim[0], str) or not isinstance(reduce_dim[1], str):
+                raise ValueError("reduce_dim method and scope must be strings.")
+
+            reduce_method = reduce_dim[0].lower()
+            valid_reduce_methods = {"pca", "autoencoder"}
+            if reduce_method not in valid_reduce_methods:
+                raise ValueError(f"Unsupported reduce_dim method '{reduce_dim[0]}'. Valid options: {sorted(valid_reduce_methods)}")
+
+            reduce_scope = reduce_dim[1].lower()
+            if not any(k in reduce_scope for k in ["in", "out", "all"]):
+                raise ValueError("reduce_dim scope must include one of: 'in', 'out', 'all'.")
+
+            if len(reduce_dim) > 2 and reduce_dim[2] not in [None, False]:
+                if not isinstance(reduce_dim[2], (float, int)):
+                    raise ValueError("reduce_dim[2] (accuracy) must be numeric in (0, 1] when provided.")
+                if not (0 < float(reduce_dim[2]) <= 1):
+                    raise ValueError("reduce_dim[2] (accuracy) must be in the range (0, 1].")
+
+            if len(reduce_dim) > 3 and reduce_dim[3] not in [None, False]:
+                if not isinstance(reduce_dim[3], int) or reduce_dim[3] < 1:
+                    raise ValueError("reduce_dim[3] (n_components) must be a positive integer when provided.")
+
+            if len(reduce_dim) > 4 and reduce_dim[4] not in [True, False]:
+                raise ValueError("reduce_dim[4] (scale_reduced) must be True/False when provided.")
+    
+    def _initScaler(self, scale=None):
+        if scale is None:
+            scale = self.scale
+
+        if scale[0].lower() == "minmax" or scale[0].lower() == "maxmin":
+            self.scaler = MinMaxScaler()
+        elif scale[0].lower() == "standardscaler" or scale[0].lower() == "standard":
+            self.scaler = StandardScaler()
+        elif scale[0].lower() == "standardize":
+            self.scaler = standardize
+        elif scale[0].lower() == "normalize":
+            self.scaler = normalize
+
+    def _scaleData(self, scale=None):
+        if scale is not None:
+            self.scale = scale
+        if not self.scale:
+            raise ValueError("_scaleData requires scale=(...) configuration.")
+        if scale is not None or not hasattr(self, "scaler"):
+            self._initScaler(self.scale)
+        if not hasattr(self, "scaler"):
+            raise ValueError("_scaleData could not initialize scaler from scale configuration.")
+
         if self.UTmechTest:
             if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.UT_INscaler = clone(self.scaler)
@@ -743,35 +933,107 @@ class DATA:
                 self.FT_trainProps = self.FT_PROPscaler.fit_transform(self.FT_trainProps.T).T
                 self.FT_valProps   = self.FT_PROPscaler.transform(self.FT_valProps.T).T
                 self.FT_testProps  = self.FT_PROPscaler.transform(self.FT_testProps.T).T 
-    
-    def _reduceData(self):
+
+        self._updateReconstructors()
+
+    def _initReducer(self, reduce_dim=None):
+        if reduce_dim is None:
+            reduce_dim = self.reduce_dim
+
+        if reduce_dim[0].lower() == "pca":
+            self.reducer = PCA(n_components=self._pca_components(reduce_dim))
+        elif reduce_dim[0].lower() == "autoencoder":
+            self.reducer = None
+
+    def _pca_components(self, reduce_dim=None):
+        accuracy = None
+        n_components = None
+        if reduce_dim is None:
+            reduce_dim = self.reduce_dim
+        if isinstance(reduce_dim, (list, tuple)):
+            if len(reduce_dim) > 2:
+                accuracy = reduce_dim[2]
+            if len(reduce_dim) > 3:
+                n_components = reduce_dim[3]
+
+        if n_components is not None and n_components is not False:
+            return n_components
+        if accuracy is not None and accuracy is not False:
+            return accuracy
+        return 0.999999
+
+    def _reduceData(self, reduce_dim=None, scale_reduced=None, scale=None):
+        if scale is not None:
+            self.scale = scale
+        if reduce_dim is not None:
+            self.reduce_dim = reduce_dim
+
+        if scale_reduced is None:
+            scale_reduced = bool(self.reduce_dim[4]) if isinstance(self.reduce_dim, (list, tuple)) and len(self.reduce_dim) > 4 else bool(self.scale_reduced)
+        self.scale_reduced = bool(scale_reduced)
+        if scale_reduced and not self.scale:
+            raise ValueError("scale_reduced=True requires scale=(...) configuration in DATA initialization.")
+        if scale_reduced and (scale is not None or not hasattr(self, "scaler")):
+            self._initScaler(self.scale)
+        if scale_reduced and not hasattr(self, "scaler"):
+            raise ValueError("scale_reduced=True requires scale=(...) to initialize a scaler.")
+        if not self.reduce_dim:
+            raise ValueError("_reduceData requires reduce_dim=(...) configuration.")
+        if reduce_dim is not None or not hasattr(self, "reducer"):
+            self._initReducer(self.reduce_dim)
+        if not hasattr(self, "reducer"):
+            raise ValueError("_reduceData could not initialize reducer from reduce_dim configuration.")
+
+        def _scale_reduced_target(target):
+            if not scale_reduced:
+                return False
+            return ("all" in self.scale[1].lower()) or (target in self.scale[1].lower())
+
         if self.UTmechTest:
             if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                self.UT_INreducer = copy.deepcopy(self.reducer)
-                self.UT_INreducer.fit(self.UT_train_in)
-                self.UT_train_in = self.UT_INreducer.reduce(self.UT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.UT_val_in   = self.UT_INreducer.reduce(self.UT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.UT_test_in  = self.UT_INreducer.reduce(self.UT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.UT_INreducer = clone(self.reducer)
+                self.UT_train_in = self.UT_INreducer.fit_transform(self.UT_train_in)
+                self.UT_val_in   = self.UT_INreducer.transform(self.UT_val_in)
+                self.UT_test_in  = self.UT_INreducer.transform(self.UT_test_in)
+                if _scale_reduced_target("in"):
+                    self.UT_INPCAscaler = clone(self.scaler)
+                    self.UT_train_in = self.UT_INPCAscaler.fit_transform(self.UT_train_in)
+                    self.UT_val_in   = self.UT_INPCAscaler.transform(self.UT_val_in)
+                    self.UT_test_in  = self.UT_INPCAscaler.transform(self.UT_test_in)
             if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                self.UT_OUTreducer = copy.deepcopy(self.reducer)
-                self.UT_OUTreducer.fit(self.UT_train_out)
-                self.UT_train_out = self.UT_OUTreducer.reduce(self.UT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.UT_val_out   = self.UT_OUTreducer.reduce(self.UT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.UT_test_out  = self.UT_OUTreducer.reduce(self.UT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.UT_OUTreducer = clone(self.reducer)
+                self.UT_train_out = self.UT_OUTreducer.fit_transform(self.UT_train_out)
+                self.UT_val_out   = self.UT_OUTreducer.transform(self.UT_val_out)
+                self.UT_test_out  = self.UT_OUTreducer.transform(self.UT_test_out)
+                if _scale_reduced_target("out"):
+                    self.UT_OUTPCAscaler = clone(self.scaler)
+                    self.UT_train_out = self.UT_OUTPCAscaler.fit_transform(self.UT_train_out)
+                    self.UT_val_out   = self.UT_OUTPCAscaler.transform(self.UT_val_out)
+                    self.UT_test_out  = self.UT_OUTPCAscaler.transform(self.UT_test_out)
         
         if self.FTmechTest:
             if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                self.FT_INreducer = copy.deepcopy(self.reducer)
-                self.FT_INreducer.fit(self.FT_train_in)
-                self.FT_train_in = self.FT_INreducer.reduce(self.FT_train_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.FT_val_in   = self.FT_INreducer.reduce(self.FT_val_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.FT_test_in  = self.FT_INreducer.reduce(self.FT_test_in, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.FT_INreducer = clone(self.reducer)
+                self.FT_train_in = self.FT_INreducer.fit_transform(self.FT_train_in)
+                self.FT_val_in   = self.FT_INreducer.transform(self.FT_val_in)
+                self.FT_test_in  = self.FT_INreducer.transform(self.FT_test_in)
+                if _scale_reduced_target("in"):
+                    self.FT_INPCAscaler = clone(self.scaler)
+                    self.FT_train_in = self.FT_INPCAscaler.fit_transform(self.FT_train_in)
+                    self.FT_val_in   = self.FT_INPCAscaler.transform(self.FT_val_in)
+                    self.FT_test_in  = self.FT_INPCAscaler.transform(self.FT_test_in)
             if "out" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
-                self.FT_OUTreducer = copy.deepcopy(self.reducer)
-                self.FT_OUTreducer.fit(self.FT_train_out)
-                self.FT_train_out = self.FT_OUTreducer.reduce(self.FT_train_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.FT_val_out   = self.FT_OUTreducer.reduce(self.FT_val_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
-                self.FT_test_out  = self.FT_OUTreducer.reduce(self.FT_test_out, accuracy=self.reduce_dim[2], n_components=self.reduce_dim[3])
+                self.FT_OUTreducer = clone(self.reducer)
+                self.FT_train_out = self.FT_OUTreducer.fit_transform(self.FT_train_out)
+                self.FT_val_out   = self.FT_OUTreducer.transform(self.FT_val_out)
+                self.FT_test_out  = self.FT_OUTreducer.transform(self.FT_test_out)
+                if _scale_reduced_target("out"):
+                    self.FT_OUTPCAscaler = clone(self.scaler)
+                    self.FT_train_out = self.FT_OUTPCAscaler.fit_transform(self.FT_train_out)
+                    self.FT_val_out   = self.FT_OUTPCAscaler.transform(self.FT_val_out)
+                    self.FT_test_out  = self.FT_OUTPCAscaler.transform(self.FT_test_out)
+
+        self._updateReconstructors()
 
     def _GNNreshapeData(self):
         if self.UTmechTest:
