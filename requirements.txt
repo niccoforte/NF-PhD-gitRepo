@@ -2,12 +2,20 @@ numpy
 scipy
 matplotlib
 pandas
+sympy
+openpyxl
+ipywidgets
 
 scikit-learn
 torch
 torch-geometric
 torchvision
+torchbnn
 torchinfo
+tensorflow
+gpytorch
+botorch
+deepxde
 
 optuna
 networkx
