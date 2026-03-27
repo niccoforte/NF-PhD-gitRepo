@@ -737,15 +737,15 @@ class DATA:
             self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
             self.UT_test_in_df, self.UT_test_out_df, self.UT_testProps_df    = UT_test
 
-            self.UT_train_in = np.round(_to_numpy(self.UT_train_in_df), 2)
-            self.UT_train_out = np.round(_to_numpy(self.UT_train_out_df), 2)
-            self.UT_trainProps = np.round(_to_numpy(self.UT_trainProps_df), 2)
-            self.UT_val_in = np.round(_to_numpy(self.UT_val_in_df), 2)
-            self.UT_val_out = np.round(_to_numpy(self.UT_val_out_df), 2)
-            self.UT_valProps = np.round(_to_numpy(self.UT_valProps_df), 2)
-            self.UT_test_in = np.round(_to_numpy(self.UT_test_in_df), 2)
-            self.UT_test_out = np.round(_to_numpy(self.UT_test_out_df), 2)
-            self.UT_testProps = np.round(_to_numpy(self.UT_testProps_df), 2)
+            self.UT_train_in = _to_numpy(self.UT_train_in_df)
+            self.UT_train_out = _to_numpy(self.UT_train_out_df)
+            self.UT_trainProps = _to_numpy(self.UT_trainProps_df)
+            self.UT_val_in = _to_numpy(self.UT_val_in_df)
+            self.UT_val_out = _to_numpy(self.UT_val_out_df)
+            self.UT_valProps = _to_numpy(self.UT_valProps_df)
+            self.UT_test_in = _to_numpy(self.UT_test_in_df)
+            self.UT_test_out = _to_numpy(self.UT_test_out_df)
+            self.UT_testProps = _to_numpy(self.UT_testProps_df)
         
         if self.FTmechTest:
             if self.load_split:
@@ -756,15 +756,15 @@ class DATA:
             self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
             self.FT_test_in_df, self.FT_test_out_df, self.FT_testProps_df    = FT_test
 
-            self.FT_train_in = np.round(_to_numpy(self.FT_train_in_df), 2)
-            self.FT_train_out = np.round(_to_numpy(self.FT_train_out_df), 2)
-            self.FT_trainProps = np.round(_to_numpy(self.FT_trainProps_df), 2)
-            self.FT_val_in = np.round(_to_numpy(self.FT_val_in_df), 2)
-            self.FT_val_out = np.round(_to_numpy(self.FT_val_out_df), 2)
-            self.FT_valProps = np.round(_to_numpy(self.FT_valProps_df), 2)
-            self.FT_test_in = np.round(_to_numpy(self.FT_test_in_df), 2)
-            self.FT_test_out = np.round(_to_numpy(self.FT_test_out_df), 2)
-            self.FT_testProps = np.round(_to_numpy(self.FT_testProps_df), 2)
+            self.FT_train_in = _to_numpy(self.FT_train_in_df)
+            self.FT_train_out = _to_numpy(self.FT_train_out_df)
+            self.FT_trainProps = _to_numpy(self.FT_trainProps_df)
+            self.FT_val_in = _to_numpy(self.FT_val_in_df)
+            self.FT_val_out = _to_numpy(self.FT_val_out_df)
+            self.FT_valProps = _to_numpy(self.FT_valProps_df)
+            self.FT_test_in = _to_numpy(self.FT_test_in_df)
+            self.FT_test_out = _to_numpy(self.FT_test_out_df)
+            self.FT_testProps = _to_numpy(self.FT_testProps_df)
 
         self._updateReconstructors()
     
