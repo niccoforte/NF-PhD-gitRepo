@@ -223,7 +223,13 @@ def train_model(
                 scheduler.step(lossAvg)
         _lr = opt.param_groups[0]['lr']
 
-        if epoch % verbose == 0 or epoch == 1 or epoch == n_epochs:
+        if verbose:
+            _verbose_every = max(1, int(verbose))
+            _should_log = (epoch % _verbose_every == 0) or (epoch == 1) or (epoch == n_epochs)
+        else:
+            _should_log = (epoch == 1) or (epoch == n_epochs)
+
+        if _should_log:
             if val_dataloader:
                 print(f" -> Epoch {epoch}/{n_epochs} || LOSS - train: {train_lossAvg:.6f}, val: {val_lossAvg:.6f} | MSE - train: {train_metric_mse:.6f}, val: {val_metric_mse:.6f} | RMSE - train: {train_metric_rmse:.6f}, val: {val_metric_rmse:.6f} | LR: {_lr:.2e}")
             else:
@@ -243,18 +249,22 @@ def train_model(
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
     truth = []
+    device = next(model.parameters()).device
+    was_training = model.training
+    model.eval()
     with torch.no_grad():
         for batch in test_dataloader:
             if typ.lower() == "gnn":
-                device = next(model.parameters()).device
                 data_batch = batch.to(device)
                 y_predict = model(data_batch.x.float(), data_batch.edge_index, data_batch.batch)
                 y = data_batch.y.view(data_batch.num_graphs, -1)
             else:
-                x, y = batch[:][0].float(), batch[:][1].float()
+                x, y = batch[0].float().to(device), batch[1].float().to(device)
                 y_predict = model(x)
             test_outputs.append(y_predict.detach().cpu().numpy())
             truth.append(y.detach().cpu().numpy())
+    if was_training:
+        model.train()
     test_outputs = np.concatenate(test_outputs)
     truth = np.concatenate(truth)
     return test_outputs, truth
@@ -337,31 +347,41 @@ def GPR_HPopt(data, gpr, params, cv=5, verb=0):
     return grid_search.fit(data[0], data[1])
 
 def objective(trial, model):
-    n_layers = trial.suggest_int('n_layers', 1, 4)
-    hidden_dim = trial.suggest_int('hidden_dim', 8, 64, log=True)
+    if not hasattr(model, "data") or not hasattr(model, "model"):
+        raise ValueError("objective expects a configured MODEL instance template.")
+
     lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
     batch_size = trial.suggest_categorical('batch_size', [1, 2, 8, 16])
-    h_size = [hidden_dim] * n_layers
+    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2, log=True)
 
-    model_instance = MODEL( # type: ignore
-        typ="MLP",
-        model="INSERT MODEL HERE",
-        lossf=nn.MSELoss(),
-        opt=("adam", 0),
+    lossf = model.losses if hasattr(model, "losses") else model.lossf
+    template_model = copy.deepcopy(model.model)
+    model_instance = model.__class__(
+        typ=model.typ,
+        model=template_model,
+        lossf=lossf,
+        opt=("adam", weight_decay),
         batch=batch_size,
         lr=lr,
         data=model.data,
-        train_dataloader=model.train_dataloader,
-        val_dataloader=None,
-        test_dataloader=None,
-        scheduler=("min", 0.7, 10, 1e-4, True),
-        earlyStop=EarlyStopping(patience=10, verbose=False),
+        mechMode=getattr(model.data, "mechMode", "both"),
+        scheduler=None,
+        earlyStop=copy.deepcopy(model.earlyStop),
         w_init=weights_init,
+        device=model.device,
         optTrial=trial
     )
 
     model_instance.train(n_epochs=50, verbose=50)
-    return model_instance.best_loss
+    losses = []
+    if getattr(model_instance.data, "UTmechTest", False) and hasattr(model_instance, "UT_best_loss"):
+        losses.append(model_instance.UT_best_loss)
+    if getattr(model_instance.data, "FTmechTest", False) and hasattr(model_instance, "FT_best_loss"):
+        losses.append(model_instance.FT_best_loss)
+
+    if not losses:
+        raise ValueError("objective could not find UT/FT best loss values after training.")
+    return float(np.mean(losses))
 
 def hOpt(objective, n_trials=50, prnt=False, save=False, path="models/etc", name="sample"):
     pruner = optuna.pruners.MedianPruner()
@@ -407,7 +427,6 @@ def load_bestParams(path="models/etc", name="sample"):
 
 ### Custom Loss Functions
 # TODO: GPU integration
-# TODO: Custom loss functions (e.g., quantile loss, physics-informed loss)
 
 class CustomQuantileLoss(nn.Module):
     def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=(50,130), err_type="L2"):
@@ -550,16 +569,8 @@ class CustomPhysicalRegularizationLoss(nn.Module):
         )
         return weights
 
-    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
-        if y_pred.shape != y_true.shape:
-            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
-
-        if y_pred.ndim == 1:
-            y_pred = y_pred.unsqueeze(0)
-        if y_pred.ndim != 2:
-            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
-        if y_pred.shape[1] < 2:
-            return y_pred.new_tensor(0.0)
+    def forward(self, y_pred, y_true):
+        self.delta_tolerance = y_true.range() / 100
 
         diffs = torch.abs(y_pred[:, 1:] - y_pred[:, :-1])
         excess = torch.relu(diffs - self.delta_tolerance)
@@ -661,12 +672,15 @@ def plot_loss(epoch, train, val=None):
     # plt.grid()
     plt.show()
 
-def plot_predictions(perOUT, test_outputs, truth=None, mode="ut", indx=0):
+def plot_predictions(OUT_df, test_outputs, truth=None, mode="ut", indx=0):
     fig = plt.figure(figsize=(10, 5))
-    plt.scatter(perOUT[0], test_outputs[indx]+perOUT[1], s=5, label=f"Prediction-{indx}", c="orangered")
+    x = OUT_df.iloc[0][1:].to_numpy()
+    y = OUT_df.iloc[1][1:].to_numpy()
+
+    plt.scatter(x, test_outputs[indx]+y, s=5, label=f"Prediction-{indx}", c="orangered")
     if truth is not None:
-        plt.scatter(perOUT[0], truth[indx]+perOUT[1], s=5, label=f"Truth-{indx}", c="darkgreen")
-        plt.bar(perOUT[0], absErr(truth[indx], test_outputs[indx]), width=(max(perOUT[0])-min(perOUT[0]))/(len(perOUT[0])), alpha=0.25, label="Error", color="gray")
+        plt.scatter(x, truth[indx]+y, s=5, label=f"Truth-{indx}", c="darkgreen")
+        plt.bar(x, absErr(truth[indx], test_outputs[indx]), width=(max(x)-min(x))/(len(x)), alpha=0.25, label="Error", color="gray")
     if mode.lower() == "ut":
         plt.ylabel("Macroscopic Stress ($\sigma$) [MPa]")
         plt.xlabel("Macroscopic Strain ($\epsilon$)")
@@ -707,7 +721,6 @@ def plot_Distribution(train_in1, test_outputs, truth=None, typ="contour"):
 
 
 ### GNN Functions
-# TODO: Fix
 
 def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
     for batch in loader:
