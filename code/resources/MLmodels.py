@@ -2,12 +2,12 @@ from resources.imports import *
 
 from resources.lattices import connectivity
 from resources.MLfunc import train_model, predict_model, plot_loss, plot_predictions, absErr, _activation, visualize_graphNetwork
-from resources.MLdata import Dataset_
+# from resources.MLdata import Dataset_
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 from torch_geometric.loader import DataLoader as gDataLoader
 from torch_geometric.data import Data
 from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_pool
@@ -65,17 +65,6 @@ class MODEL:
         self.batch = batch
         self.lr = lr
         self.data = data
-        if mechMode.lower() not in ["ut", "ft", "both"]:
-            mechMode = data.mechMode
-        if mechMode.lower() == "ut":
-            self.UTmechTest = True
-            self.FTmechTest = False
-        elif mechMode.lower() == "ft":
-            self.UTmechTest = False
-            self.FTmechTest = True
-        elif mechMode.lower() == "both":
-            self.UTmechTest = True
-            self.FTmechTest = True
         self.UT_dataloaders = UT_dataloaders
         self.FT_dataloaders = FT_dataloaders
         self.earlyStop = earlyStop
@@ -85,12 +74,12 @@ class MODEL:
         self.model.to(device)
         self.optTrial = optTrial
 
-        if self.UTmechTest:
+        if data.UTmechTest:
             self.UT_model = copy.deepcopy(model)
             self.UT_opt = torch.optim.Adam(self.UT_model.parameters(), lr=lr, weight_decay=opt[1])
             
             if typ.lower() == "gnn":
-                self.UT_nodes = data.UT_perIN_df["in"].to_numpy().reshape(int(len(data.UT_perIN_df)/2), 2)
+                self.UT_nodes = data.UT_IN_df[data.UT_IN_df.columns.intersection(data.UT_dIN_df.columns)].iloc[0].to_numpy().reshape(int(len(data.UT_dIN_df.iloc[0])/2), 2)
                 self.UT_edges = connectivity(data.LAT, self.UT_nodes, data.geom)[:, 1:] - 1
                 self.UT_edge_index = torch.tensor(self.UT_edges, dtype=torch.long).t().contiguous()
 
@@ -107,9 +96,9 @@ class MODEL:
                     self.UT_val_dataloader = UT_dataloaders[1]
                     self.UT_test_dataloader = UT_dataloaders[2]
             else:
-                self.UT_trainDS = Dataset_(data.UT_train_in, data.UT_train_out)
-                self.UT_valDS = Dataset_(data.UT_val_in, data.UT_val_out)
-                self.UT_testDS = Dataset_(data.UT_test_in, data.UT_test_out)
+                self.UT_trainDS = self._make_tensor_dataset(data.UT_train_in, data.UT_train_out)
+                self.UT_valDS = self._make_tensor_dataset(data.UT_val_in, data.UT_val_out)
+                self.UT_testDS = self._make_tensor_dataset(data.UT_test_in, data.UT_test_out)
             
                 if UT_dataloaders is None:
                     self.UT_train_dataloader = DataLoader(dataset=self.UT_trainDS, batch_size=self.batch, shuffle=True)
@@ -120,12 +109,12 @@ class MODEL:
                     self.UT_val_dataloader = UT_dataloaders[1]
                     self.UT_test_dataloader = UT_dataloaders[2]
 
-        if self.FTmechTest:
+        if data.FTmechTest:
             self.FT_model = copy.deepcopy(model)
             self.FT_opt = torch.optim.Adam(self.FT_model.parameters(), lr=lr, weight_decay=opt[1])
             
             if typ.lower() == "gnn":
-                self.FT_nodes = data.FT_perIN_df["in"].to_numpy().reshape(int(len(data.FT_perIN_df)/2), 2)
+                self.FT_nodes = data.FT_IN_df[data.FT_IN_df.columns.intersection(data.FT_dIN_df.columns)].iloc[0].to_numpy().reshape(int(len(data.FT_dIN_df.iloc[0])/2), 2)
                 self.FT_edges = connectivity(data.LAT, self.FT_nodes, data.geom)[:, 1:] - 1
                 self.FT_edge_index = torch.tensor(self.FT_edges, dtype=torch.long).t().contiguous()
 
@@ -142,14 +131,14 @@ class MODEL:
                     self.FT_val_dataloader = FT_dataloaders[1]
                     self.FT_test_dataloader = FT_dataloaders[2]
             else:
-                if self.UTmechTest:
-                    self.FT_trainDS = Dataset_(data.UT_train_in, data.FT_train_out)
-                    self.FT_valDS = Dataset_(data.UT_val_in, data.FT_val_out)
-                    self.FT_testDS = Dataset_(data.UT_test_in, data.FT_test_out)
+                if data.UTmechTest:
+                    self.FT_trainDS = self._make_tensor_dataset(data.UT_train_in, data.FT_train_out)
+                    self.FT_valDS = self._make_tensor_dataset(data.UT_val_in, data.FT_val_out)
+                    self.FT_testDS = self._make_tensor_dataset(data.UT_test_in, data.FT_test_out)
                 else:
-                    self.FT_trainDS = Dataset_(data.FT_train_in, data.FT_train_out)
-                    self.FT_valDS = Dataset_(data.FT_val_in, data.FT_val_out)
-                    self.FT_testDS = Dataset_(data.FT_test_in, data.FT_test_out)
+                    self.FT_trainDS = self._make_tensor_dataset(data.FT_train_in, data.FT_train_out)
+                    self.FT_valDS = self._make_tensor_dataset(data.FT_val_in, data.FT_val_out)
+                    self.FT_testDS = self._make_tensor_dataset(data.FT_test_in, data.FT_test_out)
 
                 if FT_dataloaders is None:
                     self.FT_train_dataloader = DataLoader(dataset=self.FT_trainDS, batch_size=self.batch, shuffle=True)
@@ -161,14 +150,14 @@ class MODEL:
                     self.FT_test_dataloader = FT_dataloaders[2]
         
         if scheduler:
-            if self.UTmechTest:
+            if data.UTmechTest:
                 self.UTscheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.UT_opt, 
                                                                             mode=scheduler[0], 
                                                                             factor=scheduler[1],
                                                                             patience=scheduler[2], 
                                                                             threshold=scheduler[3],
                                                                             threshold_mode="abs")
-            if self.FTmechTest:
+            if data.FTmechTest:
                 self.FTscheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(self.FT_opt, 
                                                                             mode=scheduler[0], 
                                                                             factor=scheduler[1],
@@ -179,8 +168,8 @@ class MODEL:
             self.UTscheduler = None
             self.FTscheduler = None
     
-    def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
-        if self.UTmechTest:
+    def _train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
+        if self.data.UTmechTest:
             self.UT_model, \
                 self.UT_epoch, \
                 self.UT_train_lossLog, \
@@ -205,7 +194,7 @@ class MODEL:
             if plot:
                 plot_loss(self.UT_epoch, self.UT_train_lossLog, self.UT_val_lossLog)
 
-        if self.FTmechTest:
+        if self.data.FTmechTest:
             self.FT_model, \
                 self.FT_epoch, \
                 self.FT_train_lossLog, \
@@ -230,75 +219,130 @@ class MODEL:
             if plot:
                 plot_loss(self.FT_epoch, self.FT_train_lossLog, self.FT_val_lossLog)
     
-    def predict(self, test_dataloader=None, plot=False):
-        new_loader = test_dataloader
-        if self.UTmechTest:
-            if new_loader is None:
-                test_dataloader = self.UT_test_dataloader
+    def _predict(self, test_dataloader=None, plot=False):
+        if (
+            self.data.UTmechTest
+            and self.data.FTmechTest
+            and test_dataloader is not None
+            and not isinstance(test_dataloader, dict)
+            and not (isinstance(test_dataloader, (list, tuple)) and len(test_dataloader) == 2)
+        ):
+            raise ValueError(
+                "For UT+FT prediction, pass test_dataloader as {'ut': ..., 'ft': ...} or (ut_loader, ft_loader)."
+            )
 
+        if test_dataloader is None:
+            UT_loader = self.UT_test_dataloader if self.data.UTmechTest else None
+            FT_loader = self.FT_test_dataloader if self.data.FTmechTest else None
+        elif isinstance(test_dataloader, dict):
+            UT_loader = test_dataloader.get("ut", self.UT_test_dataloader if self.data.UTmechTest else None)
+            FT_loader = test_dataloader.get("ft", self.FT_test_dataloader if self.data.FTmechTest else None)
+        elif isinstance(test_dataloader, (list, tuple)) and len(test_dataloader) == 2:
+            UT_loader, FT_loader = test_dataloader
+        else:
+            UT_loader = test_dataloader
+            FT_loader = test_dataloader
+
+        if self.data.UTmechTest:
             self.UT_test_outputs, self.UT_truth = predict_model(self.typ,
                                                                 self.UT_model,
-                                                                test_dataloader)
-            if self.data.reduce_dim:
-                if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
-                    self.UT_test_outputs = self.data.UT_OUTreducer.reconstruct(self.UT_test_outputs)
-                    self.UT_truth = self.data.UT_OUTreducer.reconstruct(self.UT_truth)
-            if self.data.scale:
-                if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
-                    self.UT_test_outputs = self.data.UT_OUTscaler.inverse_transform(self.UT_test_outputs)
-                    self.UT_truth = self.data.UT_OUTscaler.inverse_transform(self.UT_truth)
+                                                                UT_loader)
+            UT_reconstructor = getattr(self.data, "UT_OUTreconstructor", None)
+            if callable(UT_reconstructor):
+                self.UT_test_outputs = UT_reconstructor(self.UT_test_outputs)
+                self.UT_truth = UT_reconstructor(self.UT_truth)
 
             self.UT_err = absErr(self.UT_test_outputs, self.UT_truth, typ="sum", axis=1)
             self.UT_best, self.UT_worst = self.UT_err.tolist().index(min(self.UT_err)), self.UT_err.tolist().index(max(self.UT_err))
             print(f"Best prediction: {self.UT_best}, Worst prediction: {self.UT_worst}")
 
             if plot:
-                plot_predictions(self.data.UT_perOUT_df.T.to_numpy(), self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_best)
-                plot_predictions(self.data.UT_perOUT_df.T.to_numpy(), self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_worst)
+                plot_predictions(self.data.UT_OUT_df, self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_best)
+                plot_predictions(self.data.UT_OUT_df, self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_worst)
         
-        if self.FTmechTest:
-            if new_loader is None:
-                test_dataloader = self.FT_test_dataloader
-
+        if self.data.FTmechTest:
             self.FT_test_outputs, self.FT_truth = predict_model(self.typ,
                                                                 self.FT_model,
-                                                                test_dataloader)
-            if self.data.reduce_dim:
-                if "out" in self.data.reduce_dim[1].lower() or "all" in self.data.reduce_dim[1].lower():
-                    self.FT_test_outputs = self.data.FT_OUTreducer.reconstruct(self.FT_test_outputs)
-                    self.FT_truth = self.data.FT_OUTreducer.reconstruct(self.FT_truth)
-            if self.data.scale:
-                if "out" in self.data.scale[1].lower() or "all" in self.data.scale[1].lower():
-                    self.FT_test_outputs = self.data.FT_OUTscaler.inverse_transform(self.FT_test_outputs)
-                    self.FT_truth = self.data.FT_OUTscaler.inverse_transform(self.FT_truth)
+                                                                FT_loader)
+            FT_reconstructor = getattr(self.data, "FT_OUTreconstructor", None)
+            if callable(FT_reconstructor):
+                self.FT_test_outputs = FT_reconstructor(self.FT_test_outputs)
+                self.FT_truth = FT_reconstructor(self.FT_truth)
 
             self.FT_err = absErr(self.FT_test_outputs, self.FT_truth, typ="sum", axis=1)
             self.FT_best, self.FT_worst = self.FT_err.tolist().index(min(self.FT_err)), self.FT_err.tolist().index(max(self.FT_err))
             print(f"Best prediction: {self.FT_best}, Worst prediction: {self.FT_worst}")
 
             if plot:
-                plot_predictions(self.data.FT_perOUT_df.T.to_numpy(), self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_best)
-                plot_predictions(self.data.FT_perOUT_df.T.to_numpy(), self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_worst)
+                plot_predictions(self.data.FT_OUT_df, self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_best)
+                plot_predictions(self.data.FT_OUT_df, self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_worst)
         
     def _summary(self):
         if self.typ.lower() == "gnn":
-            if self.UTmechTest or (self.UTmechTest and self.FTmechTest):
+            if self.data.UTmechTest or (self.data.UTmechTest and self.data.FTmechTest):
                 sample_batch = next(iter(self.UT_train_dataloader)).to(self.device)
                 visualize_graphNetwork(self.UT_train_dataloader, pos=self.UT_nodes, colors=None, layout="kk")
-                return summary(self.model, input_data=(sample_batch.x, self.UT_edge_index, sample_batch.batch))
-            elif self.FTmechTest:
+                return summary(self.UT_model, input_data=(sample_batch.x, self.UT_edge_index, sample_batch.batch))
+            elif self.data.FTmechTest:
                 sample_batch = next(iter(self.FT_train_dataloader)).to(self.device)
                 visualize_graphNetwork(self.FT_train_dataloader, pos=self.FT_nodes, colors=None, layout="kk")
-                return summary(self.model, input_data=(sample_batch.x, self.FT_edge_index, sample_batch.batch))
+                return summary(self.FT_model, input_data=(sample_batch.x, self.FT_edge_index, sample_batch.batch))
         else:
-            return summary(self.model, input_size=(self.batch, self.model.in_size))
+            if self.data.UTmechTest and hasattr(self, "UT_model"):
+                model_for_summary = self.UT_model
+            elif self.data.FTmechTest and hasattr(self, "FT_model"):
+                model_for_summary = self.FT_model
+            else:
+                model_for_summary = self.model
+            return summary(model_for_summary, input_size=(self.batch, model_for_summary.in_size))
     
-    def save(self, path, name):
-        torch.save(self.model.state_dict(), f"{path}/{name}.mdl")
+    def _save(self, path, name):
+        payload = {"version": 2}
+        if hasattr(self, "UT_model"):
+            payload["UT_model_state_dict"] = self.UT_model.state_dict()
+        if hasattr(self, "FT_model"):
+            payload["FT_model_state_dict"] = self.FT_model.state_dict()
+        if hasattr(self, "UT_model"):
+            payload["model_state_dict"] = self.UT_model.state_dict()
+        elif hasattr(self, "FT_model"):
+            payload["model_state_dict"] = self.FT_model.state_dict()
+        else:
+            payload["model_state_dict"] = self.model.state_dict()
+        torch.save(payload, f"{path}/{name}.mdl")
 
-    def load(self, path, name):
-        self.model.load_state_dict(torch.load(f"{path}/{name}.mdl", map_location=self.device))
+    def _load(self, path, name):
+        state = torch.load(f"{path}/{name}.mdl", map_location=self.device)
 
+        if isinstance(state, dict) and (
+            "UT_model_state_dict" in state
+            or "FT_model_state_dict" in state
+            or "model_state_dict" in state
+        ):
+            if "UT_model_state_dict" in state and hasattr(self, "UT_model"):
+                self.UT_model.load_state_dict(state["UT_model_state_dict"])
+            if "FT_model_state_dict" in state and hasattr(self, "FT_model"):
+                self.FT_model.load_state_dict(state["FT_model_state_dict"])
+
+            if "model_state_dict" in state:
+                self.model.load_state_dict(state["model_state_dict"])
+            elif "UT_model_state_dict" in state:
+                self.model.load_state_dict(state["UT_model_state_dict"])
+            elif "FT_model_state_dict" in state:
+                self.model.load_state_dict(state["FT_model_state_dict"])
+        else:
+            self.model.load_state_dict(state)
+            if hasattr(self, "UT_model"):
+                self.UT_model.load_state_dict(state)
+            if hasattr(self, "FT_model"):
+                self.FT_model.load_state_dict(state)
+
+    @staticmethod
+    def _make_tensor_dataset(x, y):
+        x_tensor = torch.as_tensor(np.asarray(x), dtype=torch.float32)
+        y_tensor = torch.as_tensor(np.asarray(y), dtype=torch.float32)
+        return TensorDataset(x_tensor, y_tensor)
+
+    
 ### Gaussian Process Regression model
 class GPRmodel(GPR):
     def __init__(self, K, restarts, alpha, data=None):
