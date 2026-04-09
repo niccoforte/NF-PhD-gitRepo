@@ -1,0 +1,3122 @@
+from abaqus import *
+from abaqusConstants import *
+from caeModules import *
+from driverUtils import executeOnCaeStartup
+import numpy as np
+from numpy import *
+import math
+import sys
+import time
+import os
+from fractions import Fraction
+executeOnCaeStartup()
+
+starttime = time.time()
+
+############################################################################################
+####################################### INPUT ##############################################
+############################################################################################
+
+unitCellSize = 10.0                             # Strut length
+thickness = None                                # Strut thickness
+outofPlaneThick = None                          # Out of plane thickness
+latticeType = 'hex'                             # 'FCC', 'tri', 'hex', 'kagome'
+MechanicalModel = 'ductile'                        # 'fracture', 'ductile', 'both'
+userMaterial = 'Ti'                             # 'al', 'sic', 'ti'
+relDensity = 0.2                                # relative density
+crossSection = 'rect'
+if latticeType.lower() == "tri": nnx = 30
+elif latticeType.lower() == "kagome": nnx = 20
+elif latticeType.lower() == "hex": nnx = 20
+elif latticeType.lower() == "fcc": nnx = 20
+elif "square" in latticeType.lower(): nnx = 20
+nnx = nnx  #s = [10,16,20,26,30,36,40]          # number of Unit cells in X direction (Y automatic)
+
+finalRun = 'no'
+numberOfRuns = 1
+initialJob = 1
+cpus = 12
+FieldOut_frames = 100
+HistOut_frames = 200
+
+distribution = 'lhs_uniform'                   # uniform, lhs_uniform, frequency, normal, exponential
+targeted_disorder = "all"                      # all, X, nX, D, DD, DDD, v, h, o, oo, xs
+nodeVar = 'yes'                                 # distortion
+sizeVar = 'no'
+fac = 0.3
+beta = fac
+
+pStrainUT = True
+
+stiffMatrix = False
+Cmatrix_sim = False
+UTval = False
+
+# pDir = f"C:\\Users\\exy053\\Documents\\ModelChanges"
+# pDir = f"Z:\\p1\sims\\{userMaterial}\\Validation\\" #+str(int(unitCellSize))+"\\"+str(relDensity)
+# pDir = f"Z:\\p1\\sims\\{userMaterial}\\MeshConv" 
+# pDir = f"Z:\\p1\\sims\\{userMaterial}\\PSC\\"+str(int(unitCellSize)) #DSC" #
+# pDir = f"Z:\\p1\\sims\\{userMaterial}\\DimReductionData"
+# pDir = f"Z:\\p1\\sims\\{userMaterial}\\sApp" # \\" + str(int(fac*100))
+# pDir = f"Z:\\p1\\sims\\{userMaterial}\\FrequencyDisorder" #TargetedDisorder\\{targeted_disorder}"
+pDir = "C:\\temp"
+
+global frequencies
+frequencies = []
+
+cmdIN = sys.argv[8:]
+if len(cmdIN) > 0:
+    latticeType = str(cmdIN[0])
+    nnx = int(cmdIN[1])
+    unitCellSize = float(cmdIN[2])
+    MechanicalModel = str(cmdIN[3])
+    userMaterial = str(cmdIN[4])
+    relDensity = float(cmdIN[5])
+    dis = str(cmdIN[6])
+    fac = float(cmdIN[7])
+    beta = fac
+    distribution = str(cmdIN[8])
+    targeted_disorder = str(cmdIN[9])
+    initialJob = int(cmdIN[10])
+    numberOfRuns = int(cmdIN[11])
+    cpus = int(cmdIN[12])
+    FieldOut_frames = int(cmdIN[13])
+    HistOut_frames = int(cmdIN[14])
+    pDir = str(cmdIN[15])
+
+    if "OptLoop" in cmdIN:
+        sampleN = int(cmdIN[-1])
+        opt_disorder = np.loadtxt(pDir+f"\\BO_sample{sampleN}.txt", delimiter=" ")
+        if distribution.lower() == "opt-f":
+            frequencies = opt_disorder
+        else:
+            opt_disorder = opt_disorder.reshape((len(opt_disorder)//2,2))
+            opt_dis_x = opt_disorder[:,0]
+            opt_dis_y = opt_disorder[:,1]
+    
+    stiffMatrix = False
+    Cmatrix_sim = False
+    UTval = False
+    
+    finalRun = 'yes'
+    
+    if dis.lower() == 'per':
+        nodeVar = 'no'
+        sizeVar = 'no'
+    elif dis.lower() == 'disnodes':
+        nodeVar = 'yes'
+        sizeVar = 'no'
+    elif dis.lower() == 'disstruts':
+        nodeVar = 'no'
+        sizeVar = 'yes'
+    else:
+        raise Exception("Invalid disorder input.")
+
+if stiffMatrix:
+    MechanicalModel = 'ductile'
+    pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix\\transfer"
+    finalRun = 'inp'
+
+if Cmatrix_sim:
+    MechanicalModel = 'ductile'
+    BCtype = "periodic"             # KUBC, periodic
+    pDir = f"Z:\\p1\\sims\\Ti\\stiffMatrix\\Cmatrix-{BCtype}"
+    cases_Cmatrix = ['a' , 'b', 'c']
+    pStrainUT = False
+
+if UTval:
+    latticeType = "tri"
+    nnx = 20
+    unitCellSize = 10.0
+    MechanicalModel = 'ductile'
+    finalRun = 'no'
+    userMaterial = 'al'
+    nodeVar = 'no'
+    sizeVar = 'no'
+    pDir = "C:\\Users\\exy053\\Documents\\al\\new\\18-1.1"
+
+os.chdir(pDir)
+
+STEP_TIME = 1E-1
+sm_amp = False
+AdaptiveTimeStepping = False
+RayleighDampling = False
+SevereDisplacementControl = False
+
+if (latticeType.lower() == "kagome" or latticeType.lower() == "hex"):
+    AdaptiveTimeStepping = True
+
+## AMPLITUDE
+if userMaterial.lower() == "ti":
+    if latticeType.lower() == "fcc" or latticeType.lower() == '45square': # amplitude (uniax = strainAppUT * H; FT = stainAppFT * H)
+        strainAppUT = 0.060                                               # FINAL 20 - 0.060
+        strainAppFT = 0.080                                               # FINAL 20 - 0.080
+    elif latticeType.lower() == "tri":
+        strainAppUT = 0.100                                               # FINAL 30 - 0.100
+        strainAppFT = 0.085                                               # FINAL 30 - 0.085
+    elif latticeType.lower() == "kagome":
+        strainAppUT = 0.070                                               # FINAL 20 - 0.070
+        strainAppFT = 0.080                                               # FINAL 20 - 0.080
+    elif latticeType.lower() == "hex":
+        strainAppUT = 0.165                                               # FINAL 20 - 0.165
+        strainAppFT = 0.200                                               # FINAL 20 - 0.200
+elif userMaterial.lower() == "sic":
+    if latticeType.lower() == "fcc":
+        strainAppUT = 0.00125
+        strainAppFT = 0.00125
+    elif "square" in latticeType.lower():
+        strainAppUT = 0.00
+        strainAppFT = 0.01
+    elif latticeType.lower() == "tri":
+        strainAppUT = 0.00
+        strainAppFT = 0.00
+    elif latticeType.lower() == "kagome":
+        strainAppUT = 0.00
+        strainAppFT = 0.00
+    elif latticeType.lower() == "hex":
+        strainAppUT = 0.00
+        strainAppFT = 0.00
+elif userMaterial.lower() == "al":
+    if latticeType.lower() == "fcc":
+        strainAppUT = 0.035
+        strainAppFT = 0.050
+    elif latticeType.lower() == "tri":
+        strainAppUT = 0.021
+        strainAppFT = 0.03
+    elif latticeType.lower() == "kagome":
+        strainAppUT = 0.072
+        strainAppFT = 0.067
+    elif latticeType.lower() == "hex":
+        strainAppUT = 0.100
+        strainAppFT = 0.032
+
+## MESH SIZING
+if latticeType.lower() == "fcc" or "square" in latticeType.lower():
+    BracketElemSize  = unitCellSize/5.0
+    CoarseElemSizeUT = unitCellSize/5.0
+    FineElemSizeUT   = unitCellSize/5.0
+    CoarseElemSizeFT = unitCellSize/5.0
+    FineElemSizeFT   = unitCellSize/5.0
+elif latticeType.lower() == "tri":
+    BracketElemSize  = unitCellSize/5.0
+    CoarseElemSizeUT = unitCellSize/5.0
+    FineElemSizeUT   = unitCellSize/5.0
+    CoarseElemSizeFT = unitCellSize/5.0
+    FineElemSizeFT   = unitCellSize/5.0
+elif latticeType.lower() == "kagome":
+    BracketElemSize  = unitCellSize/5.0
+    CoarseElemSizeUT = unitCellSize/5.0
+    FineElemSizeUT   = unitCellSize/5.0
+    CoarseElemSizeFT = unitCellSize/5.0
+    FineElemSizeFT   = unitCellSize/5.0
+elif latticeType.lower() == "hex":
+    BracketElemSize  = unitCellSize/5.0
+    CoarseElemSizeUT = unitCellSize/5.0
+    FineElemSizeUT   = unitCellSize/5.0
+    CoarseElemSizeFT = unitCellSize/5.0
+    FineElemSizeFT   = unitCellSize/5.0
+if Cmatrix_sim:
+    CoarseElemSizeUT = unitCellSize/5.0
+    FineElemSizeUT   = unitCellSize/5.0
+############################################################################################
+################################# FUNCTIONS ################################################
+############################################################################################
+	 
+def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution):
+    if latticeType.lower() == "fcc":
+        unitX = L / nnx
+        unitY = H / nny
+        
+        nodes = zeros(shape=(totalNodes,3)) 
+        nodesR = zeros(shape=(totalNodes,3))
+        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
+
+        count = 0
+        x = 0
+        y = 0
+        for i in range(1, nny+2):
+            for j in range(1, nnx+2):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = 0
+       
+        x = unitX / 2.0
+        y = unitY / 2.0
+        for i in range(1, nny+1):
+            for j in range(1, nnx+1):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = unitX / 2.0
+        
+        x = -2.0*unitX
+        y = H + unitY
+        for i in range(1, 4):
+            for j in range(1, nnx+6):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -2.0*unitX
+            
+        x = -2.0*unitX
+        y = -unitY 
+        for i in range(1, 4):
+            for j in range(1, nnx+6):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -2.0*unitX
+        
+        x = -1.5*unitX
+        y = H + (0.5*unitY)
+        for i in range(1, 4):
+            for j in range(1, nnx+5):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -1.5*unitX
+        
+        x = -1.5*unitX
+        y = -0.5*unitY
+        for i in range(1, 4):
+            for j in range(1, nnx+5):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -1.5*unitX
+        
+        Dnodes_brackets = []
+        Dcoords = []
+        Dcoordsr = [-unitX, L+unitX, -2.0*unitX, L+(2.0*unitX), 0, H, -unitY, H+unitY, -1.5*unitX, L+1.5*unitX, -0.5*unitY, H+0.5*unitY]
+        for i in Dcoordsr:
+            Dcoords.append(round(i,2))
+        for node in bracket_nodes:
+            if round(node[1],2) in Dcoords[:2]:
+                if round(node[2],2) in Dcoords[4:6]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[1],2) in Dcoords[2:4]:
+                if round(node[2],2) in Dcoords[4:8]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[1],2) in Dcoords[8:10]:
+                if round(node[2],2) in Dcoords[10:]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+    
+    if latticeType.lower() == "square":
+        unitX = L / nnx
+        unitY = H / nny
+        
+        nodes = zeros(shape=(totalNodes,3)) 
+        nodesR = zeros(shape=(totalNodes,3))
+        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
+
+        count = 0
+        x = 0
+        y = 0
+        for i in range(1, nny+2):
+            for j in range(1, nnx+2):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = 0
+        
+        x = -2.0*unitX
+        y = H + unitY
+        for i in range(1, 4):
+            for j in range(1, nnx+6):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -2.0*unitX
+            
+        x = -2.0*unitX
+        y = -unitY 
+        for i in range(1, 4):
+            for j in range(1, nnx+6):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -2.0*unitX
+        
+        Dnodes_brackets = []
+        Dcoords = []
+        Dcoordsr = [-unitX, L+unitX, -2.0*unitX, L+(2.0*unitX), 0, H, -unitY, H+unitY, -1.5*unitX, L+1.5*unitX, -0.5*unitY, H+0.5*unitY]
+        for i in Dcoordsr:
+            Dcoords.append(round(i,2))
+        for node in bracket_nodes:
+            if round(node[1],2) in Dcoords[:2]:
+                if round(node[2],2) in Dcoords[4:6]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[1],2) in Dcoords[2:4]:
+                if round(node[2],2) in Dcoords[4:8]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[1],2) in Dcoords[8:10]:
+                if round(node[2],2) in Dcoords[10:]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+    
+    if latticeType.lower() == "45square":
+        unitX = L / nnx
+        unitY = H / nny
+        
+        nodes = zeros(shape=(totalNodes,3)) 
+        nodesR = zeros(shape=(totalNodes,3))
+        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
+
+        count = 0
+        x = 0
+        y = 0
+        for i in range(1, nny+2):
+            for j in range(1, nnx+2):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = 0
+       
+        x = unitX / 2.0
+        y = unitY / 2.0
+        for i in range(1, nny+1):
+            for j in range(1, nnx+1):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = unitX / 2.0
+        
+        x = -2.0*unitX
+        y = H + unitY
+        for i in range(1, 4):
+            for j in range(1, nnx+6):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -2.0*unitX
+            
+        x = -2.0*unitX
+        y = -unitY 
+        for i in range(1, 4):
+            for j in range(1, nnx+6):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -2.0*unitX
+        
+        x = -1.5*unitX
+        y = H + (0.5*unitY)
+        for i in range(1, 4):
+            for j in range(1, nnx+5):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -1.5*unitX
+        
+        x = -1.5*unitX
+        y = -0.5*unitY
+        for i in range(1, 4):
+            for j in range(1, nnx+5):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -1.5*unitX
+        
+        Dnodes_brackets = []
+        Dcoords = []
+        Dcoordsr = [-unitX, L+unitX, -2.0*unitX, L+(2.0*unitX), 0, H, -unitY, H+unitY, -1.5*unitX, L+1.5*unitX, -0.5*unitY, H+0.5*unitY]
+        for i in Dcoordsr:
+            Dcoords.append(round(i,2))
+        for node in bracket_nodes:
+            if round(node[1],2) in Dcoords[:2]:
+                if round(node[2],2) in Dcoords[4:6]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[1],2) in Dcoords[2:4]:
+                if round(node[2],2) in Dcoords[4:8]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[1],2) in Dcoords[8:10]:
+                if round(node[2],2) in Dcoords[10:]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+    
+    elif latticeType.lower() == "tri":
+        unitX = 0.5 * sqrt(3) * unitCellSize
+        unitY = unitCellSize
+
+        nodes = zeros(shape=(totalNodes, 3))
+        nodesR = zeros(shape=(totalNodes, 3))
+        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
+        
+        count = 0
+        x = 0
+        y = 0
+        for i in range(1, nny + 2):
+            for j in range(1, int(round(nnx / 2.000001)) + 2):
+                nodes[count][0] = count + 1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + 2 * unitX
+                count = count + 1
+
+            y = y + unitY
+            x = 0
+        
+        x = unitX
+        y = unitY / 2.0
+        for i in range(1, nny + 1):
+            for j in range(1, int(round(nnx / 2.000001) + 1)):
+                nodes[count][0] = count + 1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + 2 * unitX
+                count = count + 1
+
+            y = y + unitY
+            x = unitX
+        
+        x = -2.0*unitX
+        y = H + unitY
+        for i in range(1, 4):
+            for j in range(1, int(round(nnx / 2.000001)) + 4):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -2.0*unitX
+        
+        x = -unitX
+        y = H + (0.5*unitY)
+        for i in range(1, 4):
+            for j in range(1, int(round(nnx / 2.000001) + 3)):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+
+            y = y + unitY
+            x = -unitX
+            
+        x = -2.0*unitX
+        y = -unitY 
+        for i in range(1, 4):
+            for j in range(1, int(round(nnx / 2.000001)) + 4):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -2.0*unitX
+        
+        x = -unitX
+        y = -0.5*unitY
+        for i in range(1, 4):
+            for j in range(1, int(round(nnx / 2.000001) + 3)):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+
+            y = y - unitY
+            x = -unitX
+        
+        x = -unitX
+        y = H + (3.0*unitY)
+        for j in range(1, int(round(nnx / 2.000001) + 3)):
+            bracket_nodes[count - totalNodes][0] = count + 1
+            bracket_nodes[count - totalNodes][1] = x
+            bracket_nodes[count - totalNodes][2] = y
+            x = x + 2.0*unitX
+            count = count + 1
+        
+        x = -unitX
+        y = -(3.0*unitY)
+        for j in range(1, int(round(nnx / 2.000001) + 3)):
+            bracket_nodes[count - totalNodes][0] = count + 1
+            bracket_nodes[count - totalNodes][1] = x
+            bracket_nodes[count - totalNodes][2] = y
+            x = x + 2.0*unitX
+            count = count + 1
+        
+        Dnodes_brackets = []
+        Dcoords = [round(-2.0*unitX,2), round(L+(2.0*unitX),2), round(-unitY,2), round(H+unitY,2)]
+        for node in bracket_nodes:
+            if round(node[1],2) in Dcoords[:2]:
+                if round(node[2],2) in Dcoords[2:]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+
+    elif latticeType.lower() == "kagome":
+        unitX = float(unitCellSize)
+        unitY = sqrt(3) * float(unitCellSize)
+        
+        nodes = zeros(shape=(totalNodes,3))
+        nodesR = zeros(shape=(totalNodes,3))
+        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
+
+        count = 0
+        x = 0
+        y = 0
+        for i in range(1, nny+2):
+            for j in range(1, 2*nnx+1):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = 0
+     
+        x = 1.5*unitX
+        y = unitY / 2.0
+        for i in range(1, int(math.ceil(nny/2.0)+1)):
+            for j in range(1, nnx):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + 2*unitX
+                count = count + 1
+            
+            y = y + 2.0*unitY
+            x = 1.5*unitX
+
+        x = 0.5*unitX
+        y = 1.5*unitY
+        for i in range(1, int(floor(nny/2)+1)):
+            for j in range(1, nnx+1):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + 2*unitX
+                count = count + 1
+            
+            y = y + 2.0*unitY
+            x = unitX/2.0
+        
+        x = -2.0 * unitX
+        y = H + unitY
+        for i in range(1, 4):
+            for j in range(1, 2*nnx+5):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = -2.0 * unitX
+     
+        x = (-2.0 + 0.5)*unitX
+        y = H + 0.5*unitY
+        for i in range(1, 3):
+            for j in range(1, nnx+3):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+            
+            y = y + 2.0*unitY
+            x = (-2.0 + 0.5)*unitX
+
+        x = (-2.0 + 1.5)*unitX
+        y = H + 1.5*unitY
+        for i in range(1, 2):
+            for j in range(1, nnx+2):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+            
+            y = y + 2.0*unitY
+            x = (-2.0 + 1.5)*unitX
+        
+        x = -2.0 * unitX
+        y = -unitY
+        for i in range(1, 4):
+            for j in range(1, 2*nnx+5):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y - unitY
+            x = -2.0 * unitX
+     
+        x = (-2.0 + 0.5)*unitX
+        y = -0.5*unitY
+        for i in range(1, 3):
+            for j in range(1, nnx+3):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+            
+            y = y - 2.0*unitY
+            x = (-2.0 + 0.5)*unitX
+
+        x = (-2.0 + 1.5)*unitX
+        y = -1.5*unitY
+        for i in range(1, 2):
+            for j in range(1, nnx+2):
+                bracket_nodes[count - totalNodes][0] = count + 1
+                bracket_nodes[count - totalNodes][1] = x
+                bracket_nodes[count - totalNodes][2] = y
+                x = x + 2.0*unitX
+                count = count + 1
+            
+            y = y - 2.0*unitY
+            x = (-2.0 + 1.5)*unitX
+        
+        Dnodes_brackets = []
+        DcoordsX = []
+        DcoordsY = []
+        DcoordsXr = [-unitX, -2.0*unitX, -0.5*unitX, -1.5*unitX, L+unitX, L+(2.0*unitX), L+(0.5*unitX), L+(1.5*unitX)]
+        DcoordsYr = [-0.5*unitY, H+0.5*unitY, -unitY, H+unitY, -1.5*unitY, H+1.5*unitY, -2.0*unitY, H+(2.0*unitY), 
+                    -2.5*unitY, H+(2.5*unitY), -3.0*unitY, H+(3.0*unitY)]
+        for i in DcoordsXr:
+            DcoordsX.append(round(i,2))
+        for i in DcoordsYr:
+            DcoordsY.append(round(i,2))
+        for node in bracket_nodes:
+            if round(node[2],2) in DcoordsY[:2]:
+                if round(node[1],2) in DcoordsX[2:4] or node[1] in DcoordsX[6:]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[2],2) in DcoordsY[2:4]:
+                if round(node[1],2) in DcoordsX[:2] or node[1] in DcoordsX[4:6]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+            if round(node[2],2) in DcoordsY[6:8]:
+                if round(node[1],2) == DcoordsX[1] or node[1] == DcoordsX[5]:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+    
+    elif latticeType.lower() == "hex":
+        unitX = sqrt(3)*unitCellSize
+        unitY = 2*unitCellSize
+            
+        nodes = zeros(shape=(totalNodes,3))
+        nodesR = zeros(shape=(totalNodes,3))
+        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
+
+
+        count = 0
+        x = 0.5*unitX
+        y = 0
+        for i in range(1, int(math.ceil(nny/2.0)+1)):
+            for j in range(1, nnx+1):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = 0.5*unitX
+            for j in range(1,nnx+1):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitCellSize
+            x = 0.5*unitX
+
+        x = 0
+        y = unitCellSize/2.0
+        for i in range(1, int(math.ceil(nny/2.0)+1)):
+            for j in range(1, nnx+2):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitCellSize
+            x = 0 
+            for j in range(1, nnx+2):
+                nodes[count][0] = count+1
+                nodes[count][1] = x
+                nodes[count][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = 0
+        
+        x = [-0.5*unitX, L+0.5*unitX]
+        y = H
+        for xx in x:
+            bracket_nodes[count-totalNodes][0] = count+1
+            bracket_nodes[count-totalNodes][1] = xx
+            bracket_nodes[count-totalNodes][2] = y
+            count = count + 1
+        
+        x = -1.5*unitX
+        y = H + unitCellSize
+        for i in range(1, 3):
+            for j in range(1, nnx+5):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = -1.5*unitX
+            for j in range(1,nnx+5):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitCellSize
+            x = -1.5*unitX
+
+        x = -2.0*unitX
+        y = H + unitY - unitCellSize/2.0
+        for i in range(1, 3):
+            for j in range(1, nnx+6):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitCellSize
+            x = -2.0*unitX
+            for j in range(1, nnx+6):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y + unitY
+            x = -2.0*unitX
+        
+        x = [-0.5*unitX, L+0.5*unitX]
+        y = 0
+        for xx in x:
+            bracket_nodes[count-totalNodes][0] = count+1
+            bracket_nodes[count-totalNodes][1] = xx
+            bracket_nodes[count-totalNodes][2] = y
+            count = count + 1
+        
+        x = -1.5*unitX
+        y = -unitCellSize
+        for i in range(1, 3):
+            for j in range(1, nnx+5):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y - unitY
+            x = -1.5*unitX
+            for j in range(1,nnx+5):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y - unitCellSize
+            x = -1.5*unitX
+
+        x = -2.0*unitX
+        y = -unitY + unitCellSize/2.0
+        for i in range(1, 3):
+            for j in range(1, nnx+6):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y - unitCellSize
+            x = -2.0*unitX
+            for j in range(1, nnx+6):
+                bracket_nodes[count-totalNodes][0] = count+1
+                bracket_nodes[count-totalNodes][1] = x
+                bracket_nodes[count-totalNodes][2] = y
+                x = x + unitX
+                count = count + 1
+            
+            y = y - unitY
+            x = -2.0*unitX
+        
+        Dnodes_brackets = []
+        DcoordsX = []
+        DcoordsY = []
+        DcoordsXr = [-1.5*unitX, -2.0*unitX, L+1.5*unitX, L+2.0*unitX]
+        DcoordsYr = [H+unitCellSize, H+1.5*unitCellSize, H+unitY+0.5*unitCellSize, 
+                     -unitCellSize, -1.5*unitCellSize, -unitY-0.5*unitCellSize]
+        for i in DcoordsXr:
+            DcoordsX.append(round(i,2))
+        for i in DcoordsYr:
+            DcoordsY.append(round(i,2))
+        for node in bracket_nodes:
+            if round(node[2],2) in DcoordsY:
+                if round(node[1],2) in DcoordsX:
+                    Dnodes_brackets.append(node[0]-totalNodes-1)
+    
+    Dnodes_brackets = np.array(Dnodes_brackets, dtype=int)
+    bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
+
+    xCoord = nodes[:, 1]
+    yCoord = nodes[:, 2]
+    bottomNodes = argwhere((yCoord >= -1e-3) & (yCoord <= 1e-3))
+    topNodes = argwhere((yCoord <= H + 1e-3) & (yCoord >= H - 1e-3))
+    leftNodes = argwhere((xCoord >= -1e-3) & (xCoord <= 1e-3))
+    rightNodes = argwhere((xCoord <= L + 1e-3) & (xCoord >= L - 1e-3))
+    
+    boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
+    boundaryNodes, inx = unique(boundaryNodes,return_index=True)
+    boundaryNodesInx = nodes[boundaryNodes, 0]
+    
+    nodeIndex = nodes[:, 0]
+    nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
+
+    xCoord = nodes[nonboundaryNodes.astype(int)-1][:, 1]
+    yCoord = nodes[nonboundaryNodes.astype(int)-1][:, 2]
+    if targeted_disorder == "X":
+        disNodes_pos = argwhere(((yCoord/H >= (xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (xCoord+1.0*unitCellSize)/L)))
+        disNodes_neg = argwhere(((yCoord/H >= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (L-xCoord+1.0*unitCellSize)/L)))
+        disNodes = np.concatenate((disNodes_pos, disNodes_neg))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "nX":
+        disNodes12 = argwhere(((yCoord/H >= (L-xCoord+1.0*unitCellSize)/L) & (yCoord/H >= (xCoord+1.0*unitCellSize)/L)))
+        disNodes23 = argwhere(((yCoord/H <= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H >= (xCoord+1.0*unitCellSize)/L)))
+        disNodes34 = argwhere(((yCoord/H <= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (xCoord-1.0*unitCellSize)/L)))
+        disNodes41 = argwhere(((yCoord/H >= (L-xCoord+1.0*unitCellSize)/L) & (yCoord/H <= (xCoord-1.0*unitCellSize)/L)))
+        disNodes = np.concatenate((disNodes12, disNodes23, disNodes34, disNodes41))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "v":
+        disNodes1 = argwhere(((xCoord >= 1*L/4-0.75*unitCellSize) & (xCoord <= 1*L/4+0.75*unitCellSize)))
+        disNodes2 = argwhere(((xCoord >= 2*L/4-0.75*unitCellSize) & (xCoord <= 2*L/4+0.75*unitCellSize)))
+        disNodes3 = argwhere(((xCoord >= 3*L/4-0.75*unitCellSize) & (xCoord <= 3*L/4+0.75*unitCellSize)))
+        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "h":
+        disNodes1 = argwhere(((yCoord >= 1*H/4-0.75*unitCellSize) & (yCoord <= 1*H/4+0.75*unitCellSize)))
+        disNodes2 = argwhere(((yCoord >= 2*H/4-0.75*unitCellSize) & (yCoord <= 2*H/4+0.75*unitCellSize)))
+        disNodes3 = argwhere(((yCoord >= 3*H/4-0.75*unitCellSize) & (yCoord <= 3*H/4+0.75*unitCellSize)))
+        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "o":
+        disNodes1 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (3*unitCellSize)**2) & 
+                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (6*unitCellSize)**2)))
+        disNodes = np.concatenate((disNodes1))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "oo":
+        disNodes1 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (2*unitCellSize)**2) & 
+                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (4*unitCellSize)**2)))
+        disNodes2 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (6*unitCellSize)**2) & 
+                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (8*unitCellSize)**2)))
+        disNodes = np.concatenate((disNodes1, disNodes2))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "D":
+        disNodes1 = argwhere(((yCoord/(H/2) >= ((3*L/2)-xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((3*L/2)-xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes2 = argwhere(((yCoord/(H/2) >= ((L/2)+xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((L/2)+xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes3 = argwhere(((yCoord/(H/2) >= ((L/2)-xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((L/2)-xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes4 = argwhere(((yCoord/(H/2) >= ((-L/2)+xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((-L/2)+xCoord+1.0*unitCellSize)/(L/2))))
+        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3, disNodes4))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "DD":
+        disNodes11 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((4*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((4*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes12 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((5*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((5*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes21 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes22 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((2*L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((2*L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes31 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes32 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((2*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((2*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes41 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((-2*L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((-2*L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes42 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((-L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((-L/3)+xCoord+1.0*unitCellSize)/(L/3))))
+        disNodes = np.concatenate((disNodes11, disNodes12, disNodes21, disNodes22, disNodes31, disNodes32, disNodes41, disNodes42))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "DDD":
+        disNodes11 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((5*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((5*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes12 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((6*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((6*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes13 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((7*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((7*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes21 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes22 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((2*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((2*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes23 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((3*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((3*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes31 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes32 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((2*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((2*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes33 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((3*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((3*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes41 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-3*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-3*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes42 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-2*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-2*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes43 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-L/4)+xCoord+1.0*unitCellSize)/(L/4))))
+        disNodes = np.concatenate((disNodes11, disNodes12, disNodes13, disNodes21, disNodes22, disNodes23, disNodes31, disNodes32, 
+                                  disNodes33, disNodes41, disNodes42, disNodes43))
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    elif targeted_disorder == "xs":
+        Hs = [0, H/3, 2*H/3, H]
+        Ls = [0, L/3, 2*L/3, L]
+        disNodes = []
+        for i in range(len(Hs)-1):
+            for j in range(len(Ls)-1):
+                disNodes_pos = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
+                disNodes_neg = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
+                disNodes.append(np.concatenate((disNodes_pos, disNodes_neg)))
+        disNodes = np.array(np.concatenate((np.array(disNodes, dtype=object))), dtype=int)
+        disNodes, inx = unique(disNodes,return_index=True)
+        disNodes = nonboundaryNodes[disNodes].flatten()
+        disorderNodes = disNodes
+    else:
+        disorderNodes = nonboundaryNodes
+    
+    if (distribution.lower() == 'uniform'):
+        randX = random.uniform(-delta, delta, len(disorderNodes))
+        randY = random.uniform(-delta, delta, len(disorderNodes))
+    elif (distribution.lower() == 'lhs_uniform'):
+        if int(idNum-initialJob) == 0:
+            global randX_all, randY_all
+            randX_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
+            randY_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
+        randX = randX_all[idNum-initialJob]
+        randY = randY_all[idNum-initialJob]
+    elif (distribution.lower() == 'normal'):
+        randX = random.normal(0.0, delta, len(disorderNodes))
+        randY = random.normal(0.0, delta, len(disorderNodes))
+    elif (distribution.lower() == 'exponential'):
+        randX = random.exponential(1/delta, len(disorderNodes))
+        randY = random.exponential(1/delta, len(disorderNodes))
+    elif (distribution.lower() == 'frequency'):
+        rows = set(nodes[disorderNodes.astype(int)-1,2])
+        while len(frequencies) < (2*len(rows)):
+            f = random_low_alias_freq(dx=unitCellSize)
+            if f not in frequencies:
+                frequencies.append(f)
+        rand = nodes[disorderNodes.astype(int)-1]
+        rand[:,1] = np.zeros(len(disorderNodes))
+        rand[:,2] = np.zeros(len(disorderNodes))
+        for i, y in enumerate(rows):
+            dN = nodes[disorderNodes.astype(int)-1]
+            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
+            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
+                          for j in dN_xs])
+            idxs = np.isin(rand[:,0], r[:,0])
+            sorter = np.argsort(r[:,0])
+            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
+            rand[idxs,1] = r[match_idxs,1]
+            rand[idxs,2] = r[match_idxs,2]
+        randX = rand[:,1]
+        randY = rand[:,2]
+    elif (distribution.lower() == 'opt'):
+        randX = opt_dis_x
+        randY = opt_dis_y
+    elif (distribution.lower() == 'opt-f'):
+        rows = set(nodes[disorderNodes.astype(int)-1,2])
+        print(len(rows), len(frequencies))
+        rand = nodes[disorderNodes.astype(int)-1]
+        rand[:,1] = np.zeros(len(disorderNodes))
+        rand[:,2] = np.zeros(len(disorderNodes))
+        for i, y in enumerate(rows):
+            dN = nodes[disorderNodes.astype(int)-1]
+            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
+            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
+                          for j in dN_xs])
+            idxs = np.isin(rand[:,0], r[:,0])
+            sorter = np.argsort(r[:,0])
+            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
+            rand[idxs,1] = r[match_idxs,1]
+            rand[idxs,2] = r[match_idxs,2]
+        randX = rand[:,1]
+        randY = rand[:,2]
+
+    disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
+    disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
+    
+    nodesR[:,0] = nodes[:,0]
+    nodesR[:,1] = nodes[:,1]
+    nodesR[:,2] = nodes[:,2]
+    nodesR[disorderNodes.astype(int)-1,1] = disorderCoordX
+    nodesR[disorderNodes.astype(int)-1,2] = disorderCoordY
+    
+    return nodes, nodesR, bracket_nodes
+
+def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
+    radius = geom.l + geom.l*1e-3
+    dummyElem = []
+    count = 0
+    for ii in range(len(nodes)):
+        x_coord = nodes.shape[-1]-3 if stiff else nodes.shape[-1]-2
+        y_coord = nodes.shape[-1]-2 if stiff else nodes.shape[-1]-1
+        if (LAT.lower() == "fcc" and nodes[ii][int(x_coord)])%2 == 1.0 and (nodes[ii][int(y_coord)])%2 == 1.0:
+            continue
+        distance = np.sqrt(np.array(nodes[ii, int(x_coord)] - nodes[:, int(x_coord)])**2 + np.array(nodes[ii, int(y_coord)] - nodes[:, int(y_coord)])**2)
+        inside = np.argwhere(distance <= radius)
+        nearNodes = np.setdiff1d(inside.astype(int), [ii])
+        for jj in range(len(nearNodes)):
+            dummyElem.append([count,ii,nearNodes[jj]])
+            count = count + 1            
+    for i in range(len(dummyElem)):
+        for j in range(len(dummyElem)):
+            if (dummyElem[i][1] == dummyElem[j][2]):
+                if (dummyElem[i][2] == dummyElem[j][1]):
+                    dummyElem[j][:] = [0, 0, 0]
+                    break
+    indexRemove = []
+    for i in range(0,len(dummyElem)):
+        if (dummyElem[i][0] == 0 and dummyElem[i][1] == 0 and dummyElem[i][2] == 0):
+            indexRemove.append(i)
+        if stiff:
+            if LAT.lower() == "tri" and mode.lower() == "unit":
+                if (dummyElem[i][1] == 3 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 3):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 0 and dummyElem[i][2] == 3) or (dummyElem[i][1] == 3 and dummyElem[i][2] == 0):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 3 and dummyElem[i][2] == 5) or (dummyElem[i][1] == 5 and dummyElem[i][2] == 3):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 1 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 1):
+                    indexRemove.append(i)
+                elif (dummyElem[i][1] == 4 and dummyElem[i][2] == 6) or (dummyElem[i][1] == 6 and dummyElem[i][2] == 4):
+                    indexRemove.append(i)
+            elif LAT.lower() == "tri" and mode.lower() == "lattice":
+                if ((nodes[dummyElem[i][1]][1] == 0 and nodes[dummyElem[i][2]][1] == 0) or 
+                    (nodes[dummyElem[i][1]][1] == geom.H and nodes[dummyElem[i][2]][1] == geom.H)):
+                    indexRemove.append(i)
+    realElem = np.delete(dummyElem, [indexRemove], axis=0)
+    if stiff:
+        realElem = realElem
+    else:
+        realElem = realElem + 1
+
+    if mode and mode.lower() == "fracture":
+        xCrS = [-0.1*geom.W, geom.H/2-geom.l*0.2]                                         # crack starting point bottomLeft
+        xCrE = [geom.a0 - 0.2*geom.l, geom.H/2+geom.l*0.2]
+    
+        delElems = []
+        for ik in range(0,len(realElem)):
+            x1 = nodes[int(realElem[ik][1]-1)][1]
+            x2 = nodes[int(realElem[ik][2]-1)][1]
+            y1 = nodes[int(realElem[ik][1]-1)][2]
+            y2 = nodes[int(realElem[ik][2]-1)][2]
+            midPointX = (x1+x2)/2
+            midPointY = (y1+y2)/2
+            point = (midPointX,midPointY)
+            insideTest = insidePoint(xCrS,xCrE,point)
+            if insideTest:
+                delElems.append(realElem[ik][0])
+
+        delElems = np.array(delElems, dtype=int)
+        realElem = np.delete(realElem, delElems, 0)
+    
+    for i in range(len(realElem)):
+        realElem[i][0] = i+1
+
+    if job is not None:
+        with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
+            f.write("*Elems\n")
+            for elem in realElem:
+                f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
+    return realElem
+
+def insidePoint(bl, tr, p) :
+   if (p[0] > bl[0] and p[0] < tr[0] and p[1] > bl[1] and p[1] < tr[1]) :
+      return True
+   else :
+      return False
+
+def in_circle(center_x, center_y, radius, x, y):
+    dist = math.sqrt((center_x - x) ** 2 + (center_y - y) ** 2)
+    return dist <= radius
+
+class Geometry:
+    def __init__(self, LAT, l, nnx, rD=0.2):
+        self.LAT = LAT
+        self.l = l
+        self.nnx = nnx
+        self.rD = rD
+
+        self.t = self.rDthickness(rD=rD)
+
+        if LAT.lower() == 'fcc':
+            L = float(l * nnx)
+            Lmin = L
+            H0 = 0.2 * L
+            Hs = [l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / l
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.2:
+                    H = H - l
+                    nny = H / l
+                elif H / L < 0.2:
+                    H = H + l
+                    nny = H / l
+
+            W = L / 1.25
+            a = [L / nnx * i for i in range(nnx + 1)]
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + ((l / 2) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
+            deltaNM = 0.5 * np.sqrt(l * l + l * l)
+
+        elif LAT.lower() == 'square':
+            L = float(l * nnx)
+            Lmin = L
+            H0 = 0.2 * L
+            Hs = [l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / l
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.2:
+                    H = H - l
+                    nny = H / l
+                elif H / L < 0.2:
+                    H = H + l
+                    nny = H / l
+
+            W = L / 1.25
+            a = [L / nnx * i for i in range(nnx + 1)]
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + ((l / 2) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round((nnx + 1) * (nny + 1)))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
+            deltaNM = l
+
+        elif LAT.lower() == '45square':
+            L = float(2**(1/2) * l * nnx)
+            Lmin = L
+            H0 = 0.2 * L
+            Hs = [2**(1/2) * l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / ((2**(1/2))*l)
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.2:
+                    H = H - ((2**(1/2))*l)
+                    nny = H / ((2**(1/2))*l)
+                elif H / L < 0.2:
+                    H = H + ((2**2)*l)
+                    nny = H / ((2**(1/2))*l)
+
+            W = L / 1.25
+            a = [L / nnx * i for i in range(nnx + 1)]
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + (((2**(1/2))*l) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
+            deltaNM = l
+
+        elif LAT.lower() == 'tri':
+            if nnx % 2.0 == 1.0:
+                nnx = nnx - 1
+            L = 0.5 * (3.0 ** 0.5) * l * nnx
+            Lmin = L
+            H0 = 0.2 * L
+            Hs = [l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / l
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.2:
+                    H = H - l
+                    nny = H / l
+                elif H / L < 0.2:
+                    H = H + l
+                    nny = H / l
+
+            W = L / 1.25
+            a = [L / (nnx / 2) * i for i in range(nnx + 1)]
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + ((0.5 * (3.0 ** 0.5) * l) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round(((nnx / 1.99999) + 1) * (nny + 1)) +
+                             round((nnx / 1.99999) * nny))
+            totalBracketNodes = int(round(((nnx / 1.99999) + 3) * 3 * 2) +
+                                    round(((nnx / 1.99999) + 2) * 3 * 2) +
+                                    2 * (nnx / 2.0 + 2))
+            deltaNM = l
+
+        elif LAT.lower() == 'kagome':
+            L = l * (2.0 * nnx - 1)
+            Lmin = L - 3*l
+            H0 = 0.2 * L
+            Hs = [(3.0 ** 0.5) * l * i for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = H / ((3.0 ** 0.5) * l)
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.2:
+                    H = H - ((3.0 ** 0.5) * l)
+                    nny = H / ((3.0 ** 0.5) * l)
+                elif H / L < 0.2:
+                    H = H + ((3.0 ** 0.5) * l)
+                    nny = H / ((3.0 ** 0.5) * l)
+
+            W = L / 1.25
+            if round(nny) % 4 == 3:
+                a = [2 * L * i / (2 * nnx - 1) + 0.5 * l for i in range(nnx + 1)]
+            elif round(nny) % 4 == 1:
+                a = [2 * L * i / (2 * nnx - 1) + 1.5 * l for i in range(nnx + 1)]
+            else:
+                a = [2 * L * i / (2 * nnx - 1) + 0.5 * l for i in range(nnx + 1)]
+
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + ((2 * l) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            nny = int(round(nny))
+            totalNodes = int(round((2 * nnx * (nny + 1)) +
+                                   (nnx - 1) * math.ceil(nny / 2.0) +
+                                   (nnx) * math.floor(nny / 2)))
+            totalBracketNodes = int(round(((2 * nnx + 4) * 3 + (nnx + 2) * 2 + (nnx + 1)) * 2))
+            deltaNM = l
+
+        elif LAT.lower() == 'hex':
+            L = (3.0 ** 0.5) * l * nnx
+            Lmin = L - ((3.0 ** 0.5) * l)
+            H0 = 0.2 * L
+            Hs = [(0.5 * l) + (1.5 * l * i) for i in range(100)]
+            H = min(Hs, key=lambda x: abs(x - H0))
+            nny = (H - (0.5 * l)) / (1.5 * l)
+
+            if round(nny) % 2.0 == 0.0:
+                if H / L >= 0.2:
+                    H = H - 1.5 * l
+                    nny = (H - (0.5 * l)) / (1.5 * l)
+                elif H / L < 0.2:
+                    H = H + 1.5 * l
+                    nny = (H - (0.5 * l)) / (1.5 * l)
+
+            nny = int(round(nny))
+            W = L / 1.25
+
+            if round(nny) % 4 == 3:
+                a = [((3.0 ** 0.5) / 2) * l + (L - ((3.0 ** 0.5) * l)) / (nnx - 1) * i
+                     for i in range(nnx + 1)]
+            elif round(nny) % 4 == 1:
+                a = [L / nnx * i for i in range(nnx + 1)]
+            else:
+                a = [L / nnx * i for i in range(nnx + 1)]
+
+            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
+            ai = [a0 + (((3.0 ** 0.5) * (l / 2)) * (i)) for i in range(nnx)]
+            vol = L * H
+
+            totalNodes = int(round(2 * (nnx) * math.ceil(nny / 2.0) +
+                                   2 * (nnx + 1) * math.ceil(nny / 2.0)))
+            totalBracketNodes = int(round(((nnx + 5) * 4 + (nnx + 4) * 4) * 2 + 4))
+            deltaNM = l
+
+        self.nnx = nnx
+        self.nny = nny
+        self.L = L
+        self.Lmin = Lmin
+        self.H = H
+        self.W = W
+        self.a0 = a0
+        self.ai = ai
+        self.vol = vol
+        self.totalNodes = totalNodes
+        self.totalBracketNodes = totalBracketNodes
+        self.deltaNM = deltaNM
+        self.B = 0.5 * self.W
+
+    def rDthickness(self, t=None, rD=None):
+        if self.LAT.lower() == "fcc":
+            A = 2*(1+np.sqrt(2))
+        elif "square" in self.LAT.lower():
+            A = 2
+        elif self.LAT.lower() == "tri":
+            A = 2*np.sqrt(3)
+        elif self.LAT.lower() == "kagome":
+            A = np.sqrt(3)
+        elif self.LAT.lower() == "hex":
+            A = 2/np.sqrt(3)
+            
+        if t:
+            self.rD = A*(t/self.l)
+        elif rD:
+            self.t = (self.l*rD)/A
+
+    def stiffnessMatrix(self, stiffCalc=False):
+        nnx = 10
+        if self.LAT.lower() == "fcc":
+            nny = nnx
+            L = float(self.l * nnx)
+            H = float(self.l * nny)
+            vol = L * H
+            if stiffCalc:
+                if stiffCalc.lower() == "unit":
+                    vol = self.l ** 2
+                elif stiffCalc.lower() == "lattice":
+                    vol = L * H
+        elif self.LAT.lower() == "tri":
+            if stiffCalc:
+                nny = nnx
+                L = (3 ** 0.5) * self.l * nnx
+                H = self.l * nny
+                vol = L * H
+                if stiffCalc.lower() == "unit":
+                    vol = self.l * (2 * self.l * (3 ** 0.5) / 2)
+                elif stiffCalc.lower() == "lattice":
+                    vol = L * H
+            else:
+                nnx = nnx * 2
+                nny = nnx / 2
+                L = 0.5 * (3.0 ** 0.5) * self.l * nnx
+                H = self.l * nny
+                vol = L * H
+        elif self.LAT.lower() == "kagome":
+            nny = nnx
+            L = self.l * (2.0 * nnx - 1)
+            H = (3.0 ** 0.5) * self.l * nny
+            vol = L * H
+            if stiffCalc:
+                if stiffCalc.lower() == "unit":
+                    vol = (3 * self.l) * (4 * self.l * ((3 ** 0.5) / 2))
+                elif stiffCalc.lower() == "lattice":
+                    vol = L * H
+        elif self.LAT.lower() == "hex":
+            L = (3 ** 0.5) * self.l * nnx
+            if stiffCalc:
+                nny = nnx
+                H = 3 * self.l * nny
+                vol = L * H
+                if stiffCalc.lower() == "unit":
+                    vol = (3 * self.l) * (2 * self.l * ((3 ** 0.5) / 2))
+                elif stiffCalc.lower() == "lattice":
+                    vol = L * H
+            else:
+                nny = nnx * 2 + 1
+                H = 3 * self.l * nny
+                vol = L * H
+        self.nnx = nnx
+        self.nny = int(round(nny))
+        self.L = L
+        self.H = H
+        self.vol = vol
+
+    def FTcalc(self):
+        self.a0 = self.a0 - 0.25 * self.W
+        if self.LAT.lower() == "fcc":
+            self.ai = [self.a0 + ((self.l / 2) * (i)) for i in range(self.nnx)]
+        elif "square" in self.LAT.lower():
+            self.ai = [self.a0 + ((self.l * 2**(1/2)) * (i)) for i in range(self.nnx)]
+        elif self.LAT.lower() == "tri":
+            self.ai = [self.a0 + ((0.5 * (3.0 ** 0.5) * self.l) * (i)) for i in range(self.nnx)]
+        elif self.LAT.lower() == "kagome":
+            self.ai = [self.a0 + ((2 * self.l) * (i)) for i in range(self.nnx)]
+        elif self.LAT.lower() == "hex":
+            self.ai = [self.a0 + (((3.0 ** 0.5) * (self.l / 2)) * (i)) for i in range(self.nnx)]
+
+    def nodeCount(self, mode=False, stiffMatrix=False):
+        if self.LAT.lower() == "fcc" or self.LAT.lower() == "45square":
+            totalNodes = int(round((self.nnx + 1) * (self.nny + 1) + self.nnx * self.nny))
+            totalBracketNodes = int(round((self.nnx + 5) * 3 * 2 + (self.nnx + 4) * 3 * 2))
+            if mode and mode.lower() == "fracture":
+                self.totalNodes = totalNodes - round(self.nnx / 1.66666667)
+            elif mode and mode.lower() == "ductile":
+                self.totalNodes = totalNodes + totalBracketNodes - 8
+            if stiffMatrix:
+                nnx, nny = 10, 10
+                self.totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
+        elif self.LAT.lower() == "square":
+            totalNodes = int(round((nnx + 1) * (nny + 1)))
+            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
+            if mode and mode.lower() == "fracture":
+                self.totalNodes = totalNodes
+            elif mode and mode.lower() == "ductile":
+                self.totalNodes = totalNodes + totalBracketNodes - 4
+            if stiffMatrix:
+                nnx, nny = 10, 10
+                self.totalNodes = int((nnx + 1) * (nny + 1))
+        elif self.LAT.lower() == "tri":
+            totalNodes = int(round(((self.nnx / 1.99999) + 1) * (self.nny + 1)) +
+                             round((self.nnx / 1.99999) * self.nny))
+            totalBracketNodes = int(round(((self.nnx / 1.99999) + 3) * 3 * 2) +
+                                    round(((self.nnx / 1.99999) + 2) * 3 * 2) +
+                                    2 * (self.nnx / 2.0 + 2))
+            if mode and mode.lower() == "fracture":
+                self.totalNodes = totalNodes - round(self.nnx / 3.33333333)
+            elif mode and mode.lower() == "ductile":
+                self.totalNodes = totalNodes + totalBracketNodes - 4
+            if stiffMatrix:
+                nnx, nny = 10, 10
+                self.totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
+        elif self.LAT.lower() == "kagome":
+            totalNodes = int(round((2 * self.nnx * (self.nny + 1)) +
+                                   (self.nnx - 1) * math.ceil(self.nny / 2.0) +
+                                   (self.nnx) * math.floor(self.nny / 2)))
+            totalBracketNodes = int(round(((2 * self.nnx + 4) * 3 + (self.nnx + 2) * 2 + (self.nnx + 1)) * 2))
+            if mode and mode.lower() == "fracture":
+                self.totalNodes = totalNodes - round(self.nnx / 1.75)
+            elif mode and mode.lower() == "ductile":
+                self.totalNodes = totalNodes + totalBracketNodes - 16
+            if stiffMatrix:
+                nnx, nny = 10, 10
+                self.totalNodes = int((2*nnx*(nny+1)) + (nnx-1)*math.ceil(nny/2.0) + (nnx)*math.floor(nny/2))
+        elif self.LAT.lower() == "hex":
+            totalNodes = int(round(2 * (self.nnx) * math.ceil(self.nny / 2.0) +
+                                   2 * (self.nnx + 1) * math.ceil(self.nny / 2.0)))
+            totalBracketNodes = int(round(((self.nnx + 5) * 4 + (self.nnx + 4) * 4) * 2 + 4))
+            if mode and mode.lower() == "fracture":
+                self.totalNodes = totalNodes
+            elif mode and mode.lower() == "ductile":
+                self.totalNodes = totalNodes + totalBracketNodes - 12
+            if stiffMatrix:
+                nnx, nny = 10, 10
+                self.totalNodes = ((2*nny) * (nnx+1)) + (((2*nny)+1) * nnx) + 50
+
+    def UTval(self):
+        self.nnx = 20
+        self.l = 10.0
+        self.nny = 18
+        self.H = self.nny * self.l
+        self.vol = self.L * self.H
+        self.totalNodes = int(round(((self.nnx / 1.99999) + 1) * (self.nny + 1)) +
+                              round((self.nnx / 1.99999) * self.nny))
+        self.totalBracketNodes = int(round(((self.nnx / 1.99999) + 3) * 3 * 2) +
+                                     round(((self.nnx / 1.99999) + 2) * 3 * 2) +
+                                     2 * (self.nnx / 2.0 + 2))
+
+def pStrainProperties(E, v):
+    return E/(1-v**2), v/(1-v)
+
+def LHS_uniform(var, strats, lim, mean=0, plot=False):
+    lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
+    upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/(len(lower_limits)-1))
+    
+    points = np.zeros((strats, var))
+    for i in range(var):
+        points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
+        np.random.shuffle(points[:, i])
+    return points
+
+def triangle_wave(x, f, A):
+    frac = np.mod(f * x, 1.0)
+    tri = np.where(frac < 0.5, 2 * frac, 2 * (1 - frac))
+    return A * (2 * tri - 1)
+
+def sine_wave(x, f, A):
+    return A * np.sin(2 * np.pi * f * x)
+
+def is_well_approximable(alpha, q_max=20, tol=1e-6):
+    frac = Fraction(alpha).limit_denominator(q_max)
+    return abs(alpha - frac.numerator/frac.denominator) < tol
+
+def random_low_alias_freq(dx=10.0, q_max=20, tol=1e-6):
+    f_max = 1.0 / (2.0 * dx)
+    while True:
+        f = random.uniform(0, f_max)
+        alpha = f * dx
+        if not is_well_approximable(alpha, q_max=q_max, tol=tol):
+            return f
+
+############################################################################################
+################################## START ###################################################
+############################################################################################
+
+## For PSC/DSC:
+# for nnx in nnxs:
+
+## For MeshConv:
+# for CoarseElemSizeUT, CoarseElemSizeFT in zip(CoarseElemSizeUTs, CoarseElemSizeFTs):
+#     for FineElemSizeUT, FineElemSizeFT in zip(FineElemSizeUTs, FineElemSizeFTs):
+#         if not os.path.exists(pDir+"\\"+str(int(unitCellSize/BracketElemSize))+"-"+str(int(unitCellSize/CoarseElemSizeUT))+"-"+str(int(unitCellSize/FineElemSizeUT))):
+#             os.makedirs(pDir+"\\"+str(int(unitCellSize/BracketElemSize))+"-"+str(int(unitCellSize/CoarseElemSizeUT))+"-"+str(int(unitCellSize/FineElemSizeUT)))
+#         os.chdir(pDir+"\\"+str(int(unitCellSize/BracketElemSize))+"-"+str(int(unitCellSize/CoarseElemSizeUT))+"-"+str(int(unitCellSize/FineElemSizeUT)))
+
+if (nodeVar == 'no' and sizeVar == 'no'):
+    imper = 'per'
+elif (nodeVar == 'yes' and sizeVar == 'no'):
+    imper = 'disNodes'
+elif (nodeVar == 'no' and sizeVar == 'yes'):
+    imper = 'disStruts'
+else:
+    imper = 'disNodesStruts'
+
+if (finalRun.lower() == 'yes' or finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+    initial = initialJob
+    numOfJobs = initial + numberOfRuns
+elif (finalRun.lower() == 'no'):
+    initial = initialJob
+    numOfJobs = initial + 1
+
+if nodeVar == "no":
+    fac = 0.0
+
+geom = Geometry(latticeType, unitCellSize, nnx)
+if stiffMatrix:
+    geom.stiffnessMatrix()
+if UTval:
+    geom.UTval()
+nnx = geom.nnx
+nny = geom.nny
+L = geom.L
+H = geom.H
+W = geom.W
+B = geom.B
+a0 = geom.a0
+ai = geom.ai
+totalNodes = geom.totalNodes
+totalBracketNodes = geom.totalBracketNodes
+deltaNM = geom.deltaNM
+delta = deltaNM * fac
+
+if (distribution.lower() == 'lhs_uniform'):    
+    if numberOfRuns == 1:
+        distribution = 'uniform'
+
+if (distribution.lower() == 'uniform'):
+    fac = fac
+    dist = "uni"
+elif (distribution.lower() == 'lhs_uniform'):
+    fac = fac
+    dist = "lhs"
+elif (distribution.lower() == 'frequency'):
+    fac = fac
+    dist = "freq"
+elif (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
+    fac = fac
+    dist = "opt"
+elif (distribution.lower() == 'normal'):
+    fac = (2*fac)/sqrt(2*pi*exp(1))
+    dist = "norm"
+elif (distribution.lower() == 'exponential'):
+    fac = exp(1)/(2*fac)
+    dist = "exp"
+
+for idNum in range(initial,numOfJobs):
+    
+    #data 	     = sys.argv[-1]
+    PBC          = 'no'
+    elemType     = B21
+    units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
+    
+    nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution)
+
+    if (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
+        idNum = sampleN
+
+# ######################################################################################################
+# ######################################################################################################
+# ######################################################################################################
+# ######################################################################################################
+# ###################################### Ductile Model #################################################
+# ######################################################################################################
+# ######################################################################################################
+# ######################################################################################################
+# ######################################################################################################
+        
+    if  (MechanicalModel.lower() == 'ductile' or MechanicalModel.lower() == 'both'):
+        if Cmatrix_sim: cases = cases_Cmatrix
+        else: cases = ['none']
+        for caseCmatrix in cases:
+            ModelName = f"Ductile-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+            if imper == 'per':
+                ModelName = f"Ductile-{latticeType}-{int(nnx)}-per-{idNum}"
+            if stiffMatrix:
+                ModelName = f"Ductile-{latticeType}-{int(nnx)}-stiffMatrix-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+                if latticeType.lower() == "tri":
+                    ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-stiffMatrix-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+                if imper == 'per':
+                    ModelName = f"Ductile-{latticeType}-{int(nnx/2)}-stiffMatrix-per-{idNum}"
+            if Cmatrix_sim:
+                ModelName = f"Ductile-{latticeType}-{int(nnx)}-Cmatrix{caseCmatrix.upper()}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+                if imper == 'per':
+                    ModelName = f"Ductile-{latticeType}-{int(nnx)}-Cmatrix{caseCmatrix.upper()}-per-{idNum}"
+            Job = ModelName
+
+            # FIX STIFF MATRIX NAMING AND DIMENSIONS AND ETC
+
+            #############################################################################################
+            #################################### Brackets ###############################################
+            #############################################################################################
+            
+            # if stiffMatrix or Cmatrix_sim:
+            nodes_duct = nodes
+            nodesR_duct = nodesR
+            # else:
+            #     nodes_duct = append(nodes, bracket_nodes, axis=0)
+            #     nodesR_duct = append(nodesR, bracket_nodes, axis=0)
+            
+            #############################################################################################
+            #################################### Strut Elements #########################################
+            #############################################################################################
+            
+            element = connectivity(latticeType, nodes, geom)
+            element_duct = connectivity(latticeType, nodes_duct, geom)
+            
+            #############################################################################################
+            ################################ Radius Calculation #########################################
+            #############################################################################################
+            
+            if outofPlaneThick is None:
+                outofPlaneThick = 0.01
+                if UTval:
+                    outofPlaneThick = 2.0
+                if pStrainUT:
+                    outofPlaneThick = B
+            
+            length = zeros(shape=(len(element),1))
+            for ik in range(0,len(element)-1):
+                x1 = nodesR[int(element[ik][1]-1)][1]
+                x2 = nodesR[int(element[ik][2]-1)][1]
+                y1 = nodesR[int(element[ik][1]-1)][2]
+                y2 = nodesR[int(element[ik][2]-1)][2]
+                length[ik][0] = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+
+            if (crossSection.lower() == 'circ'):
+                constants = [4 *relDensity, (L + H - pi * sum(length)), 4 * relDensity * (L * H)]
+                dia_opt = roots(constants)
+                dia_est = 2 * relDensity * 4 * L * H / (sum(length) * 2 * pi)
+                diff_sqr = [(dia_opt[0] - dia_est) ** 2, (dia_opt[1] - dia_est) ** 2]
+                index = argmin(diff_sqr)
+
+                rad = dia_opt[index]/ 2
+                Area = 3.14159*rad*rad
+                
+            elif (crossSection.lower() == 'rect'):
+                thick_est = relDensity * L * H * outofPlaneThick / (sum(length) * outofPlaneThick)
+                
+                if thickness is None:
+                    thickness = thick_est
+                    if UTval:
+                        thickness = 1.1
+                Area = 1.0*thickness
+
+            if (units.lower() == 'millimeter'):
+                tol = 1e-3
+            elif (units.lower() == 'meter'):
+                tol = 1e-6
+
+            ############################################################################################
+            ####################################### Part Making ########################################
+            ############################################################################################
+
+            if (elemType == B32):
+                dimenObject = THREE_D
+            elif (elemType == B21):
+                dimenObject = TWO_D_PLANAR
+            elif (elemType == B22):
+                dimenObject = TWO_D_PLANAR
+            elif (elemType == B23):
+                dimenObject = TWO_D_PLANAR
+                
+            mdb.Model(name=ModelName , modelType=STANDARD_EXPLICIT)
+
+            s = mdb.models[ModelName].ConstrainedSketch(name='__profile__', 
+                sheetSize=200.0)
+            g, v, d, c = s.geometry, s.vertices, s.dimensions, s.constraints
+            s.setPrimaryObject(option=STANDALONE)
+
+            for ik in range(len(element_duct)):
+                s.Line(point1=nodesR_duct[int(element_duct[ik][1]-1)][1:3], point2=nodesR_duct[int(element_duct[ik][2]-1)][1:3])
+            p = mdb.models[ModelName].Part(name='Part-1', dimensionality=dimenObject, 
+                type=DEFORMABLE_BODY)
+            p = mdb.models[ModelName].parts['Part-1']
+            p.BaseWire(sketch=s)
+            s.unsetPrimaryObject()
+            p = mdb.models[ModelName].parts['Part-1']
+            session.viewports['Viewport: 1'].setValues(displayedObject=p)
+
+            p = mdb.models[ModelName].parts['Part-1']
+            e = p.edges
+            edges = e.getByBoundingBox(-1000,-1000,0.0,1000,1000,0.0)
+            p.Set(edges=edges, name='AllPartSet')
+            
+            p = mdb.models[ModelName].parts['Part-1']
+            e = p.edges
+            bodyElems = []
+            bodyElem_idxs = []
+            for numEdge in range(0,len(element)):
+                x1 = nodesR_duct[int(element[numEdge][1]-1)][1]
+                x2 = nodesR_duct[int(element[numEdge][2]-1)][1]
+                y1 = nodesR_duct[int(element[numEdge][1]-1)][2]
+                y2 = nodesR_duct[int(element[numEdge][2]-1)][2]
+                xMid = (x1+x2)/2.0
+                yMid = (y1+y2)/2.0
+                edges = e.findAt(((xMid, yMid, 0.0), ))
+                bodyElems.append(edges)
+                for i in element_duct:
+                    if i[1] == element[numEdge][1] and i[2] == element[numEdge][2]:
+                        bodyElem_idxs.append(i[0]-1)
+                if sizeVar.lower() == 'yes':
+                    p.Set(edges=edges, name='edgeElem-'+str(numEdge))
+            p.Set(edges=bodyElems, name='BodySet')
+            
+        
+            brackElems = e.findAt(((0.0, 0.0, 0.0), ))
+            p.Set(edges=brackElems, name='BracketSet')
+            
+            ############################################################################################
+            ################################## Material Properties #####################################
+            ############################################################################################
+            
+            if (userMaterial.lower() == 'al'):
+                E, nu = 70000.0, 0.3
+                if pStrainUT:
+                    E, nu  = pStrainProperties(E, nu)
+                mdb.models[ModelName].Material(name=userMaterial)
+                mdb.models[ModelName].materials[userMaterial].Density(table=((2.7e-09, ), ))
+                mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
+                mdb.models[ModelName].materials[userMaterial].Plastic(table=((
+                    134.0, 0.0), (134.3, 0.001996429), (134.5, 0.002835692), (135.0, 
+                    0.004015369), (135.5, 0.005678497), (136.0, 0.008020233), (136.5, 
+                    0.011313326), (137.0, 0.015938495), (137.5, 0.022426529), (138.0, 
+                    0.031516535), (138.5, 0.044236464), (139.0, 0.062014286)))
+                mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
+                    table=((0.027544286, 0.33333, 0.0), ))
+                mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
+                    type=DISPLACEMENT, softening=TABULAR, table=(
+                    (0.0, 0.0),
+                    (0.0036, FineElemSizeUT*0.0021),
+                    (0.0045, FineElemSizeUT*0.00422), 
+                    (0.0104, FineElemSizeUT*0.0063),
+                    (0.022,  FineElemSizeUT*0.0084),
+                    (0.0336, FineElemSizeUT*0.0105),
+                    (0.0466, FineElemSizeUT*0.0126),
+                    (0.0599, FineElemSizeUT*0.0147),
+                    (0.0761, FineElemSizeUT*0.0168),
+                    (0.095,  FineElemSizeUT*0.01891),
+                    (0.1173, FineElemSizeUT*0.02101),
+                    (0.1443, FineElemSizeUT*0.02311),
+                    (0.1761, FineElemSizeUT*0.02521),
+                    (0.2144, FineElemSizeUT*0.02731),
+                    (0.2578, FineElemSizeUT*0.02928), 
+                    (0.3029, FineElemSizeUT*0.03098),
+                    (0.3457, FineElemSizeUT*0.03236),
+                    (0.3866, FineElemSizeUT*0.03335),
+                    (0.4301, FineElemSizeUT*0.034),
+                    (0.4665, FineElemSizeUT*0.03446),
+                    (1.0,    FineElemSizeUT*0.03547)))
+
+            elif (userMaterial.lower() == 'sic'):
+                E, nu = 410000, 0.14
+                if pStrainUT:
+                    E, nu  = pStrainProperties(E, nu)
+                mdb.models[ModelName].Material(name=userMaterial)
+                mdb.models[ModelName].materials[userMaterial].Density(table=((3.21e-09, ), ))
+                mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
+                mdb.models[ModelName].materials[userMaterial].Plastic(table=
+                    ((550, 0.0),
+                    (550.01,	0.00001)))
+                mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
+                    table=((0.00001, 0.333333, 0.0), ))
+                mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
+                    type=DISPLACEMENT, softening=TABULAR, table=(
+                    (0.0, 0.0),
+                    (0.2, FineElemSizeUT*0.00001),
+                    (0.4, FineElemSizeUT*0.00002), 
+                    (0.6, FineElemSizeUT*0.00003),
+                    (0.8, FineElemSizeUT*0.00004),
+                    (1.0, FineElemSizeUT*0.00005)))
+
+            elif (userMaterial.lower() == 'ti'):
+                E, nu = 123000, 0.3
+                if pStrainUT:
+                    E, nu  = pStrainProperties(E, nu)
+                mdb.models[ModelName].Material(name=userMaterial)
+                mdb.models[ModelName].materials[userMaterial].Density(table=((4.43e-09, ), ))
+                mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
+                mdb.models[ModelName].materials[userMaterial].Plastic(table=
+                    ((932,	        0),
+                    (947.411802,    0.003453491),
+                    (957.4512331,	0.006906981),
+                    (966.1307689,	0.010360472),
+                    (974.030469,	0.013813962),
+                    (981.3967087,	0.017267453),
+                    (988.3639577,	0.020720943),
+                    (995.0160058,	0.024174434),
+                    (1001.409616,	0.027627924),
+                    (1007.585541,	0.031081415),
+                    (1013.574312,	0.034534905),
+                    (1019.399572,	0.037988396),
+                    (1025.08011,	0.041441886),
+                    (1030.631179,	0.044895377),
+                    (1036.065381,	0.048348867),
+                    (1041.393285,	0.051802358),
+                    (1046.623866,	0.055255848),
+                    (1051.764831,	0.058709339),
+                    (1056.822861,	0.062162829),
+                    (1061.803799,	0.06561632),
+                    (1066.712789,	0.06906981),
+                    (1071.554397,	0.072523301),
+                    (1076.332693,	0.075976791),
+                    (1081.05133,	0.079430282),
+                    (1085.713601,	0.082883772),
+                    (1090.322488,	0.086337263),
+                    (1094.880702,	0.089790753),
+                    (1099.39072,	0.093244244),
+                    (1103.854808,	0.096697734),
+                    (1108.275052,	0.100151225),
+                    (1112.653372,	0.103604715)))
+                mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
+                    table=((0.102268174, 0.333333, 0.0), ))
+                mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
+                    type=DISPLACEMENT, softening=TABULAR, table=(
+                    (0.0, 0.0),
+                    (0.2, FineElemSizeUT*0.0001),
+                    (0.4, FineElemSizeUT*0.0002), 
+                    (0.6, FineElemSizeUT*0.0003),
+                    (0.8, FineElemSizeUT*0.0004),
+                    (1.0, FineElemSizeUT*0.0005)))
+
+            if (sizeVar.lower() == 'yes'):
+                relativeDensityUpdated = 10000
+                while relativeDensityUpdated < (relDensity - 0.001) or relativeDensityUpdated > (relDensity + 0.001):
+
+                    lowerLim = (1.0 - beta) * thickness
+                    upperLim = (1.0 + beta) * thickness
+
+                    thick = random.uniform(lowerLim, upperLim, len(element))
+                    latticeVolume = dot(length[:].T, thick*outofPlaneThick)
+                    
+                    relativeDensityUpdated = latticeVolume/(L * H * outofPlaneThick)
+
+                    if relativeDensityUpdated > relDensity:
+                        thickness = thickness - 0.001
+                    else:
+                        thickness = thickness + 0.001
+                
+                mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2.0*thickness)
+                mdb.models[ModelName].BeamSection(name='BeamSecBracket', integration=DURING_ANALYSIS, 
+                    poissonRatio=0.0, profile='RectBracket', material=userMaterial, 
+                    temperatureVar=LINEAR, consistentMassMatrix=False)
+                
+                region = p.sets['BracketSet']
+                p.SectionAssignment(region=region, sectionName='BeamSecBracket', offset=0.0, 
+                    offsetType=MIDDLE_SURFACE, offsetField='', 
+                    thicknessAssignment=FROM_SECTION)
+                p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+                
+                for numEdge in range(0,len(element)):       
+                    mdb.models[ModelName].RectangularProfile(name='Rect'+str(numEdge), a=outofPlaneThick, b=thick[numEdge])
+
+                    mdb.models[ModelName].BeamSection(name='BeamSec'+str(numEdge), integration=DURING_ANALYSIS, 
+                        poissonRatio=0.0, profile='Rect'+str(numEdge), material=userMaterial, 
+                        temperatureVar=LINEAR, consistentMassMatrix=False)
+
+                    p = mdb.models[ModelName].parts['Part-1']
+                    region = p.sets['edgeElem-'+str(numEdge)]
+                    p.SectionAssignment(region=region, sectionName='BeamSec'+str(numEdge), offset=0.0, 
+                        offsetType=MIDDLE_SURFACE, offsetField='', 
+                        thicknessAssignment=FROM_SECTION)
+                    p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+
+            if (sizeVar.lower() == 'no'):
+                if (crossSection.lower() == 'rect'):
+                    mdb.models[ModelName].RectangularProfile(name='RectBody', a=outofPlaneThick, b=thickness)
+                    mdb.models[ModelName].RectangularProfile(name='RectBracket', a=outofPlaneThick, b=2.0*thickness)
+                    
+                    mdb.models[ModelName].BeamSection(name='BeamSecBody', integration=DURING_ANALYSIS, 
+                        poissonRatio=0.0, profile='RectBody', material=userMaterial, 
+                        temperatureVar=LINEAR, consistentMassMatrix=False)
+                    mdb.models[ModelName].BeamSection(name='BeamSecBracket', integration=DURING_ANALYSIS, 
+                        poissonRatio=0.0, profile='RectBracket', material=userMaterial, 
+                        temperatureVar=LINEAR, consistentMassMatrix=False)
+                    
+                    region = p.sets['BracketSet']
+                    p.SectionAssignment(region=region, sectionName='BeamSecBracket', offset=0.0, 
+                        offsetType=MIDDLE_SURFACE, offsetField='', 
+                        thicknessAssignment=FROM_SECTION)
+                    p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+                    region = p.sets['BodySet']
+                    p.SectionAssignment(region=region, sectionName='BeamSecBody', offset=0.0, 
+                        offsetType=MIDDLE_SURFACE, offsetField='', 
+                        thicknessAssignment=FROM_SECTION)
+                    p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+               
+                elif (crossSection.lower() == 'circ'):
+               
+                   mdb.models[ModelName].CircularProfile(name='Circ', r=rad)
+    
+                   mdb.models[ModelName].BeamSection(name='BeamSec', integration=DURING_ANALYSIS, 
+                       poissonRatio=0.0, profile='Circ', material=userMaterial, 
+                       temperatureVar=LINEAR, consistentMassMatrix=False)
+    
+                   p = mdb.models[ModelName].parts['Part-1']
+                   region = p.sets['AllPartSet']
+                   p.SectionAssignment(region=region, sectionName='BeamSec', offset=0.0, 
+                       offsetType=MIDDLE_SURFACE, offsetField='', 
+                       thicknessAssignment=FROM_SECTION)
+    
+                   p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+
+            ###########################################################################################
+            ####################################### Assembly ##########################################
+            ###########################################################################################
+
+            a = mdb.models[ModelName].rootAssembly
+            a.DatumCsysByDefault(CARTESIAN)
+            p = mdb.models[ModelName].parts['Part-1']
+            a.Instance(name='Part-1-1', part=p, dependent=OFF)
+
+            ############################################################################################
+            ######################################## Step ##############################################
+            ############################################################################################
+            
+            if AdaptiveTimeStepping:
+                mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME, 
+                                                        improvedDtMethod=ON, scaleFactor=0.95)
+            
+            if RayleighDampling:
+                mdb.models[ModelName].materials[userMaterial].Damping(alpha=0.0, beta=1e-6)
+                mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
+            
+            if SevereDisplacementControl:
+                mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME,
+                                                        linearBulkViscosity=0.06, quadBulkViscosity=1.2)
+            
+            if AdaptiveTimeStepping == False and RayleighDampling == False and SevereDisplacementControl == False:
+                mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', timePeriod=STEP_TIME)
+            
+            # ############################################################################################
+            # ######################################## Mesh ##############################################
+            # ############################################################################################
+            
+            a = mdb.models[ModelName].rootAssembly
+            e = a.instances['Part-1-1'].edges
+            edges = e.getByBoundingBox(-L,-H,0.0,2*L,2*H,0.0)
+            elemType1 = mesh.ElemType(elemCode=elemType, elemLibrary=STANDARD)
+            pickedRegions =(edges, )
+            a.setElementType(regions=pickedRegions, elemTypes=(elemType1, ))
+            partInstances =(a.instances['Part-1-1'], )
+            a.seedPartInstance(regions=partInstances, size=BracketElemSize, deviationFactor=0.1, 
+                minSizeFactor=0.1)
+            a = mdb.models[ModelName].rootAssembly
+            partInstances =(a.instances['Part-1-1'], )
+            a.generateMesh(regions=partInstances)
+            
+            a = mdb.models[ModelName].rootAssembly
+            e = a.instances['Part-1-1'].edges
+            edges = e.getByBoundingBox(0.0,0.0,0.0,L,H,0.0)
+            elemType1 = mesh.ElemType(elemCode=elemType, elemLibrary=STANDARD)
+            pickedRegions =(edges, )
+            a.setElementType(regions=pickedRegions, elemTypes=(elemType1, ))
+            partInstances =(a.instances['Part-1-1'], )
+            a.seedEdgeBySize(edges=edges, size=CoarseElemSizeUT, deviationFactor=0.1, 
+                minSizeFactor=0.1)
+            a = mdb.models[ModelName].rootAssembly
+            partInstances =(a.instances['Part-1-1'], )
+            a.generateMesh(regions=partInstances)
+            
+            a = mdb.models[ModelName].rootAssembly
+            e = a.instances['Part-1-1'].edges
+            edges = e.getByBoundingBox(-L, H/6, 0.0, 2*L, H-(H/6), 0.0)
+            elemType1 = mesh.ElemType(elemCode=elemType, elemLibrary=STANDARD)
+            pickedRegions =(edges, )
+            a.setElementType(regions=pickedRegions, elemTypes=(elemType1, ))
+            partInstances = (a.instances['Part-1-1'], )
+            a.seedEdgeBySize(edges=edges, size=FineElemSizeUT, deviationFactor=0.1, 
+                minSizeFactor=0.1, constraint=FINER)
+            a = mdb.models[ModelName].rootAssembly
+            partInstances =(a.instances['Part-1-1'], )
+            a.generateMesh(regions=partInstances)
+            
+            all_nodes = mdb.models[ModelName].rootAssembly.instances['Part-1-1'].nodes
+            
+            left_nodes = []
+            bottom_nodes = []
+            right_nodes = []
+            top_nodes = []
+            topBody_nodes = []
+            bottomBody_nodes = []
+            if latticeType.lower() == 'tri':
+                for n in all_nodes:
+                    xcoord = n.coordinates[0]
+                    ycoord = n.coordinates[1]
+                    if xcoord > -tol and xcoord < +tol and ycoord > -tol and ycoord < (H+tol):
+                        left_nodes.append(n)
+                    if ycoord > (-3*unitCellSize)-tol and ycoord < (-3*unitCellSize)+tol:
+                        bottom_nodes.append(n)
+                    if xcoord > L-tol and xcoord < L+tol and ycoord > -tol and ycoord < (H+tol):
+                        right_nodes.append(n)
+                    if ycoord > (H+3*unitCellSize)-tol and ycoord < (H+3*unitCellSize)+tol:
+                        top_nodes.append(n)
+                    if ycoord > (H-tol) and ycoord < (H+tol) and xcoord > -tol and xcoord < (L+tol):
+                        topBody_nodes.append(n)
+                    if ycoord > -tol and ycoord < tol and xcoord > -tol and xcoord < (L+tol):
+                        bottomBody_nodes.append(n)
+            elif latticeType.lower() == 'hex':
+                for n in all_nodes:
+                    xcoord = n.coordinates[0]
+                    ycoord = n.coordinates[1]
+                    if xcoord > -tol and xcoord < +tol and ycoord > -tol and ycoord < (H+tol):
+                        left_nodes.append(n)
+                    if ycoord > (-6*unitCellSize)-tol and ycoord < (-6*unitCellSize)+tol:
+                        bottom_nodes.append(n)
+                    if xcoord > L-tol and xcoord < L+tol and ycoord > -tol and ycoord < (H+tol):
+                        right_nodes.append(n)
+                    if ycoord > (H+6*unitCellSize)-tol and ycoord < (H+6*unitCellSize)+tol:
+                        top_nodes.append(n)
+                    if ycoord > (H-tol) and ycoord < (H+tol) and xcoord > -tol and xcoord < (L+tol):
+                        topBody_nodes.append(n)
+                    if ycoord > -tol and ycoord < tol and xcoord > -tol and xcoord < (L+tol):
+                        bottomBody_nodes.append(n)
+            elif latticeType.lower() == 'kagome':
+                rfNodes = []
+                val = -2.0*unitCellSize
+                for kk in range(0,2*nnx+5):
+                    rfNodes.append(val)
+                    val = val + unitCellSize
+                for n in all_nodes:
+                    xcoord = n.coordinates[0]
+                    ycoord = n.coordinates[1]
+                    if xcoord > -tol and xcoord < +tol and ycoord > -tol and ycoord < (H+tol):
+                        left_nodes.append(n)
+                    if ycoord > (-3*sqrt(3)*unitCellSize)-tol and ycoord < (-3*sqrt(3)*unitCellSize)+tol:
+                        bottom_nodes.append(n)
+                    if xcoord > L-tol and xcoord < L+tol and ycoord > -tol and ycoord < (H+tol):
+                        right_nodes.append(n)
+                    if ycoord > (H+3*sqrt(3)*unitCellSize)-tol and ycoord < (H+3*sqrt(3)*unitCellSize)+tol:
+                        exist = xcoord in rfNodes
+                        if exist:
+                            top_nodes.append(n)
+                    if ycoord > (H-tol) and ycoord < (H+tol) and xcoord > -tol and xcoord < (L+tol):
+                        topBody_nodes.append(n)
+                    if ycoord > -tol and ycoord < tol and xcoord > -tol and xcoord < (L+tol):
+                        bottomBody_nodes.append(n)
+            elif latticeType.lower() == 'fcc':
+                rfNodes = []
+                val = -2.0*unitCellSize
+                for kk in range(0,nnx+5):
+                    rfNodes.append(val)
+                    val = val + unitCellSize
+                for n in all_nodes:
+                    xcoord = n.coordinates[0]
+                    ycoord = n.coordinates[1]
+                    if xcoord > -tol and xcoord < +tol and ycoord > -tol and ycoord < (H+tol):
+                        left_nodes.append(n)
+                    if ycoord > (-3*unitCellSize)-tol and ycoord < (-3*unitCellSize)+tol:
+                        bottom_nodes.append(n)
+                    if xcoord > L-tol and xcoord < L+tol and ycoord > -tol and ycoord < (H+tol):
+                        right_nodes.append(n)
+                    if ycoord > (H+3*unitCellSize)-tol and ycoord < (H+3*unitCellSize)+tol:
+                        exist = xcoord in rfNodes
+                        if exist:
+                            top_nodes.append(n)
+                    if ycoord > (H-tol) and ycoord < (H+tol) and xcoord > -tol and xcoord < (L+tol):
+                        topBody_nodes.append(n)
+                    if ycoord > -tol and ycoord < tol and xcoord > -tol and xcoord < (L+tol):
+                        bottomBody_nodes.append(n)
+            if stiffMatrix:
+                bottom_nodes.append(all_nodes[0])
+                top_nodes.append(all_nodes[0])
+
+            ln = mesh.MeshNodeArray(left_nodes)
+            mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='Set-left')
+
+            ln = mesh.MeshNodeArray(right_nodes)
+            mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='Set-right')
+            
+            ln = mesh.MeshNodeArray(topBody_nodes)
+            mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='Set-top')
+            
+            ln = mesh.MeshNodeArray(bottomBody_nodes)
+            mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='Set-bottom')
+            
+            # ############################################################################################
+            # ################################## Output Requests #########################################
+            # ############################################################################################
+            if (userMaterial.lower() == 'material-1'):    
+                mdb.models[ModelName].fieldOutputRequests['F-Output-1'].setValues(variables=(
+                    'S', 'PE', 'LE', 'UT', 'RF', 'EVOL', 'SDV'), numIntervals=FieldOut_frames)
+
+                regionDef=mdb.models[ModelName].rootAssembly.allInstances['Part-1-1'].sets['AllPartSet']
+                mdb.models[ModelName].historyOutputRequests['H-Output-1'].setValues(variables=(
+                    'ALLIE', 'ALLKE', 'ALLSE'), region=regionDef, sectionPoints=DEFAULT, 
+                    rebar=EXCLUDE)
+
+            else:
+                regionDef=mdb.models[ModelName].rootAssembly.allInstances['Part-1-1'].sets['AllPartSet']
+                mdb.models[ModelName].historyOutputRequests['H-Output-1'].setValues(variables=(
+                    'ALLIE', 'ALLKE', 'ALLSE'), numIntervals=HistOut_frames, region=regionDef, sectionPoints=DEFAULT, 
+                    rebar=EXCLUDE)
+                
+                if Cmatrix_sim:
+                    if BCtype.lower() == "kubc" and caseCmatrix.lower() == "a" or caseCmatrix.lower() == "b":
+                        regionDef=mdb.models[ModelName].rootAssembly.sets['Set-right']
+                        mdb.models[ModelName].HistoryOutputRequest(name='H-Output-2', createStepName='Step-1', 
+                            variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                            sectionPoints=DEFAULT, rebar=EXCLUDE)
+                        regionDef=mdb.models[ModelName].rootAssembly.sets['Set-topBody']
+                        mdb.models[ModelName].HistoryOutputRequest(name='H-Output-3', createStepName='Step-1', 
+                            variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                            sectionPoints=DEFAULT, rebar=EXCLUDE)
+                    elif BCtype.lower() == "kubc" and caseCmatrix.lower() == "c":
+                        regionDef=mdb.models[ModelName].rootAssembly.sets['Set-right']
+                        mdb.models[ModelName].HistoryOutputRequest(name='H-Output-2', createStepName='Step-1', 
+                            variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                            sectionPoints=DEFAULT, rebar=EXCLUDE)
+                        regionDef=mdb.models[ModelName].rootAssembly.sets['Set-left']
+                        mdb.models[ModelName].HistoryOutputRequest(name='H-Output-3', createStepName='Step-1', 
+                            variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                            sectionPoints=DEFAULT, rebar=EXCLUDE)
+                        regionDef=mdb.models[ModelName].rootAssembly.sets['Set-topBody']
+                        mdb.models[ModelName].HistoryOutputRequest(name='H-Output-4', createStepName='Step-1',
+                            variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                            sectionPoints=DEFAULT, rebar=EXCLUDE)
+                        regionDef=mdb.models[ModelName].rootAssembly.sets['Set-bottomBody']
+                        mdb.models[ModelName].HistoryOutputRequest(name='H-Output-5', createStepName='Step-1',
+                            variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                            sectionPoints=DEFAULT, rebar=EXCLUDE)      
+                
+                else:
+                    mdb.models[ModelName].fieldOutputRequests['F-Output-1'].setValues(variables=(
+                        'S', 'PE', 'LE', 'UT', 'RF', 'SDEG', 'DMICRT', 'STATUS'), numIntervals=FieldOut_frames)
+                        
+                    
+                    regionDef=mdb.models[ModelName].rootAssembly.sets['Set-top']
+                    mdb.models[ModelName].HistoryOutputRequest(name='H-Output-2', createStepName='Step-1', 
+                        variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                        sectionPoints=DEFAULT, rebar=EXCLUDE)
+            
+            # ############################################################################################
+            # #################################### Loading ###############################################
+            # ############################################################################################
+            
+            if sm_amp:
+                mdb.models[ModelName].SmoothStepAmplitude(name='Amp-1', 
+                    timeSpan=STEP, data=((0.0, 0.0), (STEP_TIME, strainAppUT*H)))
+            else:
+                mdb.models[ModelName].TabularAmplitude(name='Amp-1', timeSpan=STEP, 
+                    smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, strainAppUT*H)))
+            
+            if Cmatrix_sim:
+                if BCtype.lower() == "kubc":
+                    mdb.models[ModelName].TabularAmplitude(name='Amp-1', timeSpan=STEP, 
+                    smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, 1)))
+
+                    if caseCmatrix.lower() == "a":
+                        a = mdb.models[ModelName].rootAssembly
+                        region = a.sets['Set-right']
+                        mdb.models[ModelName].DisplacementBC(name='BC-1', createStepName='Step-1', 
+                            region=region, u1=1.0, u2=0.0, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
+                            distributionType=UNIFORM, fieldName='', localCsys=None)
+
+                        region = a.sets['Set-left']
+                        mdb.models[ModelName].DisplacementBC(name='BC-2', createStepName='Step-1', 
+                            region=region, u1=0.0, u2=0.0, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
+                            distributionType=UNIFORM, fieldName='', localCsys=None)
+                        
+                        for num, up in enumerate(a.sets['Set-topBody'].nodes):
+                            if abs(up.coordinates[0]-L)<tol or abs(up.coordinates[0])<tol:
+                                continue
+                            down = [n for n in a.sets['Set-bottomBody'].nodes if abs(n.coordinates[0]-up.coordinates[0])<tol][0]
+                            frac = up.coordinates[0]/L
+                            region = a.Set(nodes=mesh.MeshNodeArray([up, down]), name=f'Nset-{num}')
+                            mdb.models[ModelName].DisplacementBC(name=f'BC-frac{num}', createStepName='Step-1', 
+                                region=region, u1=frac, u2=0.0, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
+                                distributionType=UNIFORM, fieldName='', localCsys=None)
+
+
+                    elif caseCmatrix.lower() == "b":
+                        a = mdb.models[ModelName].rootAssembly
+                        region = a.sets['Set-topBody']
+                        mdb.models[ModelName].DisplacementBC(name='BC-1', createStepName='Step-1', 
+                            region=region, u1=0.0, u2=1.0, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
+                            distributionType=UNIFORM, fieldName='', localCsys=None)
+
+                        region = a.sets['Set-bottomBody']
+                        mdb.models[ModelName].DisplacementBC(name='BC-2', createStepName='Step-1', 
+                            region=region, u1=0.0, u2=0.0, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
+                            distributionType=UNIFORM, fieldName='', localCsys=None)
+                        
+                        for num, l in enumerate(a.sets['Set-left'].nodes):
+                            if abs(l.coordinates[1]-H)<tol or abs(l.coordinates[1])<tol:
+                                continue
+                            r = [n for n in a.sets['Set-right'].nodes if abs(n.coordinates[1]-l.coordinates[1])<tol][0]
+                            frac = l.coordinates[1]/L
+                            region = a.Set(nodes=mesh.MeshNodeArray([l, r]), name=f'Nset-{num}')
+                            mdb.models[ModelName].DisplacementBC(name=f'BC-frac{num}', createStepName='Step-1', 
+                                region=region, u1=0.0, u2=frac, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
+                                distributionType=UNIFORM, fieldName='', localCsys=None)
+
+                    elif caseCmatrix.lower() == "c":
+                        a = mdb.models[ModelName].rootAssembly
+
+                        epsC = 1.0
+
+                        bL = set(n.label for n in a.sets['Set-left'].nodes)
+                        bR = set(n.label for n in a.sets['Set-right'].nodes)
+                        bT = set(n.label for n in a.sets['Set-topBody'].nodes)
+                        bB = set(n.label for n in a.sets['Set-bottomBody'].nodes)
+                        all_ids = list(bL | bR | bT | bB)
+
+                        all_nodes = dict((n.label, n) for n in a.instances[a.instances.keys()[0]].nodes) \
+                            if hasattr(a, 'instances') else dict((n.label, n) for n in a.nodes)
+
+                        for num, nid in enumerate(all_ids):
+                            nd = all_nodes[nid]
+                            X, Y = nd.coordinates[0], nd.coordinates[1]
+                            ux = epsC * (Y/H)
+                            uy = epsC * (X/L)
+
+                            nset_name = 'Nset_C_%d' % num
+                            bc_name   = 'BC_C_%d'   % num
+                            region = a.Set(nodes=mesh.MeshNodeArray([nd]), name=nset_name)
+
+                            mdb.models[ModelName].DisplacementBC(
+                                name=bc_name, createStepName='Step-1',
+                                region=region, u1=ux, u2=0.0, ur3=UNSET,
+                                amplitude='Amp-1', fixed=OFF,
+                                distributionType=UNIFORM, fieldName='', localCsys=None
+                            )
+                
+                elif BCtype.lower() == "periodic":
+                    a = mdb.models[ModelName].rootAssembly
+                    model = mdb.models[ModelName]
+
+                    eps = 1.0e-4  
+
+                    left  = sorted(a.sets['Set-left'      ].nodes, key=lambda n: n.coordinates[1])
+                    right = sorted(a.sets['Set-right'     ].nodes, key=lambda n: n.coordinates[1])
+                    bot   = sorted(a.sets['Set-bottomBody'].nodes, key=lambda n: n.coordinates[0])
+                    top   = sorted(a.sets['Set-topBody'   ].nodes, key=lambda n: n.coordinates[0])
+
+                    assert len(left)==len(right) and len(bot)==len(top), "Periodic pairing mismatch: check edge sets."
+                    LR_pairs = list(zip(left, right))
+                    BT_pairs = list(zip(bot,  top))
+
+                    corner = min(left, key=lambda n: (abs(n.coordinates[0])+abs(n.coordinates[1])))
+                    a.Set(nodes=mesh.MeshNodeArray([corner]), name='PBC_Anchor')
+                    model.DisplacementBC(name='BC_PBC_Anchor', createStepName='Initial',
+                                        region=a.sets['PBC_Anchor'], u1=0.0, u2=0.0, ur3=UNSET,
+                                        amplitude=UNSET, fixed=OFF, distributionType=UNIFORM)
+
+                    rpx = a.ReferencePoint(point=(0.0,0.0,0.0)); RPX = 'RP_Per_X'
+                    a.Set(referencePoints=(a.referencePoints[rpx.id],), name=RPX)
+
+                    rpy = a.ReferencePoint(point=(0.0,0.0,0.0)); RPY = 'RP_Per_Y'
+                    a.Set(referencePoints=(a.referencePoints[rpy.id],), name=RPY)
+
+                    rptb = a.ReferencePoint(point=(0.0,0.0,0.0)); RPTB = 'RP_TB'
+                    a.Set(referencePoints=(a.referencePoints[rptb.id],), name=RPTB)
+
+                    rplr = a.ReferencePoint(point=(0.0,0.0,0.0)); RPLR = 'RP_LR'
+                    a.Set(referencePoints=(a.referencePoints[rplr.id],), name=RPLR)
+
+                    if caseCmatrix.lower() == "a":
+                        model.DisplacementBC(name='BC_RPX',  createStepName='Step-1',
+                                            region=a.sets[RPX], u1=eps*L,  u2=UNSET, ur3=UNSET, amplitude='Amp-1')
+                        model.DisplacementBC(name='BC_RPTB', createStepName='Step-1',
+                                            region=a.sets[RPTB], u1=UNSET, u2=0.0, ur3=UNSET, amplitude='Amp-1')
+
+                        for k,(nL,nR) in enumerate(LR_pairs):
+                            nmL = 'PBC_L_%d'%k; nmR = 'PBC_R_%d'%k
+                            a.Set(nodes=mesh.MeshNodeArray([nL]), name=nmL)
+                            a.Set(nodes=mesh.MeshNodeArray([nR]), name=nmR)
+                            model.Equation(name='Eq_LR_u1_%d'%k,
+                                terms=(( 1.0, nmR, 1), (-1.0, nmL, 1), (-1.0, RPX, 1)))
+                            model.Equation(name='Eq_LR_u2_%d'%k,
+                                terms=(( 1.0, nmR, 2), (-1.0, nmL, 2)))
+
+                        for k,(nB,nT) in enumerate(BT_pairs):
+                            nmB = 'PBC_B_%d'%k; nmT = 'PBC_T_%d'%k
+                            a.Set(nodes=mesh.MeshNodeArray([nB]), name=nmB)
+                            a.Set(nodes=mesh.MeshNodeArray([nT]), name=nmT)
+                            model.Equation(name='Eq_BT_u1_%d'%k,
+                                terms=(( 1.0, nmT, 1), (-1.0, nmB, 1)))
+                            model.Equation(name='Eq_BT_u2_%d'%k,
+                                terms=(( 1.0, nmT, 2), (-1.0, nmB, 2), (-1.0, RPTB, 2)))
+
+                        model.HistoryOutputRequest(name='H_RPX_A',  createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPX])
+                        model.HistoryOutputRequest(name='H_RPTB_A', createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPTB])
+
+                    elif caseCmatrix.lower() == "b":
+                        model.DisplacementBC(name='BC_RPY',  createStepName='Step-1',
+                                            region=a.sets[RPY], u1=UNSET, u2=eps*H, ur3=UNSET, amplitude='Amp-1')
+                        model.DisplacementBC(name='BC_RPLR', createStepName='Step-1',
+                                            region=a.sets[RPLR], u1=0.0,   u2=UNSET, ur3=UNSET, amplitude='Amp-1')
+
+                        for k,(nB,nT) in enumerate(BT_pairs):
+                            nmB = 'PBC_B_%d'%k; nmT = 'PBC_T_%d'%k
+                            a.Set(nodes=mesh.MeshNodeArray([nB]), name=nmB)
+                            a.Set(nodes=mesh.MeshNodeArray([nT]), name=nmT)
+                            model.Equation(name='Eq_BT_u2_%d'%k,
+                                terms=(( 1.0, nmT, 2), (-1.0, nmB, 2), (-1.0, RPY, 2)))
+                            model.Equation(name='Eq_BT_u1_%d'%k,
+                                terms=(( 1.0, nmT, 1), (-1.0, nmB, 1)))
+
+                        for k,(nL,nR) in enumerate(LR_pairs):
+                            nmL = 'PBC_L_%d'%k; nmR = 'PBC_R_%d'%k
+                            a.Set(nodes=mesh.MeshNodeArray([nL]), name=nmL)
+                            a.Set(nodes=mesh.MeshNodeArray([nR]), name=nmR)
+                            model.Equation(name='Eq_LR_u1_%d'%k,
+                                terms=(( 1.0, nmR, 1), (-1.0, nmL, 1), (-1.0, RPLR, 1)))
+                            model.Equation(name='Eq_LR_u2_%d'%k,
+                                terms=(( 1.0, nmR, 2), (-1.0, nmL, 2)))
+
+                        model.HistoryOutputRequest(name='H_RPY_B',  createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPY])
+                        model.HistoryOutputRequest(name='H_RPLR_B', createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPLR])
+
+                    elif caseCmatrix.lower() == "c":
+                        gamma = eps
+                        model.DisplacementBC(name='BC_RPX', createStepName='Step-1',
+                                            region=a.sets[RPX], u1=0.5*gamma*H, u2=UNSET, ur3=UNSET, amplitude='Amp-1')
+                        model.DisplacementBC(name='BC_RPY', createStepName='Step-1',
+                                            region=a.sets[RPY], u1=UNSET, u2=0.5*gamma*L, ur3=UNSET, amplitude='Amp-1')
+
+                        for k,(nL,nR) in enumerate(LR_pairs):
+                            nmL = 'PBC_L_%d'%k; nmR = 'PBC_R_%d'%k
+                            a.Set(nodes=mesh.MeshNodeArray([nL]), name=nmL)
+                            a.Set(nodes=mesh.MeshNodeArray([nR]), name=nmR)
+                            model.Equation(name='Eq_LR_u1_%d'%k,
+                                terms=(( 1.0, nmR, 1), (-1.0, nmL, 1)))
+                            model.Equation(name='Eq_LR_u2_%d'%k,
+                                terms=(( 1.0, nmR, 2), (-1.0, nmL, 2), (-1.0, RPY, 2)))
+
+                        for k,(nB,nT) in enumerate(BT_pairs):
+                            nmB = 'PBC_B_%d'%k; nmT = 'PBC_T_%d'%k
+                            a.Set(nodes=mesh.MeshNodeArray([nB]), name=nmB)
+                            a.Set(nodes=mesh.MeshNodeArray([nT]), name=nmT)
+                            model.Equation(name='Eq_BT_u1_%d'%k,
+                                terms=(( 1.0, nmT, 1), (-1.0, nmB, 1), (-1.0, RPX, 1)))
+                            model.Equation(name='Eq_BT_u2_%d'%k,
+                                terms=(( 1.0, nmT, 2), (-1.0, nmB, 2)))
+
+                        model.HistoryOutputRequest(name='H_RPX_C', createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPX])
+                        model.HistoryOutputRequest(name='H_RPY_C', createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPY])
+                        model.HistoryOutputRequest(name='H_RPX_C', createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPTB])
+                        model.HistoryOutputRequest(name='H_RPY_C', createStepName='Step-1',
+                                                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), region=a.sets[RPLR])
+            
+            else:                
+                a = mdb.models[ModelName].rootAssembly
+                region = a.sets['Set-top']
+                mdb.models[ModelName].ConcentratedForce(name='Load-1', 
+                    createStepName='Step-1', region=region, cf2=-100.0, 
+                    distributionType=UNIFORM, field='', localCsys=None)
+
+                region = a.sets['Set-bottom']
+                mdb.models[ModelName].DisplacementBC(name='BC-2', createStepName='Step-1', 
+                    region=region, u1=0.0, u2=0.0, ur3=0.0, amplitude='Amp-1', fixed=OFF, 
+                    distributionType=UNIFORM, fieldName='', localCsys=None)
+                    
+                a = mdb.models[ModelName].rootAssembly
+                region = a.sets['Set-top']
+                mdb.models[ModelName].DisplacementBC(name='BC-3', 
+                    createStepName='Step-1', region=region, u1=UNSET, u2=UNSET, ur3=0.0, 
+                    amplitude=UNSET, fixed=OFF, distributionType=UNIFORM, fieldName='', 
+                    localCsys=None)
+                
+            # ############################################################################################
+            # ###################################### Job #################################################
+            # ############################################################################################
+
+            userSubroutine = ''
+
+            mdb.Job(name=Job, model=ModelName, description='', type=ANALYSIS, 
+                atTime=None, waitMinutes=0, waitHours=0, queue=None, memory=90, 
+                memoryUnits=PERCENTAGE, explicitPrecision=SINGLE, 
+                nodalOutputPrecision=SINGLE, echoPrint=OFF, modelPrint=OFF, 
+                contactPrint=OFF, historyPrint=OFF, userSubroutine=userSubroutine, scratch='', 
+                resultsFormat=ODB, parallelizationMethodExplicit=DOMAIN, numDomains=1, 
+                activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=1)
+            
+            if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+                mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+                with open(Job+'.inp', 'a') as f:
+                    f.write('**\n**FREQUENCIES:\n')
+                    for freq in frequencies:
+                        f.write("**" + str(freq) + '\n')
+                    f.write('**END FREQUENCIES\n')
+            
+            elif (finalRun.lower() == 'yes'):
+                mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+                mdb.jobs[Job].submit(consistencyChecking=OFF)
+                mdb.jobs[Job].waitForCompletion()
+                with open(Job+'.inp', 'a') as f:
+                    f.write('**\n**FREQUENCIES:\n')
+                    for freq in frequencies:
+                        f.write("**" + str(freq) + '\n')
+                    f.write('**END FREQUENCIES\n')
+                endtime = time.time()
+                print(endtime - starttime, "== time for job", Job)
+            
+            if stiffMatrix:
+                mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+                mdb.jobs[Job].waitForCompletion()
+        
+            
+# ######################################################################################################
+# ######################################################################################################
+# ######################################################################################################
+# ###################################### Input for CT Specimen #########################################
+# ######################################################################################################
+# ######################################################################################################
+# ######################################################################################################            
+        
+    if (MechanicalModel.lower() == 'fracture' or MechanicalModel.lower() == 'both'):
+        
+        ModelName = f"Fracture-{latticeType}-{int(nnx)}-{int(fac*100)}{imper}-{dist}-{targeted_disorder}-{idNum}"
+        if imper == 'per':
+            ModelName = f"Fracture-{latticeType}-{int(nnx)}-per-{idNum}"
+        # ModelName = f"Fracture-{latticeType}-{int(nnx)}-A-per-{idNum}"
+        Job = ModelName
+        
+        #############################################################################################
+        ######################################### Crack #############################################
+        #############################################################################################
+        
+        xCrS = [-0.1*W, H/2-unitCellSize*0.2]                                         # crack starting point bottomLeft
+        if fac == 0.0:                                                                # crack end point topRight
+            xCrE = [a0 - 0.2*unitCellSize, H/2+unitCellSize*0.2]
+        else:
+            xCrE = [a0 - 1.2*fac*unitCellSize, H/2+unitCellSize*0.2]
+        
+        ridge1 = [-10000, -10000, -10000, -10000]#[0.2*W, (H/2)-(0.1*W), 0.35*W, (H/2)+(0.1*W)]
+        ridge2 = [-10000, -10000, -10000, -10000]#[-0.1*W, (H/2)-(0.21*W), 0.25*W, (H/2)+(0.21*W)]
+        
+        if latticeType.lower() == "fcc" or "square" in latticeType.lower() or latticeType.lower() == "tri":
+            CrRegSTAT = [xCrE[0]-(1.6*unitCellSize), xCrE[0]+(3.1*unitCellSize), (H/2)-(2.1*unitCellSize), (H/2)+(2.1*unitCellSize)]
+            CrRegMESH = [xCrE[0]-(2.1*unitCellSize), xCrE[0]+(5.6*unitCellSize), (H/2)-(4.1*unitCellSize), (H/2)+(4.1*unitCellSize)]
+        elif latticeType.lower() == "kagome" or latticeType.lower() == "hex":
+            CrRegSTAT = [xCrE[0]-(3.1*unitCellSize), xCrE[0]+(6.1*unitCellSize), (H/2)-(4.1*unitCellSize), (H/2)+(4.1*unitCellSize)]
+            CrRegMESH = [xCrE[0]-(4.6*unitCellSize), xCrE[0]+(10.1*unitCellSize), (H/2)-(7.6*unitCellSize), (H/2)+(7.6*unitCellSize)]
+        
+        if userMaterial.lower() == "ti" or userMaterial.lower() == "al":
+            bcDia     = 0.1875*W
+            fixityLoc = [L-W, (H/2)-0.375*W, 0.0]
+            loadLoc   = [L-W, (H/2)+0.375*W, 0.0]
+        elif userMaterial.lower() == "sic":
+            bcDia     = 0.25*W
+            fixityLoc = [L-W, (H/2)-0.275*W, 0.0]
+            loadLoc   = [L-W, (H/2)+0.275*W, 0.0]
+
+        delNodes = []
+        for kk in range(0,len(nodes)):
+            xCoord = nodes[kk][1]
+            yCoord = nodes[kk][2]
+            point = (xCoord,yCoord)
+            insideTest = insidePoint(xCrS,xCrE,point)
+            if insideTest:
+                delNodes.append(nodes[kk][0]-1)
+                continue
+            insideTest1 = insidePoint(ridge1[:2],ridge1[2:],point)
+            if insideTest1:
+                delNodes.append(nodes[kk][0]-1)
+                continue
+            insideTest2 = insidePoint(ridge2[:2],ridge2[2:],point)
+            if insideTest2:
+                delNodes.append(nodes[kk][0]-1)
+                continue
+
+        delNodes = np.array(delNodes, dtype=int)
+        nodes = delete(nodes,delNodes,0)
+        nodesR = delete(nodesR,delNodes,0)
+
+        for kk in range(0,len(nodes)):
+            nodes[kk][0] = kk+1
+            nodesR[kk][0] = kk+1
+            
+        #############################################################################################
+        #################################### Strut Elements #########################################
+        #############################################################################################
+                
+        element = connectivity(latticeType, nodes, geom)
+        
+        delNodes = []
+        for ik in range(0,len(element)):
+            x1 = nodesR[int(element[ik][1]-1)][1]
+            x2 = nodesR[int(element[ik][2]-1)][1]
+            y1 = nodesR[int(element[ik][1]-1)][2]
+            y2 = nodesR[int(element[ik][2]-1)][2]
+            midPointX = (x1+x2)/2
+            midPointY = (y1+y2)/2
+            point = (midPointX,midPointY)
+            insideTest = insidePoint(xCrS,xCrE,point)
+            if insideTest:
+                delNodes.append(element[ik][0]-1)
+            insideTest1 = insidePoint(ridge1[2:],ridge1[2:],point)
+            if insideTest1:
+                delNodes.append(nodes[ik][0]-1)
+                continue
+            insideTest2 = insidePoint(ridge2[2:],ridge2[2:],point)
+            if insideTest2:
+                delNodes.append(nodes[ik][0]-1)
+                continue
+
+        delNodes = np.array(delNodes, dtype=int)
+        element = delete(element,delNodes,0)
+        
+        #############################################################################################
+        ################################ Radius Calculation #########################################
+        #############################################################################################
+        
+        if outofPlaneThick is None:
+            outofPlaneThick = B
+        
+        length = zeros(shape=(len(element),1))
+        for ik in range(0,len(element)):
+            x1 = nodesR[int(element[ik][1]-1)][1]
+            x2 = nodesR[int(element[ik][2]-1)][1]
+            y1 = nodesR[int(element[ik][1]-1)][2]
+            y2 = nodesR[int(element[ik][2]-1)][2]
+            length[ik][0] = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+        
+        if (crossSection.lower() == 'circ'):
+            constants = [4 *relDensity, (L + H - pi * sum(length)), 4 * relDensity * (L * H)]
+            dia_opt = roots(constants)
+            dia_est = 2 * relDensity * 4 * L * H / (sum(length) * 2 * pi)
+            diff_sqr = [(dia_opt[0] - dia_est) ** 2, (dia_opt[1] - dia_est) ** 2]
+            index = argmin(diff_sqr)
+
+            rad = dia_opt[index]/ 2
+            Area = 3.142*rad*rad
+            
+        elif (crossSection.lower() == 'rect'):
+            thick_est = relDensity * L * H * outofPlaneThick / (sum(length) * outofPlaneThick)
+            
+            if thickness is None:
+                    thickness = thick_est
+            Area = 1.0*thickness
+
+        if (units.lower() == 'millimeter'):
+            tol = 1e-3
+        elif (units.lower() == 'meter'):
+            tol = 1e-6
+        else:
+            print('Please enter units scale')
+
+        ############################################################################################
+        ####################################### Part Making ########################################
+        ############################################################################################
+
+        if (elemType == B32):
+            dimenObject = THREE_D
+        elif (elemType == B21):
+            dimenObject = TWO_D_PLANAR
+        elif (elemType == B22):
+            dimenObject = TWO_D_PLANAR
+        elif (elemType == B23):
+            dimenObject = TWO_D_PLANAR
+            
+        mdb.Model(name=ModelName , modelType=STANDARD_EXPLICIT)
+
+        s = mdb.models[ModelName].ConstrainedSketch(name='__profile__', 
+            sheetSize=200.0)
+        g, v, d, c = s.geometry, s.vertices, s.dimensions, s.constraints
+        s.setPrimaryObject(option=STANDALONE)
+
+        for ik in range(len(element)):
+            s.Line(point1=nodesR[int(element[ik][1]-1)][1:3], point2=nodesR[int(element[ik][2]-1)][1:3])
+        p = mdb.models[ModelName].Part(name='Part-1', dimensionality=dimenObject, 
+            type=DEFORMABLE_BODY)
+        p = mdb.models[ModelName].parts['Part-1']
+        p.BaseWire(sketch=s)
+        s.unsetPrimaryObject()
+        p = mdb.models[ModelName].parts['Part-1']
+        session.viewports['Viewport: 1'].setValues(displayedObject=p)
+
+        p = mdb.models[ModelName].parts['Part-1']
+        e = p.edges
+        edges = e.getByBoundingBox(0.0,0.0,0.0,L,H,0.0)
+        p.Set(edges=edges, name='AllPartSet')
+
+        if (sizeVar.lower() == 'yes'):
+            p = mdb.models[ModelName].parts['Part-1']
+            e = p.edges
+            for numEdge in range(0,len(element)):
+                x1 = nodesR[int(element[numEdge][1]-1)][1]
+                x2 = nodesR[int(element[numEdge][2]-1)][1]
+                y1 = nodesR[int(element[numEdge][1]-1)][2]
+                y2 = nodesR[int(element[numEdge][2]-1)][2]
+                xMid = (x1+x2)/2.0
+                yMid = (y1+y2)/2.0
+                edges = e.findAt(((xMid, yMid, 0.0), ))
+                p.Set(edges=edges, name='edgeElem-'+str(numEdge))
+            
+        ############################################################################################
+        ################################## Material Properties #####################################
+        ############################################################################################
+
+        if (userMaterial.lower() == 'al'):
+            E, nu = 70000.0, 0.3
+            E, nu  = pStrainProperties(E, nu)
+            mdb.models[ModelName].Material(name=userMaterial)
+            mdb.models[ModelName].materials[userMaterial].Density(table=((2.7e-09, ), ))
+            mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
+            mdb.models[ModelName].materials[userMaterial].Plastic(table=((
+                134.0, 0.0), (134.3, 0.001996429), (134.5, 0.002835692), (135.0, 
+                0.004015369), (135.5, 0.005678497), (136.0, 0.008020233), (136.5, 
+                0.011313326), (137.0, 0.015938495), (137.5, 0.022426529), (138.0, 
+                0.031516535), (138.5, 0.044236464), (139.0, 0.062014286)))
+            mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
+                table=((0.027544286, 0.33333, 0.0), ))
+            mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
+                type=DISPLACEMENT, softening=TABULAR, table=(
+                (0.0, 0.0),
+                (0.0036, FineElemSizeFT*0.0021),
+                (0.0045, FineElemSizeFT*0.00422), 
+                (0.0104, FineElemSizeFT*0.0063),
+                (0.022,  FineElemSizeFT*0.0084),
+                (0.0336, FineElemSizeFT*0.0105),
+                (0.0466, FineElemSizeFT*0.0126),
+                (0.0599, FineElemSizeFT*0.0147),
+                (0.0761, FineElemSizeFT*0.0168),
+                (0.095,  FineElemSizeFT*0.01891),
+                (0.1173, FineElemSizeFT*0.02101),
+                (0.1443, FineElemSizeFT*0.02311),
+                (0.1761, FineElemSizeFT*0.02521),
+                (0.2144, FineElemSizeFT*0.02731),
+                (0.2578, FineElemSizeFT*0.02928), 
+                (0.3029, FineElemSizeFT*0.03098),
+                (0.3457, FineElemSizeFT*0.03236),
+                (0.3866, FineElemSizeFT*0.03335),
+                (0.4301, FineElemSizeFT*0.034),
+                (0.4665, FineElemSizeFT*0.03446),
+                (1.0,    FineElemSizeFT*0.03547)))
+
+        elif (userMaterial.lower() == 'sic'):
+            E, nu = 410000, 0.14
+            E, nu  = pStrainProperties(E, nu)
+            mdb.models[ModelName].Material(name=userMaterial)
+            mdb.models[ModelName].materials[userMaterial].Density(table=((3.21e-09, ), ))
+            mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
+            mdb.models[ModelName].materials[userMaterial].Plastic(table=
+                ((550, 0.0),
+                (550.1,	0.00001)))
+            mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
+                table=((0.00001, 0.333333, 0.0), ))
+            mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
+                type=DISPLACEMENT, softening=TABULAR, table=(
+                (0.0, 0.0),
+                (0.2, FineElemSizeUT*0.00001),
+                (0.4, FineElemSizeUT*0.00002), 
+                (0.6, FineElemSizeUT*0.00003),
+                (0.8, FineElemSizeUT*0.00004),
+                (1.0, FineElemSizeUT*0.00005)))
+
+        elif (userMaterial.lower() == 'ti'):
+            E, nu = 123000, 0.3
+            E, nu  = pStrainProperties(E, nu)
+            mdb.models[ModelName].Material(name=userMaterial)
+            mdb.models[ModelName].materials[userMaterial].Density(table=((4.43e-09, ), ))
+            mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
+            mdb.models[ModelName].materials[userMaterial].Plastic(table=
+                ((932,	        0),
+                (947.411802,    0.003453491),
+                (957.4512331,	0.006906981),
+                (966.1307689,	0.010360472),
+                (974.030469,	0.013813962),
+                (981.3967087,	0.017267453),
+                (988.3639577,	0.020720943),
+                (995.0160058,	0.024174434),
+                (1001.409616,	0.027627924),
+                (1007.585541,	0.031081415),
+                (1013.574312,	0.034534905),
+                (1019.399572,	0.037988396),
+                (1025.08011,	0.041441886),
+                (1030.631179,	0.044895377),
+                (1036.065381,	0.048348867),
+                (1041.393285,	0.051802358),
+                (1046.623866,	0.055255848),
+                (1051.764831,	0.058709339),
+                (1056.822861,	0.062162829),
+                (1061.803799,	0.06561632),
+                (1066.712789,	0.06906981),
+                (1071.554397,	0.072523301),
+                (1076.332693,	0.075976791),
+                (1081.05133,	0.079430282),
+                (1085.713601,	0.082883772),
+                (1090.322488,	0.086337263),
+                (1094.880702,	0.089790753),
+                (1099.39072,	0.093244244),
+                (1103.854808,	0.096697734),
+                (1108.275052,	0.100151225),
+                (1112.653372,	0.103604715)))
+            mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
+                table=((0.102268174, 0.333333, 0.0), ))
+            mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
+                type=DISPLACEMENT, softening=TABULAR, table=(
+                (0.0, 0.0),
+                (0.2, FineElemSizeFT*0.0001),
+                (0.4, FineElemSizeFT*0.0002), 
+                (0.6, FineElemSizeFT*0.0003),
+                (0.8, FineElemSizeFT*0.0004),
+                (1.0, FineElemSizeFT*0.0005)))
+
+        if (sizeVar.lower() == 'yes'):
+            relativeDensityUpdated = 10000
+            while relativeDensityUpdated < (relDensity - 0.001) or relativeDensityUpdated > (relDensity + 0.001):
+
+                lowerLim = (1.0 - beta) * thickness
+                upperLim = (1.0 + beta) * thickness
+
+                thick = random.uniform(lowerLim, upperLim, len(element))
+
+                latticeVolume = dot(length[:].T, thick*outofPlaneThick)
+                
+                relativeDensityUpdated = latticeVolume/(L * H * outofPlaneThick)
+
+                if relativeDensityUpdated > relDensity:
+                    thickness = thickness - 0.001
+                else:
+                    thickness = thickness + 0.001
+            
+            for numEdge in range(0,len(element)):       
+                mdb.models[ModelName].RectangularProfile(name='Rect'+str(numEdge), a=outofPlaneThick, b=thick[numEdge])
+
+                mdb.models[ModelName].BeamSection(name='BeamSec'+str(numEdge), integration=DURING_ANALYSIS, 
+                    poissonRatio=0.0, profile='Rect'+str(numEdge), material=userMaterial, 
+                    temperatureVar=LINEAR, consistentMassMatrix=False)
+
+                p = mdb.models[ModelName].parts['Part-1']
+                region = p.sets['edgeElem-'+str(numEdge)]
+                p.SectionAssignment(region=region, sectionName='BeamSec'+str(numEdge), offset=0.0, 
+                    offsetType=MIDDLE_SURFACE, offsetField='', 
+                    thicknessAssignment=FROM_SECTION)
+
+                p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+
+        elif (sizeVar.lower() == 'no'):
+            if (crossSection.lower() == 'circ'):
+                mdb.models[ModelName].CircularProfile(name='Circ', r=rad)
+
+                mdb.models[ModelName].BeamSection(name='BeamSec', integration=DURING_ANALYSIS, 
+                    poissonRatio=0.0, profile='Circ', material=userMaterial, 
+                    temperatureVar=LINEAR, consistentMassMatrix=False)
+
+                p = mdb.models[ModelName].parts['Part-1']
+                region = p.sets['AllPartSet']
+                p.SectionAssignment(region=region, sectionName='BeamSec', offset=0.0, 
+                    offsetType=MIDDLE_SURFACE, offsetField='', 
+                    thicknessAssignment=FROM_SECTION)
+
+                p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+
+            elif (crossSection.lower() == 'rect'):
+
+                mdb.models[ModelName].RectangularProfile(name='Rect', a=outofPlaneThick, b=thickness)
+
+                mdb.models[ModelName].BeamSection(name='BeamSec', integration=DURING_ANALYSIS, 
+                    poissonRatio=0.0, profile='Rect', material=userMaterial, 
+                    temperatureVar=LINEAR, consistentMassMatrix=False)
+
+                p = mdb.models[ModelName].parts['Part-1']
+                region = p.sets['AllPartSet']
+                p.SectionAssignment(region=region, sectionName='BeamSec', offset=0.0, 
+                    offsetType=MIDDLE_SURFACE, offsetField='', 
+                    thicknessAssignment=FROM_SECTION)
+
+                p.assignBeamSectionOrientation(region=region, method=N1_COSINES, n1=(0.0, 0.0, -1.0))
+            
+        ###########################################################################################
+        ####################################### Assembly ##########################################
+        ###########################################################################################
+
+        a = mdb.models[ModelName].rootAssembly
+        a.DatumCsysByDefault(CARTESIAN)
+        p = mdb.models[ModelName].parts['Part-1']
+        a.Instance(name='Part-1-1', part=p, dependent=OFF)
+
+        RFid = mdb.models[ModelName].rootAssembly.ReferencePoint(point=(loadLoc[0], loadLoc[1], loadLoc[2])).id
+        r1 = mdb.models[ModelName].rootAssembly.referencePoints
+        refPoints1=(r1[RFid], )
+        a.Set(referencePoints=refPoints1, name='load')
+
+        RFid = mdb.models[ModelName].rootAssembly.ReferencePoint(point=(fixityLoc[0], fixityLoc[1], fixityLoc[2])).id
+        r1 = mdb.models[ModelName].rootAssembly.referencePoints
+        refPoints1=(r1[RFid], )
+        a.Set(referencePoints=refPoints1, name='fixity')
+
+        ############################################################################################
+        ######################################## Step ##############################################
+        ############################################################################################
+
+        mdb.models[ModelName].ExplicitDynamicsStep(name='Step-1', previous='Initial', 
+            timePeriod=STEP_TIME)
+            
+        # ############################################################################################
+        # ######################################## Mesh ##############################################
+        # ############################################################################################
+
+        a = mdb.models[ModelName].rootAssembly
+        e = a.instances['Part-1-1'].edges
+        edges = e.getByBoundingBox(0.0,0.0,0.0,L,H,0.0)
+        elemType1 = mesh.ElemType(elemCode=elemType, elemLibrary=STANDARD)
+        pickedRegions =(edges, )
+        a.setElementType(regions=pickedRegions, elemTypes=(elemType1, ))
+        partInstances = (a.instances['Part-1-1'], )
+        a.seedPartInstance(regions=partInstances, size=CoarseElemSizeFT, deviationFactor=0.1, 
+            minSizeFactor=0.1)
+        a = mdb.models[ModelName].rootAssembly
+        partInstances =(a.instances['Part-1-1'], )
+        a.generateMesh(regions=partInstances)
+        
+        a = mdb.models[ModelName].rootAssembly
+        e = a.instances['Part-1-1'].edges
+        edges = e.getByBoundingBox(CrRegMESH[0], CrRegMESH[2], 0.0, CrRegMESH[1], CrRegMESH[3], 0.0)
+        elemType1 = mesh.ElemType(elemCode=elemType, elemLibrary=STANDARD)
+        pickedRegions =(edges, )
+        a.setElementType(regions=pickedRegions, elemTypes=(elemType1, ))
+        partInstances = (a.instances['Part-1-1'], )
+        a.seedEdgeBySize(edges=edges, size=FineElemSizeFT, deviationFactor=0.1, 
+            minSizeFactor=0.1, constraint=FINER)
+        a = mdb.models[ModelName].rootAssembly
+        partInstances =(a.instances['Part-1-1'], )
+        a.generateMesh(regions=partInstances)
+
+        all_nodes = mdb.models[ModelName].rootAssembly.instances['Part-1-1'].nodes
+        fix_nodes = []
+        load_nodes = []
+        for n in all_nodes:
+            xcoord = n.coordinates[0]
+            ycoord = n.coordinates[1]
+            if in_circle(fixityLoc[0], fixityLoc[1], 0.5*bcDia, xcoord, ycoord):
+                fix_nodes.append(n)
+            if in_circle(loadLoc[0], loadLoc[1], 0.5*bcDia, xcoord, ycoord):
+                load_nodes.append(n)
+            
+        ln = mesh.MeshNodeArray(fix_nodes)
+        mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='Set-fix')
+
+        ln = mesh.MeshNodeArray(load_nodes)
+        mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='Set-load')
+        
+        all_nodes = mdb.models[ModelName].rootAssembly.instances['Part-1-1'].nodes
+        cracktip_node_labels = []
+        for n in all_nodes:
+            xcoord = n.coordinates[0]
+            ycoord = n.coordinates[1]
+            if xcoord > CrRegSTAT[0] and xcoord < CrRegSTAT[1] and ycoord > CrRegSTAT[2] and ycoord < CrRegSTAT[3]:
+                cracktip_node_labels.append(n.label)
+        
+#        print(len(cracktip_node_labels))      
+#        ln = mesh.MeshNodeArray(cracktip_node_labels)
+#        mdb.models[ModelName].rootAssembly.Set(nodes=ln , name='temp')
+        
+        all_elements = mdb.models[ModelName].rootAssembly.instances['Part-1-1'].elements
+        cracktip_elements = []
+        for e in all_elements:
+            connected_node1 = e.connectivity[0]+1
+            connected_node2 = e.connectivity[1]+1
+            if connected_node1 in cracktip_node_labels or connected_node2 in cracktip_node_labels:
+                cracktip_elements.append(e)
+        
+        e1 = mesh.MeshElementArray(cracktip_elements)
+        mdb.models[ModelName].rootAssembly.Set(elements=e1 , name='Set-cracktip')
+
+        # ############################################################################################
+        # ################################## Output Requests #########################################
+        # ############################################################################################
+
+        if (userMaterial.lower() == 'material-1'):    
+            mdb.models[ModelName].fieldOutputRequests['F-Output-1'].setValues(variables=(
+                'S', 'PE', 'LE', 'UT', 'RF', 'EVOL', 'SDV'), numIntervals=FieldOut_frames)
+
+            regionDef=mdb.models[ModelName].rootAssembly.allInstances['Part-1-1'].sets['AllPartSet']
+            mdb.models[ModelName].historyOutputRequests['H-Output-1'].setValues(variables=(
+                'ALLIE', 'ALLKE', 'ALLSE'), region=regionDef, sectionPoints=DEFAULT, 
+                rebar=EXCLUDE)
+
+        else:
+            mdb.models[ModelName].fieldOutputRequests['F-Output-1'].setValues(variables=(
+                'S', 'PE', 'LE', 'UT', 'RF', 'SDEG', 'DMICRT', 'STATUS'), numIntervals=FieldOut_frames)
+
+            regionDef=mdb.models[ModelName].rootAssembly.allInstances['Part-1-1'].sets['AllPartSet']
+            mdb.models[ModelName].historyOutputRequests['H-Output-1'].setValues(variables=(
+                'ALLIE', 'ALLKE', 'ALLSE'), numIntervals=HistOut_frames, region=regionDef, 
+                sectionPoints=DEFAULT, rebar=EXCLUDE)
+
+            regionDef=mdb.models[ModelName].rootAssembly.sets['load']
+            mdb.models[ModelName].HistoryOutputRequest(name='H-Output-2', createStepName='Step-1', 
+                variables=('S', 'E', 'PE', 'LE', 'U', 'RF'), numIntervals=HistOut_frames, region=regionDef, 
+                sectionPoints=DEFAULT, rebar=EXCLUDE)
+            
+            regionDef=mdb.models[ModelName].rootAssembly.sets['Set-cracktip']
+            mdb.models[ModelName].HistoryOutputRequest(name='H-Output-3', createStepName='Step-1', 
+                variables=('STATUS', ), numIntervals=HistOut_frames, region=regionDef, 
+                sectionPoints=DEFAULT, rebar=EXCLUDE)
+                
+        # ############################################################################################
+        # #################################### Interactions ##########################################
+        # ############################################################################################
+
+
+        a = mdb.models[ModelName].rootAssembly
+        region1=a.sets['fixity']
+        region2=a.sets['Set-fix']
+        mdb.models[ModelName].Coupling(name='couplingFixity', controlPoint=region1, 
+        surface=region2, influenceRadius=WHOLE_SURFACE, couplingType=KINEMATIC, 
+        localCsys=None, u1=ON, u2=ON, ur3=ON)    
+
+        a = mdb.models[ModelName].rootAssembly
+        region1=a.sets['load']
+        region2=a.sets['Set-load']
+        mdb.models[ModelName].Coupling(name='couplingLoad', controlPoint=region1, 
+        surface=region2, influenceRadius=WHOLE_SURFACE, couplingType=KINEMATIC, 
+        localCsys=None, u1=ON, u2=ON, ur3=ON)
+
+        # if (elemType == B32):
+            # a = mdb.models[ModelName].rootAssembly
+            # mdb.models[ModelName].ContactProperty('IntProp-1')
+            # mdb.models[ModelName].interactionProperties['IntProp-1'].NormalBehavior(
+                # pressureOverclosure=HARD, allowSeparation=ON, 
+                # constraintEnforcementMethod=DEFAULT)
+            # mdb.models[ModelName].interactionProperties['IntProp-1'].TangentialBehavior(
+                # formulation=PENALTY, directionality=ISOTROPIC, slipRateDependency=OFF, 
+                # pressureDependency=OFF, temperatureDependency=OFF, dependencies=0, table=((
+                # 0.3, ), ), shearStressLimit=None, maximumElasticSlip=FRACTION, 
+                # fraction=0.005, elasticSlipStiffness=None)
+            # mdb.models[ModelName].ContactExp(name='Int-1', createStepName='Initial')
+            # mdb.models[ModelName].interactions['Int-1'].includedPairs.setValuesInStep(
+                # stepName='Initial', useAllstar=ON)
+            # mdb.models[ModelName].interactions['Int-1'].contactPropertyAssignments.appendInStep(
+                # stepName='Initial', assignments=((GLOBAL, SELF, 'IntProp-1'), ))
+
+        # ############################################################################################
+        # #################################### Loading ###############################################
+        # ############################################################################################
+
+        if sm_amp:
+            mdb.models[ModelName].SmoothStepAmplitude(name='Amp-1', 
+                timeSpan=STEP, data=((0.0, 0.0), (STEP_TIME, strainAppFT*H)))
+        else:
+            mdb.models[ModelName].TabularAmplitude(name='Amp-1', timeSpan=STEP, 
+            smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (STEP_TIME, strainAppFT*H)))
+
+        a = mdb.models[ModelName].rootAssembly
+        region = a.sets['load']
+        mdb.models[ModelName].DisplacementBC(name='BC-1', createStepName='Step-1', 
+            region=region, u1=0.0, u2=1.0, amplitude='Amp-1', fixed=OFF, 
+            distributionType=UNIFORM, fieldName='', localCsys=None)
+
+        region = a.sets['fixity']
+        mdb.models[ModelName].DisplacementBC(name='BC-2', createStepName='Step-1', 
+            region=region, u1=0.0, u2=0.0, amplitude='Amp-1', fixed=OFF, 
+            distributionType=UNIFORM, fieldName='', localCsys=None)
+            
+        # ############################################################################################
+        # ###################################### Job #################################################
+        # ############################################################################################
+
+        userSubroutine = ''
+
+        mdb.Job(name=Job, model=ModelName, description='', type=ANALYSIS, 
+            atTime=None, waitMinutes=0, waitHours=0, queue=None, memory=90, 
+            memoryUnits=PERCENTAGE, explicitPrecision=SINGLE, 
+            nodalOutputPrecision=SINGLE, echoPrint=OFF, modelPrint=OFF, 
+            contactPrint=OFF, historyPrint=OFF, userSubroutine=userSubroutine, scratch='', 
+            resultsFormat=ODB, parallelizationMethodExplicit=DOMAIN, numDomains=cpus, 
+            activateLoadBalancing=False, multiprocessingMode=DEFAULT, numCpus=cpus)
+        
+        if (finalRun.lower() == 'inp' or finalRun.lower() == 'input'):
+            mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
+        
+        elif (finalRun.lower() == 'yes'):
+            mdb.jobs[Job].writeInput(consistencyChecking=OFF)
+            mdb.jobs[Job].submit(consistencyChecking=OFF)
+            mdb.jobs[Job].waitForCompletion()
+            with open(Job+'.inp', 'a') as f:
+                f.write('**\n**FREQUENCIES:\n')
+                for freq in frequencies:
+                    f.write("**" + str(freq) + '\n')
+                f.write('**END FREQUENCIES\n')
+            endtime = time.time()
+            print(endtime - starttime, "== time for job", Job)
