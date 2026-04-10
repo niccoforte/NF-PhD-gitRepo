@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phd-shared-resources"
+version = "0.1.0"
+description = "Shared Python resources used across PhD paper folders."
+requires-python = ">=3.9"
+
+[tool.setuptools]
+packages = ["resources"]
