@@ -44,26 +44,41 @@ python -m pip install -r requirements.txt
 ```
 
 `requirements.txt` includes `-e .`, so this single command installs:
-- third-party dependencies, and
-- the local `resources` package in editable mode.
+- third-party dependencies
+- the local `resources` package in editable mode
 
-Editable mode means changes to files inside `resources/` are picked up without reinstalling.
+Editable mode means changes inside `resources/` are picked up without reinstalling.
 
 Important:
 - Run install commands from the repository root.
-- Do not use `pip install -e resources` (the project metadata is in root `pyproject.toml`, not inside `resources/`).
+- Do not use `pip install -e resources` (project metadata is in root `pyproject.toml`).
 
 ## ABAQUS Python Setup
 
-If ABAQUS scripts need to import `resources`, install with the ABAQUS interpreter:
+Recommended one-command setup from repo root:
 
 ```powershell
-abaqus python -m pip install -r requirements.txt
+.\setup-abaqus.ps1
 ```
 
-If `pip` is not available in your ABAQUS Python, use a `PYTHONPATH` approach or add a small `sys.path` bootstrap in the ABAQUS script.
+Manual steps:
+
+```powershell
+abaqus python -m pip install -r requirements-abaqus.txt
+abaqus python -m pip install --no-build-isolation -e .
+```
+
+The setup script:
+- checks if ABAQUS Python has `pip`
+- tries `ensurepip` if `pip` is missing
+- installs third-party deps from `requirements-abaqus.txt`
+- tries to install the local repo package (`resources`) into ABAQUS Python in editable mode
+- if editable install fails, tries to write a persistent `.pth` entry in ABAQUS `site-packages`
+- if ABAQUS `site-packages` is not writable, falls back to local `.abaqus-pydeps/` plus `PYTHONPATH`
+- attempts to persist `PYTHONPATH` via `setx` when possible
+- verifies imports with `resources.lattices`
 
 ## Notes
 
 - `phd_shared_resources.egg-info/` is created by editable installs and is expected.
-- It is local install metadata and should not be committed.
+- This metadata should not be committed.
