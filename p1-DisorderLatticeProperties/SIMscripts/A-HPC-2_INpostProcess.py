@@ -2,6 +2,7 @@ import os
 import numpy as np
 import math
 import sys
+from resources.abaqus import export_frequencies, export_nodes, export_struts
 
 cmdIN = sys.argv[10:]
 if len(cmdIN) > 0:
@@ -414,75 +415,6 @@ class Geometry:
         self.totalBracketNodes = int(round(((self.nnx / 1.99999) + 3) * 3 * 2) +
                                      round(((self.nnx / 1.99999) + 2) * 3 * 2) +
                                      2 * (self.nnx / 2.0 + 2))
-
-
-def export_frequencies(inpFile, expFile):
-    with open(inpFile, 'r') as f:
-        lines = f.readlines()
-
-    freq_start = int([lines.index(line) for line in lines if "**FREQUENCIES:" in line][0]) + 1
-    freq_end = int([lines.index(line) for line in lines if "**END FREQUENCIES" in line][0])
-    frequencies = [line.strip().strip("**") for line in lines[freq_start:freq_end]]
-    
-    with open(expFile, 'w') as f:
-        for freq in frequencies:
-            f.write(freq + '\n')
-
-def export_nodes(inpFile, expFile):
-    LAT = inpFile.split('-')[1]
-    nnx = int(inpFile.split('-')[2])
-    l = 10.0
-    if "Fracture" in inpFile:
-        mode = 'fracture'
-    elif "Ductile" in inpFile:
-        mode = 'ductile'
-    
-    geom = Geometry(latticeType, unitCellSize, nnx)
-    if stiffMatrix:
-        geom.stiffnessMatrix()
-    geom.nodeCount(mode=mode, stiffMatrix=stiffMatrix)
-    totalNodes = geom.totalNodes
-    
-    with open(inpFile, 'r') as f:
-        lines = f.readlines()
-    
-    nodes_start = int([lines.index(line) for line in lines if "*Node" in line][0]) + 1
-    all_nodes_end = int([lines.index(line) for line in lines if "*Element" in line][0])
-    nodes = [[float(i.strip().strip('\n')) for i in line.split(",")] for line in lines[nodes_start:all_nodes_end]]
-    
-    # for i in range(len(nodes)):
-        # dx = abs(nodes[i][1] - nodes[i-1][1])
-        # dy = abs(nodes[i][2] - nodes[i-1][2])
-        
-        # if (dx > 1.0 and dx < 3.0) or (dy > 0.0 and dy < 5.0):
-            # nodes_end = nodes_start + (int(nodes[i][0]) - 2)
-            # break
-    nodes_end = nodes_start + totalNodes
-    
-    node_lines = lines[nodes_start:nodes_end]
-    
-    with open(expFile, 'w') as f:
-        for line in node_lines:
-            f.write(line)
-
-def export_struts(inpFile, expFile):
-    with open(inpFile, 'r') as f:
-        lines = f.readlines()
-
-    strut_lines = [lines[lines.index(line)+1].split(' ') for line in lines if "*Beam Section, elset=" in line]
-    thicks = [float(line[-1].strip('\n')) for line in strut_lines]
-    thicks_check = list(set(thicks))
-    thicks_check.sort(reverse = True)
-    if len(thicks_check) == 2:
-        if round(thicks_check[0],3) == round(2*thicks_check[1],3):
-            thicks = [t for t in thicks if t != thicks_check[0]]
-    elif len(thicks_check) > 2:
-        if round(thicks_check[0],1) == 2*round(np.mean(thicks_check[1:]),1):
-            thicks = [t for t in thicks if t != thicks_check[0]]
-        
-    with open(expFile, 'w') as f:
-        for thick in thicks:
-            f.write(str(thick) + '\n')
 
 freq = False
 if distribution.lower() == "frequency" or distribution.lower() == "opt-f":

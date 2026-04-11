@@ -3,13 +3,12 @@ from abaqusConstants import *
 from caeModules import *
 from driverUtils import executeOnCaeStartup
 import numpy as np
-from numpy import *
 import math
 import sys
 import time
 import os
-from fractions import Fraction
-from resources.lattices import Geometry
+from resources.lattices import Geometry, connectivity
+from resources.abaqus import node, insidePoint, in_circle, pStrainProperties
 executeOnCaeStartup()
 
 starttime = time.time()
@@ -219,1390 +218,6 @@ elif latticeType.lower() == "hex":
 if Cmatrix_sim:
     CoarseElemSizeUT = unitCellSize/10.0
     FineElemSizeUT   = unitCellSize/10.0
-############################################################################################
-################################# FUNCTIONS ################################################
-############################################################################################
-	 
-def node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution):
-    if latticeType.lower() == "fcc":
-        unitX = L / nnx
-        unitY = H / nny
-        
-        nodes = zeros(shape=(totalNodes,3)) 
-        nodesR = zeros(shape=(totalNodes,3))
-        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
-
-        count = 0
-        x = 0
-        y = 0
-        for i in range(1, nny+2):
-            for j in range(1, nnx+2):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = 0
-       
-        x = unitX / 2.0
-        y = unitY / 2.0
-        for i in range(1, nny+1):
-            for j in range(1, nnx+1):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = unitX / 2.0
-        
-        x = -2.0*unitX
-        y = H + unitY
-        for i in range(1, 4):
-            for j in range(1, nnx+6):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -2.0*unitX
-            
-        x = -2.0*unitX
-        y = -unitY 
-        for i in range(1, 4):
-            for j in range(1, nnx+6):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -2.0*unitX
-        
-        x = -1.5*unitX
-        y = H + (0.5*unitY)
-        for i in range(1, 4):
-            for j in range(1, nnx+5):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -1.5*unitX
-        
-        x = -1.5*unitX
-        y = -0.5*unitY
-        for i in range(1, 4):
-            for j in range(1, nnx+5):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -1.5*unitX
-        
-        Dnodes_brackets = []
-        Dcoords = []
-        Dcoordsr = [-unitX, L+unitX, -2.0*unitX, L+(2.0*unitX), 0, H, -unitY, H+unitY, -1.5*unitX, L+1.5*unitX, -0.5*unitY, H+0.5*unitY]
-        for i in Dcoordsr:
-            Dcoords.append(round(i,2))
-        for node in bracket_nodes:
-            if round(node[1],2) in Dcoords[:2]:
-                if round(node[2],2) in Dcoords[4:6]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[1],2) in Dcoords[2:4]:
-                if round(node[2],2) in Dcoords[4:8]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[1],2) in Dcoords[8:10]:
-                if round(node[2],2) in Dcoords[10:]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-    
-    if latticeType.lower() == "square":
-        unitX = L / nnx
-        unitY = H / nny
-        
-        nodes = zeros(shape=(totalNodes,3)) 
-        nodesR = zeros(shape=(totalNodes,3))
-        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
-
-        count = 0
-        x = 0
-        y = 0
-        for i in range(1, nny+2):
-            for j in range(1, nnx+2):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = 0
-        
-        x = -2.0*unitX
-        y = H + unitY
-        for i in range(1, 4):
-            for j in range(1, nnx+6):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -2.0*unitX
-            
-        x = -2.0*unitX
-        y = -unitY 
-        for i in range(1, 4):
-            for j in range(1, nnx+6):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -2.0*unitX
-        
-        Dnodes_brackets = []
-        Dcoords = []
-        Dcoordsr = [-unitX, L+unitX, -2.0*unitX, L+(2.0*unitX), 0, H, -unitY, H+unitY, -1.5*unitX, L+1.5*unitX, -0.5*unitY, H+0.5*unitY]
-        for i in Dcoordsr:
-            Dcoords.append(round(i,2))
-        for node in bracket_nodes:
-            if round(node[1],2) in Dcoords[:2]:
-                if round(node[2],2) in Dcoords[4:6]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[1],2) in Dcoords[2:4]:
-                if round(node[2],2) in Dcoords[4:8]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[1],2) in Dcoords[8:10]:
-                if round(node[2],2) in Dcoords[10:]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-    
-    if latticeType.lower() == "45square":
-        unitX = L / nnx
-        unitY = H / nny
-        
-        nodes = zeros(shape=(totalNodes,3)) 
-        nodesR = zeros(shape=(totalNodes,3))
-        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
-
-        count = 0
-        x = 0
-        y = 0
-        for i in range(1, nny+2):
-            for j in range(1, nnx+2):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = 0
-       
-        x = unitX / 2.0
-        y = unitY / 2.0
-        for i in range(1, nny+1):
-            for j in range(1, nnx+1):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = unitX / 2.0
-        
-        x = -2.0*unitX
-        y = H + unitY
-        for i in range(1, 4):
-            for j in range(1, nnx+6):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -2.0*unitX
-            
-        x = -2.0*unitX
-        y = -unitY 
-        for i in range(1, 4):
-            for j in range(1, nnx+6):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -2.0*unitX
-        
-        x = -1.5*unitX
-        y = H + (0.5*unitY)
-        for i in range(1, 4):
-            for j in range(1, nnx+5):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -1.5*unitX
-        
-        x = -1.5*unitX
-        y = -0.5*unitY
-        for i in range(1, 4):
-            for j in range(1, nnx+5):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -1.5*unitX
-        
-        Dnodes_brackets = []
-        Dcoords = []
-        Dcoordsr = [-unitX, L+unitX, -2.0*unitX, L+(2.0*unitX), 0, H, -unitY, H+unitY, -1.5*unitX, L+1.5*unitX, -0.5*unitY, H+0.5*unitY]
-        for i in Dcoordsr:
-            Dcoords.append(round(i,2))
-        for node in bracket_nodes:
-            if round(node[1],2) in Dcoords[:2]:
-                if round(node[2],2) in Dcoords[4:6]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[1],2) in Dcoords[2:4]:
-                if round(node[2],2) in Dcoords[4:8]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[1],2) in Dcoords[8:10]:
-                if round(node[2],2) in Dcoords[10:]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-    
-    elif latticeType.lower() == "tri":
-        unitX = 0.5 * sqrt(3) * unitCellSize
-        unitY = unitCellSize
-
-        nodes = zeros(shape=(totalNodes, 3))
-        nodesR = zeros(shape=(totalNodes, 3))
-        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
-        
-        count = 0
-        x = 0
-        y = 0
-        for i in range(1, nny + 2):
-            for j in range(1, int(round(nnx / 2.000001)) + 2):
-                nodes[count][0] = count + 1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + 2 * unitX
-                count = count + 1
-
-            y = y + unitY
-            x = 0
-        
-        x = unitX
-        y = unitY / 2.0
-        for i in range(1, nny + 1):
-            for j in range(1, int(round(nnx / 2.000001) + 1)):
-                nodes[count][0] = count + 1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + 2 * unitX
-                count = count + 1
-
-            y = y + unitY
-            x = unitX
-        
-        x = -2.0*unitX
-        y = H + unitY
-        for i in range(1, 4):
-            for j in range(1, int(round(nnx / 2.000001)) + 4):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -2.0*unitX
-        
-        x = -unitX
-        y = H + (0.5*unitY)
-        for i in range(1, 4):
-            for j in range(1, int(round(nnx / 2.000001) + 3)):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-
-            y = y + unitY
-            x = -unitX
-            
-        x = -2.0*unitX
-        y = -unitY 
-        for i in range(1, 4):
-            for j in range(1, int(round(nnx / 2.000001)) + 4):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -2.0*unitX
-        
-        x = -unitX
-        y = -0.5*unitY
-        for i in range(1, 4):
-            for j in range(1, int(round(nnx / 2.000001) + 3)):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-
-            y = y - unitY
-            x = -unitX
-        
-        x = -unitX
-        y = H + (3.0*unitY)
-        for j in range(1, int(round(nnx / 2.000001) + 3)):
-            bracket_nodes[count - totalNodes][0] = count + 1
-            bracket_nodes[count - totalNodes][1] = x
-            bracket_nodes[count - totalNodes][2] = y
-            x = x + 2.0*unitX
-            count = count + 1
-        
-        x = -unitX
-        y = -(3.0*unitY)
-        for j in range(1, int(round(nnx / 2.000001) + 3)):
-            bracket_nodes[count - totalNodes][0] = count + 1
-            bracket_nodes[count - totalNodes][1] = x
-            bracket_nodes[count - totalNodes][2] = y
-            x = x + 2.0*unitX
-            count = count + 1
-        
-        Dnodes_brackets = []
-        Dcoords = [round(-2.0*unitX,2), round(L+(2.0*unitX),2), round(-unitY,2), round(H+unitY,2)]
-        for node in bracket_nodes:
-            if round(node[1],2) in Dcoords[:2]:
-                if round(node[2],2) in Dcoords[2:]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-
-    elif latticeType.lower() == "kagome":
-        unitX = float(unitCellSize)
-        unitY = sqrt(3) * float(unitCellSize)
-        
-        nodes = zeros(shape=(totalNodes,3))
-        nodesR = zeros(shape=(totalNodes,3))
-        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
-
-        count = 0
-        x = 0
-        y = 0
-        for i in range(1, nny+2):
-            for j in range(1, 2*nnx+1):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = 0
-     
-        x = 1.5*unitX
-        y = unitY / 2.0
-        for i in range(1, int(math.ceil(nny/2.0)+1)):
-            for j in range(1, nnx):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + 2*unitX
-                count = count + 1
-            
-            y = y + 2.0*unitY
-            x = 1.5*unitX
-
-        x = 0.5*unitX
-        y = 1.5*unitY
-        for i in range(1, int(floor(nny/2)+1)):
-            for j in range(1, nnx+1):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + 2*unitX
-                count = count + 1
-            
-            y = y + 2.0*unitY
-            x = unitX/2.0
-        
-        x = -2.0 * unitX
-        y = H + unitY
-        for i in range(1, 4):
-            for j in range(1, 2*nnx+5):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = -2.0 * unitX
-     
-        x = (-2.0 + 0.5)*unitX
-        y = H + 0.5*unitY
-        for i in range(1, 3):
-            for j in range(1, nnx+3):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-            
-            y = y + 2.0*unitY
-            x = (-2.0 + 0.5)*unitX
-
-        x = (-2.0 + 1.5)*unitX
-        y = H + 1.5*unitY
-        for i in range(1, 2):
-            for j in range(1, nnx+2):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-            
-            y = y + 2.0*unitY
-            x = (-2.0 + 1.5)*unitX
-        
-        x = -2.0 * unitX
-        y = -unitY
-        for i in range(1, 4):
-            for j in range(1, 2*nnx+5):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y - unitY
-            x = -2.0 * unitX
-     
-        x = (-2.0 + 0.5)*unitX
-        y = -0.5*unitY
-        for i in range(1, 3):
-            for j in range(1, nnx+3):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-            
-            y = y - 2.0*unitY
-            x = (-2.0 + 0.5)*unitX
-
-        x = (-2.0 + 1.5)*unitX
-        y = -1.5*unitY
-        for i in range(1, 2):
-            for j in range(1, nnx+2):
-                bracket_nodes[count - totalNodes][0] = count + 1
-                bracket_nodes[count - totalNodes][1] = x
-                bracket_nodes[count - totalNodes][2] = y
-                x = x + 2.0*unitX
-                count = count + 1
-            
-            y = y - 2.0*unitY
-            x = (-2.0 + 1.5)*unitX
-        
-        Dnodes_brackets = []
-        DcoordsX = []
-        DcoordsY = []
-        DcoordsXr = [-unitX, -2.0*unitX, -0.5*unitX, -1.5*unitX, L+unitX, L+(2.0*unitX), L+(0.5*unitX), L+(1.5*unitX)]
-        DcoordsYr = [-0.5*unitY, H+0.5*unitY, -unitY, H+unitY, -1.5*unitY, H+1.5*unitY, -2.0*unitY, H+(2.0*unitY), 
-                    -2.5*unitY, H+(2.5*unitY), -3.0*unitY, H+(3.0*unitY)]
-        for i in DcoordsXr:
-            DcoordsX.append(round(i,2))
-        for i in DcoordsYr:
-            DcoordsY.append(round(i,2))
-        for node in bracket_nodes:
-            if round(node[2],2) in DcoordsY[:2]:
-                if round(node[1],2) in DcoordsX[2:4] or node[1] in DcoordsX[6:]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[2],2) in DcoordsY[2:4]:
-                if round(node[1],2) in DcoordsX[:2] or node[1] in DcoordsX[4:6]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-            if round(node[2],2) in DcoordsY[6:8]:
-                if round(node[1],2) == DcoordsX[1] or node[1] == DcoordsX[5]:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-    
-    elif latticeType.lower() == "hex":
-        unitX = sqrt(3)*unitCellSize
-        unitY = 2*unitCellSize
-            
-        nodes = zeros(shape=(totalNodes,3))
-        nodesR = zeros(shape=(totalNodes,3))
-        bracket_nodes = zeros(shape=(totalBracketNodes, 3))
-
-
-        count = 0
-        x = 0.5*unitX
-        y = 0
-        for i in range(1, int(math.ceil(nny/2.0)+1)):
-            for j in range(1, nnx+1):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = 0.5*unitX
-            for j in range(1,nnx+1):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitCellSize
-            x = 0.5*unitX
-
-        x = 0
-        y = unitCellSize/2.0
-        for i in range(1, int(math.ceil(nny/2.0)+1)):
-            for j in range(1, nnx+2):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitCellSize
-            x = 0 
-            for j in range(1, nnx+2):
-                nodes[count][0] = count+1
-                nodes[count][1] = x
-                nodes[count][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = 0
-        
-        x = [-0.5*unitX, L+0.5*unitX]
-        y = H
-        for xx in x:
-            bracket_nodes[count-totalNodes][0] = count+1
-            bracket_nodes[count-totalNodes][1] = xx
-            bracket_nodes[count-totalNodes][2] = y
-            count = count + 1
-        
-        x = -1.5*unitX
-        y = H + unitCellSize
-        for i in range(1, 3):
-            for j in range(1, nnx+5):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = -1.5*unitX
-            for j in range(1,nnx+5):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitCellSize
-            x = -1.5*unitX
-
-        x = -2.0*unitX
-        y = H + unitY - unitCellSize/2.0
-        for i in range(1, 3):
-            for j in range(1, nnx+6):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitCellSize
-            x = -2.0*unitX
-            for j in range(1, nnx+6):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y + unitY
-            x = -2.0*unitX
-        
-        x = [-0.5*unitX, L+0.5*unitX]
-        y = 0
-        for xx in x:
-            bracket_nodes[count-totalNodes][0] = count+1
-            bracket_nodes[count-totalNodes][1] = xx
-            bracket_nodes[count-totalNodes][2] = y
-            count = count + 1
-        
-        x = -1.5*unitX
-        y = -unitCellSize
-        for i in range(1, 3):
-            for j in range(1, nnx+5):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y - unitY
-            x = -1.5*unitX
-            for j in range(1,nnx+5):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y - unitCellSize
-            x = -1.5*unitX
-
-        x = -2.0*unitX
-        y = -unitY + unitCellSize/2.0
-        for i in range(1, 3):
-            for j in range(1, nnx+6):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y - unitCellSize
-            x = -2.0*unitX
-            for j in range(1, nnx+6):
-                bracket_nodes[count-totalNodes][0] = count+1
-                bracket_nodes[count-totalNodes][1] = x
-                bracket_nodes[count-totalNodes][2] = y
-                x = x + unitX
-                count = count + 1
-            
-            y = y - unitY
-            x = -2.0*unitX
-        
-        Dnodes_brackets = []
-        DcoordsX = []
-        DcoordsY = []
-        DcoordsXr = [-1.5*unitX, -2.0*unitX, L+1.5*unitX, L+2.0*unitX]
-        DcoordsYr = [H+unitCellSize, H+1.5*unitCellSize, H+unitY+0.5*unitCellSize, 
-                     -unitCellSize, -1.5*unitCellSize, -unitY-0.5*unitCellSize]
-        for i in DcoordsXr:
-            DcoordsX.append(round(i,2))
-        for i in DcoordsYr:
-            DcoordsY.append(round(i,2))
-        for node in bracket_nodes:
-            if round(node[2],2) in DcoordsY:
-                if round(node[1],2) in DcoordsX:
-                    Dnodes_brackets.append(node[0]-totalNodes-1)
-    
-    Dnodes_brackets = np.array(Dnodes_brackets, dtype=int)
-    bracket_nodes = delete(bracket_nodes, Dnodes_brackets, 0)
-
-    xCoord = nodes[:, 1]
-    yCoord = nodes[:, 2]
-    bottomNodes = argwhere((yCoord >= -1e-3) & (yCoord <= 1e-3))
-    topNodes = argwhere((yCoord <= H + 1e-3) & (yCoord >= H - 1e-3))
-    leftNodes = argwhere((xCoord >= -1e-3) & (xCoord <= 1e-3))
-    rightNodes = argwhere((xCoord <= L + 1e-3) & (xCoord >= L - 1e-3))
-    
-    boundaryNodes = concatenate((bottomNodes, leftNodes, topNodes, rightNodes))
-    boundaryNodes, inx = unique(boundaryNodes,return_index=True)
-    boundaryNodesInx = nodes[boundaryNodes, 0]
-    
-    nodeIndex = nodes[:, 0]
-    nonboundaryNodes = setdiff1d(nodeIndex, boundaryNodesInx)
-
-    xCoord = nodes[nonboundaryNodes.astype(int)-1][:, 1]
-    yCoord = nodes[nonboundaryNodes.astype(int)-1][:, 2]
-    if targeted_disorder == "X":
-        disNodes_pos = argwhere(((yCoord/H >= (xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (xCoord+1.0*unitCellSize)/L)))
-        disNodes_neg = argwhere(((yCoord/H >= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (L-xCoord+1.0*unitCellSize)/L)))
-        disNodes = np.concatenate((disNodes_pos, disNodes_neg))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "nX":
-        disNodes12 = argwhere(((yCoord/H >= (L-xCoord+1.0*unitCellSize)/L) & (yCoord/H >= (xCoord+1.0*unitCellSize)/L)))
-        disNodes23 = argwhere(((yCoord/H <= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H >= (xCoord+1.0*unitCellSize)/L)))
-        disNodes34 = argwhere(((yCoord/H <= (L-xCoord-1.0*unitCellSize)/L) & (yCoord/H <= (xCoord-1.0*unitCellSize)/L)))
-        disNodes41 = argwhere(((yCoord/H >= (L-xCoord+1.0*unitCellSize)/L) & (yCoord/H <= (xCoord-1.0*unitCellSize)/L)))
-        disNodes = np.concatenate((disNodes12, disNodes23, disNodes34, disNodes41))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "v":
-        disNodes1 = argwhere(((xCoord >= 1*L/4-0.75*unitCellSize) & (xCoord <= 1*L/4+0.75*unitCellSize)))
-        disNodes2 = argwhere(((xCoord >= 2*L/4-0.75*unitCellSize) & (xCoord <= 2*L/4+0.75*unitCellSize)))
-        disNodes3 = argwhere(((xCoord >= 3*L/4-0.75*unitCellSize) & (xCoord <= 3*L/4+0.75*unitCellSize)))
-        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "h":
-        disNodes1 = argwhere(((yCoord >= 1*H/4-0.75*unitCellSize) & (yCoord <= 1*H/4+0.75*unitCellSize)))
-        disNodes2 = argwhere(((yCoord >= 2*H/4-0.75*unitCellSize) & (yCoord <= 2*H/4+0.75*unitCellSize)))
-        disNodes3 = argwhere(((yCoord >= 3*H/4-0.75*unitCellSize) & (yCoord <= 3*H/4+0.75*unitCellSize)))
-        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "o":
-        disNodes1 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (3*unitCellSize)**2) & 
-                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (6*unitCellSize)**2)))
-        disNodes = np.concatenate((disNodes1))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "oo":
-        disNodes1 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (2*unitCellSize)**2) & 
-                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (4*unitCellSize)**2)))
-        disNodes2 = argwhere((((yCoord - H/2)**2 + (xCoord - L/2)**2 >= (6*unitCellSize)**2) & 
-                              ((yCoord - H/2)**2 + (xCoord - L/2)**2 <= (8*unitCellSize)**2)))
-        disNodes = np.concatenate((disNodes1, disNodes2))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "D":
-        disNodes1 = argwhere(((yCoord/(H/2) >= ((3*L/2)-xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((3*L/2)-xCoord+1.0*unitCellSize)/(L/2))))
-        disNodes2 = argwhere(((yCoord/(H/2) >= ((L/2)+xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((L/2)+xCoord+1.0*unitCellSize)/(L/2))))
-        disNodes3 = argwhere(((yCoord/(H/2) >= ((L/2)-xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((L/2)-xCoord+1.0*unitCellSize)/(L/2))))
-        disNodes4 = argwhere(((yCoord/(H/2) >= ((-L/2)+xCoord-1.0*unitCellSize)/(L/2)) & (yCoord/(H/2) <= ((-L/2)+xCoord+1.0*unitCellSize)/(L/2))))
-        disNodes = np.concatenate((disNodes1, disNodes2, disNodes3, disNodes4))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "DD":
-        disNodes11 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((4*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((4*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes12 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((5*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((5*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes21 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((L/3)+xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes22 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((2*L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((2*L/3)+xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes31 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((L/3)-xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes32 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/3) >= ((2*L/3)-xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((2*L/3)-xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes41 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((-2*L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((-2*L/3)+xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes42 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/3) >= ((-L/3)+xCoord-1.0*unitCellSize)/(L/3)) & (yCoord/(H/3) <= ((-L/3)+xCoord+1.0*unitCellSize)/(L/3))))
-        disNodes = np.concatenate((disNodes11, disNodes12, disNodes21, disNodes22, disNodes31, disNodes32, disNodes41, disNodes42))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "DDD":
-        disNodes11 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((5*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((5*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes12 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((6*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((6*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes13 = argwhere(((yCoord >= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((7*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((7*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes21 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((L/4)+xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes22 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((2*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((2*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes23 = argwhere(((yCoord >= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((3*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((3*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes31 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((L/4)-xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes32 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((2*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((2*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes33 = argwhere(((yCoord <= H/2) & (xCoord <= L/2) & (yCoord/(H/4) >= ((3*L/4)-xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((3*L/4)-xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes41 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-3*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-3*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes42 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-2*L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-2*L/4)+xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes43 = argwhere(((yCoord <= H/2) & (xCoord >= L/2) & (yCoord/(H/4) >= ((-L/4)+xCoord-1.0*unitCellSize)/(L/4)) & (yCoord/(H/4) <= ((-L/4)+xCoord+1.0*unitCellSize)/(L/4))))
-        disNodes = np.concatenate((disNodes11, disNodes12, disNodes13, disNodes21, disNodes22, disNodes23, disNodes31, disNodes32, 
-                                  disNodes33, disNodes41, disNodes42, disNodes43))
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    elif targeted_disorder == "xs":
-        Hs = [0, H/3, 2*H/3, H]
-        Ls = [0, L/3, 2*L/3, L]
-        disNodes = []
-        for i in range(len(Hs)-1):
-            for j in range(len(Ls)-1):
-                disNodes_pos = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
-                disNodes_neg = argwhere((((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) >= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])-0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & ((yCoord-Hs[i])/(Hs[i+1]-Hs[i]) <= ((Ls[j+1]-Ls[j])-(xCoord-Ls[j])+0.5*unitCellSize)/(Ls[j+1]-Ls[j])) & (yCoord>Hs[i]+0.5*unitCellSize) & (yCoord<Hs[i+1]-0.5*unitCellSize) & (xCoord>Ls[j]+0.5*unitCellSize) & (xCoord<Ls[j+1]-0.5*unitCellSize)))
-                disNodes.append(np.concatenate((disNodes_pos, disNodes_neg)))
-        disNodes = np.array(np.concatenate((np.array(disNodes, dtype=object))), dtype=int)
-        disNodes, inx = unique(disNodes,return_index=True)
-        disNodes = nonboundaryNodes[disNodes].flatten()
-        disorderNodes = disNodes
-    else:
-        disorderNodes = nonboundaryNodes
-    
-    if (distribution.lower() == 'uniform'):
-        randX = random.uniform(-delta, delta, len(disorderNodes))
-        randY = random.uniform(-delta, delta, len(disorderNodes))
-    elif (distribution.lower() == 'lhs_uniform'):
-        if int(idNum-initialJob) == 0:
-            global randX_all, randY_all
-            randX_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
-            randY_all = LHS_uniform(var=len(disorderNodes), strats=numberOfRuns, lim=delta)
-        randX = randX_all[idNum-initialJob]
-        randY = randY_all[idNum-initialJob]
-    elif (distribution.lower() == 'normal'):
-        randX = random.normal(0.0, delta, len(disorderNodes))
-        randY = random.normal(0.0, delta, len(disorderNodes))
-    elif (distribution.lower() == 'exponential'):
-        randX = random.exponential(1/delta, len(disorderNodes))
-        randY = random.exponential(1/delta, len(disorderNodes))
-    elif (distribution.lower() == 'frequency'):
-        rows = set(nodes[disorderNodes.astype(int)-1,2])
-        while len(frequencies) < (2*len(rows)):
-            f = random_low_alias_freq(dx=unitCellSize)
-            if f not in frequencies:
-                frequencies.append(f)
-        rand = nodes[disorderNodes.astype(int)-1]
-        rand[:,1] = np.zeros(len(disorderNodes))
-        rand[:,2] = np.zeros(len(disorderNodes))
-        for i, y in enumerate(rows):
-            dN = nodes[disorderNodes.astype(int)-1]
-            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
-            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
-                          for j in dN_xs])
-            idxs = np.isin(rand[:,0], r[:,0])
-            sorter = np.argsort(r[:,0])
-            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
-            rand[idxs,1] = r[match_idxs,1]
-            rand[idxs,2] = r[match_idxs,2]
-        randX = rand[:,1]
-        randY = rand[:,2]
-    elif (distribution.lower() == 'opt'):
-        randX = opt_dis_x
-        randY = opt_dis_y
-    elif (distribution.lower() == 'opt-f'):
-        rows = set(nodes[disorderNodes.astype(int)-1,2])
-        print(len(rows), len(frequencies))
-        rand = nodes[disorderNodes.astype(int)-1]
-        rand[:,1] = np.zeros(len(disorderNodes))
-        rand[:,2] = np.zeros(len(disorderNodes))
-        for i, y in enumerate(rows):
-            dN = nodes[disorderNodes.astype(int)-1]
-            dN_xs = dN[argwhere(dN[:,2] == y)][:,:,:2]
-            r = np.array([[j[0,0], triangle_wave(j[0,1]+(2*unitCellSize), frequencies[2*i], delta), triangle_wave(j[0,1], frequencies[2*i+1], delta)] 
-                          for j in dN_xs])
-            idxs = np.isin(rand[:,0], r[:,0])
-            sorter = np.argsort(r[:,0])
-            match_idxs = sorter[np.searchsorted(r[:,0], rand[idxs,0], sorter=sorter)]
-            rand[idxs,1] = r[match_idxs,1]
-            rand[idxs,2] = r[match_idxs,2]
-        randX = rand[:,1]
-        randY = rand[:,2]
-
-    disorderCoordX = nodes[disorderNodes.astype(int)-1,1] + randX
-    disorderCoordY = nodes[disorderNodes.astype(int)-1,2] + randY
-    
-    nodesR[:,0] = nodes[:,0]
-    nodesR[:,1] = nodes[:,1]
-    nodesR[:,2] = nodes[:,2]
-    nodesR[disorderNodes.astype(int)-1,1] = disorderCoordX
-    nodesR[disorderNodes.astype(int)-1,2] = disorderCoordY
-    
-    return nodes, nodesR, bracket_nodes
-
-def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
-    radius = geom.l + geom.l*1e-3
-    dummyElem = []
-    count = 0
-    for ii in range(len(nodes)):
-        x_coord = nodes.shape[-1]-3 if stiff else nodes.shape[-1]-2
-        y_coord = nodes.shape[-1]-2 if stiff else nodes.shape[-1]-1
-        if (LAT.lower() == "fcc" and nodes[ii][int(x_coord)])%2 == 1.0 and (nodes[ii][int(y_coord)])%2 == 1.0:
-            continue
-        distance = np.sqrt(np.array(nodes[ii, int(x_coord)] - nodes[:, int(x_coord)])**2 + np.array(nodes[ii, int(y_coord)] - nodes[:, int(y_coord)])**2)
-        inside = np.argwhere(distance <= radius)
-        nearNodes = np.setdiff1d(inside.astype(int), [ii])
-        for jj in range(len(nearNodes)):
-            dummyElem.append([count,ii,nearNodes[jj]])
-            count = count + 1            
-    for i in range(len(dummyElem)):
-        for j in range(len(dummyElem)):
-            if (dummyElem[i][1] == dummyElem[j][2]):
-                if (dummyElem[i][2] == dummyElem[j][1]):
-                    dummyElem[j][:] = [0, 0, 0]
-                    break
-    indexRemove = []
-    for i in range(0,len(dummyElem)):
-        if (dummyElem[i][0] == 0 and dummyElem[i][1] == 0 and dummyElem[i][2] == 0):
-            indexRemove.append(i)
-        if stiff:
-            if LAT.lower() == "tri" and mode.lower() == "unit":
-                if (dummyElem[i][1] == 3 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 3):
-                    indexRemove.append(i)
-                elif (dummyElem[i][1] == 0 and dummyElem[i][2] == 3) or (dummyElem[i][1] == 3 and dummyElem[i][2] == 0):
-                    indexRemove.append(i)
-                elif (dummyElem[i][1] == 3 and dummyElem[i][2] == 5) or (dummyElem[i][1] == 5 and dummyElem[i][2] == 3):
-                    indexRemove.append(i)
-                elif (dummyElem[i][1] == 1 and dummyElem[i][2] == 4) or (dummyElem[i][1] == 4 and dummyElem[i][2] == 1):
-                    indexRemove.append(i)
-                elif (dummyElem[i][1] == 4 and dummyElem[i][2] == 6) or (dummyElem[i][1] == 6 and dummyElem[i][2] == 4):
-                    indexRemove.append(i)
-            elif LAT.lower() == "tri" and mode.lower() == "lattice":
-                if ((nodes[dummyElem[i][1]][1] == 0 and nodes[dummyElem[i][2]][1] == 0) or 
-                    (nodes[dummyElem[i][1]][1] == geom.H and nodes[dummyElem[i][2]][1] == geom.H)):
-                    indexRemove.append(i)
-    realElem = np.delete(dummyElem, [indexRemove], axis=0)
-    if stiff:
-        realElem = realElem
-    else:
-        realElem = realElem + 1
-
-    if mode and mode.lower() == "fracture":
-        xCrS = [-0.1*geom.W, geom.H/2-geom.l*0.2]                                         # crack starting point bottomLeft
-        xCrE = [geom.a0 - 0.2*geom.l, geom.H/2+geom.l*0.2]
-    
-        delElems = []
-        for ik in range(0,len(realElem)):
-            x1 = nodes[int(realElem[ik][1]-1)][1]
-            x2 = nodes[int(realElem[ik][2]-1)][1]
-            y1 = nodes[int(realElem[ik][1]-1)][2]
-            y2 = nodes[int(realElem[ik][2]-1)][2]
-            midPointX = (x1+x2)/2
-            midPointY = (y1+y2)/2
-            point = (midPointX,midPointY)
-            insideTest = insidePoint(xCrS,xCrE,point)
-            if insideTest:
-                delElems.append(realElem[ik][0])
-
-        delElems = np.array(delElems, dtype=int)
-        realElem = np.delete(realElem, delElems, 0)
-    
-    for i in range(len(realElem)):
-        realElem[i][0] = i+1
-
-    if job is not None:
-        with open(job.split('.inp')[0]+"\\"+"NodesElems.csv", 'a') as f:
-            f.write("*Elems\n")
-            for elem in realElem:
-                f.write("{}, {}, {}\n".format(int(elem[0]), int(elem[1]), int(elem[2])))
-    return realElem
-
-def insidePoint(bl, tr, p) :
-   if (p[0] > bl[0] and p[0] < tr[0] and p[1] > bl[1] and p[1] < tr[1]) :
-      return True
-   else :
-      return False
-
-def in_circle(center_x, center_y, radius, x, y):
-    dist = math.sqrt((center_x - x) ** 2 + (center_y - y) ** 2)
-    return dist <= radius
-
-class Geometry:
-    def __init__(self, LAT, l, nnx, rD=0.2):
-        self.LAT = LAT
-        self.l = l
-        self.nnx = nnx
-        self.rD = rD
-
-        self.t = self.rDthickness(rD=rD)
-
-        if LAT.lower() == 'fcc':
-            L = float(l * nnx)
-            Lmin = L
-            H0 = 0.96 * L
-            Hs = [l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / l
-
-            if round(nny) % 2.0 == 0.0:
-                if H / L >= 0.96:
-                    H = H - l
-                    nny = H / l
-                elif H / L < 0.96:
-                    H = H + l
-                    nny = H / l
-
-            W = L / 1.25
-            a = [L / nnx * i for i in range(nnx + 1)]
-            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
-            ai = [a0 + ((l / 2) * (i)) for i in range(nnx)]
-            vol = L * H
-
-            nny = int(round(nny))
-            totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
-            totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
-            deltaNM = 0.5 * np.sqrt(l * l + l * l)
-
-        elif LAT.lower() == 'square':
-            L = float(l * nnx)
-            Lmin = L
-            H0 = 0.96 * L
-            Hs = [l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / l
-
-            if round(nny) % 2.0 == 0.0:
-                if H / L >= 0.96:
-                    H = H - l
-                    nny = H / l
-                elif H / L < 0.96:
-                    H = H + l
-                    nny = H / l
-
-            W = L / 1.25
-            a = [L / nnx * i for i in range(nnx + 1)]
-            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
-            ai = [a0 + ((l / 2) * (i)) for i in range(nnx)]
-            vol = L * H
-
-            nny = int(round(nny))
-            totalNodes = int(round((nnx + 1) * (nny + 1)))
-            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
-            deltaNM = l
-
-        elif LAT.lower() == '45square':
-            L = float(2**(1/2) * l * nnx)
-            Lmin = L
-            H0 = 0.96 * L
-            Hs = [2**(1/2) * l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / ((2**(1/2))*l)
-
-            if round(nny) % 2.0 == 0.0:
-                if H / L >= 0.96:
-                    H = H - ((2**(1/2))*l)
-                    nny = H / ((2**(1/2))*l)
-                elif H / L < 0.96:
-                    H = H + ((2**2)*l)
-                    nny = H / ((2**(1/2))*l)
-
-            W = L / 1.25
-            a = [L / nnx * i for i in range(nnx + 1)]
-            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
-            ai = [a0 + (((2**(1/2))*l) * (i)) for i in range(nnx)]
-            vol = L * H
-
-            nny = int(round(nny))
-            totalNodes = int(round((nnx + 1) * (nny + 1) + nnx * nny))
-            totalBracketNodes = int(round((nnx + 5) * 3 * 2 + (nnx + 4) * 3 * 2))
-            deltaNM = l
-
-        elif LAT.lower() == 'tri':
-            if nnx % 2.0 == 1.0:
-                nnx = nnx - 1
-            L = 0.5 * (3.0 ** 0.5) * l * nnx
-            Lmin = L
-            H0 = 0.96 * L
-            Hs = [l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / l
-
-            if round(nny) % 2.0 == 0.0:
-                if H / L >= 0.96:
-                    H = H - l
-                    nny = H / l
-                elif H / L < 0.96:
-                    H = H + l
-                    nny = H / l
-
-            W = L / 1.25
-            a = [L / (nnx / 2) * i for i in range(nnx + 1)]
-            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
-            ai = [a0 + ((0.5 * (3.0 ** 0.5) * l) * (i)) for i in range(nnx)]
-            vol = L * H
-
-            nny = int(round(nny))
-            totalNodes = int(round(((nnx / 1.99999) + 1) * (nny + 1)) +
-                             round((nnx / 1.99999) * nny))
-            totalBracketNodes = int(round(((nnx / 1.99999) + 3) * 3 * 2) +
-                                    round(((nnx / 1.99999) + 2) * 3 * 2) +
-                                    2 * (nnx / 2.0 + 2))
-            deltaNM = l
-
-        elif LAT.lower() == 'kagome':
-            L = l * (2.0 * nnx - 1)
-            Lmin = L - 3*l
-            H0 = 0.96 * L
-            Hs = [(3.0 ** 0.5) * l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / ((3.0 ** 0.5) * l)
-
-            if round(nny) % 2.0 == 0.0:
-                if H / L >= 0.96:
-                    H = H - ((3.0 ** 0.5) * l)
-                    nny = H / ((3.0 ** 0.5) * l)
-                elif H / L < 0.96:
-                    H = H + ((3.0 ** 0.5) * l)
-                    nny = H / ((3.0 ** 0.5) * l)
-
-            W = L / 1.25
-            if round(nny) % 4 == 3:
-                a = [2 * L * i / (2 * nnx - 1) + 0.5 * l for i in range(nnx + 1)]
-            elif round(nny) % 4 == 1:
-                a = [2 * L * i / (2 * nnx - 1) + 1.5 * l for i in range(nnx + 1)]
-            else:
-                a = [2 * L * i / (2 * nnx - 1) + 0.5 * l for i in range(nnx + 1)]
-
-            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
-            ai = [a0 + ((2 * l) * (i)) for i in range(nnx)]
-            vol = L * H
-
-            nny = int(round(nny))
-            totalNodes = int(round((2 * nnx * (nny + 1)) +
-                                   (nnx - 1) * math.ceil(nny / 2.0) +
-                                   (nnx) * math.floor(nny / 2)))
-            totalBracketNodes = int(round(((2 * nnx + 4) * 3 + (nnx + 2) * 2 + (nnx + 1)) * 2))
-            deltaNM = l
-
-        elif LAT.lower() == 'hex':
-            L = (3.0 ** 0.5) * l * nnx
-            Lmin = L - ((3.0 ** 0.5) * l)
-            H0 = 0.96 * L
-            Hs = [(0.5 * l) + (1.5 * l * i) for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = (H - (0.5 * l)) / (1.5 * l)
-
-            if round(nny) % 2.0 == 0.0:
-                if H / L >= 0.96:
-                    H = H - 1.5 * l
-                    nny = (H - (0.5 * l)) / (1.5 * l)
-                elif H / L < 0.96:
-                    H = H + 1.5 * l
-                    nny = (H - (0.5 * l)) / (1.5 * l)
-
-            nny = int(round(nny))
-            W = L / 1.25
-
-            if round(nny) % 4 == 3:
-                a = [((3.0 ** 0.5) / 2) * l + (L - ((3.0 ** 0.5) * l)) / (nnx - 1) * i
-                     for i in range(nnx + 1)]
-            elif round(nny) % 4 == 1:
-                a = [L / nnx * i for i in range(nnx + 1)]
-            else:
-                a = [L / nnx * i for i in range(nnx + 1)]
-
-            a0 = min(a, key=lambda x: abs(x - (0.75 * W)))
-            ai = [a0 + (((3.0 ** 0.5) * (l / 2)) * (i)) for i in range(nnx)]
-            vol = L * H
-
-            totalNodes = int(round(2 * (nnx) * math.ceil(nny / 2.0) +
-                                   2 * (nnx + 1) * math.ceil(nny / 2.0)))
-            totalBracketNodes = int(round(((nnx + 5) * 4 + (nnx + 4) * 4) * 2 + 4))
-            deltaNM = l
-
-        self.nnx = nnx
-        self.nny = nny
-        self.L = L
-        self.Lmin = Lmin
-        self.H = H
-        self.W = W
-        self.a0 = a0
-        self.ai = ai
-        self.vol = vol
-        self.totalNodes = totalNodes
-        self.totalBracketNodes = totalBracketNodes
-        self.deltaNM = deltaNM
-        self.B = 0.5 * self.W
-
-    def rDthickness(self, t=None, rD=None):
-        if self.LAT.lower() == "fcc":
-            A = 2*(1+np.sqrt(2))
-        elif "square" in self.LAT.lower():
-            A = 2
-        elif self.LAT.lower() == "tri":
-            A = 2*np.sqrt(3)
-        elif self.LAT.lower() == "kagome":
-            A = np.sqrt(3)
-        elif self.LAT.lower() == "hex":
-            A = 2/np.sqrt(3)
-            
-        if t:
-            self.rD = A*(t/self.l)
-        elif rD:
-            self.t = (self.l*rD)/A
-
-    def stiffnessMatrix(self, stiffCalc=False):
-        nnx = 10
-        if self.LAT.lower() == "fcc":
-            nny = nnx
-            L = float(self.l * nnx)
-            H = float(self.l * nny)
-            vol = L * H
-            if stiffCalc:
-                if stiffCalc.lower() == "unit":
-                    vol = self.l ** 2
-                elif stiffCalc.lower() == "lattice":
-                    vol = L * H
-        elif self.LAT.lower() == "tri":
-            if stiffCalc:
-                nny = nnx
-                L = (3 ** 0.5) * self.l * nnx
-                H = self.l * nny
-                vol = L * H
-                if stiffCalc.lower() == "unit":
-                    vol = self.l * (2 * self.l * (3 ** 0.5) / 2)
-                elif stiffCalc.lower() == "lattice":
-                    vol = L * H
-            else:
-                nnx = nnx * 2
-                nny = nnx / 2
-                L = 0.5 * (3.0 ** 0.5) * self.l * nnx
-                H = self.l * nny
-                vol = L * H
-        elif self.LAT.lower() == "kagome":
-            nny = nnx
-            L = self.l * (2.0 * nnx - 1)
-            H = (3.0 ** 0.5) * self.l * nny
-            vol = L * H
-            if stiffCalc:
-                if stiffCalc.lower() == "unit":
-                    vol = (3 * self.l) * (4 * self.l * ((3 ** 0.5) / 2))
-                elif stiffCalc.lower() == "lattice":
-                    vol = L * H
-        elif self.LAT.lower() == "hex":
-            L = (3 ** 0.5) * self.l * nnx
-            if stiffCalc:
-                nny = nnx
-                H = 3 * self.l * nny
-                vol = L * H
-                if stiffCalc.lower() == "unit":
-                    vol = (3 * self.l) * (2 * self.l * ((3 ** 0.5) / 2))
-                elif stiffCalc.lower() == "lattice":
-                    vol = L * H
-            else:
-                nny = nnx * 2 + 1
-                H = 3 * self.l * nny
-                vol = L * H
-        self.nnx = nnx
-        self.nny = int(round(nny))
-        self.L = L
-        self.H = H
-        self.vol = vol
-
-    def FTcalc(self):
-        self.a0 = self.a0 - 0.25 * self.W
-        if self.LAT.lower() == "fcc":
-            self.ai = [self.a0 + ((self.l / 2) * (i)) for i in range(self.nnx)]
-        elif "square" in self.LAT.lower():
-            self.ai = [self.a0 + ((self.l * 2**(1/2)) * (i)) for i in range(self.nnx)]
-        elif self.LAT.lower() == "tri":
-            self.ai = [self.a0 + ((0.5 * (3.0 ** 0.5) * self.l) * (i)) for i in range(self.nnx)]
-        elif self.LAT.lower() == "kagome":
-            self.ai = [self.a0 + ((2 * self.l) * (i)) for i in range(self.nnx)]
-        elif self.LAT.lower() == "hex":
-            self.ai = [self.a0 + (((3.0 ** 0.5) * (self.l / 2)) * (i)) for i in range(self.nnx)]
-
-    def nodeCount(self, mode=False, stiffMatrix=False):
-        if self.LAT.lower() == "fcc" or self.LAT.lower() == "45square":
-            totalNodes = int(round((self.nnx + 1) * (self.nny + 1) + self.nnx * self.nny))
-            totalBracketNodes = int(round((self.nnx + 5) * 3 * 2 + (self.nnx + 4) * 3 * 2))
-            if mode and mode.lower() == "fracture":
-                self.totalNodes = totalNodes - round(self.nnx / 1.66666667)
-            elif mode and mode.lower() == "ductile":
-                self.totalNodes = totalNodes + totalBracketNodes - 8
-            if stiffMatrix:
-                nnx, nny = 10, 10
-                self.totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
-        elif self.LAT.lower() == "square":
-            totalNodes = int(round((nnx + 1) * (nny + 1)))
-            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
-            if mode and mode.lower() == "fracture":
-                self.totalNodes = totalNodes
-            elif mode and mode.lower() == "ductile":
-                self.totalNodes = totalNodes + totalBracketNodes - 4
-            if stiffMatrix:
-                nnx, nny = 10, 10
-                self.totalNodes = int((nnx + 1) * (nny + 1))
-        elif self.LAT.lower() == "tri":
-            totalNodes = int(round(((self.nnx / 1.99999) + 1) * (self.nny + 1)) +
-                             round((self.nnx / 1.99999) * self.nny))
-            totalBracketNodes = int(round(((self.nnx / 1.99999) + 3) * 3 * 2) +
-                                    round(((self.nnx / 1.99999) + 2) * 3 * 2) +
-                                    2 * (self.nnx / 2.0 + 2))
-            if mode and mode.lower() == "fracture":
-                self.totalNodes = totalNodes - round(self.nnx / 3.33333333)
-            elif mode and mode.lower() == "ductile":
-                self.totalNodes = totalNodes + totalBracketNodes - 4
-            if stiffMatrix:
-                nnx, nny = 10, 10
-                self.totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
-        elif self.LAT.lower() == "kagome":
-            totalNodes = int(round((2 * self.nnx * (self.nny + 1)) +
-                                   (self.nnx - 1) * math.ceil(self.nny / 2.0) +
-                                   (self.nnx) * math.floor(self.nny / 2)))
-            totalBracketNodes = int(round(((2 * self.nnx + 4) * 3 + (self.nnx + 2) * 2 + (self.nnx + 1)) * 2))
-            if mode and mode.lower() == "fracture":
-                self.totalNodes = totalNodes - round(self.nnx / 1.75)
-            elif mode and mode.lower() == "ductile":
-                self.totalNodes = totalNodes + totalBracketNodes - 16
-            if stiffMatrix:
-                nnx, nny = 10, 10
-                self.totalNodes = int((2*nnx*(nny+1)) + (nnx-1)*math.ceil(nny/2.0) + (nnx)*math.floor(nny/2))
-        elif self.LAT.lower() == "hex":
-            totalNodes = int(round(2 * (self.nnx) * math.ceil(self.nny / 2.0) +
-                                   2 * (self.nnx + 1) * math.ceil(self.nny / 2.0)))
-            totalBracketNodes = int(round(((self.nnx + 5) * 4 + (self.nnx + 4) * 4) * 2 + 4))
-            if mode and mode.lower() == "fracture":
-                self.totalNodes = totalNodes
-            elif mode and mode.lower() == "ductile":
-                self.totalNodes = totalNodes + totalBracketNodes - 12
-            if stiffMatrix:
-                nnx, nny = 10, 10
-                self.totalNodes = ((2*nny) * (nnx+1)) + (((2*nny)+1) * nnx) + 50
-
-    def UTval(self):
-        self.nnx = 20
-        self.l = 10.0
-        self.nny = 18
-        self.H = self.nny * self.l
-        self.vol = self.L * self.H
-        self.totalNodes = int(round(((self.nnx / 1.99999) + 1) * (self.nny + 1)) +
-                              round((self.nnx / 1.99999) * self.nny))
-        self.totalBracketNodes = int(round(((self.nnx / 1.99999) + 3) * 3 * 2) +
-                                     round(((self.nnx / 1.99999) + 2) * 3 * 2) +
-                                     2 * (self.nnx / 2.0 + 2))
-
-def pStrainProperties(E, v):
-    return E/(1-v**2), v/(1-v)
-
-def LHS_uniform(var, strats, lim, mean=0, plot=False):
-    lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
-    upper_limits = lower_limits + ((lower_limits[-1] - lower_limits[0])/(len(lower_limits)-1))
-    
-    points = np.zeros((strats, var))
-    for i in range(var):
-        points[:, i] = np.random.uniform(lower_limits, upper_limits, size=strats)
-        np.random.shuffle(points[:, i])
-    return points
-
-def triangle_wave(x, f, A):
-    frac = np.mod(f * x, 1.0)
-    tri = np.where(frac < 0.5, 2 * frac, 2 * (1 - frac))
-    return A * (2 * tri - 1)
-
-def sine_wave(x, f, A):
-    return A * np.sin(2 * np.pi * f * x)
-
-def is_well_approximable(alpha, q_max=20, tol=1e-6):
-    frac = Fraction(alpha).limit_denominator(q_max)
-    return abs(alpha - frac.numerator/frac.denominator) < tol
-
-def random_low_alias_freq(dx=10.0, q_max=20, tol=1e-6):
-    f_max = 1.0 / (2.0 * dx)
-    while True:
-        f = random.uniform(0, f_max)
-        alpha = f * dx
-        if not is_well_approximable(alpha, q_max=q_max, tol=tol):
-            return f
 
 ############################################################################################
 ################################## START ###################################################
@@ -1672,10 +287,10 @@ elif (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
     fac = fac
     dist = "opt"
 elif (distribution.lower() == 'normal'):
-    fac = (2*fac)/sqrt(2*pi*exp(1))
+    fac = (2*fac)/np.sqrt(2*np.pi*np.exp(1))
     dist = "norm"
 elif (distribution.lower() == 'exponential'):
-    fac = exp(1)/(2*fac)
+    fac = np.exp(1)/(2*fac)
     dist = "exp"
 
 for idNum in range(initial,numOfJobs):
@@ -1685,7 +300,25 @@ for idNum in range(initial,numOfJobs):
     elemType     = B21
     units        = 'millimeter'    # mass = tonn, length = millimeter, stress = MPa
     
-    nodes, nodesR, bracket_nodes = node(latticeType, L, H, nnx, nny, totalNodes, totalBracketNodes, delta, distribution)
+    nodes, nodesR, bracket_nodes = node(
+        latticeType,
+        L,
+        H,
+        nnx,
+        nny,
+        totalNodes,
+        totalBracketNodes,
+        delta,
+        distribution,
+        unitCellSize=unitCellSize,
+        targeted_disorder=targeted_disorder,
+        idNum=idNum,
+        initialJob=initial,
+        numberOfRuns=(numOfJobs - initial),
+        frequencies=frequencies,
+        opt_dis_x=globals().get("opt_dis_x"),
+        opt_dis_y=globals().get("opt_dis_y"),
+    )
 
     if (distribution.lower() == 'opt') or (distribution.lower() == 'opt-f'):
         idNum = sampleN
@@ -1729,8 +362,8 @@ for idNum in range(initial,numOfJobs):
                 nodes_duct = nodes
                 nodesR_duct = nodesR
             else:
-                nodes_duct = append(nodes, bracket_nodes, axis=0)
-                nodesR_duct = append(nodesR, bracket_nodes, axis=0)
+                nodes_duct = np.append(nodes, bracket_nodes, axis=0)
+                nodesR_duct = np.append(nodesR, bracket_nodes, axis=0)
             
             #############################################################################################
             #################################### Strut Elements #########################################
@@ -1750,20 +383,20 @@ for idNum in range(initial,numOfJobs):
                 if pStrainUT:
                     outofPlaneThick = B
             
-            length = zeros(shape=(len(element),1))
+            length = np.zeros(shape=(len(element),1))
             for ik in range(0,len(element)-1):
                 x1 = nodesR[int(element[ik][1]-1)][1]
                 x2 = nodesR[int(element[ik][2]-1)][1]
                 y1 = nodesR[int(element[ik][1]-1)][2]
                 y2 = nodesR[int(element[ik][2]-1)][2]
-                length[ik][0] = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+                length[ik][0] = np.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
 
             if (crossSection.lower() == 'circ'):
-                constants = [4 *relDensity, (L + H - pi * sum(length)), 4 * relDensity * (L * H)]
-                dia_opt = roots(constants)
-                dia_est = 2 * relDensity * 4 * L * H / (sum(length) * 2 * pi)
+                constants = [4 *relDensity, (L + H - np.pi * sum(length)), 4 * relDensity * (L * H)]
+                dia_opt = np.roots(constants)
+                dia_est = 2 * relDensity * 4 * L * H / (sum(length) * 2 * np.pi)
                 diff_sqr = [(dia_opt[0] - dia_est) ** 2, (dia_opt[1] - dia_est) ** 2]
-                index = argmin(diff_sqr)
+                index = np.argmin(diff_sqr)
 
                 rad = dia_opt[index]/ 2
                 Area = 3.14159*rad*rad
@@ -1838,7 +471,7 @@ for idNum in range(initial,numOfJobs):
             p.Set(edges=bodyElems, name='BodySet')
             
             brackElems = []
-            elemBrackets = delete(element_duct, bodyElem_idxs, 0)
+            elemBrackets = np.delete(element_duct, bodyElem_idxs, 0)
             for numEdge in range(len(element), len(element_duct)):
                 x1 = nodesR_duct[int(elemBrackets[numEdge-len(element)][1]-1)][1]
                 x2 = nodesR_duct[int(elemBrackets[numEdge-len(element)][2]-1)][1]
@@ -1903,7 +536,7 @@ for idNum in range(initial,numOfJobs):
                 mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
                 mdb.models[ModelName].materials[userMaterial].Plastic(table=
                     ((550, 0.0),
-                    (550.01,	0.00001)))
+                    (550.01, 0.00001)))
                 mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
                     table=((0.00001, 0.333333, 0.0), ))
                 mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
@@ -1923,37 +556,37 @@ for idNum in range(initial,numOfJobs):
                 mdb.models[ModelName].materials[userMaterial].Density(table=((4.43e-09, ), ))
                 mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
                 mdb.models[ModelName].materials[userMaterial].Plastic(table=
-                    ((932,	        0),
+                    ((932,         0),
                     (947.411802,    0.003453491),
-                    (957.4512331,	0.006906981),
-                    (966.1307689,	0.010360472),
-                    (974.030469,	0.013813962),
-                    (981.3967087,	0.017267453),
-                    (988.3639577,	0.020720943),
-                    (995.0160058,	0.024174434),
-                    (1001.409616,	0.027627924),
-                    (1007.585541,	0.031081415),
-                    (1013.574312,	0.034534905),
-                    (1019.399572,	0.037988396),
-                    (1025.08011,	0.041441886),
-                    (1030.631179,	0.044895377),
-                    (1036.065381,	0.048348867),
-                    (1041.393285,	0.051802358),
-                    (1046.623866,	0.055255848),
-                    (1051.764831,	0.058709339),
-                    (1056.822861,	0.062162829),
-                    (1061.803799,	0.06561632),
-                    (1066.712789,	0.06906981),
-                    (1071.554397,	0.072523301),
-                    (1076.332693,	0.075976791),
-                    (1081.05133,	0.079430282),
-                    (1085.713601,	0.082883772),
-                    (1090.322488,	0.086337263),
-                    (1094.880702,	0.089790753),
-                    (1099.39072,	0.093244244),
-                    (1103.854808,	0.096697734),
-                    (1108.275052,	0.100151225),
-                    (1112.653372,	0.103604715)))
+                    (957.4512331, 0.006906981),
+                    (966.1307689, 0.010360472),
+                    (974.030469, 0.013813962),
+                    (981.3967087, 0.017267453),
+                    (988.3639577, 0.020720943),
+                    (995.0160058, 0.024174434),
+                    (1001.409616, 0.027627924),
+                    (1007.585541, 0.031081415),
+                    (1013.574312, 0.034534905),
+                    (1019.399572, 0.037988396),
+                    (1025.08011, 0.041441886),
+                    (1030.631179, 0.044895377),
+                    (1036.065381, 0.048348867),
+                    (1041.393285, 0.051802358),
+                    (1046.623866, 0.055255848),
+                    (1051.764831, 0.058709339),
+                    (1056.822861, 0.062162829),
+                    (1061.803799, 0.06561632),
+                    (1066.712789, 0.06906981),
+                    (1071.554397, 0.072523301),
+                    (1076.332693, 0.075976791),
+                    (1081.05133, 0.079430282),
+                    (1085.713601, 0.082883772),
+                    (1090.322488, 0.086337263),
+                    (1094.880702, 0.089790753),
+                    (1099.39072, 0.093244244),
+                    (1103.854808, 0.096697734),
+                    (1108.275052, 0.100151225),
+                    (1112.653372, 0.103604715)))
                 mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
                     table=((0.102268174, 0.333333, 0.0), ))
                 mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
@@ -1972,8 +605,8 @@ for idNum in range(initial,numOfJobs):
                     lowerLim = (1.0 - beta) * thickness
                     upperLim = (1.0 + beta) * thickness
 
-                    thick = random.uniform(lowerLim, upperLim, len(element))
-                    latticeVolume = dot(length[:].T, thick*outofPlaneThick)
+                    thick = np.random.uniform(lowerLim, upperLim, len(element))
+                    latticeVolume = np.dot(length[:].T, thick*outofPlaneThick)
                     
                     relativeDensityUpdated = latticeVolume/(L * H * outofPlaneThick)
 
@@ -2168,11 +801,11 @@ for idNum in range(initial,numOfJobs):
                     ycoord = n.coordinates[1]
                     if xcoord > -tol and xcoord < +tol and ycoord > -tol and ycoord < (H+tol):
                         left_nodes.append(n)
-                    if ycoord > (-3*sqrt(3)*unitCellSize)-tol and ycoord < (-3*sqrt(3)*unitCellSize)+tol:
+                    if ycoord > (-3*np.sqrt(3)*unitCellSize)-tol and ycoord < (-3*np.sqrt(3)*unitCellSize)+tol:
                         bottom_nodes.append(n)
                     if xcoord > L-tol and xcoord < L+tol and ycoord > -tol and ycoord < (H+tol):
                         right_nodes.append(n)
-                    if ycoord > (H+3*sqrt(3)*unitCellSize)-tol and ycoord < (H+3*sqrt(3)*unitCellSize)+tol:
+                    if ycoord > (H+3*np.sqrt(3)*unitCellSize)-tol and ycoord < (H+3*np.sqrt(3)*unitCellSize)+tol:
                         exist = xcoord in rfNodes
                         if exist:
                             top_nodes.append(n)
@@ -2320,7 +953,6 @@ for idNum in range(initial,numOfJobs):
                                 region=region, u1=frac, u2=0.0, ur3=UNSET, amplitude='Amp-1', fixed=OFF, 
                                 distributionType=UNIFORM, fieldName='', localCsys=None)
 
-
                     elif caseCmatrix.lower() == "b":
                         a = mdb.models[ModelName].rootAssembly
                         region = a.sets['Set-topBody']
@@ -2354,7 +986,7 @@ for idNum in range(initial,numOfJobs):
                         bB = set(n.label for n in a.sets['Set-bottomBody'].nodes)
                         all_ids = list(bL | bR | bT | bB)
 
-                        all_nodes = dict((n.label, n) for n in a.instances[a.instances.keys()[0]].nodes) \
+                        all_nodes = dict((n.label, n) for n in a.instances[a.instances.keys()[0]].nodes)\
                             if hasattr(a, 'instances') else dict((n.label, n) for n in a.nodes)
 
                         for num, nid in enumerate(all_ids):
@@ -2614,8 +1246,8 @@ for idNum in range(initial,numOfJobs):
                 continue
 
         delNodes = np.array(delNodes, dtype=int)
-        nodes = delete(nodes,delNodes,0)
-        nodesR = delete(nodesR,delNodes,0)
+        nodes = np.delete(nodes,delNodes,0)
+        nodesR = np.delete(nodesR,delNodes,0)
 
         for kk in range(0,len(nodes)):
             nodes[kk][0] = kk+1
@@ -2649,7 +1281,7 @@ for idNum in range(initial,numOfJobs):
                 continue
 
         delNodes = np.array(delNodes, dtype=int)
-        element = delete(element,delNodes,0)
+        element = np.delete(element,delNodes,0)
         
         #############################################################################################
         ################################ Radius Calculation #########################################
@@ -2658,20 +1290,20 @@ for idNum in range(initial,numOfJobs):
         if outofPlaneThick is None:
             outofPlaneThick = B
         
-        length = zeros(shape=(len(element),1))
+        length = np.zeros(shape=(len(element),1))
         for ik in range(0,len(element)):
             x1 = nodesR[int(element[ik][1]-1)][1]
             x2 = nodesR[int(element[ik][2]-1)][1]
             y1 = nodesR[int(element[ik][1]-1)][2]
             y2 = nodesR[int(element[ik][2]-1)][2]
-            length[ik][0] = sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
+            length[ik][0] = np.sqrt((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2))
         
         if (crossSection.lower() == 'circ'):
-            constants = [4 *relDensity, (L + H - pi * sum(length)), 4 * relDensity * (L * H)]
-            dia_opt = roots(constants)
-            dia_est = 2 * relDensity * 4 * L * H / (sum(length) * 2 * pi)
+            constants = [4 *relDensity, (L + H - np.pi * sum(length)), 4 * relDensity * (L * H)]
+            dia_opt = np.roots(constants)
+            dia_est = 2 * relDensity * 4 * L * H / (sum(length) * 2 * np.pi)
             diff_sqr = [(dia_opt[0] - dia_est) ** 2, (dia_opt[1] - dia_est) ** 2]
-            index = argmin(diff_sqr)
+            index = np.argmin(diff_sqr)
 
             rad = dia_opt[index]/ 2
             Area = 3.142*rad*rad
@@ -2787,7 +1419,7 @@ for idNum in range(initial,numOfJobs):
             mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
             mdb.models[ModelName].materials[userMaterial].Plastic(table=
                 ((550, 0.0),
-                (550.1,	0.00001)))
+                (550.1, 0.00001)))
             mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
                 table=((0.00001, 0.333333, 0.0), ))
             mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
@@ -2806,37 +1438,37 @@ for idNum in range(initial,numOfJobs):
             mdb.models[ModelName].materials[userMaterial].Density(table=((4.43e-09, ), ))
             mdb.models[ModelName].materials[userMaterial].Elastic(table=((E, nu), ))
             mdb.models[ModelName].materials[userMaterial].Plastic(table=
-                ((932,	        0),
+                ((932,         0),
                 (947.411802,    0.003453491),
-                (957.4512331,	0.006906981),
-                (966.1307689,	0.010360472),
-                (974.030469,	0.013813962),
-                (981.3967087,	0.017267453),
-                (988.3639577,	0.020720943),
-                (995.0160058,	0.024174434),
-                (1001.409616,	0.027627924),
-                (1007.585541,	0.031081415),
-                (1013.574312,	0.034534905),
-                (1019.399572,	0.037988396),
-                (1025.08011,	0.041441886),
-                (1030.631179,	0.044895377),
-                (1036.065381,	0.048348867),
-                (1041.393285,	0.051802358),
-                (1046.623866,	0.055255848),
-                (1051.764831,	0.058709339),
-                (1056.822861,	0.062162829),
-                (1061.803799,	0.06561632),
-                (1066.712789,	0.06906981),
-                (1071.554397,	0.072523301),
-                (1076.332693,	0.075976791),
-                (1081.05133,	0.079430282),
-                (1085.713601,	0.082883772),
-                (1090.322488,	0.086337263),
-                (1094.880702,	0.089790753),
-                (1099.39072,	0.093244244),
-                (1103.854808,	0.096697734),
-                (1108.275052,	0.100151225),
-                (1112.653372,	0.103604715)))
+                (957.4512331, 0.006906981),
+                (966.1307689, 0.010360472),
+                (974.030469, 0.013813962),
+                (981.3967087, 0.017267453),
+                (988.3639577, 0.020720943),
+                (995.0160058, 0.024174434),
+                (1001.409616, 0.027627924),
+                (1007.585541, 0.031081415),
+                (1013.574312, 0.034534905),
+                (1019.399572, 0.037988396),
+                (1025.08011, 0.041441886),
+                (1030.631179, 0.044895377),
+                (1036.065381, 0.048348867),
+                (1041.393285, 0.051802358),
+                (1046.623866, 0.055255848),
+                (1051.764831, 0.058709339),
+                (1056.822861, 0.062162829),
+                (1061.803799, 0.06561632),
+                (1066.712789, 0.06906981),
+                (1071.554397, 0.072523301),
+                (1076.332693, 0.075976791),
+                (1081.05133, 0.079430282),
+                (1085.713601, 0.082883772),
+                (1090.322488, 0.086337263),
+                (1094.880702, 0.089790753),
+                (1099.39072, 0.093244244),
+                (1103.854808, 0.096697734),
+                (1108.275052, 0.100151225),
+                (1112.653372, 0.103604715)))
             mdb.models[ModelName].materials[userMaterial].DuctileDamageInitiation(
                 table=((0.102268174, 0.333333, 0.0), ))
             mdb.models[ModelName].materials[userMaterial].ductileDamageInitiation.DamageEvolution(
@@ -2855,9 +1487,9 @@ for idNum in range(initial,numOfJobs):
                 lowerLim = (1.0 - beta) * thickness
                 upperLim = (1.0 + beta) * thickness
 
-                thick = random.uniform(lowerLim, upperLim, len(element))
+                thick = np.random.uniform(lowerLim, upperLim, len(element))
 
-                latticeVolume = dot(length[:].T, thick*outofPlaneThick)
+                latticeVolume = np.dot(length[:].T, thick*outofPlaneThick)
                 
                 relativeDensityUpdated = latticeVolume/(L * H * outofPlaneThick)
 
@@ -3044,7 +1676,6 @@ for idNum in range(initial,numOfJobs):
         # ############################################################################################
         # #################################### Interactions ##########################################
         # ############################################################################################
-
 
         a = mdb.models[ModelName].rootAssembly
         region1=a.sets['fixity']

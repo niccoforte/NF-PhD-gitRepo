@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import math
 import os
+from resources.abaqus import nodes_in_set, get_DuctData, get_FracData
 
 mode = "any"
 unitCellSize = 10.0
@@ -439,184 +440,6 @@ class Geometry:
                                      round(((self.nnx / 1.99999) + 2) * 3 * 2) +
                                      2 * (self.nnx / 2.0 + 2))
 
-def nodes_in_set(ra, name, prefix='Node '):
-    pairs = set()
-    if name in ra.nodeSets:
-        for n in ra.nodeSets[name].nodes[0]:
-            pairs.add((prefix + ".".join([n.instanceName, str(n.label)])))
-    for iname, inst in ra.instances.items():
-        if name in inst.nodeSets:
-            for n in inst.nodeSets[name].nodes:
-                pairs.add((prefix + ".".join([iname, str(n.label)])))
-    return pairs
-
-def get_DuctData(Job, H, L, B):
-    odb = openOdb(path=Job) 
-    step = "Step-1"
-    variables = [["U2", "RF2"]]
-    nodeSets = ["Set-top"]
-    if Cmatrix and case_Cmatrix.lower() == 'a':
-        variables = [["U1", "RF1"], ["U1", "RF2"]]
-        if BCtype.lower() == "kubc": nodeSets = ["Set-right", "Set-topBody"]
-        elif BCtype.lower() == "periodic": nodeSets = ["RP_Per_X", "RP_TB"]
-    if Cmatrix and case_Cmatrix.lower() == 'b':
-        variables = [["U2", "RF2"], ["U2", "RF1"]]
-        if BCtype.lower() == "kubc": nodeSets = ["Set-topBody", "Set-right"]
-        elif BCtype.lower() == "periodic": nodeSets = ["RP_Per_Y", "RP_LR"]
-    if Cmatrix and case_Cmatrix.lower() == 'c':
-        variables = [["U1", "RF1"], ["U2", "RF2"], ["U1", "RF1"], ["U2", "RF2"]]
-        if BCtype.lower() == "kubc": nodeSets = ["Set-topBody", "Set-right", "Set-right", "Set-topBody"]
-        elif BCtype.lower() == "periodic": nodeSets = ["RP_Per_X", "RP_Per_Y", "RP_LR", "RP_TB"]
-
-    reg_load = 'Node '
-    if Cmatrix and BCtype.lower() == "periodic": reg_load = 'Node ASSEMBLY'
-    
-    all_Us = []
-    all_RFs = []
-    for nodeSet, variable in zip(nodeSets, variables):
-        Us_nodes, RFs_nodes = [], []
-        target_nodes = nodes_in_set(odb.rootAssembly, nodeSet.upper(), prefix=reg_load)
-        for reg in odb.steps[step].historyRegions.keys():
-            if reg_load in reg and reg in target_nodes:
-                try:
-                    Us = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variable[0]].data]
-                    RFs = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variable[1]].data]
-                    Us = list(np.nan_to_num(Us))
-                    RFs = list(np.nan_to_num(RFs))
-                except:
-                    Us = list(np.zeros(expected_steps))
-                    RFs = list(np.zeros(expected_steps))
-                if len(Us) != expected_steps:
-                    Us, RFs = Us[:-1], RFs[:-1]
-                    intrv = (Us[20] - Us[10])/10
-                    Us = Us + [(i+1)*intrv for i in range(len(Us), expected_steps)]
-                    RFs = RFs + list(np.zeros(expected_steps-len(RFs)))
-                Us_nodes.append(Us)
-                RFs_nodes.append(RFs)
-        all_Us.append(Us_nodes)
-        all_RFs.append(RFs_nodes)
-    odb.close()
-
-    all_SE = []
-    for i, (Us_nodes, RFs_nodes) in enumerate(zip(all_Us, all_RFs)):
-        Us_steps = np.transpose(Us_nodes)
-        RFs_steps = np.transpose(RFs_nodes)
-        
-        numNodes = len(Us_steps[0])
-        strain = []
-        stress = []
-        for j, (Us_step, RFs_step) in enumerate(zip(Us_steps, RFs_steps)):
-            Usum = 0.0
-            RFsum = 0.0
-            # if Cmatrix and case_Cmatrix.lower() == 'c':
-            #     RFs_step = np.sort(RFs_step)[:-1]
-            for U, RF in zip(Us_step, RFs_step):
-                Usum += U
-                RFsum += RF
-            
-            e = Usum/numNodes/H
-            s = RFsum/(L*B)
-
-            if Cmatrix:
-                if case_Cmatrix.lower() == 'a':
-                    if i == 0:
-                        e = Usum/numNodes/L
-                        s = RFsum/(H*B)
-                    elif i == 1:
-                        e = all_SE[0][j][0]
-                        s = RFsum/(L*B)
-                if case_Cmatrix.lower() == 'b':
-                    if i == 0:
-                        e = Usum/numNodes/H
-                        s = RFsum/(L*B)
-                    elif i == 1:
-                        e = all_SE[0][j][0]
-                        s = RFsum/(H*B)
-                if case_Cmatrix.lower() == 'c':
-                    if i == 0:
-                        e = Usum/numNodes/H
-                        s = RFsum/(L*B)
-                    elif i == 1:
-                        e = Usum/numNodes/L
-                        s = RFsum/(H*B)
-                    elif i == 2:
-                        e = all_SE[0][j][0]
-                        s = RFsum/(H*B)
-                    elif i == 3:
-                        e = all_SE[1][j][0]
-                        s = RFsum/(L*B)
-
-            
-            strain.append(e)
-            stress.append(s)
-
-        STEPS_OUT = np.transpose([strain, stress])
-        all_SE.append(STEPS_OUT)
-    all_SE = np.array(all_SE)
-    
-    if Cmatrix and case_Cmatrix.lower() == 'c':
-        e12 = all_SE[0][:,0]
-        s12 = all_SE[0][:,1]
-        e21 = all_SE[1][:,0]
-        s21 = all_SE[1][:,1]
-        e13 = all_SE[2][:,0]
-        s13 = all_SE[2][:,1]
-        e23 = all_SE[3][:,0]
-        s23 = all_SE[3][:,1]
-        all_SE = np.array([np.transpose([e12, s12]), 
-                           np.transpose([e21, s21]),
-                           np.transpose([e13, s13]), 
-                           np.transpose([e23, s23])])
-    
-    return all_SE
-
-def get_FracData(Job):
-    odb = openOdb(path=Job) 
-    step = "Step-1"
-    variables = ["U2", "RF2", "STATUS"]
-
-    reg_load = 'Node ASSEMBLY.1'
-    reg_cracktip = 'Element '
-    
-    try:
-        U2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[0]].data]
-        RF2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[1]].data]
-        U2 = list(np.nan_to_num(U2))
-        RF2 = list(np.nan_to_num(RF2))
-    except:
-        U2 = list(np.zeros(expected_steps))
-        RF2 = list(np.zeros(expected_steps))
-    if len(U2) != expected_steps:
-        U2, RF2 = U2[:-1], RF2[:-1]
-        intrv = (U2[20] - U2[10])/10
-        U2 = U2 + [(i+1)*intrv for i in range(len(U2), expected_steps)]
-        RF2 = RF2 + list(np.zeros(expected_steps-len(RF2)))
-        
-    ALL_STATUS = []
-    for reg in odb.steps[step].historyRegions.keys():
-        if reg_cracktip in reg:
-            try:
-                STATUS = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[2]].data]
-                STATUS = list(np.nan_to_num(STATUS))
-            except:
-                STATUS = list(np.zeros(expected_steps))
-            if len(STATUS) != expected_steps:
-                STATUS = STATUS[:-1]
-                STATUS = STATUS + list(np.zeros(expected_steps-len(STATUS)))
-            ALL_STATUS.append(STATUS)
-    
-    ALL_STATUS = np.transpose(ALL_STATUS)
-    
-    STEPS_OUT = []
-    for U, RF, STAT in zip(U2, RF2, ALL_STATUS):
-        OUT = [U, RF]
-        for el_STAT in STAT:
-            OUT.append(el_STAT)
-        STEPS_OUT.append(OUT)
-    odb.close()
-    return STEPS_OUT
-
-
 if mode.lower() == 'any':
     for curDirectory, folders, files in os.walk(pDir):
         odbs = [f for f in files if f.endswith('.odb')]
@@ -660,7 +483,6 @@ if (mode.lower() == 'ductile' or mode.lower() == 'both'):
         data = f"transfer/OUT-{MechMode}-{odbName}.csv"
         OUT = get_DuctData(Job, H, L, B)
         np.savetxt(data, OUT, delimiter=",")
-
 
 if (mode.lower() == 'fracture' or mode.lower() == 'both'):
     if not os.path.exists("transfer"):
