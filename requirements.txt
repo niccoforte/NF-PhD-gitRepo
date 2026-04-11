@@ -19,3 +19,6 @@ deepxde
 
 optuna
 networkx
+
+# Install local shared package in editable mode (repo root).
+-e .

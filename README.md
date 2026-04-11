@@ -1,65 +1,69 @@
 # Niccolo Forte's PhD Repository
 
-#### Optional but recommended:
-After cloning, create a local virtual environment and install Python dependencies from `requirements.txt`.
+This repository is organized by PhD paper, with a shared top-level Python package:
 
-Access repo directory: `cd path\to\repo\p1git-Lattices`  
-Initiate venv: `python -m venv venv`  
-Activate venv (Windows): `venv\Scripts\activate`  
-Install required packages: `pip install -r requirements.txt`  
-Deactivate venv: `deactivate`  
+- `p1-DisorderLatticeProperties/`
+- `p2-DisorderML/`
+- `p3-DisorderIcingMitigation/`
+- `resources/` (shared package used across all papers)
 
-Using a virtual environment keeps this project's package versions isolated from your base Python installation.
+## Repository Structure
 
-## ABAQUS Simulation Files
-ABAQUS scripts for local and HPC simulation execution are in `SIMscripts`.
+### `p1-DisorderLatticeProperties/`
+- `code/`: notebooks and scripts for lattice properties, data processing, and ML workflows.
+- `SIMscripts/`: ABAQUS local/HPC simulation and post-processing scripts.
 
-- `A1_FractureToughness-Ductility.py` / `A-HPC-1_FractureToughness-Ductility.py`:
-  Main simulation drivers for fracture toughness and ductility runs.
-- `A2_INpostProcess.py`, `A2_OUTpostProcess.py` and HPC variants:
-  Post-process `.inp`/`.odb` outputs and assemble run data.
-- `A3_ContinuumPP.py`:
-  Alternative post-processing path for continuum-plot-oriented outputs.
-- `B*.sh` scripts:
-  HPC submission, scratch-space workflow, transfer, zipping/unzipping, and clean-up utilities.
-- `run-local.ps1`:
-  Example local execution wrapper calling A1 then A2 post-processing.
+### `p2-DisorderML/`
+- `code/`: paper-specific ML notebooks and scripts.
 
-The A/HPC scripts are designed to be driven by command-line arguments (`sys.argv`) passed from job scripts, so most run configuration can be controlled from the shell scripts.
+### `p3-DisorderIcingMitigation/`
+- `SIMscripts/`: paper-specific ABAQUS simulation and post-processing scripts.
 
-Important practical note:
-- Update job parameters and paths before running (for example `LAT`, `nnx`, `DIS`, `pDir`, and cluster directory roots).
-- `OldScriptVersions/` keeps historical script snapshots for traceability.
+### `resources/`
+Shared reusable Python modules for all papers, for example:
+- `calculations.py`
+- `lattices.py`
+- `MLdata.py`
+- `MLfunc.py`
+- `MLmodels.py`
+- `tokenization.py`
+- `utilities.py`
 
-## Data Processing
-Data processing and visualization notebooks are in `code/`. Shared reusable Python utilities are in `code/resources/`.
+Use imports like:
 
-Typical data-processing notebooks include:
-- `DataProcessing.ipynb`, `AK-DataProcessing.ipynb`
-- `InputsOutputs.ipynb`, `AK-InputsOutputs.ipynb`
-- `SIMresults.ipynb`, `StiffnessMatrix.ipynb`, `ContinuumPlots.ipynb`
-- `Sampling.ipynb`, `FunctionApproximation.ipynb`
-- `Tokenization.ipynb`
+```python
+from resources.module_name import function_name
+```
 
-Core utility modules in `code/resources/`:
-- `calculations.py`: reading/cleaning simulation outputs and UT/FT property calculations.
-- `lattices.py`: lattice geometry, connectivity, stiffness/compliance, isotropy metrics.
-- `MLdata.py`: dataset assembly, filtering/outlier handling, split/save/load helpers.
-- `utilities.py`: filename/convention utilities and file-processing helpers.
-- `imports.py`: shared import bundle used by multiple notebooks.
+## Python Setup
 
-## Machine Learning
-Machine-learning workflows are primarily notebook-driven in `code/`, with model/training logic centralized in `code/resources/`.
+From the repository root:
 
-Main ML notebooks include:
-- `ML-StressStrain.ipynb`, `AK-ML-StressStrain.ipynb`
-- `ML-DisorderDistribution.ipynb`
-- `DimensionalityReduction.ipynb`, `Optimization.ipynb`, `ValConvPlots.ipynb`
+```powershell
+python -m pip install -r requirements.txt
+```
 
-Core ML code modules:
-- `MLmodels.py`: model definitions (MLP, GNN, transformer/sequence blocks, autoencoder, GPR extensions, BoTorch optimizer wrapper).
-- `MLfunc.py`: training loops, prediction helpers, losses, metrics, plotting, and hyperparameter optimization utilities.
-- `MLdata.py`: data interface (`DATA` class), preprocessing and split workflows for ML pipelines.
-- `tokenization.py`: output-informed embedding/tokenization utilities for graph/data representations.
+`requirements.txt` includes `-e .`, so this single command installs:
+- third-party dependencies, and
+- the local `resources` package in editable mode.
 
-The Python requirements include both classical ML and deep learning stacks (for example `scikit-learn`, `torch`, `torch-geometric`, `tensorflow`, `gpytorch`, `botorch`, and `optuna`). GPU acceleration is optional but recommended for heavier training workflows.
+Editable mode means changes to files inside `resources/` are picked up without reinstalling.
+
+Important:
+- Run install commands from the repository root.
+- Do not use `pip install -e resources` (the project metadata is in root `pyproject.toml`, not inside `resources/`).
+
+## ABAQUS Python Setup
+
+If ABAQUS scripts need to import `resources`, install with the ABAQUS interpreter:
+
+```powershell
+abaqus python -m pip install -r requirements.txt
+```
+
+If `pip` is not available in your ABAQUS Python, use a `PYTHONPATH` approach or add a small `sys.path` bootstrap in the ABAQUS script.
+
+## Notes
+
+- `phd_shared_resources.egg-info/` is created by editable installs and is expected.
+- It is local install metadata and should not be committed.
