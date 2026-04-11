@@ -7,8 +7,8 @@ import math
 import sys
 import time
 import os
-from resources.lattices import Geometry, connectivity
-from resources.abaqus import node, insidePoint, in_circle, pStrainProperties
+from resources.lattices import Geometry, connectivity, insidePoint, pStrainProperties
+from resources.abaqus import node, in_circle
 executeOnCaeStartup()
 
 starttime = time.time()

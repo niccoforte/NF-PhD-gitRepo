@@ -5,7 +5,7 @@ from odbAccess import *
 import numpy as np
 import math
 from fractions import Fraction
-from resources.lattices import Geometry
+from resources.lattices import Geometry, insidePoint, pStrainProperties
 
 randX_all = None
 randY_all = None
@@ -939,19 +939,9 @@ def node(
     
     return nodes, nodesR, bracket_nodes
 
-def insidePoint(bl, tr, p) :
-   if (p[0] > bl[0] and p[0] < tr[0] and p[1] > bl[1] and p[1] < tr[1]) :
-      return True
-   else :
-      return False
-
 def in_circle(center_x, center_y, radius, x, y):
     dist = math.sqrt((center_x - x) ** 2 + (center_y - y) ** 2)
     return dist <= radius
-
-
-def pStrainProperties(E, v):
-    return E/(1-v**2), v/(1-v)
 
 def LHS_uniform(var, strats, lim, mean=0, plot=False):
     lower_limits = np.linspace(mean-lim, mean+lim, strats, endpoint=False)
@@ -1067,6 +1057,36 @@ def nodes_in_set(ra, name, prefix='Node '):
                 pairs.add((prefix + ".".join([iname, str(n.label)])))
     return pairs
 
+def _normalize_history_series(values, expected_steps, extrapolate=False):
+    values = list(np.nan_to_num(values))
+
+    if len(values) != expected_steps:
+        if len(values) > 0:
+            values = values[:-1]
+
+        if extrapolate:
+            if len(values) > 20:
+                intrv = (values[20] - values[10]) / 10.0
+            elif len(values) > 1:
+                intrv = values[-1] - values[-2]
+            else:
+                intrv = 0.0
+            values = values + [(i + 1) * intrv for i in range(len(values), expected_steps)]
+        else:
+            values = values + list(np.zeros(max(0, expected_steps - len(values))))
+
+    if len(values) > expected_steps:
+        values = values[:expected_steps]
+
+    return values
+
+def _read_history_output(region, key, expected_steps, extrapolate=False):
+    try:
+        values = [float(i[1]) for i in region.historyOutputs[key].data]
+    except:
+        values = list(np.zeros(expected_steps))
+    return _normalize_history_series(values, expected_steps, extrapolate=extrapolate)
+
 def get_DuctData(Job, H, L, B, Cmatrix=False, case_Cmatrix=None, BCtype="periodic", expected_steps=201):
     odb = openOdb(path=Job) 
     step = "Step-1"
@@ -1096,19 +1116,9 @@ def get_DuctData(Job, H, L, B, Cmatrix=False, case_Cmatrix=None, BCtype="periodi
         target_nodes = nodes_in_set(odb.rootAssembly, nodeSet.upper(), prefix=reg_load)
         for reg in odb.steps[step].historyRegions.keys():
             if reg_load in reg and reg in target_nodes:
-                try:
-                    Us = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variable[0]].data]
-                    RFs = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variable[1]].data]
-                    Us = list(np.nan_to_num(Us))
-                    RFs = list(np.nan_to_num(RFs))
-                except:
-                    Us = list(np.zeros(expected_steps))
-                    RFs = list(np.zeros(expected_steps))
-                if len(Us) != expected_steps:
-                    Us, RFs = Us[:-1], RFs[:-1]
-                    intrv = (Us[20] - Us[10])/10
-                    Us = Us + [(i+1)*intrv for i in range(len(Us), expected_steps)]
-                    RFs = RFs + list(np.zeros(expected_steps-len(RFs)))
+                region = odb.steps[step].historyRegions[reg]
+                Us = _read_history_output(region, variable[0], expected_steps, extrapolate=True)
+                RFs = _read_history_output(region, variable[1], expected_steps, extrapolate=False)
                 Us_nodes.append(Us)
                 RFs_nodes.append(RFs)
         all_Us.append(Us_nodes)
@@ -1196,31 +1206,15 @@ def get_FracData(Job, expected_steps=201):
     reg_load = 'Node ASSEMBLY.1'
     reg_cracktip = 'Element '
     
-    try:
-        U2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[0]].data]
-        RF2 = [i[1] for i in odb.steps[step].historyRegions[reg_load].historyOutputs[variables[1]].data]
-        U2 = list(np.nan_to_num(U2))
-        RF2 = list(np.nan_to_num(RF2))
-    except:
-        U2 = list(np.zeros(expected_steps))
-        RF2 = list(np.zeros(expected_steps))
-    if len(U2) != expected_steps:
-        U2, RF2 = U2[:-1], RF2[:-1]
-        intrv = (U2[20] - U2[10])/10
-        U2 = U2 + [(i+1)*intrv for i in range(len(U2), expected_steps)]
-        RF2 = RF2 + list(np.zeros(expected_steps-len(RF2)))
+    region_load = odb.steps[step].historyRegions[reg_load]
+    U2 = _read_history_output(region_load, variables[0], expected_steps, extrapolate=True)
+    RF2 = _read_history_output(region_load, variables[1], expected_steps, extrapolate=False)
         
     ALL_STATUS = []
     for reg in odb.steps[step].historyRegions.keys():
         if reg_cracktip in reg:
-            try:
-                STATUS = [float(i[1]) for i in odb.steps[step].historyRegions[reg].historyOutputs[variables[2]].data]
-                STATUS = list(np.nan_to_num(STATUS))
-            except:
-                STATUS = list(np.zeros(expected_steps))
-            if len(STATUS) != expected_steps:
-                STATUS = STATUS[:-1]
-                STATUS = STATUS + list(np.zeros(expected_steps-len(STATUS)))
+            region = odb.steps[step].historyRegions[reg]
+            STATUS = _read_history_output(region, variables[2], expected_steps, extrapolate=False)
             ALL_STATUS.append(STATUS)
     
     ALL_STATUS = np.transpose(ALL_STATUS)
