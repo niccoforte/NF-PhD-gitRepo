@@ -35,50 +35,47 @@ Use imports like:
 from resources.module_name import function_name
 ```
 
-## Python Setup
-
-From the repository root:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-`requirements.txt` includes `-e .`, so this single command installs:
-- third-party dependencies
-- the local `resources` package in editable mode
-
-Editable mode means changes inside `resources/` are picked up without reinstalling.
-
-Important:
-- Run install commands from the repository root.
-- Do not use `pip install -e resources` (project metadata is in root `pyproject.toml`).
-
-## ABAQUS Python Setup
+## Setup (Python + ABAQUS)
 
 Recommended one-command setup from repo root:
 
 ```powershell
-.\setup-abaqus.ps1
+.\setup.ps1
 ```
 
-Manual steps:
+This installs for both interpreters:
+- all dependencies from `requirements.txt` into standard Python
+- all dependencies from `requirements-abaqus.txt` into ABAQUS Python
+- the local repo package (`resources`) for standard Python
+- the local repo package (`resources`) for ABAQUS Python
+
+Important implementation details:
+- the script does **not** create `.pydeps/` or `.abaqus-pydeps/`
+- if pip install of the local package fails in ABAQUS, setup writes a `.pth` hook (`phd_shared_resources_repo.pth`) in ABAQUS user site-packages as fallback
+- setup verifies imports from a temp directory (not repo root), so import checks are real
+- if `PIP_NO_INDEX` is set in the shell, setup temporarily unsets it during install and restores it afterwards
+
+## Remove Setup
+
+To uninstall everything installed by setup (both interpreters), run:
 
 ```powershell
-abaqus python -m pip install -r requirements-abaqus.txt
-abaqus python -m pip install --no-build-isolation -e .
+.\remove-setup.ps1
 ```
 
-The setup script:
-- checks if ABAQUS Python has `pip`
-- tries `ensurepip` if `pip` is missing
-- installs third-party deps from `requirements-abaqus.txt`
-- tries to install the local repo package (`resources`) into ABAQUS Python in editable mode
-- if editable install fails, tries to write a persistent `.pth` entry in ABAQUS `site-packages`
-- if ABAQUS `site-packages` is not writable, falls back to local `.abaqus-pydeps/` plus `PYTHONPATH`
-- attempts to persist `PYTHONPATH` via `setx` when possible
-- verifies imports with `resources.lattices`
+Default behavior:
+- standard Python: uninstall local `resources` package and uninstall all packages listed in `requirements.txt`
+- ABAQUS Python: uninstall local `resources` package only
+- remove fallback `.pth` hooks (`phd_shared_resources_repo.pth`) for both Python and ABAQUS (if present)
+
+Important:
+- ABAQUS built-ins like `numpy`/`matplotlib` are intentionally not removed by this script
+- verification at the end checks whether `resources` can still be discovered outside repo-root path injection
+
+Useful options:
+- `.\remove-setup.ps1 -SkipPythonRequirementsUninstall` (remove only local package setup, keep standard Python requirements installed)
 
 ## Notes
 
-- `phd_shared_resources.egg-info/` is created by editable installs and is expected.
-- This metadata should not be committed.
+- `phd_shared_resources.egg-info/` can be created by editable installs and is expected.
+- pip warnings such as `Ignoring invalid distribution -ygments/-ympy` come from existing broken metadata in the Python environment, not from this repository.

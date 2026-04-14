@@ -1251,4 +1251,3 @@ def export_Udata(job, totalNodes, mode="ductile"):
         count = count + 1
     
     odb.close()
-

@@ -1,8 +1,7 @@
 # ABAQUS-focused Python dependencies.
-# Install with: .\setup-abaqus.ps1
+# Recommended install: .\setup.ps1
+# ABAQUS-only install: .\setup.ps1 -SkipPython
 # Manual fallback: abaqus python -m pip install -r requirements-abaqus.txt
 
 # Third-party deps used in ABAQUS scripts/resources
-numpy
 pandas
-matplotlib
