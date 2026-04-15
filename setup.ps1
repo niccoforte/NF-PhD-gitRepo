@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$RepoRoot
+    [string]$RepoRoot,
+    [switch]$OnlyPython,
+    [switch]$OnlyAbaqus
 )
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
@@ -8,6 +10,19 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $ErrorActionPreference = "Stop"
+
+if ($OnlyPython -and $OnlyAbaqus) {
+    throw "Use only one selector: -OnlyPython or -OnlyAbaqus (not both)."
+}
+
+$runPython = $true
+$runAbaqus = $true
+if ($OnlyPython) {
+    $runAbaqus = $false
+}
+elseif ($OnlyAbaqus) {
+    $runPython = $false
+}
 
 function Invoke-Step {
     param(
@@ -174,19 +189,19 @@ print("IMPORT_OK")
 
 Push-Location $RepoRoot
 try {
-    if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+    if ($runPython -and -not (Get-Command python -ErrorAction SilentlyContinue)) {
         throw "python command not found on PATH."
     }
-    if (-not (Get-Command abaqus -ErrorAction SilentlyContinue)) {
+    if ($runAbaqus -and -not (Get-Command abaqus -ErrorAction SilentlyContinue)) {
         throw "abaqus command not found on PATH."
     }
 
     $requirementsPath = Join-Path $RepoRoot "requirements.txt"
     $requirementsAbaqusPath = Join-Path $RepoRoot "requirements-abaqus.txt"
-    if (-not (Test-Path $requirementsPath)) {
+    if ($runPython -and -not (Test-Path $requirementsPath)) {
         throw "Missing requirements file: $requirementsPath"
     }
-    if (-not (Test-Path $requirementsAbaqusPath)) {
+    if ($runAbaqus -and -not (Test-Path $requirementsAbaqusPath)) {
         throw "Missing requirements file: $requirementsAbaqusPath"
     }
 
@@ -197,32 +212,36 @@ try {
         Remove-Item Env:PIP_NO_INDEX -ErrorAction SilentlyContinue
     }
 
-    Write-Host "=== Standard Python: install requirements.txt ==="
-    Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "-r", $requirementsPath)
+    if ($runPython) {
+        Write-Host "=== Standard Python: install requirements.txt ==="
+        Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "-r", $requirementsPath)
 
-    Write-Host "=== Standard Python: enforce NumPy/Pandas binary compatibility ==="
-    Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "numpy>=1.26,<2", "numexpr>=2.8.4", "bottleneck>=1.3.6")
+        Write-Host "=== Standard Python: enforce NumPy/Pandas binary compatibility ==="
+        Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "numpy>=1.26,<2", "numexpr>=2.8.4", "bottleneck>=1.3.6")
 
-    Write-Host "=== Standard Python: install local resources package ==="
-    Install-LocalPackage-Python -Root $RepoRoot
+        Write-Host "=== Standard Python: install local resources package ==="
+        Install-LocalPackage-Python -Root $RepoRoot
 
-    Write-Host "=== Verify standard Python import ==="
-    Verify-ResourcesImport -Exe "python" -PrefixArgs @()
-    Write-Host "PYTHON setup OK"
+        Write-Host "=== Verify standard Python import ==="
+        Verify-ResourcesImport -Exe "python" -PrefixArgs @()
+        Write-Host "PYTHON setup OK"
+    }
 
-    Ensure-AbaqusPip
+    if ($runAbaqus) {
+        Ensure-AbaqusPip
 
-    Write-Host "=== ABAQUS Python: install requirements-abaqus.txt ==="
-    Invoke-Step -Exe "abaqus" -CommandArgs @("python", "-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "-r", $requirementsAbaqusPath)
+        Write-Host "=== ABAQUS Python: install requirements-abaqus.txt ==="
+        Invoke-Step -Exe "abaqus" -CommandArgs @("python", "-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "-r", $requirementsAbaqusPath)
 
-    Write-Host "=== ABAQUS Python: install local resources package ==="
-    Install-LocalPackage-Abaqus -Root $RepoRoot
+        Write-Host "=== ABAQUS Python: install local resources package ==="
+        Install-LocalPackage-Abaqus -Root $RepoRoot
 
-    Write-Host "=== Verify ABAQUS Python import ==="
-    Verify-ResourcesImport -Exe "abaqus" -PrefixArgs @("python")
-    Write-Host "ABAQUS setup OK"
+        Write-Host "=== Verify ABAQUS Python import ==="
+        Verify-ResourcesImport -Exe "abaqus" -PrefixArgs @("python")
+        Write-Host "ABAQUS setup OK"
+    }
 
-    Write-Host "Setup completed successfully for Python and ABAQUS Python."
+    Write-Host "Setup completed successfully."
 }
 finally {
     if ($null -ne $originalNoIndex) {

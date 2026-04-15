@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$RepoRoot,
+    [switch]$OnlyPython,
+    [switch]$OnlyAbaqus,
     [switch]$SkipPythonRequirementsUninstall
 )
 
@@ -9,6 +11,19 @@ if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
 }
 
 $ErrorActionPreference = "Stop"
+
+if ($OnlyPython -and $OnlyAbaqus) {
+    throw "Use only one selector: -OnlyPython or -OnlyAbaqus (not both)."
+}
+
+$runPython = $true
+$runAbaqus = $true
+if ($OnlyPython) {
+    $runAbaqus = $false
+}
+elseif ($OnlyAbaqus) {
+    $runPython = $false
+}
 
 function Invoke-StepBestEffort {
     param(
@@ -97,7 +112,7 @@ Push-Location $RepoRoot
 try {
     $resourceNames = @("phd-shared-resources", "phd_shared_resources", "resources")
 
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    if ($runPython -and (Get-Command python -ErrorAction SilentlyContinue)) {
         Write-Host "=== Standard Python: uninstall local resources package ==="
         foreach ($pkg in $resourceNames) {
             Invoke-StepBestEffort -Exe "python" -CommandArgs @("-m", "pip", "uninstall", "-y", $pkg)
@@ -125,17 +140,27 @@ try {
             }
         }
     }
-    else {
+    elseif ($runPython) {
         Write-Warning "python command not found; skipping standard Python uninstall."
     }
 
-    if (Get-Command abaqus -ErrorAction SilentlyContinue) {
+    if ($runAbaqus -and (Get-Command abaqus -ErrorAction SilentlyContinue)) {
         Write-Host "=== ABAQUS Python: uninstall local resources package only ==="
         foreach ($pkg in $resourceNames) {
             Invoke-StepBestEffort -Exe "abaqus" -CommandArgs @("python", "-m", "pip", "uninstall", "-y", $pkg)
         }
 
-        # Do not uninstall ABAQUS numpy/matplotlib.
+        if (-not $SkipPythonRequirementsUninstall) {
+            $reqAbaqusPath = Join-Path $RepoRoot "requirements-abaqus.txt"
+            $reqAbaqusPkgs = Get-RequirementPackages -Path $reqAbaqusPath
+            if ($reqAbaqusPkgs.Count -gt 0) {
+                Write-Host "=== ABAQUS Python: uninstall requirements-abaqus.txt packages ==="
+                foreach ($pkg in $reqAbaqusPkgs) {
+                    Invoke-StepBestEffort -Exe "abaqus" -CommandArgs @("python", "-m", "pip", "uninstall", "-y", $pkg)
+                }
+            }
+        }
+
         # Optional cleanup of old path-hook based installs:
         try {
             $userSite = (& abaqus python -c "import site; print(site.getusersitepackages())" 2>$null | Select-Object -First 1).Trim()
@@ -147,16 +172,16 @@ try {
             Write-Warning "Could not check ABAQUS user site-packages for legacy .pth cleanup."
         }
     }
-    else {
+    elseif ($runAbaqus) {
         Write-Warning "abaqus command not found; skipping ABAQUS uninstall."
     }
 
-    if (Get-Command python -ErrorAction SilentlyContinue) {
+    if ($runPython -and (Get-Command python -ErrorAction SilentlyContinue)) {
         Write-Host "=== Verify standard Python ==="
         Verify-NotImportable -Exe "python" -PrefixArgs @() -RepoRootPath $RepoRoot
     }
 
-    if (Get-Command abaqus -ErrorAction SilentlyContinue) {
+    if ($runAbaqus -and (Get-Command abaqus -ErrorAction SilentlyContinue)) {
         Write-Host "=== Verify ABAQUS Python ==="
         Verify-NotImportable -Exe "abaqus" -PrefixArgs @("python") -RepoRootPath $RepoRoot
     }
