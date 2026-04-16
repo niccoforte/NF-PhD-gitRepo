@@ -6,12 +6,13 @@ import copy
 
 
 class Geometry:
-    def __init__(self, LAT, l, nnx, rD=0.2,  t=None):
+    def __init__(self, LAT, l, nnx, rD=0.2, t=None, nny=None):
         self.LAT = LAT
         self.l = l
         self.nnx = nnx
         self.rD = rD
         self.t = t
+        self.nny = nny
         if t is None:
             self.rDthickness(rD=rD)
         else:
@@ -20,10 +21,13 @@ class Geometry:
         if LAT.lower() == 'fcc':
             L = float(l * nnx)
             Lmin = L
-            H0 = 0.96 * L
-            Hs = [l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / l
+            if nny is None:
+                H0 = 0.96 * L
+                Hs = [l * i for i in range(100)]
+                H = min(Hs, key=lambda x: abs(x - H0))
+                nny = H / l
+            else:
+                H = float(nny * l)
 
             if round(nny) % 2.0 == 0.0:
                 if H / L >= 0.96:
@@ -48,10 +52,13 @@ class Geometry:
         elif LAT.lower() == 'square':
             L = float(l * nnx)
             Lmin = L
-            H0 = 0.96 * L
-            Hs = [l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / l
+            if nny is None:
+                H0 = 0.96 * L
+                Hs = [l * i for i in range(100)]
+                H = min(Hs, key=lambda x: abs(x - H0))
+                nny = H / l
+            else:
+                H = float(nny * l)
 
             if round(nny) % 2.0 == 0.0:
                 if H / L >= 0.96:
@@ -76,17 +83,20 @@ class Geometry:
         elif LAT.lower() == '45square':
             L = float(2**(1/2) * l * nnx)
             Lmin = L
-            H0 = 0.96 * L
-            Hs = [2**(1/2) * l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / ((2**(1/2))*l)
+            if nny is None:
+                H0 = 0.96 * L
+                Hs = [2**(1/2) * l * i for i in range(100)]
+                H = min(Hs, key=lambda x: abs(x - H0))
+                nny = H / ((2**(1/2))*l)
+            else:
+                H = float(nny * (2**(1/2)) * l)
 
             if round(nny) % 2.0 == 0.0:
                 if H / L >= 0.96:
                     H = H - ((2**(1/2))*l)
                     nny = H / ((2**(1/2))*l)
                 elif H / L < 0.96:
-                    H = H + ((2**2)*l)
+                    H = H + ((2**(1/2))*l)
                     nny = H / ((2**(1/2))*l)
 
             W = L / 1.25
@@ -106,10 +116,13 @@ class Geometry:
                 nnx = nnx - 1
             L = 0.5 * (3.0 ** 0.5) * l * nnx
             Lmin = L
-            H0 = 0.96 * L
-            Hs = [l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / l
+            if nny is None:
+                H0 = 0.96 * L
+                Hs = [l * i for i in range(100)]
+                H = min(Hs, key=lambda x: abs(x - H0))
+                nny = H / l
+            else:
+                H = float(nny * l)
 
             if round(nny) % 2.0 == 0.0:
                 if H / L >= 0.96:
@@ -137,10 +150,13 @@ class Geometry:
         elif LAT.lower() == 'kagome':
             L = l * (2.0 * nnx - 1)
             Lmin = L - 3*l
-            H0 = 0.96 * L
-            Hs = [(3.0 ** 0.5) * l * i for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = H / ((3.0 ** 0.5) * l)
+            if nny is None:
+                H0 = 0.96 * L
+                Hs = [(3.0 ** 0.5) * l * i for i in range(100)]
+                H = min(Hs, key=lambda x: abs(x - H0))
+                nny = H / ((3.0 ** 0.5) * l)
+            else:
+                H = float(nny * (3.0 ** 0.5) * l)
 
             if round(nny) % 2.0 == 0.0:
                 if H / L >= 0.96:
@@ -173,10 +189,13 @@ class Geometry:
         elif LAT.lower() == 'hex':
             L = (3.0 ** 0.5) * l * nnx
             Lmin = L - ((3.0 ** 0.5) * l)
-            H0 = 0.96 * L
-            Hs = [(0.5 * l) + (1.5 * l * i) for i in range(100)]
-            H = min(Hs, key=lambda x: abs(x - H0))
-            nny = (H - (0.5 * l)) / (1.5 * l)
+            if nny is None:
+                H0 = 0.96 * L
+                Hs = [(0.5 * l) + (1.5 * l * i) for i in range(100)]
+                H = min(Hs, key=lambda x: abs(x - H0))
+                nny = (H - (0.5 * l)) / (1.5 * l)
+            else:
+                H = float((0.5 * l) + (1.5 * l * nny))
 
             if round(nny) % 2.0 == 0.0:
                 if H / L >= 0.96:
