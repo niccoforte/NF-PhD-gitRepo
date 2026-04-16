@@ -688,7 +688,8 @@ def get_ns(n0s):
     return np.array(ns)
     
 def n_values(n0):
-    return np.array([np.cos(np.arctan([n0[1]/n0[0]]))[0], np.sin(np.arctan([n0[1]/n0[0]]))[0]])
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return np.array([np.cos(np.arctan([n0[1]/n0[0]]))[0], np.sin(np.arctan([n0[1]/n0[0]]))[0]])
 
 def get_Nmatrix(ns):
     N = []
