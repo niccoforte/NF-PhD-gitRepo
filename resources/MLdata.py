@@ -27,7 +27,7 @@ def load_data(inputs, outputs, f_inputs=None, props=None):
     dOUT_df = OUTr_df - OUTr_df.iloc[1].values
     dOUT_df = dOUT_df.drop(columns='0')
     dOUT_df = dOUT_df.iloc[1:].sort_index()
-    OUT_df  = OUTr_df.iloc[0].to_frame().T.append(OUTr_df.iloc[1:].sort_index())
+    OUT_df = pd.concat([OUTr_df.iloc[[0]], OUTr_df.iloc[1:].sort_index()], axis=0)
     
     return IN_df, OUT_df, INf_df, dIN_df, dOUT_df, props_df
 
@@ -62,7 +62,7 @@ def FTprops(OUT_df, geom, E_eff_pe):
     props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.iloc[1:].index)
     return props_df
 
-def prep_MULTIdata(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe):
+def MULTIprops(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe):
     UT_props_df, FT_props_df = props_dfs
     UT_IN_df, FT_IN_df = IN_dfs
     UT_OUT_df, FT_OUT_df = OUT_dfs
@@ -250,6 +250,7 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, h
         ax_histy.set_xlabel('Frequency', fontsize=20, fontname="Times New Roman")
         
         fig.tight_layout()
+        ax = ax_scatter
 
     else:
         if compare_ax is not None:
@@ -523,6 +524,7 @@ class DATA:
         save_split=False,
         LAT="FCC", 
         nnx=None,
+        nny=None,
         dis="disNodes", 
         dN=20, 
         mechMode="MULTI",
@@ -540,6 +542,7 @@ class DATA:
         self.save_split = save_split
         self.LAT = LAT
         self.nnx = nnx
+        self.nny = nny
         self.dis = dis
         self.dN = dN
         self.nsims = nsims
@@ -582,22 +585,19 @@ class DATA:
         self._calcGeom()
         self._getDataPath()
         if load:
-            if path == 0:
-                self._loadData(typ="a")
-            else:
-                self._loadData()
-                self._splitData()
-                if self.save_split:
-                    self._saveSplitData()
-                if self.scale:
-                    self._scaleData()
-                if self.reduce_dim:
-                    self._reduceData()
-                if self.model.lower() == "gnn":
-                    self._GNNreshapeData()
+            self._loadData()
+            self._splitData()
+            if self.save_split:
+                self._saveSplitData()
+            if self.scale:
+                self._scaleData()
+            if self.reduce_dim:
+                self._reduceData()
+            if self.model.lower() == "gnn":
+                self._GNNreshapeData()
 
     def _calcGeom(self):
-        self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx)
+        self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx, nny=self.nny)
         self.E_s = 123e9  ## Pa
         self.v_s = 0.3
         self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom)
@@ -607,97 +607,62 @@ class DATA:
 
         pAl          = pData + 'Al/'
         pAK          = pAl + 'AK/'
-        pUTdisNodes  = pAK + 'Ductile-disNodes-FCC-12X16/'
-        pUTdisNodes2 = pAK + '20_RD02_10mm/'
-        pUTdisStruts = pAK + 'Ductile-disStruts-FCC-12X16/'
-        pFTdisNodes  = pAK + 'Fracture-disNodes/'
+        pUTdisNodes  = pAK + '/D-ANN_ABAQUSv2/distorted/20_RD02_10mm(5000)/'
 
         pTi    = pData + 'Ti/'
         pTiLAT = pTi + f'{self.dis}/{self.path_add}/{self.dN}/{self.LAT}/'
 
         if self.path == 0:
-            self.PATH = pUTdisNodes2
+            self.PATH = pUTdisNodes
         elif self.path == 1:
             self.PATH = pTiLAT
         else:
             self.PATH = str(self.path)+"/"
     
-    def _loadData(self, typ="n"):
-        if typ.lower() == "a":
+    def _loadData(self):
+        if self.UTmechTest:
             self.UT_IN_df, \
             self.UT_OUT_df, \
             self.UT_INf_df, \
             self.UT_dIN_df, \
             self.UT_dOUT_df, \
-            self.UT_props_df = load_data(self.PATH+f"{self.mechTest}-{self.dis}-IN.csv", 
-                                        self.PATH+f"{self.mechTest}-{self.dis}-OUT.csv")
-            UT_train, UT_val, UT_test = load_akData(self.PATH+f"NN-{self.mechMode}-{self.dis}-trainIN.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-trainOUT.csv",
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-valIN.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-valOUT.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-testIN.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-testOUT.csv")
+            self.UT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allIN.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allOUT.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allINf.csv" if self.freq else None,
+                                            self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
+            
+            cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
+            if self.mechMode.lower() == "multi":
+                cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
+            self.UT_props_df.columns = cols
 
-            self.UT_train_in, self.UT_train_out = UT_train
-            self.UT_val_in, self.UT_val_out = UT_val
-            self.UT_test_in, self.UT_test_out = UT_test
+            if self.nsims is not None:
+                self.UT_props_df, self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_props_df[:self.nsims], self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
+                if self.freq:
+                    self.UT_INf_df = self.UT_INf_df[:self.nsims]
 
-            if self.scale:
-                if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                    self.UT_INscaler = clone(self.scaler)
-                    self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                    self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                    self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
-                if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                    self.UT_OUTscaler = clone(self.scaler)
-                    self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                    self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                    self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+        if self.FTmechTest:
+            self.FT_IN_df, \
+            self.FT_OUT_df, \
+            self.FT_INf_df, \
+            self.FT_dIN_df, \
+            self.FT_dOUT_df, \
+            self.FT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allIN.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allOUT.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allINf.csv" if self.freq else None,
+                                            self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
+            cols = ['K_JIC', 'K_IC', 'Force', 'Displacement']
+            if self.mechMode.lower() == "multi":
+                cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
+            self.FT_props_df.columns = cols
 
-        else:
-            if self.UTmechTest:
-                self.UT_IN_df, \
-                self.UT_OUT_df, \
-                self.UT_INf_df, \
-                self.UT_dIN_df, \
-                self.UT_dOUT_df, \
-                self.UT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allIN.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allOUT.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allINf.csv" if self.freq else None,
-                                             self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
-                
-                cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
-                if self.mechMode.lower() == "multi":
-                    cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.UT_props_df.columns = cols
+            if self.nsims is not None:
+                self.FT_props_df, self.FT_OUT_df, self.FT_dOUT_df, self.FT_IN_df, self.FT_dIN_df = self.FT_props_df[:self.nsims], self.FT_OUT_df[:self.nsims], self.FT_dOUT_df[:self.nsims], self.FT_IN_df[:self.nsims], self.FT_dIN_df[:self.nsims]
+                if self.freq:
+                    self.FT_INf_df = self.FT_INf_df[:self.nsims]
 
-                if self.nsims is not None:
-                    self.UT_props_df, self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_props_df[:self.nsims], self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
-                    if self.freq:
-                        self.UT_INf_df = self.UT_INf_df[:self.nsims]
-
-            if self.FTmechTest:
-                self.FT_IN_df, \
-                self.FT_OUT_df, \
-                self.FT_INf_df, \
-                self.FT_dIN_df, \
-                self.FT_dOUT_df, \
-                self.FT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allIN.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allOUT.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allINf.csv" if self.freq else None,
-                                             self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
-                cols = ['K_JIC', 'K_IC', 'Force', 'Displacement']
-                if self.mechMode.lower() == "multi":
-                    cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.FT_props_df.columns = cols
-
-                if self.nsims is not None:
-                    self.FT_props_df, self.FT_OUT_df, self.FT_dOUT_df, self.FT_IN_df, self.FT_dIN_df = self.FT_props_df[:self.nsims], self.FT_OUT_df[:self.nsims], self.FT_dOUT_df[:self.nsims], self.FT_IN_df[:self.nsims], self.FT_dIN_df[:self.nsims]
-                    if self.freq:
-                        self.FT_INf_df = self.FT_INf_df[:self.nsims]
-
-            if self.UTmechTest and self.FTmechTest:
-                self.common_props_df = self.UT_props_df
+        if self.UTmechTest and self.FTmechTest:
+            self.common_props_df = self.UT_props_df
 
     def _splitData(self, split_name=None):
         if split_name is None:
