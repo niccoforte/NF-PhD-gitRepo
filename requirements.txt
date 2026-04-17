@@ -16,7 +16,7 @@ torchbnn
 torchinfo
 tensorflow
 gpytorch
-botorch
+botorch>=0.10.0
 deepxde
 
 optuna
