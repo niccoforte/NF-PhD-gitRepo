@@ -1,4 +1,4 @@
-from resources.imports import *
+﻿from resources.imports import *
 from resources.calculations import calcUT, calcFT
 from resources.lattices import Geometry, effProperties
 
@@ -423,7 +423,8 @@ class SymmetricScaler(BaseEstimator, TransformerMixin):
     def __init__(self):
         self.data_min_ = None
         self.data_max_ = None
-    
+
+    @staticmethod
     def rescale_symmetric(x, minx, maxx, mode=0):
         x = np.asarray(x, dtype=float)
         minx = np.asarray(minx, dtype=float)
@@ -1144,3 +1145,4 @@ class DATA:
         # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dy[0], self.outParams2dy[1])
         # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dx[2], self.outParams2dx[3])
         # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dy[2], self.outParams2dy[3])
+
