@@ -418,7 +418,44 @@ def normalize(x, mean, std, mode=0):
         return (x - mean)/std
     if mode == 1:
         return (x*std) + mean
+
+class SymmetricScaler(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.data_min_ = None
+        self.data_max_ = None
     
+    def rescale_symmetric(x, minx, maxx, mode=0):
+        x = np.asarray(x, dtype=float)
+        minx = np.asarray(minx, dtype=float)
+        maxx = np.asarray(maxx, dtype=float)
+        denom = maxx - minx
+        denom_safe = np.where(denom == 0, 1.0, denom)
+
+        if mode == 0:
+            return 2.0 * ((x - minx) / denom_safe) - 1.0
+        if mode == 1:
+            return ((x + 1.0) / 2.0) * denom_safe + minx
+        raise ValueError("mode must be 0 (forward) or 1 (inverse)")
+
+    def fit(self, X, y=None):
+        X = np.asarray(X, dtype=float)
+        self.data_min_ = np.nanmin(X, axis=0)
+        self.data_max_ = np.nanmax(X, axis=0)
+        return self
+
+    def transform(self, X):
+        if self.data_min_ is None or self.data_max_ is None:
+            raise RuntimeError("SymmetricScaler is not fitted. Call fit() before transform().")
+        return self.rescale_symmetric(X, self.data_min_, self.data_max_, mode=0)
+
+    def fit_transform(self, X, y=None):
+        return self.fit(X, y).transform(X)
+
+    def inverse_transform(self, X):
+        if self.data_min_ is None or self.data_max_ is None:
+            raise RuntimeError("SymmetricScaler is not fitted. Call fit() before inverse_transform().")
+        return self.rescale_symmetric(X, self.data_min_, self.data_max_, mode=1)
+
 class PCA_(BaseEstimator, TransformerMixin):
     def __init__(self, accuracy=0.999999, n_components=None):
         self.accuracy = accuracy
@@ -526,7 +563,8 @@ class DATA:
         nnx=None,
         nny=None,
         dis="disNodes", 
-        dN=20, 
+        dN=20,
+        d_data="all",
         mechMode="MULTI",
         nsims=None,
         model="MLP", 
@@ -545,6 +583,7 @@ class DATA:
         self.nny = nny
         self.dis = dis
         self.dN = dN
+        self.d_data = d_data
         self.nsims = nsims
         self.model = model
         self.freq = freq
@@ -582,27 +621,27 @@ class DATA:
             elif LAT.lower() == "tri":
                 self.nnx = 30
         
-        self._calcGeom()
-        self._getDataPath()
+        self.calcGeom()
+        self.getDataPath()
         if load:
-            self._loadData()
-            self._splitData()
+            self.loadData()
+            self.splitData()
             if self.save_split:
-                self._saveSplitData()
+                self.saveSplitData()
             if self.scale:
-                self._scaleData()
+                self.scaleData()
             if self.reduce_dim:
-                self._reduceData()
+                self.reduceData()
             if self.model.lower() == "gnn":
-                self._GNNreshapeData()
+                self.GNNreshapeData()
 
-    def _calcGeom(self):
+    def calcGeom(self):
         self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx, nny=self.nny)
         self.E_s = 123e9  ## Pa
         self.v_s = 0.3
         self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom)
 
-    def _getDataPath(self):
+    def getDataPath(self):
         pData = 'Z:/p1/data/'
 
         pAl          = pData + 'Al/'
@@ -619,7 +658,7 @@ class DATA:
         else:
             self.PATH = str(self.path)+"/"
     
-    def _loadData(self):
+    def loadData(self):
         if self.UTmechTest:
             self.UT_IN_df, \
             self.UT_OUT_df, \
@@ -664,7 +703,14 @@ class DATA:
         if self.UTmechTest and self.FTmechTest:
             self.common_props_df = self.UT_props_df
 
-    def _splitData(self, split_name=None):
+    def splitData(self, split_name=None):
+        if self.UTmechTest:
+            UT_IN_df = self.UT_dIN_df if self.d_data is not None and ("in" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_IN_df
+            UT_OUT_df = self.UT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_OUT_df.iloc[1:].drop(['0'], axis=1)
+        if self.FTmechTest:
+            FT_IN_df = self.FT_dIN_df if self.d_data is not None and ("in" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_IN_df
+            FT_OUT_df = self.FT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_OUT_df.iloc[1:].drop(['0'], axis=1)
+
         if split_name is None:
             split_name = self.load_split if self.load_split else datetime.datetime.now()
 
@@ -677,7 +723,7 @@ class DATA:
         FT_train = FT_val = FT_test = None
 
         shared_multi_split = (not self.load_split and self.UTmechTest and self.FTmechTest)
-        if shared_multi_split:
+        if shared_multi_split:  # TODO: No load_splitData() functionality, check if can use split_data() function for splitting.
             common_idx = self.UT_dIN_df.index
             for idx in [self.UT_dOUT_df.index, self.UT_props_df.index, self.FT_dIN_df.index, self.FT_dOUT_df.index, self.FT_props_df.index]:
                 self.common_idx = common_idx.intersection(idx)
@@ -685,19 +731,19 @@ class DATA:
             train_idx, test_idx = train_test_split(common_idx.to_numpy(), train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
             train_idx, val_idx  = train_test_split(train_idx, train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
 
-            UT_train = [self.UT_dIN_df.loc[train_idx], self.UT_dOUT_df.loc[train_idx], self.UT_props_df.loc[train_idx]]
-            UT_val   = [self.UT_dIN_df.loc[val_idx], self.UT_dOUT_df.loc[val_idx], self.UT_props_df.loc[val_idx]]
-            UT_test  = [self.UT_dIN_df.loc[test_idx], self.UT_dOUT_df.loc[test_idx], self.UT_props_df.loc[test_idx]]
+            UT_train = [UT_IN_df.loc[train_idx], UT_OUT_df.loc[train_idx], self.UT_props_df.loc[train_idx]]
+            UT_val   = [UT_IN_df.loc[val_idx], UT_OUT_df.loc[val_idx], self.UT_props_df.loc[val_idx]]
+            UT_test  = [UT_IN_df.loc[test_idx], UT_OUT_df.loc[test_idx], self.UT_props_df.loc[test_idx]]
 
-            FT_train = [self.FT_dIN_df.loc[train_idx], self.FT_dOUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
-            FT_val   = [self.FT_dIN_df.loc[val_idx], self.FT_dOUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
-            FT_test  = [self.FT_dIN_df.loc[test_idx], self.FT_dOUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
+            FT_train = [FT_IN_df.loc[train_idx], FT_OUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
+            FT_val   = [FT_IN_df.loc[val_idx], FT_OUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
+            FT_test  = [FT_IN_df.loc[test_idx], FT_OUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
 
         if self.UTmechTest:
             if self.load_split:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
             elif UT_train is None:
-                UT_train, UT_val, UT_test = split_data(self.UT_dIN_df, self.UT_dOUT_df, self.UT_props_df, split=self.split_frac)
+                UT_train, UT_val, UT_test = split_data(UT_IN_df, UT_OUT_df, self.UT_props_df, split=self.split_frac)
             self.UT_train_in_df, self.UT_train_out_df, self.UT_trainProps_df = UT_train
             self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
             self.UT_test_in_df, self.UT_test_out_df, self.UT_testProps_df    = UT_test
@@ -716,7 +762,7 @@ class DATA:
             if self.load_split:
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
             elif FT_train is None:
-                FT_train, FT_val, FT_test = split_data(self.FT_dIN_df, self.FT_dOUT_df, self.FT_props_df, split=self.split_frac)
+                FT_train, FT_val, FT_test = split_data(FT_IN_df, FT_OUT_df, self.FT_props_df, split=self.split_frac)
             self.FT_train_in_df, self.FT_train_out_df, self.FT_trainProps_df = FT_train
             self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
             self.FT_test_in_df, self.FT_test_out_df, self.FT_testProps_df    = FT_test
@@ -733,7 +779,7 @@ class DATA:
 
         self._updateReconstructors()
     
-    def _saveSplitData(self, split_name=None):
+    def saveSplitData(self, split_name=None):
         if split_name is None:
             split_name = self.save_split if self.save_split else datetime.datetime.now()
         if self.UTmechTest:
@@ -746,7 +792,7 @@ class DATA:
                             [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
                             [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
                             self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
-    
+    ###
     def _targetConfigured(self, cfg, target):
         if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
             return False
@@ -804,7 +850,17 @@ class DATA:
                 raise ValueError("scale entries must be strings, e.g. ('maxmin', 'inout').")
 
             scale_method = scale[0].lower()
-            valid_scale_methods = {"minmax", "maxmin", "standardscaler", "standard", "standardize", "normalize"}
+            valid_scale_methods = {
+                "minmax",
+                "maxmin",
+                "standardscaler",
+                "standard",
+                "standardize",
+                "normalize",
+                "symm",
+                "symmetric",
+                "rescale-symmetric",
+            }
             if scale_method not in valid_scale_methods:
                 raise ValueError(f"Unsupported scale method '{scale[0]}'. Valid options: {sorted(valid_scale_methods)}")
 
@@ -841,21 +897,23 @@ class DATA:
 
             if len(reduce_dim) > 4 and reduce_dim[4] not in [True, False]:
                 raise ValueError("reduce_dim[4] (scale_reduced) must be True/False when provided.")
-    
+    ###
     def _initScaler(self, scale=None):
         if scale is None:
             scale = self.scale
 
-        if scale[0].lower() == "minmax" or scale[0].lower() == "maxmin":
+        if "min" in scale[0].lower() or "max" in scale[0].lower():
             self.scaler = MinMaxScaler()
-        elif scale[0].lower() == "standardscaler" or scale[0].lower() == "standard":
+        elif "standard" in scale[0].lower():
             self.scaler = StandardScaler()
         elif scale[0].lower() == "standardize":
             self.scaler = standardize
         elif scale[0].lower() == "normalize":
             self.scaler = normalize
+        elif "symm" in scale[0].lower():
+            self.scaler = SymmetricScaler()
 
-    def _scaleData(self, scale=None):
+    def scaleData(self, scale=None):
         if scale is not None:
             self.scale = scale
         if not self.scale:
@@ -927,7 +985,7 @@ class DATA:
             return accuracy
         return 0.999999
 
-    def _reduceData(self, reduce_dim=None, scale_reduced=None, scale=None):
+    def reduceData(self, reduce_dim=None, scale_reduced=None, scale=None):
         if scale is not None:
             self.scale = scale
         if reduce_dim is not None:
@@ -1000,7 +1058,7 @@ class DATA:
 
         self._updateReconstructors()
 
-    def _GNNreshapeData(self):
+    def _NNreshapeData(self):
         if self.UTmechTest:
             self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
             self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
