@@ -1059,7 +1059,7 @@ class DATA:
 
         self._updateReconstructors()
 
-    def _NNreshapeData(self):
+    def GNNreshapeData(self):
         if self.UTmechTest:
             self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
             self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
