@@ -3,7 +3,6 @@ from abaqusConstants import *
 from caeModules import *
 from driverUtils import executeOnCaeStartup
 import numpy as np
-import math
 import sys
 import time
 import os
@@ -21,7 +20,7 @@ unitCellSize = 10.0                             # Strut length
 thickness = None                                # Strut thickness
 outofPlaneThick = None                          # Out of plane thickness
 latticeType = 'FCC'                             # 'FCC', 'tri', 'hex', 'kagome'
-MechanicalModel = 'ductile'                        # 'fracture', 'ductile', 'both'
+MechanicalModel = 'both'                        # 'fracture', 'ductile', 'both'
 userMaterial = 'Ti'                             # 'al', 'sic', 'ti'
 relDensity = 0.2                                # relative density
 crossSection = 'rect'
@@ -30,7 +29,7 @@ elif latticeType.lower() == "kagome": nnx = 20
 elif latticeType.lower() == "hex": nnx = 20
 elif latticeType.lower() == "fcc": nnx = 20
 elif "square" in latticeType.lower(): nnx = 20
-nnx = 4 #nnx  #s = [10,16,20,26,30,36,40]          # number of Unit cells in X direction (Y automatic)
+nnx = nnx  #s = [10,16,20,26,30,36,40]          # number of Unit cells in X direction (Y automatic)
 
 finalRun = 'no'
 numberOfRuns = 1

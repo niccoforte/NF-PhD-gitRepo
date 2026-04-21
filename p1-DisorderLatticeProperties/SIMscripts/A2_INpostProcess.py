@@ -1,9 +1,7 @@
 import os
 import numpy as np
-import math
 import sys
 from resources.abaqus import export_frequencies, export_nodes, export_struts
-from resources.lattices import Geometry
 
 stiffMatrix = False
 distribution = "lhs_uniform"
