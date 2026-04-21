@@ -12,6 +12,3 @@ __pycache__/
 
 *.egg-info/
 .abaqus-pydeps/
-
-# HPC
-*pydeps*
