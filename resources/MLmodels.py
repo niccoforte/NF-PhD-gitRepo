@@ -1,4 +1,4 @@
-from resources.imports import *
+﻿from resources.imports import *
 
 from resources.lattices import connectivity
 from resources.MLfunc import train_model, predict_model, plot_loss, plot_predictions, absErr, _activation, visualize_graphNetwork
@@ -168,7 +168,7 @@ class MODEL:
             self.UTscheduler = None
             self.FTscheduler = None
     
-    def _train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
+    def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
         if self.data.UTmechTest:
             self.UT_model, \
                 self.UT_epoch, \
@@ -219,7 +219,7 @@ class MODEL:
             if plot:
                 plot_loss(self.FT_epoch, self.FT_train_lossLog, self.FT_val_lossLog)
     
-    def _predict(self, test_dataloader=None, plot=False):
+    def predict(self, test_dataloader=None, plot=False):
         if (
             self.data.UTmechTest
             and self.data.FTmechTest
@@ -277,7 +277,7 @@ class MODEL:
                 plot_predictions(self.data.FT_OUT_df, self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_best)
                 plot_predictions(self.data.FT_OUT_df, self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_worst)
         
-    def _summary(self):
+    def summary(self):
         if self.typ.lower() == "gnn":
             if self.data.UTmechTest or (self.data.UTmechTest and self.data.FTmechTest):
                 sample_batch = next(iter(self.UT_train_dataloader)).to(self.device)
@@ -296,7 +296,7 @@ class MODEL:
                 model_for_summary = self.model
             return summary(model_for_summary, input_size=(self.batch, model_for_summary.in_size))
     
-    def _save(self, path, name):
+    def save(self, path, name):
         payload = {"version": 2}
         if hasattr(self, "UT_model"):
             payload["UT_model_state_dict"] = self.UT_model.state_dict()
@@ -310,7 +310,7 @@ class MODEL:
             payload["model_state_dict"] = self.model.state_dict()
         torch.save(payload, f"{path}/{name}.mdl")
 
-    def _load(self, path, name):
+    def load(self, path, name):
         state = torch.load(f"{path}/{name}.mdl", map_location=self.device)
 
         if isinstance(state, dict) and (

@@ -3,7 +3,6 @@ from abaqusConstants import *
 from odbAccess import *
 import numpy as np
 import sys
-import math
 import os
 from resources.abaqus import get_DuctData, get_FracData
 from resources.lattices import Geometry

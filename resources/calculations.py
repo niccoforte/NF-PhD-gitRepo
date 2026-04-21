@@ -64,12 +64,12 @@ def get_ductileData(CSVout, crit=0.25, delimiter=',', typ='n'):
     s_max_indx = s_sm.index(max(s_sm))
     frac = 0.0
     for indx, row in output_df[s_max_indx:].iterrows():
-        if row[2] <= crit*max(s_sm):
+        if row["y_sm"] <= crit*max(s_sm):
             frac = indx
             break
     final = None
     for indx, row in output_df[s_max_indx:].iterrows():
-        if row[2] <= 0.01*max(s_sm):
+        if row["y_sm"] <= 0.01*max(s_sm):
             final = indx-1
             break
     if final is not None:
@@ -120,7 +120,7 @@ def get_fractureData(outputCSV):
     F_max_indx = F_sm.index(max(F_sm))
     final = None
     for indx, row in output_df[F_max_indx:].iterrows():
-        if row[2] <= 0.01*max(F_sm):
+        if row["y_sm"] <= 0.01*max(F_sm):
             final = indx-1
             break
     if final is not None:

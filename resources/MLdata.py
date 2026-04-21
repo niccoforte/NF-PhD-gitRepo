@@ -1,4 +1,4 @@
-from resources.imports import *
+﻿from resources.imports import *
 from resources.calculations import calcUT, calcFT
 from resources.lattices import Geometry, effProperties
 
@@ -27,7 +27,7 @@ def load_data(inputs, outputs, f_inputs=None, props=None):
     dOUT_df = OUTr_df - OUTr_df.iloc[1].values
     dOUT_df = dOUT_df.drop(columns='0')
     dOUT_df = dOUT_df.iloc[1:].sort_index()
-    OUT_df  = OUTr_df.iloc[0].to_frame().T.append(OUTr_df.iloc[1:].sort_index())
+    OUT_df = pd.concat([OUTr_df.iloc[[0]], OUTr_df.iloc[1:].sort_index()], axis=0)
     
     return IN_df, OUT_df, INf_df, dIN_df, dOUT_df, props_df
 
@@ -62,7 +62,7 @@ def FTprops(OUT_df, geom, E_eff_pe):
     props_df = pd.DataFrame(np.array(props).T, columns=['K_JIC', 'K_IC', 'Force', 'Displacement'], index=OUT_df.iloc[1:].index)
     return props_df
 
-def prep_MULTIdata(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe):
+def MULTIprops(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe):
     UT_props_df, FT_props_df = props_dfs
     UT_IN_df, FT_IN_df = IN_dfs
     UT_OUT_df, FT_OUT_df = OUT_dfs
@@ -250,6 +250,7 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, h
         ax_histy.set_xlabel('Frequency', fontsize=20, fontname="Times New Roman")
         
         fig.tight_layout()
+        ax = ax_scatter
 
     else:
         if compare_ax is not None:
@@ -417,7 +418,45 @@ def normalize(x, mean, std, mode=0):
         return (x - mean)/std
     if mode == 1:
         return (x*std) + mean
-    
+
+class SymmetricScaler(BaseEstimator, TransformerMixin):
+    def __init__(self):
+        self.data_min_ = None
+        self.data_max_ = None
+
+    @staticmethod
+    def rescale_symmetric(x, minx, maxx, mode=0):
+        x = np.asarray(x, dtype=float)
+        minx = np.asarray(minx, dtype=float)
+        maxx = np.asarray(maxx, dtype=float)
+        denom = maxx - minx
+        denom_safe = np.where(denom == 0, 1.0, denom)
+
+        if mode == 0:
+            return 2.0 * ((x - minx) / denom_safe) - 1.0
+        if mode == 1:
+            return ((x + 1.0) / 2.0) * denom_safe + minx
+        raise ValueError("mode must be 0 (forward) or 1 (inverse)")
+
+    def fit(self, X, y=None):
+        X = np.asarray(X, dtype=float)
+        self.data_min_ = np.nanmin(X, axis=0)
+        self.data_max_ = np.nanmax(X, axis=0)
+        return self
+
+    def transform(self, X):
+        if self.data_min_ is None or self.data_max_ is None:
+            raise RuntimeError("SymmetricScaler is not fitted. Call fit() before transform().")
+        return self.rescale_symmetric(X, self.data_min_, self.data_max_, mode=0)
+
+    def fit_transform(self, X, y=None):
+        return self.fit(X, y).transform(X)
+
+    def inverse_transform(self, X):
+        if self.data_min_ is None or self.data_max_ is None:
+            raise RuntimeError("SymmetricScaler is not fitted. Call fit() before inverse_transform().")
+        return self.rescale_symmetric(X, self.data_min_, self.data_max_, mode=1)
+
 class PCA_(BaseEstimator, TransformerMixin):
     def __init__(self, accuracy=0.999999, n_components=None):
         self.accuracy = accuracy
@@ -523,8 +562,10 @@ class DATA:
         save_split=False,
         LAT="FCC", 
         nnx=None,
+        nny=None,
         dis="disNodes", 
-        dN=20, 
+        dN=20,
+        d_data="all",
         mechMode="MULTI",
         nsims=None,
         model="MLP", 
@@ -540,8 +581,10 @@ class DATA:
         self.save_split = save_split
         self.LAT = LAT
         self.nnx = nnx
+        self.nny = nny
         self.dis = dis
         self.dN = dN
+        self.d_data = d_data
         self.nsims = nsims
         self.model = model
         self.freq = freq
@@ -579,127 +622,96 @@ class DATA:
             elif LAT.lower() == "tri":
                 self.nnx = 30
         
-        self._calcGeom()
-        self._getDataPath()
+        self.calcGeom()
+        self.getDataPath()
         if load:
-            if path == 0:
-                self._loadData(typ="a")
-            else:
-                self._loadData()
-                self._splitData()
-                if self.save_split:
-                    self._saveSplitData()
-                if self.scale:
-                    self._scaleData()
-                if self.reduce_dim:
-                    self._reduceData()
-                if self.model.lower() == "gnn":
-                    self._GNNreshapeData()
+            self.loadData()
+            self.splitData()
+            if self.save_split:
+                self.saveSplitData()
+            if self.scale:
+                self.scaleData()
+            if self.reduce_dim:
+                self.reduceData()
+            if self.model.lower() == "gnn":
+                self.GNNreshapeData()
 
-    def _calcGeom(self):
-        self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx)
+    def calcGeom(self):
+        self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx, nny=self.nny)
         self.E_s = 123e9  ## Pa
         self.v_s = 0.3
         self.E_eff, self.v_eff, self.E_eff_pe, self.v_eff_pe = effProperties(self.LAT, self.geom)
 
-    def _getDataPath(self):
+    def getDataPath(self):
         pData = 'Z:/p1/data/'
 
         pAl          = pData + 'Al/'
         pAK          = pAl + 'AK/'
-        pUTdisNodes  = pAK + 'Ductile-disNodes-FCC-12X16/'
-        pUTdisNodes2 = pAK + '20_RD02_10mm/'
-        pUTdisStruts = pAK + 'Ductile-disStruts-FCC-12X16/'
-        pFTdisNodes  = pAK + 'Fracture-disNodes/'
+        pUTdisNodes  = pAK + '/D-ANN_ABAQUSv2/distorted/20_RD02_10mm(5000)/'
 
         pTi    = pData + 'Ti/'
         pTiLAT = pTi + f'{self.dis}/{self.path_add}/{self.dN}/{self.LAT}/'
 
         if self.path == 0:
-            self.PATH = pUTdisNodes2
+            self.PATH = pUTdisNodes
         elif self.path == 1:
             self.PATH = pTiLAT
         else:
             self.PATH = str(self.path)+"/"
     
-    def _loadData(self, typ="n"):
-        if typ.lower() == "a":
+    def loadData(self):
+        if self.UTmechTest:
             self.UT_IN_df, \
             self.UT_OUT_df, \
             self.UT_INf_df, \
             self.UT_dIN_df, \
             self.UT_dOUT_df, \
-            self.UT_props_df = load_data(self.PATH+f"{self.mechTest}-{self.dis}-IN.csv", 
-                                        self.PATH+f"{self.mechTest}-{self.dis}-OUT.csv")
-            UT_train, UT_val, UT_test = load_akData(self.PATH+f"NN-{self.mechMode}-{self.dis}-trainIN.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-trainOUT.csv",
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-valIN.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-valOUT.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-testIN.csv", 
-                                                    self.PATH+f"NN-{self.mechMode}-{self.dis}-testOUT.csv")
+            self.UT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allIN.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allOUT.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allINf.csv" if self.freq else None,
+                                            self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
+            
+            cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
+            if self.mechMode.lower() == "multi":
+                cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
+            self.UT_props_df.columns = cols
 
-            self.UT_train_in, self.UT_train_out = UT_train
-            self.UT_val_in, self.UT_val_out = UT_val
-            self.UT_test_in, self.UT_test_out = UT_test
+            if self.nsims is not None:
+                self.UT_props_df, self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_props_df[:self.nsims], self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
+                if self.freq:
+                    self.UT_INf_df = self.UT_INf_df[:self.nsims]
 
-            if self.scale:
-                if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                    self.UT_INscaler = clone(self.scaler)
-                    self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                    self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                    self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
-                if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
-                    self.UT_OUTscaler = clone(self.scaler)
-                    self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                    self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                    self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+        if self.FTmechTest:
+            self.FT_IN_df, \
+            self.FT_OUT_df, \
+            self.FT_INf_df, \
+            self.FT_dIN_df, \
+            self.FT_dOUT_df, \
+            self.FT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allIN.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allOUT.csv", 
+                                            self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allINf.csv" if self.freq else None,
+                                            self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
+            cols = ['K_JIC', 'K_IC', 'Force', 'Displacement']
+            if self.mechMode.lower() == "multi":
+                cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
+            self.FT_props_df.columns = cols
 
-        else:
-            if self.UTmechTest:
-                self.UT_IN_df, \
-                self.UT_OUT_df, \
-                self.UT_INf_df, \
-                self.UT_dIN_df, \
-                self.UT_dOUT_df, \
-                self.UT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allIN.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allOUT.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allINf.csv" if self.freq else None,
-                                             self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
-                
-                cols = ['Ductility', 'Strength', 'Stiffness', 'WoF']
-                if self.mechMode.lower() == "multi":
-                    cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.UT_props_df.columns = cols
+            if self.nsims is not None:
+                self.FT_props_df, self.FT_OUT_df, self.FT_dOUT_df, self.FT_IN_df, self.FT_dIN_df = self.FT_props_df[:self.nsims], self.FT_OUT_df[:self.nsims], self.FT_dOUT_df[:self.nsims], self.FT_IN_df[:self.nsims], self.FT_dIN_df[:self.nsims]
+                if self.freq:
+                    self.FT_INf_df = self.FT_INf_df[:self.nsims]
 
-                if self.nsims is not None:
-                    self.UT_props_df, self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_props_df[:self.nsims], self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
-                    if self.freq:
-                        self.UT_INf_df = self.UT_INf_df[:self.nsims]
+        if self.UTmechTest and self.FTmechTest:
+            self.common_props_df = self.UT_props_df
 
-            if self.FTmechTest:
-                self.FT_IN_df, \
-                self.FT_OUT_df, \
-                self.FT_INf_df, \
-                self.FT_dIN_df, \
-                self.FT_dOUT_df, \
-                self.FT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allIN.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allOUT.csv", 
-                                             self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allINf.csv" if self.freq else None,
-                                             self.PATH+f"MLdata/{self.mechMode}-{self.dis}-allProps.csv")
-                cols = ['K_JIC', 'K_IC', 'Force', 'Displacement']
-                if self.mechMode.lower() == "multi":
-                    cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
-                self.FT_props_df.columns = cols
+    def splitData(self, split_name=None):
+        if self.UTmechTest:
+            UT_IN_df = self.UT_dIN_df if self.d_data is not None and ("in" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_IN_df
+            UT_OUT_df = self.UT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_OUT_df.iloc[1:].drop(['0'], axis=1)
+        if self.FTmechTest:
+            FT_IN_df = self.FT_dIN_df if self.d_data is not None and ("in" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_IN_df
+            FT_OUT_df = self.FT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_OUT_df.iloc[1:].drop(['0'], axis=1)
 
-                if self.nsims is not None:
-                    self.FT_props_df, self.FT_OUT_df, self.FT_dOUT_df, self.FT_IN_df, self.FT_dIN_df = self.FT_props_df[:self.nsims], self.FT_OUT_df[:self.nsims], self.FT_dOUT_df[:self.nsims], self.FT_IN_df[:self.nsims], self.FT_dIN_df[:self.nsims]
-                    if self.freq:
-                        self.FT_INf_df = self.FT_INf_df[:self.nsims]
-
-            if self.UTmechTest and self.FTmechTest:
-                self.common_props_df = self.UT_props_df
-
-    def _splitData(self, split_name=None):
         if split_name is None:
             split_name = self.load_split if self.load_split else datetime.datetime.now()
 
@@ -712,7 +724,7 @@ class DATA:
         FT_train = FT_val = FT_test = None
 
         shared_multi_split = (not self.load_split and self.UTmechTest and self.FTmechTest)
-        if shared_multi_split:
+        if shared_multi_split:  # TODO: No load_splitData() functionality, check if can use split_data() function for splitting.
             common_idx = self.UT_dIN_df.index
             for idx in [self.UT_dOUT_df.index, self.UT_props_df.index, self.FT_dIN_df.index, self.FT_dOUT_df.index, self.FT_props_df.index]:
                 self.common_idx = common_idx.intersection(idx)
@@ -720,19 +732,19 @@ class DATA:
             train_idx, test_idx = train_test_split(common_idx.to_numpy(), train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
             train_idx, val_idx  = train_test_split(train_idx, train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
 
-            UT_train = [self.UT_dIN_df.loc[train_idx], self.UT_dOUT_df.loc[train_idx], self.UT_props_df.loc[train_idx]]
-            UT_val   = [self.UT_dIN_df.loc[val_idx], self.UT_dOUT_df.loc[val_idx], self.UT_props_df.loc[val_idx]]
-            UT_test  = [self.UT_dIN_df.loc[test_idx], self.UT_dOUT_df.loc[test_idx], self.UT_props_df.loc[test_idx]]
+            UT_train = [UT_IN_df.loc[train_idx], UT_OUT_df.loc[train_idx], self.UT_props_df.loc[train_idx]]
+            UT_val   = [UT_IN_df.loc[val_idx], UT_OUT_df.loc[val_idx], self.UT_props_df.loc[val_idx]]
+            UT_test  = [UT_IN_df.loc[test_idx], UT_OUT_df.loc[test_idx], self.UT_props_df.loc[test_idx]]
 
-            FT_train = [self.FT_dIN_df.loc[train_idx], self.FT_dOUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
-            FT_val   = [self.FT_dIN_df.loc[val_idx], self.FT_dOUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
-            FT_test  = [self.FT_dIN_df.loc[test_idx], self.FT_dOUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
+            FT_train = [FT_IN_df.loc[train_idx], FT_OUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
+            FT_val   = [FT_IN_df.loc[val_idx], FT_OUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
+            FT_test  = [FT_IN_df.loc[test_idx], FT_OUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
 
         if self.UTmechTest:
             if self.load_split:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
             elif UT_train is None:
-                UT_train, UT_val, UT_test = split_data(self.UT_dIN_df, self.UT_dOUT_df, self.UT_props_df, split=self.split_frac)
+                UT_train, UT_val, UT_test = split_data(UT_IN_df, UT_OUT_df, self.UT_props_df, split=self.split_frac)
             self.UT_train_in_df, self.UT_train_out_df, self.UT_trainProps_df = UT_train
             self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
             self.UT_test_in_df, self.UT_test_out_df, self.UT_testProps_df    = UT_test
@@ -751,7 +763,7 @@ class DATA:
             if self.load_split:
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
             elif FT_train is None:
-                FT_train, FT_val, FT_test = split_data(self.FT_dIN_df, self.FT_dOUT_df, self.FT_props_df, split=self.split_frac)
+                FT_train, FT_val, FT_test = split_data(FT_IN_df, FT_OUT_df, self.FT_props_df, split=self.split_frac)
             self.FT_train_in_df, self.FT_train_out_df, self.FT_trainProps_df = FT_train
             self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
             self.FT_test_in_df, self.FT_test_out_df, self.FT_testProps_df    = FT_test
@@ -768,7 +780,7 @@ class DATA:
 
         self._updateReconstructors()
     
-    def _saveSplitData(self, split_name=None):
+    def saveSplitData(self, split_name=None):
         if split_name is None:
             split_name = self.save_split if self.save_split else datetime.datetime.now()
         if self.UTmechTest:
@@ -781,7 +793,7 @@ class DATA:
                             [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
                             [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
                             self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
-    
+    ###
     def _targetConfigured(self, cfg, target):
         if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
             return False
@@ -839,7 +851,17 @@ class DATA:
                 raise ValueError("scale entries must be strings, e.g. ('maxmin', 'inout').")
 
             scale_method = scale[0].lower()
-            valid_scale_methods = {"minmax", "maxmin", "standardscaler", "standard", "standardize", "normalize"}
+            valid_scale_methods = {
+                "minmax",
+                "maxmin",
+                "standardscaler",
+                "standard",
+                "standardize",
+                "normalize",
+                "symm",
+                "symmetric",
+                "rescale-symmetric",
+            }
             if scale_method not in valid_scale_methods:
                 raise ValueError(f"Unsupported scale method '{scale[0]}'. Valid options: {sorted(valid_scale_methods)}")
 
@@ -876,21 +898,23 @@ class DATA:
 
             if len(reduce_dim) > 4 and reduce_dim[4] not in [True, False]:
                 raise ValueError("reduce_dim[4] (scale_reduced) must be True/False when provided.")
-    
+    ###
     def _initScaler(self, scale=None):
         if scale is None:
             scale = self.scale
 
-        if scale[0].lower() == "minmax" or scale[0].lower() == "maxmin":
+        if "min" in scale[0].lower() or "max" in scale[0].lower():
             self.scaler = MinMaxScaler()
-        elif scale[0].lower() == "standardscaler" or scale[0].lower() == "standard":
+        elif "standard" in scale[0].lower():
             self.scaler = StandardScaler()
         elif scale[0].lower() == "standardize":
             self.scaler = standardize
         elif scale[0].lower() == "normalize":
             self.scaler = normalize
+        elif "symm" in scale[0].lower():
+            self.scaler = SymmetricScaler()
 
-    def _scaleData(self, scale=None):
+    def scaleData(self, scale=None):
         if scale is not None:
             self.scale = scale
         if not self.scale:
@@ -962,7 +986,7 @@ class DATA:
             return accuracy
         return 0.999999
 
-    def _reduceData(self, reduce_dim=None, scale_reduced=None, scale=None):
+    def reduceData(self, reduce_dim=None, scale_reduced=None, scale=None):
         if scale is not None:
             self.scale = scale
         if reduce_dim is not None:
@@ -1035,7 +1059,7 @@ class DATA:
 
         self._updateReconstructors()
 
-    def _GNNreshapeData(self):
+    def GNNreshapeData(self):
         if self.UTmechTest:
             self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
             self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
@@ -1121,3 +1145,4 @@ class DATA:
         # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dy[0], self.outParams2dy[1])
         # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dx[2], self.outParams2dx[3])
         # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dy[2], self.outParams2dy[3])
+
