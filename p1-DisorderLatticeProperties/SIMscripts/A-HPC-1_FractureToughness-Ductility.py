@@ -3,10 +3,8 @@ from abaqusConstants import *
 from caeModules import *
 from driverUtils import executeOnCaeStartup
 import numpy as np
-import math
 import sys
 import time
-import os
 from resources.lattices import Geometry, connectivity, insidePoint, pStrainProperties
 from resources.abaqus import node, in_circle
 executeOnCaeStartup()
