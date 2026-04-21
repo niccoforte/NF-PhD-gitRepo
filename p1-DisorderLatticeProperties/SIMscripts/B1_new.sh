@@ -38,25 +38,30 @@ zip=false
 delete_scratch=true
 
 
+/bin/echo Running on host: `hostname`.
+/bin/echo Starting on: `date`, in `pwd`.
+
+
 # Load required modules
 module load abaqus/2024
 module load intel
-
-/bin/echo Running on host: `hostname`.
-/bin/echo Starting on: `date`, in `pwd`.
 
 
 # make dir
 mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID
 mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID/transfer/
+mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID/resources/
 mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
 mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/transfer/
+mkdir /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/resources/
 
 
 # copy command
-rsync -av /data/home/exy053/p1/p1git-Lattices/SIMscripts/A-HPC-* /gpfs/scratch/$USER/$SLURM_JOB_ID
+rsync -av /data/home/exy053/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/A-HPC-* /gpfs/scratch/$USER/$SLURM_JOB_ID
 rsync -av $SLURM_SUBMIT_DIR/B* /gpfs/scratch/$USER/$SLURM_JOB_ID
+rsync -av /data/home/exy053/00-PhD-gitRepo/resources/* /gpfs/scratch/$USER/$SLURM_JOB_ID/resources/
 cd /gpfs/scratch/$USER/$SLURM_JOB_ID
+
 
 /bin/echo Working in directory: `pwd`.
 
@@ -80,6 +85,7 @@ rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/B* /gpfs/scratch/$USER/$SLURM_JOB_ID
 rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/abaqus* /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
 rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/*.odb /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
 rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/*.inp /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/
+rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/resources/* /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/resources/
 rsync -av /gpfs/scratch/$USER/$SLURM_JOB_ID/transfer/* /gpfs/scratch/$USER/$SLURM_JOB_ID/zip/transfer/
 
 /bin/echo Simulation files in /gpfs/scratch/$USER/$SLURM_JOB_ID/zip.
