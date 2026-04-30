@@ -1,14 +1,16 @@
 # Default ignored files
 /shelf/
 /workspace.xml
-*/code/models/
+*/code/models/*
 
 # Additional ignored files
-.idea/
-*.DS_Store
-.ipynb_checkpoints/
-__pycache__/
-.vscode/
+*.idea*
+*.DS_Store*
+*.ipynb_checkpoints*
+*__pycache__*
+*.vscode*
 
 *.egg-info/
 .abaqus-pydeps/
+
+*codex*
