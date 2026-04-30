@@ -551,6 +551,7 @@ class PCA_(BaseEstimator, TransformerMixin):
         reconstructed_data = self.final_pca.inverse_transform(data)
         return reconstructed_data
 
+### DATA Class and Helper Functions
 class DATA:
     def __init__(
         self, 
@@ -589,16 +590,16 @@ class DATA:
         self.model = model
         self.freq = freq
         
-        self._validatePreprocessConfig(scale=scale, reduce_dim=reduce_dim)
+        _data_validate_preprocess_config(scale=scale, reduce_dim=reduce_dim)
 
         self.scale = scale
         self.scale_reduced = bool(reduce_dim[4]) if isinstance(reduce_dim, (list, tuple)) and len(reduce_dim) > 4 else False
         if scale:
-            self._initScaler(scale)
+            _data_init_scaler(self, scale)
 
         self.reduce_dim = reduce_dim
         if reduce_dim:
-            self._initReducer(reduce_dim)
+            _data_init_reducer(self, reduce_dim)
 
         if path_add.lower() == "frequency":
             self.freq = True
@@ -715,33 +716,36 @@ class DATA:
         if split_name is None:
             split_name = self.load_split if self.load_split else datetime.datetime.now()
 
-        def _to_numpy(x):
-            if hasattr(x, "to_numpy"):
-                return x.to_numpy(copy=True)
-            return np.asarray(x).copy()
-
         UT_train = UT_val = UT_test = None
         FT_train = FT_val = FT_test = None
 
-        shared_multi_split = (not self.load_split and self.UTmechTest and self.FTmechTest)
-        if shared_multi_split:  # TODO: No load_splitData() functionality, check if can use split_data() function for splitting.
-            common_idx = self.UT_dIN_df.index
-            for idx in [self.UT_dOUT_df.index, self.UT_props_df.index, self.FT_dIN_df.index, self.FT_dOUT_df.index, self.FT_props_df.index]:
-                self.common_idx = common_idx.intersection(idx)
+        shared_multi_split = (self.UTmechTest and self.FTmechTest)
+        if shared_multi_split:
+            if self.load_split:
+                UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
+                FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
+            else:
+                common_idx = self.UT_dIN_df.index
+                for idx in [self.UT_dOUT_df.index, self.UT_props_df.index, self.FT_dIN_df.index, self.FT_dOUT_df.index, self.FT_props_df.index]:
+                    common_idx = common_idx.intersection(idx)
+                self.common_idx = common_idx
 
-            train_idx, test_idx = train_test_split(common_idx.to_numpy(), train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
-            train_idx, val_idx  = train_test_split(train_idx, train_size=self.split_frac, random_state=None, shuffle=True, stratify=None)
+                UT_train, UT_val, UT_test = split_data(
+                    UT_IN_df.loc[common_idx],
+                    UT_OUT_df.loc[common_idx],
+                    self.UT_props_df.loc[common_idx],
+                    split=self.split_frac
+                )
+                train_idx = UT_train[0].index
+                val_idx = UT_val[0].index
+                test_idx = UT_test[0].index
 
-            UT_train = [UT_IN_df.loc[train_idx], UT_OUT_df.loc[train_idx], self.UT_props_df.loc[train_idx]]
-            UT_val   = [UT_IN_df.loc[val_idx], UT_OUT_df.loc[val_idx], self.UT_props_df.loc[val_idx]]
-            UT_test  = [UT_IN_df.loc[test_idx], UT_OUT_df.loc[test_idx], self.UT_props_df.loc[test_idx]]
-
-            FT_train = [FT_IN_df.loc[train_idx], FT_OUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
-            FT_val   = [FT_IN_df.loc[val_idx], FT_OUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
-            FT_test  = [FT_IN_df.loc[test_idx], FT_OUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
+                FT_train = [FT_IN_df.loc[train_idx], FT_OUT_df.loc[train_idx], self.FT_props_df.loc[train_idx]]
+                FT_val   = [FT_IN_df.loc[val_idx], FT_OUT_df.loc[val_idx], self.FT_props_df.loc[val_idx]]
+                FT_test  = [FT_IN_df.loc[test_idx], FT_OUT_df.loc[test_idx], self.FT_props_df.loc[test_idx]]
 
         if self.UTmechTest:
-            if self.load_split:
+            if self.load_split and UT_train is None:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
             elif UT_train is None:
                 UT_train, UT_val, UT_test = split_data(UT_IN_df, UT_OUT_df, self.UT_props_df, split=self.split_frac)
@@ -749,18 +753,18 @@ class DATA:
             self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
             self.UT_test_in_df, self.UT_test_out_df, self.UT_testProps_df    = UT_test
 
-            self.UT_train_in = _to_numpy(self.UT_train_in_df)
-            self.UT_train_out = _to_numpy(self.UT_train_out_df)
-            self.UT_trainProps = _to_numpy(self.UT_trainProps_df)
-            self.UT_val_in = _to_numpy(self.UT_val_in_df)
-            self.UT_val_out = _to_numpy(self.UT_val_out_df)
-            self.UT_valProps = _to_numpy(self.UT_valProps_df)
-            self.UT_test_in = _to_numpy(self.UT_test_in_df)
-            self.UT_test_out = _to_numpy(self.UT_test_out_df)
-            self.UT_testProps = _to_numpy(self.UT_testProps_df)
+            self.UT_train_in = _data_to_numpy(self.UT_train_in_df)
+            self.UT_train_out = _data_to_numpy(self.UT_train_out_df)
+            self.UT_trainProps = _data_to_numpy(self.UT_trainProps_df)
+            self.UT_val_in = _data_to_numpy(self.UT_val_in_df)
+            self.UT_val_out = _data_to_numpy(self.UT_val_out_df)
+            self.UT_valProps = _data_to_numpy(self.UT_valProps_df)
+            self.UT_test_in = _data_to_numpy(self.UT_test_in_df)
+            self.UT_test_out = _data_to_numpy(self.UT_test_out_df)
+            self.UT_testProps = _data_to_numpy(self.UT_testProps_df)
         
         if self.FTmechTest:
-            if self.load_split:
+            if self.load_split and FT_train is None:
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
             elif FT_train is None:
                 FT_train, FT_val, FT_test = split_data(FT_IN_df, FT_OUT_df, self.FT_props_df, split=self.split_frac)
@@ -768,17 +772,17 @@ class DATA:
             self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
             self.FT_test_in_df, self.FT_test_out_df, self.FT_testProps_df    = FT_test
 
-            self.FT_train_in = _to_numpy(self.FT_train_in_df)
-            self.FT_train_out = _to_numpy(self.FT_train_out_df)
-            self.FT_trainProps = _to_numpy(self.FT_trainProps_df)
-            self.FT_val_in = _to_numpy(self.FT_val_in_df)
-            self.FT_val_out = _to_numpy(self.FT_val_out_df)
-            self.FT_valProps = _to_numpy(self.FT_valProps_df)
-            self.FT_test_in = _to_numpy(self.FT_test_in_df)
-            self.FT_test_out = _to_numpy(self.FT_test_out_df)
-            self.FT_testProps = _to_numpy(self.FT_testProps_df)
+            self.FT_train_in = _data_to_numpy(self.FT_train_in_df)
+            self.FT_train_out = _data_to_numpy(self.FT_train_out_df)
+            self.FT_trainProps = _data_to_numpy(self.FT_trainProps_df)
+            self.FT_val_in = _data_to_numpy(self.FT_val_in_df)
+            self.FT_val_out = _data_to_numpy(self.FT_val_out_df)
+            self.FT_valProps = _data_to_numpy(self.FT_valProps_df)
+            self.FT_test_in = _data_to_numpy(self.FT_test_in_df)
+            self.FT_test_out = _data_to_numpy(self.FT_test_out_df)
+            self.FT_testProps = _data_to_numpy(self.FT_testProps_df)
 
-        self._updateReconstructors()
+        _data_update_reconstructors(self)
     
     def saveSplitData(self, split_name=None):
         if split_name is None:
@@ -793,126 +797,6 @@ class DATA:
                             [self.FT_val_in, self.FT_val_out, self.FT_valProps], 
                             [self.FT_test_in, self.FT_test_out, self.FT_testProps], 
                             self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
-    ###
-    def _targetConfigured(self, cfg, target):
-        if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
-            return False
-        scope = str(cfg[1]).lower()
-        return ("all" in scope) or (target in scope)
-
-    def _apply_inverse_steps(self, data, inverse_steps):
-        out = data
-        for inverse_step in inverse_steps:
-            out = inverse_step(out)
-        return out
-    
-    def _updateReconstructors(self):
-        for mode, enabled in [("UT", self.UTmechTest), ("FT", self.FTmechTest)]:
-            if not enabled:
-                continue
-
-            for target in ["in", "out"]:
-                target_token = target.upper()
-                inverse_steps = []
-
-                if (
-                    getattr(self, "scale_reduced", False)
-                    and self._targetConfigured(self.reduce_dim, target)
-                    and self._targetConfigured(self.scale, target)
-                ):
-                    pca_scaler_attr = f"{mode}_{target_token}PCAscaler"
-                    if hasattr(self, pca_scaler_attr):
-                        inverse_steps.append(getattr(self, pca_scaler_attr).inverse_transform)
-
-                if self._targetConfigured(self.reduce_dim, target):
-                    reducer_attr = f"{mode}_{target_token}reducer"
-                    if hasattr(self, reducer_attr):
-                        reducer = getattr(self, reducer_attr)
-                        if reducer is not None and hasattr(reducer, "inverse_transform"):
-                            inverse_steps.append(reducer.inverse_transform)
-
-                if self._targetConfigured(self.scale, target):
-                    scaler_attr = f"{mode}_{target_token}scaler"
-                    if hasattr(self, scaler_attr):
-                        inverse_steps.append(getattr(self, scaler_attr).inverse_transform)
-
-                reconstructor_attr = f"{mode}_{target_token}reconstructor"
-                setattr(
-                    self,
-                    reconstructor_attr,
-                    lambda data, inverse_steps=tuple(inverse_steps): self._apply_inverse_steps(data, inverse_steps),
-                )
-
-    def _validatePreprocessConfig(self, scale, reduce_dim):
-        if scale:
-            if not isinstance(scale, (list, tuple)) or len(scale) < 2:
-                raise ValueError("scale must be False/None or tuple/list like ('maxmin', 'in|out|props|all').")
-            if not isinstance(scale[0], str) or not isinstance(scale[1], str):
-                raise ValueError("scale entries must be strings, e.g. ('maxmin', 'inout').")
-
-            scale_method = scale[0].lower()
-            valid_scale_methods = {
-                "minmax",
-                "maxmin",
-                "standardscaler",
-                "standard",
-                "standardize",
-                "normalize",
-                "symm",
-                "symmetric",
-                "rescale-symmetric",
-            }
-            if scale_method not in valid_scale_methods:
-                raise ValueError(f"Unsupported scale method '{scale[0]}'. Valid options: {sorted(valid_scale_methods)}")
-
-            scale_scope = scale[1].lower()
-            if not any(k in scale_scope for k in ["in", "out", "props", "all"]):
-                raise ValueError("scale target must include one of: 'in', 'out', 'props', 'all'.")
-
-        if reduce_dim:
-            if not isinstance(reduce_dim, (list, tuple)) or len(reduce_dim) < 2:
-                raise ValueError("reduce_dim must be False/None or tuple/list like ('PCA', 'in|out|all', ...).")
-            if len(reduce_dim) > 5:
-                raise ValueError("reduce_dim supports at most 5 entries: (method, scope, accuracy, n_components, scale_reduced).")
-            if not isinstance(reduce_dim[0], str) or not isinstance(reduce_dim[1], str):
-                raise ValueError("reduce_dim method and scope must be strings.")
-
-            reduce_method = reduce_dim[0].lower()
-            valid_reduce_methods = {"pca", "autoencoder"}
-            if reduce_method not in valid_reduce_methods:
-                raise ValueError(f"Unsupported reduce_dim method '{reduce_dim[0]}'. Valid options: {sorted(valid_reduce_methods)}")
-
-            reduce_scope = reduce_dim[1].lower()
-            if not any(k in reduce_scope for k in ["in", "out", "all"]):
-                raise ValueError("reduce_dim scope must include one of: 'in', 'out', 'all'.")
-
-            if len(reduce_dim) > 2 and reduce_dim[2] not in [None, False]:
-                if not isinstance(reduce_dim[2], (float, int)):
-                    raise ValueError("reduce_dim[2] (accuracy) must be numeric in (0, 1] when provided.")
-                if not (0 < float(reduce_dim[2]) <= 1):
-                    raise ValueError("reduce_dim[2] (accuracy) must be in the range (0, 1].")
-
-            if len(reduce_dim) > 3 and reduce_dim[3] not in [None, False]:
-                if not isinstance(reduce_dim[3], int) or reduce_dim[3] < 1:
-                    raise ValueError("reduce_dim[3] (n_components) must be a positive integer when provided.")
-
-            if len(reduce_dim) > 4 and reduce_dim[4] not in [True, False]:
-                raise ValueError("reduce_dim[4] (scale_reduced) must be True/False when provided.")
-    ###
-    def _initScaler(self, scale=None):
-        if scale is None:
-            scale = self.scale
-
-        if "min" in scale[0].lower() or "max" in scale[0].lower():
-            self.scaler = MinMaxScaler()
-        elif "standard" in scale[0].lower():
-            self.scaler = StandardScaler()
-        elif scale[0].lower() == "standardize":
-            self.scaler = standardize
-        elif scale[0].lower() == "normalize":
-            self.scaler = normalize
-        elif "symm" in scale[0].lower():
-            self.scaler = SymmetricScaler()
 
     def scaleData(self, scale=None):
         if scale is not None:
@@ -920,7 +804,7 @@ class DATA:
         if not self.scale:
             raise ValueError("_scaleData requires scale=(...) configuration.")
         if scale is not None or not hasattr(self, "scaler"):
-            self._initScaler(self.scale)
+            _data_init_scaler(self, self.scale)
         if not hasattr(self, "scaler"):
             raise ValueError("_scaleData could not initialize scaler from scale configuration.")
 
@@ -958,33 +842,7 @@ class DATA:
                 self.FT_valProps   = self.FT_PROPscaler.transform(self.FT_valProps.T).T
                 self.FT_testProps  = self.FT_PROPscaler.transform(self.FT_testProps.T).T 
 
-        self._updateReconstructors()
-
-    def _initReducer(self, reduce_dim=None):
-        if reduce_dim is None:
-            reduce_dim = self.reduce_dim
-
-        if reduce_dim[0].lower() == "pca":
-            self.reducer = PCA(n_components=self._pca_components(reduce_dim))
-        elif reduce_dim[0].lower() == "autoencoder":
-            self.reducer = None
-
-    def _pca_components(self, reduce_dim=None):
-        accuracy = None
-        n_components = None
-        if reduce_dim is None:
-            reduce_dim = self.reduce_dim
-        if isinstance(reduce_dim, (list, tuple)):
-            if len(reduce_dim) > 2:
-                accuracy = reduce_dim[2]
-            if len(reduce_dim) > 3:
-                n_components = reduce_dim[3]
-
-        if n_components is not None and n_components is not False:
-            return n_components
-        if accuracy is not None and accuracy is not False:
-            return accuracy
-        return 0.999999
+        _data_update_reconstructors(self)
 
     def reduceData(self, reduce_dim=None, scale_reduced=None, scale=None):
         if scale is not None:
@@ -998,20 +856,15 @@ class DATA:
         if scale_reduced and not self.scale:
             raise ValueError("scale_reduced=True requires scale=(...) configuration in DATA initialization.")
         if scale_reduced and (scale is not None or not hasattr(self, "scaler")):
-            self._initScaler(self.scale)
+            _data_init_scaler(self, self.scale)
         if scale_reduced and not hasattr(self, "scaler"):
             raise ValueError("scale_reduced=True requires scale=(...) to initialize a scaler.")
         if not self.reduce_dim:
             raise ValueError("_reduceData requires reduce_dim=(...) configuration.")
         if reduce_dim is not None or not hasattr(self, "reducer"):
-            self._initReducer(self.reduce_dim)
+            _data_init_reducer(self, self.reduce_dim)
         if not hasattr(self, "reducer"):
             raise ValueError("_reduceData could not initialize reducer from reduce_dim configuration.")
-
-        def _scale_reduced_target(target):
-            if not scale_reduced:
-                return False
-            return ("all" in self.scale[1].lower()) or (target in self.scale[1].lower())
 
         if self.UTmechTest:
             if "in" in self.reduce_dim[1].lower() or "all" in self.reduce_dim[1].lower():
@@ -1019,7 +872,7 @@ class DATA:
                 self.UT_train_in = self.UT_INreducer.fit_transform(self.UT_train_in)
                 self.UT_val_in   = self.UT_INreducer.transform(self.UT_val_in)
                 self.UT_test_in  = self.UT_INreducer.transform(self.UT_test_in)
-                if _scale_reduced_target("in"):
+                if _data_scale_reduced_target(self.scale, scale_reduced, "in"):
                     self.UT_INPCAscaler = clone(self.scaler)
                     self.UT_train_in = self.UT_INPCAscaler.fit_transform(self.UT_train_in)
                     self.UT_val_in   = self.UT_INPCAscaler.transform(self.UT_val_in)
@@ -1029,7 +882,7 @@ class DATA:
                 self.UT_train_out = self.UT_OUTreducer.fit_transform(self.UT_train_out)
                 self.UT_val_out   = self.UT_OUTreducer.transform(self.UT_val_out)
                 self.UT_test_out  = self.UT_OUTreducer.transform(self.UT_test_out)
-                if _scale_reduced_target("out"):
+                if _data_scale_reduced_target(self.scale, scale_reduced, "out"):
                     self.UT_OUTPCAscaler = clone(self.scaler)
                     self.UT_train_out = self.UT_OUTPCAscaler.fit_transform(self.UT_train_out)
                     self.UT_val_out   = self.UT_OUTPCAscaler.transform(self.UT_val_out)
@@ -1041,7 +894,7 @@ class DATA:
                 self.FT_train_in = self.FT_INreducer.fit_transform(self.FT_train_in)
                 self.FT_val_in   = self.FT_INreducer.transform(self.FT_val_in)
                 self.FT_test_in  = self.FT_INreducer.transform(self.FT_test_in)
-                if _scale_reduced_target("in"):
+                if _data_scale_reduced_target(self.scale, scale_reduced, "in"):
                     self.FT_INPCAscaler = clone(self.scaler)
                     self.FT_train_in = self.FT_INPCAscaler.fit_transform(self.FT_train_in)
                     self.FT_val_in   = self.FT_INPCAscaler.transform(self.FT_val_in)
@@ -1051,13 +904,13 @@ class DATA:
                 self.FT_train_out = self.FT_OUTreducer.fit_transform(self.FT_train_out)
                 self.FT_val_out   = self.FT_OUTreducer.transform(self.FT_val_out)
                 self.FT_test_out  = self.FT_OUTreducer.transform(self.FT_test_out)
-                if _scale_reduced_target("out"):
+                if _data_scale_reduced_target(self.scale, scale_reduced, "out"):
                     self.FT_OUTPCAscaler = clone(self.scaler)
                     self.FT_train_out = self.FT_OUTPCAscaler.fit_transform(self.FT_train_out)
                     self.FT_val_out   = self.FT_OUTPCAscaler.transform(self.FT_val_out)
                     self.FT_test_out  = self.FT_OUTPCAscaler.transform(self.FT_test_out)
 
-        self._updateReconstructors()
+        _data_update_reconstructors(self)
 
     def GNNreshapeData(self):
         if self.UTmechTest:
@@ -1069,6 +922,160 @@ class DATA:
             self.FT_train_in = self.FT_train_in.reshape(*self.FT_train_in.shape[:-1], self.FT_train_in.shape[-1]//2, 2)
             self.FT_val_in   = self.FT_val_in.reshape(*self.FT_val_in.shape[:-1], self.FT_val_in.shape[-1]//2, 2)
             self.FT_test_in  = self.FT_test_in.reshape(*self.FT_test_in.shape[:-1], self.FT_test_in.shape[-1]//2, 2)
+
+def _data_to_numpy(x):
+    if hasattr(x, "to_numpy"):
+        return x.to_numpy(copy=True)
+    return np.asarray(x).copy()
+
+def _data_target_configured(cfg, target):
+    if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
+        return False
+    scope = str(cfg[1]).lower()
+    return ("all" in scope) or (target in scope)
+
+def _data_apply_inverse_steps(data, inverse_steps):
+    out = data
+    for inverse_step in inverse_steps:
+        out = inverse_step(out)
+    return out
+
+def _data_update_reconstructors(data_obj):
+    for mode, enabled in [("UT", data_obj.UTmechTest), ("FT", data_obj.FTmechTest)]:
+        if not enabled:
+            continue
+
+        for target in ["in", "out"]:
+            target_token = target.upper()
+            inverse_steps = []
+
+            if (
+                getattr(data_obj, "scale_reduced", False)
+                and _data_target_configured(data_obj.reduce_dim, target)
+                and _data_target_configured(data_obj.scale, target)
+            ):
+                pca_scaler_attr = f"{mode}_{target_token}PCAscaler"
+                if hasattr(data_obj, pca_scaler_attr):
+                    inverse_steps.append(getattr(data_obj, pca_scaler_attr).inverse_transform)
+
+            if _data_target_configured(data_obj.reduce_dim, target):
+                reducer_attr = f"{mode}_{target_token}reducer"
+                if hasattr(data_obj, reducer_attr):
+                    reducer = getattr(data_obj, reducer_attr)
+                    if reducer is not None and hasattr(reducer, "inverse_transform"):
+                        inverse_steps.append(reducer.inverse_transform)
+
+            if _data_target_configured(data_obj.scale, target):
+                scaler_attr = f"{mode}_{target_token}scaler"
+                if hasattr(data_obj, scaler_attr):
+                    inverse_steps.append(getattr(data_obj, scaler_attr).inverse_transform)
+
+            reconstructor_attr = f"{mode}_{target_token}reconstructor"
+            setattr(
+                data_obj,
+                reconstructor_attr,
+                lambda data, inverse_steps=tuple(inverse_steps): _data_apply_inverse_steps(data, inverse_steps),
+            )
+
+def _data_validate_preprocess_config(scale, reduce_dim):
+    if scale:
+        if not isinstance(scale, (list, tuple)) or len(scale) < 2:
+            raise ValueError("scale must be False/None or tuple/list like ('maxmin', 'in|out|props|all').")
+        if not isinstance(scale[0], str) or not isinstance(scale[1], str):
+            raise ValueError("scale entries must be strings, e.g. ('maxmin', 'inout').")
+
+        scale_method = scale[0].lower()
+        valid_scale_methods = {
+            "minmax",
+            "maxmin",
+            "standardscaler",
+            "standard",
+            "standardize",
+            "normalize",
+            "symm",
+            "symmetric",
+            "rescale-symmetric",
+        }
+        if scale_method not in valid_scale_methods:
+            raise ValueError(f"Unsupported scale method '{scale[0]}'. Valid options: {sorted(valid_scale_methods)}")
+
+        scale_scope = scale[1].lower()
+        if not any(k in scale_scope for k in ["in", "out", "props", "all"]):
+            raise ValueError("scale target must include one of: 'in', 'out', 'props', 'all'.")
+
+    if reduce_dim:
+        if not isinstance(reduce_dim, (list, tuple)) or len(reduce_dim) < 2:
+            raise ValueError("reduce_dim must be False/None or tuple/list like ('PCA', 'in|out|all', ...).")
+        if len(reduce_dim) > 5:
+            raise ValueError("reduce_dim supports at most 5 entries: (method, scope, accuracy, n_components, scale_reduced).")
+        if not isinstance(reduce_dim[0], str) or not isinstance(reduce_dim[1], str):
+            raise ValueError("reduce_dim method and scope must be strings.")
+
+        reduce_method = reduce_dim[0].lower()
+        valid_reduce_methods = {"pca", "autoencoder"}
+        if reduce_method not in valid_reduce_methods:
+            raise ValueError(f"Unsupported reduce_dim method '{reduce_dim[0]}'. Valid options: {sorted(valid_reduce_methods)}")
+
+        reduce_scope = reduce_dim[1].lower()
+        if not any(k in reduce_scope for k in ["in", "out", "all"]):
+            raise ValueError("reduce_dim scope must include one of: 'in', 'out', 'all'.")
+
+        if len(reduce_dim) > 2 and reduce_dim[2] not in [None, False]:
+            if not isinstance(reduce_dim[2], (float, int)):
+                raise ValueError("reduce_dim[2] (accuracy) must be numeric in (0, 1] when provided.")
+            if not (0 < float(reduce_dim[2]) <= 1):
+                raise ValueError("reduce_dim[2] (accuracy) must be in the range (0, 1].")
+
+        if len(reduce_dim) > 3 and reduce_dim[3] not in [None, False]:
+            if not isinstance(reduce_dim[3], int) or reduce_dim[3] < 1:
+                raise ValueError("reduce_dim[3] (n_components) must be a positive integer when provided.")
+
+        if len(reduce_dim) > 4 and reduce_dim[4] not in [True, False]:
+            raise ValueError("reduce_dim[4] (scale_reduced) must be True/False when provided.")
+
+def _data_init_scaler(data_obj, scale=None):
+    if scale is None:
+        scale = data_obj.scale
+
+    if "min" in scale[0].lower() or "max" in scale[0].lower():
+        data_obj.scaler = MinMaxScaler()
+    elif "standard" in scale[0].lower():
+        data_obj.scaler = StandardScaler()
+    elif scale[0].lower() == "standardize":
+        data_obj.scaler = standardize
+    elif scale[0].lower() == "normalize":
+        data_obj.scaler = normalize
+    elif "symm" in scale[0].lower():
+        data_obj.scaler = SymmetricScaler()
+
+def _data_pca_components(reduce_dim):
+    accuracy = None
+    n_components = None
+    if isinstance(reduce_dim, (list, tuple)):
+        if len(reduce_dim) > 2:
+            accuracy = reduce_dim[2]
+        if len(reduce_dim) > 3:
+            n_components = reduce_dim[3]
+
+    if n_components is not None and n_components is not False:
+        return n_components
+    if accuracy is not None and accuracy is not False:
+        return accuracy
+    return 0.999999
+
+def _data_init_reducer(data_obj, reduce_dim=None):
+    if reduce_dim is None:
+        reduce_dim = data_obj.reduce_dim
+
+    if reduce_dim[0].lower() == "pca":
+        data_obj.reducer = PCA(n_components=_data_pca_components(reduce_dim))
+    elif reduce_dim[0].lower() == "autoencoder":
+        data_obj.reducer = None
+
+def _data_scale_reduced_target(scale, scale_reduced, target):
+    if not scale_reduced:
+        return False
+    return ("all" in scale[1].lower()) or (target in scale[1].lower())
 
 
 
