@@ -923,6 +923,7 @@ class DATA:
             self.FT_val_in   = self.FT_val_in.reshape(*self.FT_val_in.shape[:-1], self.FT_val_in.shape[-1]//2, 2)
             self.FT_test_in  = self.FT_test_in.reshape(*self.FT_test_in.shape[:-1], self.FT_test_in.shape[-1]//2, 2)
 
+#DATA Helper Functions
 def _data_to_numpy(x):
     if hasattr(x, "to_numpy"):
         return x.to_numpy(copy=True)
