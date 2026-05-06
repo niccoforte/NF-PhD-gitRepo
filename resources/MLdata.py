@@ -374,9 +374,56 @@ def load_akData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV_test_i
     train, val, test = [train_in, train_out], [val_in, val_out], [test_in, test_out]
     return train, val, test
 
-def split_data(dIN, dOUT, props, split=0.8, random_state=None):
+def split_data(IN, OUT, props, split=0.8, random_state=None, force_train_idx=None):
     val_random_state = None if random_state is None else int(random_state) + 1
-    train_in, test_in, train_out, test_out, train_props, test_props = train_test_split(dIN, dOUT, props, train_size=split,
+    if force_train_idx is not None and len(force_train_idx) > 0:
+        force_idx = IN.index.intersection(pd.Index(force_train_idx))
+        if len(force_idx) > 0:
+            remaining_idx = IN.index.difference(force_idx, sort=False)
+            n_total = len(IN)
+            n_train_target = int(round(n_total * split * split))
+            n_val_target = int(round(n_total * split * (1.0 - split)))
+            n_train_extra = max(0, min(n_train_target - len(force_idx), len(remaining_idx)))
+
+            if n_train_extra == 0:
+                train_extra_idx = pd.Index([])
+                holdout_idx = remaining_idx
+            elif n_train_extra == len(remaining_idx):
+                train_extra_idx = remaining_idx
+                holdout_idx = pd.Index([])
+            else:
+                train_extra_idx, holdout_idx = train_test_split(
+                    remaining_idx,
+                    train_size=n_train_extra,
+                    random_state=random_state,
+                    shuffle=True,
+                    stratify=None,
+                )
+                train_extra_idx = pd.Index(train_extra_idx)
+                holdout_idx = pd.Index(holdout_idx)
+
+            train_idx = force_idx.append(train_extra_idx)
+            if len(holdout_idx) < 2:
+                val_idx = holdout_idx
+                test_idx = pd.Index([])
+            else:
+                n_val = max(1, min(n_val_target, len(holdout_idx) - 1))
+                val_idx, test_idx = train_test_split(
+                    holdout_idx,
+                    train_size=n_val,
+                    random_state=val_random_state,
+                    shuffle=True,
+                    stratify=None,
+                )
+                val_idx = pd.Index(val_idx)
+                test_idx = pd.Index(test_idx)
+
+            train = [IN.loc[train_idx], OUT.loc[train_idx], props.loc[train_idx]]
+            val = [IN.loc[val_idx], OUT.loc[val_idx], props.loc[val_idx]]
+            test = [IN.loc[test_idx], OUT.loc[test_idx], props.loc[test_idx]]
+            return train, val, test
+
+    train_in, test_in, train_out, test_out, train_props, test_props = train_test_split(IN, OUT, props, train_size=split,
                                                                                        random_state=random_state, shuffle=True, stratify=None)
     train_in, val_in, train_out, val_out, train_props, val_props = train_test_split(train_in, train_out, train_props, train_size=split,
                                                                                     random_state=val_random_state, shuffle=True, stratify=None)
@@ -563,6 +610,7 @@ class DATA:
         load_split=False,
         split_frac=0.8,
         split_seed=None,
+        range_split=(True, False),
         save_split=False,
         LAT="FCC", 
         nnx=None,
@@ -585,6 +633,9 @@ class DATA:
         self.load_split = load_split
         self.split_frac = split_frac
         self.split_seed = None if split_seed is None or split_seed is False else int(split_seed)
+        self.range_split = _data_resolve_range_split(range_split)
+        self.input_range_split = self.range_split["input"]
+        self.output_range_split = self.range_split["output"]
         self.save_split = save_split
         self.LAT = LAT
         self.nnx = nnx
@@ -770,6 +821,14 @@ class DATA:
             FT_IN_df = _data_select_input_dataframe(self, "FT")
             FT_OUT_df = self.FT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_OUT_df.iloc[1:].drop(['0'], axis=1)
 
+        def _force_range_idx(input_df=None, props_df=None):
+            force_idx = pd.Index([])
+            if self.input_range_split and input_df is not None:
+                force_idx = force_idx.union(_data_range_split_indices(input_df))
+            if self.output_range_split and props_df is not None:
+                force_idx = force_idx.union(_data_range_split_indices(props_df))
+            return force_idx if len(force_idx) > 0 else None
+
         if split_name is None:
             split_name = self.load_split if self.load_split else datetime.datetime.now()
 
@@ -786,13 +845,24 @@ class DATA:
                 for idx in [UT_OUT_df.index, self.UT_props_df.index, FT_IN_df.index, FT_OUT_df.index, self.FT_props_df.index]:
                     common_idx = common_idx.intersection(idx)
                 self.common_idx = common_idx
+                force_train_idx = pd.Index([])
+                UT_force_idx = _force_range_idx(UT_IN_df.loc[common_idx], self.UT_props_df.loc[common_idx])
+                FT_force_idx = _force_range_idx(FT_IN_df.loc[common_idx], self.FT_props_df.loc[common_idx])
+                if UT_force_idx is not None:
+                    force_train_idx = force_train_idx.union(UT_force_idx)
+                if FT_force_idx is not None:
+                    force_train_idx = force_train_idx.union(FT_force_idx)
+                force_train_idx = force_train_idx if len(force_train_idx) > 0 else None
+                if force_train_idx is not None:
+                    self.common_range_split_idx = force_train_idx
 
                 UT_train, UT_val, UT_test = split_data(
                     UT_IN_df.loc[common_idx],
                     UT_OUT_df.loc[common_idx],
                     self.UT_props_df.loc[common_idx],
                     split=self.split_frac,
-                    random_state=self.split_seed
+                    random_state=self.split_seed,
+                    force_train_idx=force_train_idx
                 )
                 train_idx = UT_train[0].index
                 val_idx = UT_val[0].index
@@ -806,12 +876,16 @@ class DATA:
             if self.load_split and UT_train is None:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
             elif UT_train is None:
+                force_train_idx = _force_range_idx(UT_IN_df, self.UT_props_df)
+                if force_train_idx is not None:
+                    self.UT_range_split_idx = force_train_idx
                 UT_train, UT_val, UT_test = split_data(
                     UT_IN_df,
                     UT_OUT_df,
                     self.UT_props_df,
                     split=self.split_frac,
-                    random_state=self.split_seed
+                    random_state=self.split_seed,
+                    force_train_idx=force_train_idx
                 )
             self.UT_train_in_df, self.UT_train_out_df, self.UT_trainProps_df = UT_train
             self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
@@ -831,12 +905,16 @@ class DATA:
             if self.load_split and FT_train is None:
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
             elif FT_train is None:
+                force_train_idx = _force_range_idx(FT_IN_df, self.FT_props_df)
+                if force_train_idx is not None:
+                    self.FT_range_split_idx = force_train_idx
                 FT_train, FT_val, FT_test = split_data(
                     FT_IN_df,
                     FT_OUT_df,
                     self.FT_props_df,
                     split=self.split_frac,
-                    random_state=self.split_seed
+                    random_state=self.split_seed,
+                    force_train_idx=force_train_idx
                 )
             self.FT_train_in_df, self.FT_train_out_df, self.FT_trainProps_df = FT_train
             self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
@@ -1096,6 +1174,48 @@ def _data_to_numpy(x):
 def _data_is_node_model(model):
     return str(model).lower() in ["tr", "gnn", "gcn", "gat"]
 
+def _data_resolve_range_split(range_split):
+    if range_split is None or range_split is False:
+        return {"input": False, "output": False}
+    if range_split is True:
+        return {"input": True, "output": False}
+
+    aliases = {
+        "input": "input",
+        "inputs": "input",
+        "in": "input",
+        "x": "input",
+        "dxdy": "input",
+        "delta": "input",
+        "output": "output",
+        "outputs": "output",
+        "out": "output",
+        "y": "output",
+        "props": "output",
+        "properties": "output",
+    }
+
+    if isinstance(range_split, dict):
+        resolved = {"input": False, "output": False}
+        for key, value in range_split.items():
+            norm_key = aliases.get(str(key).strip().lower())
+            if norm_key is None:
+                raise ValueError("range_split dict keys must refer to input/output range splitting.")
+            resolved[norm_key] = bool(value)
+        return resolved
+
+    if isinstance(range_split, (list, tuple)):
+        if len(range_split) == 0:
+            return {"input": False, "output": False}
+        if len(range_split) > 2:
+            raise ValueError("range_split list/tuple supports at most two booleans: (input_range, output_range).")
+        return {
+            "input": bool(range_split[0]),
+            "output": bool(range_split[1]) if len(range_split) > 1 else False,
+        }
+
+    raise TypeError("range_split must be bool, None, tuple/list like (input_range, output_range), or dict.")
+
 def _data_resolve_tr_params(tr_params):
     defaults = {
         "geom_feats": True,
@@ -1168,6 +1288,23 @@ def _data_select_input_dataframe(data_obj, mode):
     if data_obj.round_decimals is not None:
         input_df = input_df.copy().round(data_obj.round_decimals)
     return input_df
+
+def _data_range_split_indices(input_df, eps=1e-12):
+    if input_df is None or len(input_df) == 0:
+        return pd.Index([])
+
+    numeric_df = input_df.select_dtypes(include=[np.number])
+    if numeric_df.shape[1] == 0:
+        return pd.Index([])
+
+    col_range = numeric_df.max(axis=0) - numeric_df.min(axis=0)
+    varying_cols = col_range.index[np.abs(col_range.to_numpy(dtype=float)) > eps]
+    if len(varying_cols) == 0:
+        return pd.Index([])
+
+    idx_min = numeric_df.loc[:, varying_cols].idxmin(axis=0)
+    idx_max = numeric_df.loc[:, varying_cols].idxmax(axis=0)
+    return pd.Index(idx_min).union(pd.Index(idx_max))
 
 def _data_target_configured(cfg, target):
     if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
