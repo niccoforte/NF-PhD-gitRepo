@@ -337,6 +337,622 @@ def predict_model(typ, model, test_dataloader):
     truth = np.concatenate(truth)
     return test_outputs, truth
 
+# Prediction diagnostics
+def _curve_2d_array(data, name):
+    arr = np.asarray(data, dtype=float)
+    if arr.ndim == 1:
+        arr = arr.reshape(1, -1)
+    if arr.ndim != 2:
+        raise ValueError(f"{name} must be a 1D or 2D curve array, got shape {arr.shape}.")
+    return arr
+
+def _safe_nanmean(x):
+    x = np.asarray(x, dtype=float)
+    if x.size == 0 or np.all(np.isnan(x)):
+        return np.nan
+    return float(np.nanmean(x))
+
+def _safe_corr(a, b, eps=1e-12):
+    a = np.asarray(a, dtype=float).reshape(-1)
+    b = np.asarray(b, dtype=float).reshape(-1)
+    mask = np.isfinite(a) & np.isfinite(b)
+    if int(mask.sum()) < 2:
+        return np.nan
+    a = a[mask]
+    b = b[mask]
+    if np.nanstd(a) <= eps or np.nanstd(b) <= eps:
+        return np.nan
+    return float(np.corrcoef(a, b)[0, 1])
+
+def _curve_x_array(x_values, n_points):
+    x = _coerce_curve_x_values(x_values)
+    if x is None:
+        return np.arange(n_points, dtype=float)
+    x = np.asarray(x, dtype=float).reshape(-1)
+    if x.size != n_points:
+        raise ValueError(f"x_values length ({x.size}) does not match curve length ({n_points}).")
+    return x
+
+def _curve_zone_slices(n_points, zone_boundaries=None, zone_names=None):
+    if zone_boundaries is None:
+        b1 = n_points // 3
+        b2 = (2 * n_points) // 3
+    else:
+        if len(zone_boundaries) != 2:
+            raise ValueError("zone_boundaries must contain exactly two point indices.")
+        b1, b2 = int(zone_boundaries[0]), int(zone_boundaries[1])
+    if not (0 < b1 < b2 < n_points):
+        raise ValueError(f"Invalid zone boundaries ({b1}, {b2}) for n_points={n_points}.")
+    if zone_names is None:
+        zone_names = ("elastic", "peak_region", "post_peak")
+    if len(zone_names) != 3:
+        raise ValueError("zone_names must contain exactly three names.")
+    return [
+        (str(zone_names[0]), slice(0, b1)),
+        (str(zone_names[1]), slice(b1, b2)),
+        (str(zone_names[2]), slice(b2, n_points)),
+    ]
+
+def _curve_zone_boundaries_from_slices(zones):
+    return [zone.stop for _, zone in zones[:-1]]
+
+def _curve_integral(y, x):
+    if y.shape[-1] <= 1:
+        return np.zeros(y.shape[0], dtype=float)
+    return np.trapz(y, x=x, axis=1)
+
+def curve_performance_diagnostics(
+    y_pred,
+    y_true,
+    x_values=None,
+    train_truth=None,
+    zone_boundaries=None,
+    zone_names=None,
+    eps=1e-12,
+):
+    """
+    Compute curve-level diagnostics for stress-strain or force-displacement outputs.
+
+    The collapse ratio is mean pointwise std(predictions) divided by mean pointwise
+    std(targets). Values near zero indicate average-curve collapse.
+    """
+    y_pred = _curve_2d_array(y_pred, "y_pred")
+    y_true = _curve_2d_array(y_true, "y_true")
+    if y_pred.shape != y_true.shape:
+        raise ValueError(f"y_pred shape {y_pred.shape} does not match y_true shape {y_true.shape}.")
+
+    n_samples, n_points = y_true.shape
+    x = _curve_x_array(x_values, n_points)
+    zones = _curve_zone_slices(n_points, zone_boundaries=zone_boundaries, zone_names=zone_names)
+    resolved_zone_boundaries = tuple(_curve_zone_boundaries_from_slices(zones))
+
+    err = y_pred - y_true
+    abs_err = np.abs(err)
+    sq_err = err ** 2
+
+    ddof = 1 if n_samples > 1 else 0
+    true_std = np.nanstd(y_true, axis=0, ddof=ddof)
+    pred_std = np.nanstd(y_pred, axis=0, ddof=ddof)
+    std_ratio_curve = pred_std / np.maximum(true_std, eps)
+    collapse_ratio = float(np.nanmean(pred_std) / max(float(np.nanmean(true_std)), eps))
+
+    point_metrics = pd.DataFrame(
+        {
+            "x": x,
+            "true_mean": np.nanmean(y_true, axis=0),
+            "pred_mean": np.nanmean(y_pred, axis=0),
+            "bias": np.nanmean(err, axis=0),
+            "mae": np.nanmean(abs_err, axis=0),
+            "rmse": np.sqrt(np.nanmean(sq_err, axis=0)),
+            "true_std": true_std,
+            "pred_std": pred_std,
+            "std_ratio": std_ratio_curve,
+        }
+    )
+
+    sample_mae = np.nanmean(abs_err, axis=1)
+    sample_mse = np.nanmean(sq_err, axis=1)
+    sample_rmse = np.sqrt(sample_mse)
+    sample_bias = np.nanmean(err, axis=1)
+    sample_max_abs_error = np.nanmax(abs_err, axis=1)
+    sample_curve_corr = np.array([_safe_corr(p, t, eps=eps) for p, t in zip(y_pred, y_true)], dtype=float)
+
+    true_peak_idx = np.nanargmax(y_true, axis=1)
+    pred_peak_idx = np.nanargmax(y_pred, axis=1)
+    true_peak = y_true[np.arange(n_samples), true_peak_idx]
+    pred_peak = y_pred[np.arange(n_samples), pred_peak_idx]
+    true_peak_x = x[true_peak_idx]
+    pred_peak_x = x[pred_peak_idx]
+    true_energy = _curve_integral(y_true, x)
+    pred_energy = _curve_integral(y_pred, x)
+
+    sample_metrics = pd.DataFrame(
+        {
+            "sample": np.arange(n_samples),
+            "sample_mae": sample_mae,
+            "sample_mse": sample_mse,
+            "sample_rmse": sample_rmse,
+            "sample_bias": sample_bias,
+            "sample_max_abs_error": sample_max_abs_error,
+            "sample_curve_corr": sample_curve_corr,
+            "true_peak": true_peak,
+            "pred_peak": pred_peak,
+            "peak_error": pred_peak - true_peak,
+            "true_peak_x": true_peak_x,
+            "pred_peak_x": pred_peak_x,
+            "peak_x_error": pred_peak_x - true_peak_x,
+            "true_energy": true_energy,
+            "pred_energy": pred_energy,
+            "energy_error": pred_energy - true_energy,
+        }
+    )
+
+    zone_rows = []
+    for zone_name, zone in zones:
+        zone_err = err[:, zone]
+        zone_abs = abs_err[:, zone]
+        zone_sq = sq_err[:, zone]
+        zone_true_std = np.nanstd(y_true[:, zone], axis=0, ddof=ddof)
+        zone_pred_std = np.nanstd(y_pred[:, zone], axis=0, ddof=ddof)
+        zone_rows.append(
+            {
+                "zone": zone_name,
+                "start_idx": zone.start,
+                "end_idx": zone.stop,
+                "x_start": float(x[zone.start]),
+                "x_end": float(x[zone.stop - 1]),
+                "mae": _safe_nanmean(zone_abs),
+                "mse": _safe_nanmean(zone_sq),
+                "rmse": float(np.sqrt(_safe_nanmean(zone_sq))),
+                "bias": _safe_nanmean(zone_err),
+                "true_std_mean": _safe_nanmean(zone_true_std),
+                "pred_std_mean": _safe_nanmean(zone_pred_std),
+                "collapse_ratio": float(
+                    np.nanmean(zone_pred_std) / max(float(np.nanmean(zone_true_std)), eps)
+                ),
+            }
+        )
+    zone_metrics = pd.DataFrame(zone_rows)
+
+    mse_value = _safe_nanmean(sq_err)
+    rmse_value = float(np.sqrt(mse_value))
+    true_range = float(np.nanmax(y_true) - np.nanmin(y_true))
+    true_std_global = float(np.nanstd(y_true, ddof=ddof))
+    sse = float(np.nansum(sq_err))
+    sst = float(np.nansum((y_true - np.nanmean(y_true)) ** 2))
+    summary = {
+        "n_samples": int(n_samples),
+        "n_points": int(n_points),
+        "mae": _safe_nanmean(abs_err),
+        "mse": mse_value,
+        "rmse": rmse_value,
+        "bias": _safe_nanmean(err),
+        "r2_global": float(1.0 - sse / sst) if sst > eps else np.nan,
+        "nrmse_range": float(rmse_value / true_range) if true_range > eps else np.nan,
+        "nrmse_std": float(rmse_value / true_std_global) if true_std_global > eps else np.nan,
+        "collapse_ratio": collapse_ratio,
+        "mean_sample_curve_corr": _safe_nanmean(sample_curve_corr),
+        "median_sample_curve_corr": float(np.nanmedian(sample_curve_corr)) if not np.all(np.isnan(sample_curve_corr)) else np.nan,
+        "peak_corr": _safe_corr(true_peak, pred_peak, eps=eps),
+        "peak_x_corr": _safe_corr(true_peak_x, pred_peak_x, eps=eps),
+        "energy_corr": _safe_corr(true_energy, pred_energy, eps=eps),
+        "zone_boundaries": resolved_zone_boundaries,
+    }
+
+    baseline_source = None
+    if train_truth is not None:
+        train_truth = _curve_2d_array(train_truth, "train_truth")
+        if train_truth.shape[1] != n_points:
+            raise ValueError(
+                f"train_truth curve length ({train_truth.shape[1]}) does not match y_true length ({n_points})."
+            )
+        baseline_curve = np.nanmean(train_truth, axis=0)
+        baseline_source = "train_mean_curve"
+    else:
+        baseline_curve = np.nanmean(y_true, axis=0)
+        baseline_source = "truth_mean_curve"
+
+    baseline_err = baseline_curve.reshape(1, -1) - y_true
+    baseline_mse = _safe_nanmean(baseline_err ** 2)
+    baseline_rmse = float(np.sqrt(baseline_mse))
+    baseline_mae = _safe_nanmean(np.abs(baseline_err))
+    summary.update(
+        {
+            "mean_curve_baseline_source": baseline_source,
+            "mean_curve_baseline_mae": baseline_mae,
+            "mean_curve_baseline_mse": baseline_mse,
+            "mean_curve_baseline_rmse": baseline_rmse,
+            "skill_vs_mean_curve_rmse": float(1.0 - rmse_value / baseline_rmse) if baseline_rmse > eps else np.nan,
+            "skill_vs_mean_curve_mae": float(1.0 - summary["mae"] / baseline_mae) if baseline_mae > eps else np.nan,
+        }
+    )
+
+    return {
+        "summary": summary,
+        "sample_metrics": sample_metrics,
+        "point_metrics": point_metrics,
+        "zone_metrics": zone_metrics,
+        "x": x,
+        "y_pred": y_pred,
+        "y_true": y_true,
+        "baseline_curve": baseline_curve,
+    }
+
+def _fmt_metric(value, digits=4):
+    if value is None:
+        return "n/a"
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if not np.isfinite(value):
+        return "n/a"
+    return f"{value:.{digits}g}"
+
+def print_curve_diagnostics(diagnostics, label="Curve"):
+    summary = diagnostics["summary"] if isinstance(diagnostics, dict) else diagnostics
+    label = str(label).upper()
+    print(
+        f"{label} prediction diagnostics | "
+        f"collapse ratio: {_fmt_metric(summary.get('collapse_ratio'), 3)} | "
+        f"RMSE: {_fmt_metric(summary.get('rmse'))} | "
+        f"mean-curve RMSE: {_fmt_metric(summary.get('mean_curve_baseline_rmse'))} | "
+        f"skill vs mean curve: {_fmt_metric(summary.get('skill_vs_mean_curve_rmse'), 3)} | "
+        f"peak corr: {_fmt_metric(summary.get('peak_corr'), 3)} | "
+        f"energy corr: {_fmt_metric(summary.get('energy_corr'), 3)} | "
+        f"sample curve corr: {_fmt_metric(summary.get('mean_sample_curve_corr'), 3)}"
+    )
+    if isinstance(diagnostics, dict) and "zone_metrics" in diagnostics:
+        zone_text = []
+        for _, row in diagnostics["zone_metrics"].iterrows():
+            zone_text.append(
+                f"{row['zone']}: collapse {_fmt_metric(row['collapse_ratio'], 3)}, "
+                f"RMSE {_fmt_metric(row['rmse'])}"
+            )
+        print(f"{label} zones | " + " | ".join(zone_text))
+
+def _diagnostic_order(sample_metrics, sort_by="rmse"):
+    sort_by = "sample_rmse" if sort_by is None else str(sort_by)
+    aliases = {
+        "rmse": "sample_rmse",
+        "mae": "sample_mae",
+        "bias": "sample_bias",
+        "max": "sample_max_abs_error",
+        "max_abs_error": "sample_max_abs_error",
+        "corr": "sample_curve_corr",
+        "curve_corr": "sample_curve_corr",
+        "sample": "sample",
+        "index": "sample",
+    }
+    col = aliases.get(sort_by.lower(), sort_by)
+    if col not in sample_metrics.columns:
+        col = "sample_rmse"
+    ascending = col in ["sample", "sample_curve_corr"]
+    ordered = sample_metrics.sort_values(col, ascending=ascending)
+    return ordered["sample"].astype(int).to_numpy()
+
+def _add_zone_lines(ax, x, zone_boundaries=None, **kwargs):
+    if zone_boundaries is None:
+        return
+    n_points = len(x)
+    for boundary in zone_boundaries:
+        boundary = int(boundary)
+        if 0 < boundary < n_points:
+            ax.axvline(x[boundary], **kwargs)
+
+def plot_prediction_error_curves(
+    OUT_df,
+    test_outputs,
+    truth,
+    diagnostics=None,
+    mode="ut",
+    max_samples=50,
+    sort_by="rmse",
+    zone_boundaries=None,
+):
+    if diagnostics is None:
+        diagnostics = curve_performance_diagnostics(
+            test_outputs,
+            truth,
+            x_values=OUT_df,
+            zone_boundaries=zone_boundaries,
+        )
+    x = diagnostics["x"]
+    err = diagnostics["y_pred"] - diagnostics["y_true"]
+    order = _diagnostic_order(diagnostics["sample_metrics"], sort_by=sort_by)
+    if max_samples is not None:
+        order = order[: int(max_samples)]
+
+    fig, ax = plt.subplots(figsize=(10, 5))
+    for sample_idx in order:
+        ax.plot(x, err[sample_idx], color="tab:blue", alpha=0.18, linewidth=1.0)
+    ax.plot(x, np.nanmean(err[order], axis=0), color="black", linewidth=2.0, label="Mean error")
+    ax.axhline(0.0, color="gray", linestyle="--", linewidth=1.0)
+    _add_zone_lines(ax, x, diagnostics["summary"].get("zone_boundaries"), color="gray", linestyle=":", alpha=0.5)
+    ax.set_title(f"{str(mode).upper()} Prediction Error Curves")
+    ax.set_xlabel("Macroscopic Strain ($\\epsilon$)" if str(mode).lower() == "ut" else "Load-line Displacement ($d$)")
+    ax.set_ylabel("Prediction - Truth")
+    ax.legend()
+    plt.show()
+    return fig, ax
+
+def plot_curve_correlation_matrix(diagnostics, columns=None, method="pearson", figsize=(8, 7)):
+    sample_metrics = diagnostics["sample_metrics"] if isinstance(diagnostics, dict) else diagnostics
+    if columns is None:
+        columns = [
+            "sample_rmse",
+            "sample_bias",
+            "sample_curve_corr",
+            "true_peak",
+            "pred_peak",
+            "peak_error",
+            "true_peak_x",
+            "pred_peak_x",
+            "true_energy",
+            "pred_energy",
+            "energy_error",
+        ]
+    columns = [col for col in columns if col in sample_metrics.columns]
+    if len(columns) == 0:
+        raise ValueError("No requested columns are present in the diagnostics sample metrics.")
+    corr = sample_metrics[columns].corr(method=method)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.imshow(corr.to_numpy(), vmin=-1, vmax=1, cmap="coolwarm")
+    ax.set_xticks(np.arange(len(columns)))
+    ax.set_yticks(np.arange(len(columns)))
+    ax.set_xticklabels(columns, rotation=45, ha="right")
+    ax.set_yticklabels(columns)
+    ax.set_title("Prediction Diagnostic Correlations")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    if len(columns) <= 10:
+        for i in range(len(columns)):
+            for j in range(len(columns)):
+                val = corr.iloc[i, j]
+                if np.isfinite(val):
+                    ax.text(j, i, f"{val:.2f}", ha="center", va="center", fontsize=8)
+    fig.tight_layout()
+    plt.show()
+    return corr, fig, ax
+
+def plot_curve_diagnostics(
+    OUT_df,
+    test_outputs,
+    truth,
+    diagnostics=None,
+    mode="ut",
+    max_samples=64,
+    sort_by="rmse",
+    zone_boundaries=None,
+):
+    if diagnostics is None:
+        diagnostics = curve_performance_diagnostics(
+            test_outputs,
+            truth,
+            x_values=OUT_df,
+            zone_boundaries=zone_boundaries,
+        )
+
+    x = diagnostics["x"]
+    y_pred = diagnostics["y_pred"]
+    y_true = diagnostics["y_true"]
+    point = diagnostics["point_metrics"]
+    samples = diagnostics["sample_metrics"]
+    summary = diagnostics["summary"]
+    order = _diagnostic_order(samples, sort_by=sort_by)
+    if max_samples is not None:
+        order = order[: int(max_samples)]
+    err = y_pred - y_true
+
+    fig, axes = plt.subplots(2, 3, figsize=(18, 9))
+    ax = axes[0, 0]
+    ax.plot(x, point["true_mean"], color="darkgreen", label="Truth mean")
+    ax.fill_between(
+        x,
+        point["true_mean"] - point["true_std"],
+        point["true_mean"] + point["true_std"],
+        color="darkgreen",
+        alpha=0.18,
+        label="Truth +/- std",
+    )
+    ax.plot(x, point["pred_mean"], color="orangered", label="Prediction mean")
+    ax.fill_between(
+        x,
+        point["pred_mean"] - point["pred_std"],
+        point["pred_mean"] + point["pred_std"],
+        color="orangered",
+        alpha=0.18,
+        label="Prediction +/- std",
+    )
+    if "baseline_curve" in diagnostics:
+        ax.plot(x, diagnostics["baseline_curve"], color="gray", linestyle="--", linewidth=1.5, label="Mean-curve baseline")
+    _add_zone_lines(ax, x, summary.get("zone_boundaries"), color="gray", linestyle=":", alpha=0.5)
+    ax.set_title("Mean Curve And Diversity")
+    ax.set_xlabel("Macroscopic Strain ($\\epsilon$)" if str(mode).lower() == "ut" else "Load-line Displacement ($d$)")
+    ax.set_ylabel("Stress / force")
+    ax.legend(fontsize=8)
+
+    ax = axes[0, 1]
+    ax.plot(x, point["mae"], color="tab:blue", label="MAE")
+    ax.plot(x, point["rmse"], color="tab:orange", label="RMSE")
+    ax.plot(x, point["bias"], color="black", linestyle="--", label="Bias")
+    ax.axhline(0.0, color="gray", linewidth=0.8)
+    _add_zone_lines(ax, x, summary.get("zone_boundaries"), color="gray", linestyle=":", alpha=0.5)
+    ax.set_title("Pointwise Error")
+    ax.set_xlabel("Macroscopic Strain ($\\epsilon$)" if str(mode).lower() == "ut" else "Load-line Displacement ($d$)")
+    ax.set_ylabel("Error")
+    ax.legend(fontsize=8)
+
+    ax = axes[0, 2]
+    ax.plot(x, point["true_std"], color="darkgreen", label="Truth std")
+    ax.plot(x, point["pred_std"], color="orangered", label="Prediction std")
+    ax2 = ax.twinx()
+    ax2.plot(x, point["std_ratio"], color="tab:purple", alpha=0.65, label="Pred/true std")
+    ax2.axhline(1.0, color="gray", linestyle="--", linewidth=0.8)
+    _add_zone_lines(ax, x, summary.get("zone_boundaries"), color="gray", linestyle=":", alpha=0.5)
+    ax.set_title(f"Diversity Collapse Ratio = {_fmt_metric(summary.get('collapse_ratio'), 3)}")
+    ax.set_xlabel("Macroscopic Strain ($\\epsilon$)" if str(mode).lower() == "ut" else "Load-line Displacement ($d$)")
+    ax.set_ylabel("Across-sample std")
+    ax2.set_ylabel("Std ratio")
+    lines, labels = ax.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax.legend(lines + lines2, labels + labels2, fontsize=8)
+
+    ax = axes[1, 0]
+    heat = err[order]
+    vmax = np.nanpercentile(np.abs(heat), 98) if heat.size else 1.0
+    vmax = max(float(vmax), 1e-12)
+    im = ax.imshow(
+        heat,
+        aspect="auto",
+        cmap="coolwarm",
+        vmin=-vmax,
+        vmax=vmax,
+        extent=[float(x[0]), float(x[-1]), len(order), 0],
+    )
+    _add_zone_lines(ax, x, summary.get("zone_boundaries"), color="black", linestyle=":", alpha=0.45)
+    ax.set_title(f"Residual Heatmap ({len(order)} samples)")
+    ax.set_xlabel("Macroscopic Strain ($\\epsilon$)" if str(mode).lower() == "ut" else "Load-line Displacement ($d$)")
+    ax.set_ylabel(f"Samples sorted by {sort_by}")
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+
+    ax = axes[1, 1]
+    ax.scatter(samples["true_peak"], samples["pred_peak"], c=samples["sample_rmse"], cmap="viridis", s=28, alpha=0.8)
+    lo = np.nanmin([samples["true_peak"].min(), samples["pred_peak"].min()])
+    hi = np.nanmax([samples["true_peak"].max(), samples["pred_peak"].max()])
+    ax.plot([lo, hi], [lo, hi], color="gray", linestyle="--", linewidth=1.0)
+    ax.set_title(f"Peak Correlation = {_fmt_metric(summary.get('peak_corr'), 3)}")
+    ax.set_xlabel("True peak")
+    ax.set_ylabel("Predicted peak")
+
+    ax = axes[1, 2]
+    ax.scatter(samples["true_energy"], samples["pred_energy"], c=samples["sample_rmse"], cmap="viridis", s=28, alpha=0.8)
+    lo = np.nanmin([samples["true_energy"].min(), samples["pred_energy"].min()])
+    hi = np.nanmax([samples["true_energy"].max(), samples["pred_energy"].max()])
+    ax.plot([lo, hi], [lo, hi], color="gray", linestyle="--", linewidth=1.0)
+    ax.set_title(f"Energy Correlation = {_fmt_metric(summary.get('energy_corr'), 3)}")
+    ax.set_xlabel("True integrated curve")
+    ax.set_ylabel("Predicted integrated curve")
+
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def collect_layer_activations(typ, model, dataloader, layer_names=None, max_batches=1, device=None):
+    if device is None:
+        device = next(model.parameters()).device
+    if layer_names is not None:
+        layer_names = set(layer_names)
+
+    activations = {}
+    hooks = []
+
+    def _capture(name):
+        def hook(_, __, output):
+            out = output[0] if isinstance(output, (tuple, list)) else output
+            if torch.is_tensor(out):
+                activations.setdefault(name, []).append(out.detach().cpu().float().numpy())
+        return hook
+
+    layer_types = [nn.Linear]
+    try:
+        from torch_geometric.nn import GCNConv, GATConv
+        layer_types.extend([GCNConv, GATConv])
+    except Exception:
+        pass
+    layer_types = tuple(layer_types)
+
+    for name, module in model.named_modules():
+        if not name:
+            continue
+        if layer_names is not None:
+            keep = name in layer_names
+        else:
+            keep = isinstance(module, layer_types)
+        if keep:
+            hooks.append(module.register_forward_hook(_capture(name)))
+
+    was_training = model.training
+    model.eval()
+    try:
+        with torch.no_grad():
+            for batch_idx, batch in enumerate(dataloader):
+                if max_batches is not None and batch_idx >= int(max_batches):
+                    break
+                _forward_batch(typ, model, batch, device, context="activation diagnostics")
+    finally:
+        for hook in hooks:
+            hook.remove()
+        if was_training:
+            model.train()
+
+    out = {}
+    for name, chunks in activations.items():
+        if not chunks:
+            continue
+        try:
+            out[name] = np.concatenate(chunks, axis=0)
+        except ValueError:
+            out[name] = chunks
+    return out
+
+def summarize_activations(activations, near_zero=1e-6):
+    rows = []
+    for name, values in activations.items():
+        if isinstance(values, list):
+            arr = np.concatenate([np.ravel(v) for v in values])
+            shape = "ragged"
+        else:
+            arr_raw = np.asarray(values, dtype=float)
+            shape = tuple(arr_raw.shape)
+            arr = arr_raw.reshape(-1)
+        finite = arr[np.isfinite(arr)]
+        if finite.size == 0:
+            rows.append({"layer": name, "shape": shape, "n_values": 0})
+            continue
+        rows.append(
+            {
+                "layer": name,
+                "shape": shape,
+                "n_values": int(finite.size),
+                "mean": float(np.mean(finite)),
+                "std": float(np.std(finite)),
+                "min": float(np.min(finite)),
+                "p01": float(np.percentile(finite, 1)),
+                "p50": float(np.percentile(finite, 50)),
+                "p99": float(np.percentile(finite, 99)),
+                "max": float(np.max(finite)),
+                "zero_fraction": float(np.mean(finite == 0.0)),
+                "near_zero_fraction": float(np.mean(np.abs(finite) <= near_zero)),
+            }
+        )
+    return pd.DataFrame(rows)
+
+def plot_activation_summary(summary_or_activations, figsize=(10, 5)):
+    if isinstance(summary_or_activations, pd.DataFrame):
+        summary = summary_or_activations
+    else:
+        summary = summarize_activations(summary_or_activations)
+    if summary.empty:
+        raise ValueError("No activation values were collected.")
+
+    fig, ax1 = plt.subplots(figsize=figsize)
+    x = np.arange(len(summary))
+    ax1.bar(x - 0.18, summary["std"], width=0.36, color="tab:blue", label="Activation std")
+    ax1.set_ylabel("Std")
+    ax2 = ax1.twinx()
+    ax2.bar(x + 0.18, summary["near_zero_fraction"], width=0.36, color="tab:orange", alpha=0.75, label="Near-zero fraction")
+    ax2.set_ylabel("Near-zero fraction")
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(summary["layer"], rotation=45, ha="right")
+    ax1.set_title("Layer Activation Summary")
+    lines, labels = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines + lines2, labels + labels2, loc="best")
+    fig.tight_layout()
+    plt.show()
+    return fig, (ax1, ax2)
+
 # Weights initialization
 def make_weights_init(act="relu", bias_value=0.0, distribution="normal"):
     act_name = _activation(act, return_name=True)
@@ -1180,7 +1796,7 @@ def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
 
 
 ### HYPERPARAMETER OPTIMIZATION
-def GPR_HPopt(data, gpr, params, cv=5, verb=0):
+def GPR_hOpt(data, gpr, params, cv=5, verb=0):
     grid_search = GridSearchCV(gpr, params, cv=cv, scoring=None, verbose=verb)
     return grid_search.fit(data[0], data[1])
 
@@ -1197,6 +1813,54 @@ def _hopt_by_typ(value, typ):
     if not any(key in value for key in typ_keys):
         return value
     return value.get(typ, value.get("default"))
+
+def _hopt_task_token(data):
+    if data is None:
+        return "other"
+    ut = bool(getattr(data, "UTmechTest", False))
+    ft = bool(getattr(data, "FTmechTest", False))
+    return "multi" if (ut and ft) else ("ut" if ut else ("ft" if ft else "other"))
+
+def _hopt_model_type_token(typ):
+    from resources.MLmodels import _mp_slugify
+
+    typ = str(typ).lower()
+    if typ not in ["mlp", "tr", "gnn", "gcn", "gat"]:
+        raise ValueError("typ must be one of ['mlp', 'tr', 'gnn', 'gcn', 'gat'].")
+    return _mp_slugify(typ, default="model")
+
+def _hopt_data_descriptor(data):
+    from resources.MLmodels import _mp_data_descriptor
+
+    return _mp_data_descriptor(data)
+
+def _hopt_task_base_dir(data):
+    if data is not None and getattr(data, "path", None) == 0:
+        return os.path.join("models", "Akash")
+    return os.path.join("models", _hopt_task_token(data))
+
+def _hopt_data_base_dir(data):
+    return os.path.join(_hopt_task_base_dir(data), _hopt_data_descriptor(data))
+
+def _hopt_model_base_dir(typ, data):
+    return os.path.join(_hopt_data_base_dir(data), _hopt_model_type_token(typ))
+
+def _hopt_model_study_dir(typ, data, name):
+    return os.path.join(_hopt_model_base_dir(typ, data), "HPO", str(name))
+
+def _hopt_compare_study_base_dir(typs, data, name):
+    typ_keys = [str(typ).lower() for typ in typs]
+    typ_data = [_hopt_by_typ(data, typ) for typ in typ_keys]
+    if any(d is None for d in typ_data):
+        missing = [typ for typ, d in zip(typ_keys, typ_data) if d is None]
+        raise ValueError(f"No DATA object supplied for typ(s): {missing}.")
+
+    if len({id(d) for d in typ_data}) == 1:
+        base_dir = _hopt_data_base_dir(typ_data[0])
+    else:
+        task_dirs = {_hopt_task_base_dir(d) for d in typ_data}
+        base_dir = next(iter(task_dirs)) if len(task_dirs) == 1 else "models"
+    return os.path.join(base_dir, "HPO", str(name))
 
 def _hopt_sample(trial, name, spec, default=None):
     if callable(spec):
@@ -1596,6 +2260,7 @@ def hOpt(
     timeout=None,
     n_jobs=1,
     show_progress_bar=False,
+    study_dir=None,
 ):
     if sampler is None:
         sampler = optuna.samplers.TPESampler(multivariate=True, group=True, seed=seed)
@@ -1604,8 +2269,9 @@ def hOpt(
         pruner = optuna.pruners.PatientPruner(base_pruner, patience=5) if hasattr(optuna.pruners, "PatientPruner") else base_pruner
 
     if save:
-        os.makedirs(f"{path}/{name}/HPO", exist_ok=True)
-        storage_name = f"sqlite:///{path}/{name}/HPO/full_study.db"
+        save_dir = str(study_dir) if study_dir is not None else f"{path}/{name}/HPO"
+        os.makedirs(save_dir, exist_ok=True)
+        storage_name = f"sqlite:///{save_dir.replace(os.sep, '/')}/full_study.db"
         study_name = name
         study = optuna.create_study(storage=storage_name,
                                     study_name=study_name,
@@ -1626,16 +2292,18 @@ def hOpt(
         print(f"  Number of finished trials: {len(study.trials)}")
 
         best_trial = study.best_trial
-        print(f"\nBest trial \n Loss: {best_trial.value}")
+        objective_name = best_trial.params.get("objective_metric", "objective")
+        print(f"\nBest trial \n Objective ({objective_name}): {best_trial.value}")
         print("\n Hyperparameters:")
         for key, value in best_trial.params.items():
             print(f"  {key}: {value}")
 
     if save:
         best_params = best_trial.params
-        with open(f"{path}/{name}/HPO/best_params.json", "w") as f:
+        save_dir = str(study_dir) if study_dir is not None else f"{path}/{name}/HPO"
+        with open(f"{save_dir}/best_params.json", "w") as f:
             json.dump(best_params, f, indent=4)
-        with open(f"{path}/{name}/HPO/best_trial_user_attrs.json", "w") as f:
+        with open(f"{save_dir}/best_trial_user_attrs.json", "w") as f:
             json.dump(_hopt_json_safe(best_trial.user_attrs), f, indent=4)
     
     return study
@@ -1650,7 +2318,7 @@ def hOpt_model(
     mechMode=None,
     prnt=True,
     save=False,
-    path="models/etc",
+    path=None,
     name=None,
     seed=None,
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -1658,6 +2326,7 @@ def hOpt_model(
     n_jobs=1,
     RMSEtarget=False,
     show_progress_bar=False,
+    study_dir=None,
 ):
     typ = str(typ).lower()
     objective_fn = make_hOpt_objective(
@@ -1671,17 +2340,21 @@ def hOpt_model(
         RMSEtarget=RMSEtarget,
     )
     study_name = name if name is not None else f"{typ}_hOpt"
+    if save and study_dir is None and path is None:
+        study_dir = _hopt_model_study_dir(typ, data, study_name)
+    legacy_path = "models/etc" if path is None else path
     return hOpt(
         objective_fn,
         n_trials=n_trials,
         prnt=prnt,
         save=save,
-        path=path,
+        path=legacy_path,
         name=study_name,
         seed=seed,
         timeout=timeout,
         n_jobs=n_jobs,
         show_progress_bar=show_progress_bar,
+        study_dir=study_dir,
     )
 
 def hOpt_compare(
@@ -1694,7 +2367,7 @@ def hOpt_compare(
     mechMode=None,
     prnt=True,
     save=False,
-    path="models/etc",
+    path=None,
     name="model_compare",
     seed=None,
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
@@ -1704,11 +2377,14 @@ def hOpt_compare(
     show_progress_bar=False,
 ):
     studies = {}
+    compare_study_base_dir = _hopt_compare_study_base_dir(typs, data, name) if save and path is None else None
     for typ in typs:
         typ_key = str(typ).lower()
         typ_data = _hopt_by_typ(data, typ_key)
         if typ_data is None:
             raise ValueError(f"No DATA object supplied for typ='{typ}'.")
+        study_name = f"{name}_{typ_key}"
+        study_dir = os.path.join(compare_study_base_dir, typ_key) if compare_study_base_dir is not None else None
         study = hOpt_model(
             typ=typ_key,
             data=typ_data,
@@ -1720,13 +2396,14 @@ def hOpt_compare(
             prnt=prnt,
             save=save,
             path=path,
-            name=f"{name}_{typ_key}",
+            name=study_name,
             seed=seed,
             device=device,
             timeout=timeout,
             n_jobs=n_jobs,
             RMSEtarget=RMSEtarget,
             show_progress_bar=show_progress_bar,
+            study_dir=study_dir,
         )
         studies[typ_key] = study
 
@@ -1761,8 +2438,9 @@ def _hopt_json_safe(value):
         return value
     return str(value)
 
-def load_bestParams(path="models/etc", name="sample"):
-    with open(f"{path}/{name}/HPO/best_params.json", "r") as f:
+def load_bestParams(path="models/etc", name="sample", study_dir=None):
+    save_dir = str(study_dir) if study_dir is not None else f"{path}/{name}/HPO"
+    with open(f"{save_dir}/best_params.json", "r") as f:
         best_params = json.load(f)
 
     return best_params

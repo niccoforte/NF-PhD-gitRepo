@@ -6,6 +6,14 @@ from resources.MLfunc import (
     predict_model,
     plot_loss,
     plot_predictions,
+    curve_performance_diagnostics,
+    print_curve_diagnostics,
+    plot_curve_diagnostics,
+    plot_prediction_error_curves,
+    plot_curve_correlation_matrix,
+    collect_layer_activations,
+    summarize_activations,
+    plot_activation_summary,
     absErr,
     _activation,
     visualize_graphNetwork,
@@ -178,7 +186,15 @@ class MODEL:
             if plot:
                 plot_loss(self.FT_epoch, self.FT_train_lossLog, self.FT_val_lossLog)
     
-    def predict(self, test_dataloader=None, plot=False):
+    def predict(
+        self,
+        test_dataloader=None,
+        plot=False,
+        diagnostics=True,
+        diag_plot=False,
+        diag_samples=64,
+        zone_boundaries=None,
+    ):
         if (
             self.data.UTmechTest
             and self.data.FTmechTest
@@ -203,52 +219,239 @@ class MODEL:
             FT_loader = test_dataloader
 
         if self.data.UTmechTest:
-            self.UT_test_outputs, self.UT_truth = predict_model(self.typ,
-                                                                self.UT_model,
-                                                                UT_loader)
-            UT_reconstructor = getattr(self.data, "UT_OUTreconstructor", None)
-            if callable(UT_reconstructor):
-                self.UT_test_outputs = UT_reconstructor(self.UT_test_outputs)
-                self.UT_truth = UT_reconstructor(self.UT_truth)
-
-            self.UT_err = absErr(self.UT_test_outputs, self.UT_truth, typ="sum", axis=1)
-            self.UT_best, self.UT_worst = self.UT_err.tolist().index(min(self.UT_err)), self.UT_err.tolist().index(max(self.UT_err))
-            self.UT_mae = float(np.mean(np.abs(self.UT_test_outputs - self.UT_truth)))
-            self.UT_mse = float(np.mean((self.UT_test_outputs - self.UT_truth) ** 2))
-            self.UT_rmse = float(np.sqrt(self.UT_mse))
-            self.UT_mean_sum_abs_err = float(np.mean(self.UT_err))
-            print(f"UT test metrics | MAE: {self.UT_mae:.6f}, MSE: {self.UT_mse:.6f}, RMSE: {self.UT_rmse:.6f}, mean summed abs err: {self.UT_mean_sum_abs_err:.6f}")
-            print(f"Best prediction: {self.UT_best}, Worst prediction: {self.UT_worst}")
-
-            if plot:
-                plot_predictions(self.data.UT_OUT_df, self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_best,
-                                 d_out=False)
-                plot_predictions(self.data.UT_OUT_df, self.UT_test_outputs, truth=self.UT_truth, mode="ut", indx=self.UT_worst,
-                                 d_out=False)
+            self._predict_mode(
+                "UT",
+                UT_loader,
+                split="test",
+                plot=plot,
+                diagnostics=diagnostics,
+                diag_plot=diag_plot,
+                diag_samples=diag_samples,
+                zone_boundaries=zone_boundaries,
+            )
         
         if self.data.FTmechTest:
-            self.FT_test_outputs, self.FT_truth = predict_model(self.typ,
-                                                                self.FT_model,
-                                                                FT_loader)
-            FT_reconstructor = getattr(self.data, "FT_OUTreconstructor", None)
-            if callable(FT_reconstructor):
-                self.FT_test_outputs = FT_reconstructor(self.FT_test_outputs)
-                self.FT_truth = FT_reconstructor(self.FT_truth)
+            self._predict_mode(
+                "FT",
+                FT_loader,
+                split="test",
+                plot=plot,
+                diagnostics=diagnostics,
+                diag_plot=diag_plot,
+                diag_samples=diag_samples,
+                zone_boundaries=zone_boundaries,
+            )
 
-            self.FT_err = absErr(self.FT_test_outputs, self.FT_truth, typ="sum", axis=1)
-            self.FT_best, self.FT_worst = self.FT_err.tolist().index(min(self.FT_err)), self.FT_err.tolist().index(max(self.FT_err))
-            self.FT_mae = float(np.mean(np.abs(self.FT_test_outputs - self.FT_truth)))
-            self.FT_mse = float(np.mean((self.FT_test_outputs - self.FT_truth) ** 2))
-            self.FT_rmse = float(np.sqrt(self.FT_mse))
-            self.FT_mean_sum_abs_err = float(np.mean(self.FT_err))
-            print(f"FT test metrics | MAE: {self.FT_mae:.6f}, MSE: {self.FT_mse:.6f}, RMSE: {self.FT_rmse:.6f}, mean summed abs err: {self.FT_mean_sum_abs_err:.6f}")
-            print(f"Best prediction: {self.FT_best}, Worst prediction: {self.FT_worst}")
+    def _predict_mode(
+        self,
+        mode,
+        loader,
+        split="test",
+        plot=False,
+        diagnostics=True,
+        diag_plot=False,
+        diag_samples=64,
+        zone_boundaries=None,
+    ):
+        mode = mode.upper()
+        mode_lower = mode.lower()
+        task_model = getattr(self, f"{mode}_model")
+        outputs, truth = predict_model(self.typ, task_model, loader)
+        outputs = _model_reconstruct_output(self.data, mode, outputs)
+        truth = _model_reconstruct_output(self.data, mode, truth)
 
-            if plot:
-                plot_predictions(self.data.FT_OUT_df, self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_best,
-                                 d_out=False)
-                plot_predictions(self.data.FT_OUT_df, self.FT_test_outputs, truth=self.FT_truth, mode="ft", indx=self.FT_worst,
-                                 d_out=False)
+        setattr(self, f"{mode}_{split}_outputs", outputs)
+        if split == "test":
+            setattr(self, f"{mode}_test_outputs", outputs)
+            setattr(self, f"{mode}_truth", truth)
+        else:
+            setattr(self, f"{mode}_{split}_truth", truth)
+
+        err = absErr(outputs, truth, typ="sum", axis=1)
+        best = err.tolist().index(min(err))
+        worst = err.tolist().index(max(err))
+        mae = float(np.mean(np.abs(outputs - truth)))
+        mse = float(np.mean((outputs - truth) ** 2))
+        rmse = float(np.sqrt(mse))
+        mean_sum_abs_err = float(np.mean(err))
+        for name, value in [
+            ("err", err),
+            ("best", best),
+            ("worst", worst),
+            ("mae", mae),
+            ("mse", mse),
+            ("rmse", rmse),
+            ("mean_sum_abs_err", mean_sum_abs_err),
+        ]:
+            setattr(self, f"{mode}_{name}" if split == "test" else f"{mode}_{split}_{name}", value)
+
+        print(
+            f"{mode} {split} metrics | MAE: {mae:.6f}, MSE: {mse:.6f}, RMSE: {rmse:.6f}, "
+            f"mean summed abs err: {mean_sum_abs_err:.6f}"
+        )
+        print(f"Best prediction: {best}, Worst prediction: {worst}")
+
+        if diagnostics:
+            diag = _model_curve_diagnostics(
+                self,
+                mode,
+                outputs,
+                truth,
+                split=split,
+                zone_boundaries=zone_boundaries,
+            )
+            setattr(self, f"{mode}_{split}_diagnostics", diag)
+            if split == "test":
+                setattr(self, f"{mode}_diagnostics", diag)
+                setattr(self, f"{mode}_prediction_summary", diag["summary"])
+            print_curve_diagnostics(diag, label=f"{mode} {split}")
+            if diag_plot:
+                plot_curve_diagnostics(
+                    getattr(self.data, f"{mode}_OUT_df"),
+                    outputs,
+                    truth,
+                    diagnostics=diag,
+                    mode=mode_lower,
+                    max_samples=diag_samples,
+                    sort_by="rmse",
+                )
+
+        if plot:
+            plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=best,
+                             d_out=False)
+            plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=worst,
+                             d_out=False)
+
+        return outputs, truth
+
+    def evaluate_split(
+        self,
+        split="test",
+        mode=None,
+        plot=False,
+        diagnostics=True,
+        diag_plot=False,
+        diag_samples=64,
+        zone_boundaries=None,
+    ):
+        split = str(split).lower()
+        if split not in ["train", "val", "test"]:
+            raise ValueError("split must be one of ['train', 'val', 'test'].")
+        modes = [mode.upper()] if mode is not None else []
+        if not modes:
+            if self.data.UTmechTest:
+                modes.append("UT")
+            if self.data.FTmechTest:
+                modes.append("FT")
+        results = {}
+        for task_mode in modes:
+            loader = getattr(self, f"{task_mode}_{split}_dataloader")
+            outputs, truth = self._predict_mode(
+                task_mode,
+                loader,
+                split=split,
+                plot=plot,
+                diagnostics=diagnostics,
+                diag_plot=diag_plot,
+                diag_samples=diag_samples,
+                zone_boundaries=zone_boundaries,
+            )
+            results[task_mode] = (outputs, truth, getattr(self, f"{task_mode}_{split}_diagnostics", None))
+        return results if len(results) != 1 else next(iter(results.values()))
+
+    def plot_diagnostics(self, mode="UT", split="test", max_samples=64, sort_by="rmse"):
+        mode = mode.upper()
+        split = str(split).lower()
+        diagnostics = getattr(self, f"{mode}_{split}_diagnostics", None)
+        if diagnostics is None and split == "test":
+            diagnostics = getattr(self, f"{mode}_diagnostics", None)
+        outputs = getattr(self, f"{mode}_{split}_outputs", None)
+        truth = getattr(self, f"{mode}_{split}_truth", None)
+        if outputs is None and split == "test":
+            outputs = getattr(self, f"{mode}_test_outputs", None)
+            truth = getattr(self, f"{mode}_truth", None)
+        if outputs is None or truth is None:
+            raise ValueError(f"No stored {mode} {split} predictions. Run predict() or evaluate_split('{split}') first.")
+        if diagnostics is None:
+            diagnostics = _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+        return plot_curve_diagnostics(
+            getattr(self.data, f"{mode}_OUT_df"),
+            outputs,
+            truth,
+            diagnostics=diagnostics,
+            mode=mode.lower(),
+            max_samples=max_samples,
+            sort_by=sort_by,
+        )
+
+    def plot_error_curves(self, mode="UT", split="test", max_samples=50, sort_by="rmse"):
+        mode = mode.upper()
+        split = str(split).lower()
+        diagnostics = getattr(self, f"{mode}_{split}_diagnostics", None)
+        if diagnostics is None and split == "test":
+            diagnostics = getattr(self, f"{mode}_diagnostics", None)
+        outputs = getattr(self, f"{mode}_{split}_outputs", None)
+        truth = getattr(self, f"{mode}_{split}_truth", None)
+        if outputs is None and split == "test":
+            outputs = getattr(self, f"{mode}_test_outputs", None)
+            truth = getattr(self, f"{mode}_truth", None)
+        if outputs is None or truth is None:
+            raise ValueError(f"No stored {mode} {split} predictions. Run predict() or evaluate_split('{split}') first.")
+        if diagnostics is None:
+            diagnostics = _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+        return plot_prediction_error_curves(
+            getattr(self.data, f"{mode}_OUT_df"),
+            outputs,
+            truth,
+            diagnostics=diagnostics,
+            mode=mode.lower(),
+            max_samples=max_samples,
+            sort_by=sort_by,
+        )
+
+    def plot_correlation_matrix(self, mode="UT", split="test", columns=None, method="pearson"):
+        mode = mode.upper()
+        split = str(split).lower()
+        diagnostics = getattr(self, f"{mode}_{split}_diagnostics", None)
+        if diagnostics is None and split == "test":
+            diagnostics = getattr(self, f"{mode}_diagnostics", None)
+        if diagnostics is None:
+            outputs = getattr(self, f"{mode}_{split}_outputs", None)
+            truth = getattr(self, f"{mode}_{split}_truth", None)
+            if outputs is None and split == "test":
+                outputs = getattr(self, f"{mode}_test_outputs", None)
+                truth = getattr(self, f"{mode}_truth", None)
+            if outputs is None or truth is None:
+                raise ValueError(f"No stored {mode} {split} predictions. Run predict() or evaluate_split('{split}') first.")
+            diagnostics = _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+        return plot_curve_correlation_matrix(diagnostics, columns=columns, method=method)
+
+    def activation_diagnostics(
+        self,
+        mode="UT",
+        split="test",
+        layer_names=None,
+        max_batches=1,
+        plot=True,
+    ):
+        mode = mode.upper()
+        split = str(split).lower()
+        task_model = getattr(self, f"{mode}_model")
+        loader = getattr(self, f"{mode}_{split}_dataloader")
+        activations = collect_layer_activations(
+            self.typ,
+            task_model,
+            loader,
+            layer_names=layer_names,
+            max_batches=max_batches,
+            device=self.device,
+        )
+        summary = summarize_activations(activations)
+        setattr(self, f"{mode}_{split}_activations", activations)
+        setattr(self, f"{mode}_{split}_activation_summary", summary)
+        if plot and not summary.empty:
+            plot_activation_summary(summary)
+        return summary
         
     def summary(self):
         if _model_is_gnn_type(self.typ):
@@ -304,10 +507,67 @@ class MODEL:
         )
 
 
+def _model_reconstruct_output(data, mode, values):
+    reconstructor = getattr(data, f"{mode}_OUTreconstructor", None)
+    values = np.asarray(values, dtype=float)
+    return reconstructor(values) if callable(reconstructor) else values
+
+def _model_split_truth(data, mode, split):
+    attr = f"{mode}_{split}_out"
+    if not hasattr(data, attr):
+        return None
+    return _model_reconstruct_output(data, mode, getattr(data, attr))
+
+def _model_task_zone_boundaries(model_obj, mode):
+    losses = getattr(model_obj, f"{mode}_losses", None)
+    if losses is None:
+        losses = getattr(model_obj, "losses", [])
+    for loss in losses:
+        zone_boundaries = getattr(loss, "zone_boundaries", None)
+        if zone_boundaries is not None:
+            return tuple(zone_boundaries)
+        weighted_mse = getattr(loss, "weighted_mse", None)
+        zone_boundaries = getattr(weighted_mse, "zone_boundaries", None)
+        if zone_boundaries is not None:
+            return tuple(zone_boundaries)
+    return None
+
+def _model_zone_boundaries_for_mode(model_obj, mode, zone_boundaries):
+    if isinstance(zone_boundaries, dict):
+        return zone_boundaries.get(mode, zone_boundaries.get(mode.lower()))
+    if zone_boundaries is not None:
+        return zone_boundaries
+    return _model_task_zone_boundaries(model_obj, mode)
+
+def _model_curve_diagnostics(model_obj, mode, outputs, truth, split="test", zone_boundaries=None):
+    mode = mode.upper()
+    zone_cfg = _model_zone_boundaries_for_mode(model_obj, mode, zone_boundaries)
+    train_truth = _model_split_truth(model_obj.data, mode, "train")
+    try:
+        return curve_performance_diagnostics(
+            outputs,
+            truth,
+            x_values=getattr(model_obj.data, f"{mode}_OUT_df"),
+            train_truth=train_truth,
+            zone_boundaries=zone_cfg,
+        )
+    except ValueError as exc:
+        if zone_cfg is None:
+            raise
+        print(f"{mode} {split} diagnostics warning: {exc} Falling back to equal thirds.")
+        return curve_performance_diagnostics(
+            outputs,
+            truth,
+            x_values=getattr(model_obj.data, f"{mode}_OUT_df"),
+            train_truth=train_truth,
+            zone_boundaries=None,
+        )
+
+
 ### Gaussian Process Regression model
 class GPRmodel(GPR):
     def __init__(self, K, restarts, alpha, data=None):
-        super(GPRmodel, self).__init__()
+        super().__init__()
         self.K = self.set_K(K)
         self.res = restarts
         self.alpha = alpha
@@ -337,7 +597,7 @@ class resBlock(nn.Module):
         norm=None, 
         bias=True
     ):
-        super(resBlock, self).__init__()
+        super().__init__()
         self.norm = _resolve_norm(norm)
         self.fc1 = nn.Linear(size, size*2, bias=bias)
         self.fc2 = nn.Linear(size*2, size, bias=bias)
@@ -367,7 +627,7 @@ class mlpBlock(nn.Module):
         norm=None,
         bias=True
     ):
-        super(mlpBlock, self).__init__()
+        super().__init__()
         self.norm = _resolve_norm(norm)
         self.fc = nn.Linear(in_size, out_size, bias=bias)
         self._act = _activation(act)
@@ -702,7 +962,7 @@ class Transformer(nn.Module):
 ### Graph Neural Network models
 class gcnBlock(nn.Module):
     def __init__(self, in_size, out_size, act, norm=None, bias=True):
-        super(gcnBlock, self).__init__()
+        super().__init__()
         self.norm = _resolve_norm(norm)
         
         self.Gconv = GCNConv(in_size, out_size, bias=bias)
@@ -718,7 +978,7 @@ class gcnBlock(nn.Module):
 
 class gatBlock(nn.Module):
     def __init__(self, in_size, out_size, act, heads=1, norm=None, dropout=0.0, bias=True):
-        super(gatBlock, self).__init__()
+        super().__init__()
         self.norm = _resolve_norm(norm)
         self.heads = heads
         self.att_dropout = _resolve_dropout(dropout, 0.0)
@@ -751,7 +1011,7 @@ class GNN(nn.Module):
         heads=1,
         pool="add"
     ):
-        super(GNN, self).__init__()
+        super().__init__()
 
         if out_size is None:
             raise ValueError("out_size must be provided.")
@@ -848,7 +1108,7 @@ class Autoencoder(nn.Module):
         head_dropout=None,
         bias=True
     ):
-        super(Autoencoder, self).__init__()
+        super().__init__()
 
         h_size = [] if h_size is None else list(h_size)
         decoder_h_size = list(reversed(h_size)) if decoder_h_size is None else list(decoder_h_size)
@@ -1396,6 +1656,113 @@ def _mp_format_num(value):
         return f"{val:.1e}"
     return f"{val:.4g}"
 
+def _mp_format_filename_num(value):
+    try:
+        from decimal import Decimal, InvalidOperation
+        try:
+            dec = Decimal(str(value))
+        except InvalidOperation:
+            return str(value)
+    except Exception:
+        return str(value)
+
+    if dec == dec.to_integral_value():
+        return str(int(dec))
+
+    sign = "m" if dec < 0 else ""
+    text = format(abs(dec).normalize(), "f")
+    if "." in text:
+        whole, frac = text.split(".", 1)
+        text = f"{whole}{frac.rstrip('0')}"
+    return f"{sign}{text}"
+
+def _mp_bool_token(value):
+    return "True" if bool(value) else "False"
+
+def _mp_range_split_token(data):
+    range_split = getattr(data, "range_split", None)
+    if isinstance(range_split, dict):
+        in_range = bool(range_split.get("input", False))
+        out_range = bool(range_split.get("output", False))
+    else:
+        in_range = bool(getattr(data, "input_range_split", False))
+        out_range = bool(getattr(data, "output_range_split", False))
+    return f"in{_mp_bool_token(in_range)}-out{_mp_bool_token(out_range)}"
+
+def _mp_node_feature_token(data):
+    model_name = str(getattr(data, "model", "")).lower()
+    if model_name not in ["tr", "gnn", "gcn", "gat"]:
+        return None
+    tr_params = getattr(data, "tr_params", None)
+    if not isinstance(tr_params, dict):
+        return None
+    geom = _mp_bool_token(tr_params.get("geom_feats", False))
+    coord = _mp_bool_token(tr_params.get("coord_norm", False))
+    return f"nodeFeat-geom{geom}-coordNorm{coord}"
+
+def _mp_data_descriptor(data, model_obj=None):
+    if data is None:
+        return "data-default"
+
+    parts = []
+    for key in ["LAT", "dis"]:
+        if hasattr(data, key):
+            val = getattr(data, key)
+            if val is not None and str(val).strip():
+                parts.append(_mp_slugify(val, max_len=24, preserve_case=True))
+
+    if hasattr(data, "dN") and getattr(data, "dN") is not None:
+        parts.append(f"dN-{_mp_slugify(_mp_format_num(getattr(data, 'dN')), max_len=24, preserve_case=True)}")
+
+    path_add = getattr(data, "path_add", None)
+    if path_add is not None and str(path_add).strip():
+        parts.append(f"pathAdd-{_mp_slugify(path_add, max_len=24, preserve_case=True)}")
+
+    if hasattr(data, "d_data") and getattr(data, "d_data") is not None:
+        parts.append(f"data-{_mp_slugify(getattr(data, 'd_data'), max_len=24, preserve_case=True)}")
+
+    nsims = getattr(data, "nsims", None)
+    parts.append(f"nSims-{_mp_slugify('all' if nsims is None else nsims, max_len=24, preserve_case=True)}")
+
+    load_split = getattr(data, "load_split", False)
+    if load_split:
+        split_desc = f"split-load-{_mp_slugify(load_split, max_len=24, preserve_case=True)}" if isinstance(load_split, str) else "split-load"
+    else:
+        split_frac = getattr(data, "split_frac", None)
+        split_frac = "na" if split_frac is None else _mp_format_num(split_frac)
+        split_seed = getattr(data, "split_seed", None)
+        split_seed = "None" if split_seed is None else split_seed
+        split_desc = f"split-frac-{_mp_slugify(split_frac, max_len=16)}-seed-{_mp_slugify(split_seed, max_len=16, preserve_case=True)}-range-{_mp_range_split_token(data)}"
+    parts.append(split_desc)
+
+    round_decimals = getattr(data, "round_decimals", None)
+    parts.append(f"round-{_mp_slugify('None' if round_decimals is None else round_decimals, max_len=16, preserve_case=True)}")
+
+    node_feature_token = _mp_node_feature_token(data)
+    if node_feature_token is not None:
+        parts.append(node_feature_token)
+
+    descriptor_obj = model_obj
+    if descriptor_obj is None:
+        class _DescriptorObj:
+            def __init__(self, data):
+                self.data = data
+        descriptor_obj = _DescriptorObj(data)
+
+    if getattr(data, "scale", None):
+        scale_sig = _mp_scaler_signature(descriptor_obj)
+        parts.append(f"scale-{_mp_slugify(getattr(data, 'scale', None), max_len=16, preserve_case=True)}-cfgHash{_mp_json_sha1(scale_sig)[:6]}")
+    else:
+        parts.append("scale-None")
+
+    if getattr(data, "reduce_dim", None):
+        reducer_sig = _mp_reducer_signature(descriptor_obj)
+        parts.append(f"rDim-{_mp_slugify(getattr(data, 'reduce_dim', None), max_len=16, preserve_case=True)}-cfgHash{_mp_json_sha1(reducer_sig)[:6]}")
+    else:
+        parts.append("rDim-None")
+
+    return "_".join(parts) if parts else "data-default"
+
 def _mp_to_serializable(value):
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
@@ -1461,6 +1828,8 @@ def _mp_collect_data_signature(model_obj):
 
     for key in (
         "mechMode", "LAT", "dis", "dN", "d_data", "nsims", "split_frac",
+        "split_seed", "range_split", "input_range_split", "output_range_split",
+        "round_decimals", "tr_params", "model",
         "scale", "scale_reduced", "reduce_dim", "path", "path_add", "load_split",
         "UTmechTest", "FTmechTest",
     ):
@@ -1607,48 +1976,14 @@ def _mp_build_setup_signature(model_obj, include_data_values=True):
 def _mp_resolve_model_dir(model_obj, path):
     if path is None:
         data = getattr(model_obj, "data", None)
-        typ_token = _mp_slugify(getattr(model_obj, "typ", None), default="model")
-        class_token = _mp_slugify(model_obj.model.__class__.__name__, default="model")
-        model_type = typ_token if typ_token == class_token else f"{typ_token}-{class_token}"
+        typ = str(getattr(model_obj, "typ", "")).lower()
+        block = str(getattr(model_obj.model, "block", "")).lower()
+        model_type = block if typ in ["gnn", "gcn", "gat"] and block in ["gcn", "gat"] else typ
+        model_type = _mp_slugify(model_type, default="model")
         if data is None:
             data_desc = "data-default"
         else:
-            parts = []
-            for key, label in [
-                ("LAT", "lat"),
-                ("dis", "dis"),
-                ("path_add", "pAdd"),
-                ("dN", "dN"),
-                ("d_data", "d"),
-                ("nsims", "n"),
-            ]:
-                if hasattr(data, key):
-                    val = getattr(data, key)
-                    if val is not None:
-                        parts.append(f"{label}-{_mp_slugify(val, max_len=24, preserve_case=True)}")
-
-            load_split = getattr(data, "load_split", False)
-            if load_split:
-                split_desc = f"split-load-{_mp_slugify(load_split, max_len=24, preserve_case=True)}" if isinstance(load_split, str) else "split-load"
-            else:
-                split_frac = getattr(data, "split_frac", None)
-                split_desc = "split-na" if split_frac is None else f"split-{_mp_slugify(_mp_format_num(split_frac), max_len=16)}"
-            parts.append(split_desc)
-
-            if getattr(data, "scale", None):
-                scale_sig = _mp_scaler_signature(model_obj)
-                parts.append(f"sc-{_mp_slugify(getattr(data, 'scale', None), max_len=16, preserve_case=True)}-hash{_mp_json_sha1(scale_sig)[:6]}")
-            else:
-                parts.append("sc-none")
-
-            if getattr(data, "reduce_dim", None):
-                reducer_sig = _mp_reducer_signature(model_obj)
-                parts.append(f"rD-{_mp_slugify(getattr(data, 'reduce_dim', None), max_len=16, preserve_case=True)}-hash{_mp_json_sha1(reducer_sig)[:6]}")
-            else:
-                parts.append("rD-none")
-            if not parts:
-                parts.append("data-default")
-            data_desc = "_".join(parts)
+            data_desc = _mp_data_descriptor(data, model_obj=model_obj)
 
         if data is not None and getattr(data, "path", None) == 0:
             return os.path.join("models", "Akash", data_desc, model_type)
@@ -1668,6 +2003,7 @@ def _model_refresh_descriptor(model_obj, path=None, name=None):
     for key in (
         "UT_best_loss", "UT_best_mse", "UT_best_rmse", "UT_best_epoch",
         "FT_best_loss", "FT_best_mse", "FT_best_rmse", "FT_best_epoch",
+        "UT_prediction_summary", "FT_prediction_summary",
     ):
         if hasattr(model_obj, key):
             metrics[key] = _mp_to_serializable(getattr(model_obj, key))
@@ -1777,59 +2113,74 @@ def _model_find_matching_checkpoint(model_obj, path=None, strict=True, recursive
     candidates = sorted(candidates, key=lambda p: Path(p).stat().st_mtime, reverse=True)
     return candidates[0]
 
+def _mp_loss_filename_token(model_obj):
+    losses = []
+    if hasattr(model_obj, "losses"):
+        for lf in model_obj.losses:
+            losses.append(getattr(lf, "__class__", type(lf)).__name__)
+    losses = list(dict.fromkeys(losses))
+    return f"loss-{_mp_slugify('-'.join(losses) if losses else 'None', max_len=48, preserve_case=True)}"
+
+def _mp_early_stop_filename_token(model_obj):
+    es = getattr(model_obj, "earlyStop", None)
+    if es is None:
+        return "earlyStop-None"
+    patience = getattr(es, "patience", None)
+    if patience is not None:
+        return f"earlyStop-patience{_mp_slugify(patience, max_len=16, preserve_case=True)}"
+    return f"earlyStop-{_mp_slugify(es.__class__.__name__, max_len=24, preserve_case=True)}"
+
+def _mp_w_init_filename_token(model_obj):
+    w_init = getattr(model_obj, "w_init", None)
+    if not w_init:
+        return "wInit-None"
+    raw = "Auto" if isinstance(w_init, str) and w_init.lower() == "auto" else w_init
+    return f"wInit-{_mp_slugify(raw, max_len=24, preserve_case=True)}"
+
+def _mp_scheduler_filename_token(model_obj):
+    sch_cfg = getattr(model_obj, "scheduler_cfg", None)
+    if sch_cfg is None or sch_cfg is False:
+        return "sch-None"
+    if isinstance(sch_cfg, (list, tuple)) and len(sch_cfg) >= 3:
+        sch_name = str(sch_cfg[0]).strip().lower()
+        if sch_name in ["plateau", "reduce", "reduce_on_plateau", "reducelronplateau"] and len(sch_cfg) >= 5:
+            mode_raw, factor_raw, patience_raw, threshold_raw = sch_cfg[1], sch_cfg[2], sch_cfg[3], sch_cfg[4]
+        else:
+            mode_raw, factor_raw, patience_raw = sch_cfg[0], sch_cfg[1], sch_cfg[2]
+            threshold_raw = sch_cfg[3] if len(sch_cfg) >= 4 else None
+        parts = [
+            "sch",
+            _mp_slugify(str(mode_raw).strip().lower(), max_len=16),
+            _mp_slugify(_mp_format_filename_num(factor_raw), max_len=16),
+            _mp_slugify(patience_raw, max_len=16, preserve_case=True),
+        ]
+        if threshold_raw is not None:
+            parts.append(_mp_slugify(_mp_format_filename_num(threshold_raw), max_len=16))
+        return "-".join(parts)
+    return "sch-Custom"
+
 def _model_save_checkpoint(model_obj, path=None, name=None):
     path = _mp_resolve_model_dir(model_obj, path)
     os.makedirs(path, exist_ok=True)
     if name is None:
-        lr_tok = f"lr{_mp_slugify(_mp_format_num(model_obj.lr), max_len=16)}"
-        b_tok = f"b{_mp_slugify(model_obj.batch, max_len=16)}"
+        lr_tok = f"lr-{_mp_slugify(_mp_format_filename_num(model_obj.lr), max_len=16)}"
+        b_tok = f"batch-{_mp_slugify(model_obj.batch, max_len=16)}"
         weight_decay = _mp_weight_decay(model_obj)
-        wd_tok = f"wd{_mp_slugify(_mp_format_num(weight_decay), default='na', max_len=16)}"
-        opt_name = "optNone"
+        wd_tok = f"wd-{_mp_slugify(_mp_format_filename_num(weight_decay), default='na', max_len=16)}"
+        opt_name = "opt-None"
         ut_opt = getattr(model_obj, "UT_opt", None)
         ft_opt = getattr(model_obj, "FT_opt", None)
         primary_opt_name = ut_opt.__class__.__name__ if ut_opt is not None else (ft_opt.__class__.__name__ if ft_opt is not None else None)
         if primary_opt_name is not None:
-            opt_name = f"opt{_mp_slugify(primary_opt_name, max_len=12, preserve_case=True)}"
-        sch_parts = []
-        sch_cfg = getattr(model_obj, "scheduler_cfg", None)
-        if isinstance(sch_cfg, (list, tuple)) and len(sch_cfg) >= 3:
-            sch_name = str(sch_cfg[0]).strip().lower()
-            if sch_name in ["plateau", "reduce", "reduce_on_plateau", "reducelronplateau"] and len(sch_cfg) >= 5:
-                sch_mode_raw, sch_factor_raw, sch_pat_raw, sch_threshold_raw = sch_cfg[1], sch_cfg[2], sch_cfg[3], sch_cfg[4]
-            else:
-                sch_mode_raw, sch_factor_raw, sch_pat_raw = sch_cfg[0], sch_cfg[1], sch_cfg[2]
-                sch_threshold_raw = sch_cfg[3] if len(sch_cfg) >= 4 else None
-            sch_mode_raw = str(sch_mode_raw).strip()
-            sch_mode = _mp_slugify(sch_mode_raw[:1].upper() + sch_mode_raw[1:], max_len=16, preserve_case=True)
-            sch_factor = _mp_slugify(_mp_format_num(sch_factor_raw), max_len=8)
-            sch_pat = _mp_slugify(sch_pat_raw, max_len=8)
-            sch_parts = [f"sch{sch_mode}", f"factor{sch_factor}", f"patience{sch_pat}"]
-            if sch_threshold_raw is not None:
-                sch_threshold = _mp_slugify(_mp_format_num(sch_threshold_raw), max_len=8)
-                sch_parts.append(f"threshold{sch_threshold}")
-        elif sch_cfg:
-            sch_parts = ["schCustom"]
-        es_tok = "earlyStopOn" if getattr(model_obj, "earlyStop", None) is not None else "earlyStopOff"
-        wi_tok = "wInitOn" if bool(getattr(model_obj, "w_init", False)) else "wInitOff"
+            opt_name = f"opt-{_mp_slugify(primary_opt_name, max_len=12, preserve_case=True)}"
+        sch_tok = _mp_scheduler_filename_token(model_obj)
+        es_tok = _mp_early_stop_filename_token(model_obj)
+        wi_tok = _mp_w_init_filename_token(model_obj)
+        loss_tok = _mp_loss_filename_token(model_obj)
         cfg = {"model": _mp_collect_model_signature(model_obj), "data": _mp_collect_data_signature(model_obj)}
         cfg_hash = _mp_json_sha1(cfg)[:8]
-        seed_tok = "seedNone"
-        for parent in [model_obj, getattr(model_obj, "data", None)]:
-            if parent is None:
-                continue
-            for key in ["seed", "random_state", "rng_seed"]:
-                if hasattr(parent, key):
-                    val = getattr(parent, key)
-                    if val is not None:
-                        seed_tok = f"seed{_mp_slugify(val, default='na', max_len=16, preserve_case=True)}"
-                        break
-            if seed_tok != "seedNone":
-                break
         ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        parts = [ts, seed_tok, opt_name, lr_tok, b_tok, wd_tok, es_tok, wi_tok]
-        parts.extend(sch_parts)
-        parts.append(f"setupHash{cfg_hash}")
+        parts = [f"date-{ts}", opt_name, lr_tok, b_tok, wd_tok, loss_tok, es_tok, wi_tok, sch_tok, f"setupHash-{cfg_hash}"]
         name = "_".join(parts)
     name = str(name)
     if name.endswith(".mdl"):
