@@ -90,7 +90,7 @@ def Fsurface(gpr, density=50):
 def plot_Fsurface(x_values, y_values, val, typ="3d"):
     X_grid, Y_grid = np.meshgrid(x_values, y_values)
     if val.shape != X_grid.shape:
-        val.reshape(X_grid.shape)
+        val = val.reshape(X_grid.shape)
     
     if typ.lower() == "3d" or typ.lower() == "both":
         fig1 = plt.figure(figsize=(10, 6))
@@ -112,7 +112,7 @@ def plot_Fsurface(x_values, y_values, val, typ="3d"):
 
 
 ### NEURAL NETWORK FUNCTIONS
-
+# Training function & helpers
 def train_model(
     typ, 
     model, 
@@ -129,72 +129,36 @@ def train_model(
     RMSEtarget=False
 ):
     train_lossLog, val_lossLog = [], []
-    best_loss, best_mse, best_rmse, best_epoch, best_model_state = 1000, 1000, (False, 1000), 0, None
+    best_loss, best_mse, best_rmse, best_epoch, best_model_state = float("inf"), float("inf"), (False, float("inf")), 0, None
     for epoch in range(1, n_epochs+1):
-        train_lossSum, train_metric_sse, train_n = 0, 0, 0
+        train_stats = _new_epoch_stats()
         model.train()
         for batch in train_dataloader:
             opt.zero_grad(set_to_none=True)
-            if typ.lower() == "gnn":
-                data_batch = batch.to(device)
-                x, y = data_batch.x.float(), data_batch.y.float()
-                edge_index = data_batch.edge_index
-                batch_vec = data_batch.batch
-                y_predict = model(x, edge_index, batch_vec)
-                y = data_batch.y.view(data_batch.num_graphs, -1)
-            else:
-                x, y = batch[0].float().to(device), batch[1].float().to(device)
-                y_predict = model(x)
+            y_predict, y = _forward_batch(typ, model, batch, device, context="training")
             opt_loss = lossf(y_predict, y)
             opt_loss.backward()
             #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
 
-            train_lossSum += opt_loss.item()
-            metric_mse_batch = torch.mean((y_predict - y) ** 2)
-            train_metric_sse += metric_mse_batch.item()*y.numel()
-            train_n += y.numel()
+            _update_epoch_stats(train_stats, opt_loss, y_predict, y)
             if isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR,
                           torch.optim.lr_scheduler.CosineAnnealingLR)):
                 scheduler.step()
 
-        train_lossAvg = train_lossSum/len(train_dataloader)
-        train_metric_mse = train_metric_sse/train_n
-        train_metric_rmse = math.sqrt(train_metric_mse)
+        train_lossAvg, train_metric_mse, train_metric_rmse, train_target_range = _finalize_epoch_stats(train_stats)
         train_lossLog.append(train_lossAvg)
         
         if val_dataloader:
-            model.eval()
-            val_lossSum, val_metric_sse, val_n = 0, 0, 0
-            with torch.no_grad():
-                for batch in val_dataloader:
-                    if typ.lower() == "gnn":
-                        data_batch = batch.to(device)
-                        x = data_batch.x.float()
-                        y = data_batch.y.float()
-                        edge_index = data_batch.edge_index
-                        batch_vec = data_batch.batch
-                        y_predict = model(x, edge_index, batch_vec)
-                        y = data_batch.y.view(data_batch.num_graphs, -1)
-
-                    else:
-                        x, y = batch[0].float().to(device), batch[1].float().to(device)
-                        y_predict = model(x)
-                    
-                    val_opt_loss = lossf(y_predict, y)
-                    val_lossSum += val_opt_loss.item()
-                    val_metric_mse_batch = torch.mean((y_predict - y) ** 2)
-                    val_metric_sse += val_metric_mse_batch.item()*y.numel()
-                    val_n += y.numel()
-
-                val_lossAvg = val_lossSum/len(val_dataloader)
-                val_metric_mse = val_metric_sse/val_n
-                val_metric_rmse = math.sqrt(val_metric_mse)
-                val_lossLog.append(val_lossAvg)
+            val_lossAvg, val_metric_mse, val_metric_rmse, val_target_range = _evaluate_model(
+                typ, model, lossf, val_dataloader, device, context="validation"
+            )
+            val_lossLog.append(val_lossAvg)
 
         lossAvg = val_lossAvg if val_dataloader else train_lossAvg
         mse = val_metric_mse if val_dataloader else train_metric_mse
         rmse = val_metric_rmse if val_dataloader else train_metric_rmse
+        target_range = val_target_range if val_dataloader else train_target_range
 
         if lossAvg < best_loss:
             best_loss = lossAvg
@@ -209,10 +173,7 @@ def train_model(
                 raise optuna.exceptions.TrialPruned()
         
         if RMSEtarget:
-            if RMSEtarget is True:
-                target = 0.1*np.sqrt(1/12)
-            else:
-                target = float(RMSEtarget)
+            target = _rmse_target_value(RMSEtarget, target_range)
             if rmse <= target:
                 best_rmse = (True, rmse)
                 print(f"RMSE check passed at epoch {epoch} with RMSE: {rmse:.4f}")
@@ -246,6 +207,119 @@ def train_model(
     print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with LOSS: {best_loss:.6f}, MSE: {best_mse:.6f} and RMSE: {best_rmse[1]:.6f} ==================")
     return model, epoch, train_lossLog, val_lossLog, best_loss, best_mse, best_rmse, best_epoch
 
+def _validate_gnn_batch(data_batch, y_predict=None, y=None, context="GNN batch"):
+    if not hasattr(data_batch, "x") or data_batch.x is None:
+        raise ValueError(f"{context}: missing node feature tensor 'x'.")
+    if data_batch.x.ndim != 2:
+        raise ValueError(f"{context}: expected x shape [num_nodes, node_features], got {tuple(data_batch.x.shape)}.")
+
+    if not hasattr(data_batch, "edge_index") or data_batch.edge_index is None:
+        raise ValueError(f"{context}: missing 'edge_index'.")
+    if data_batch.edge_index.ndim != 2 or data_batch.edge_index.shape[0] != 2:
+        raise ValueError(f"{context}: expected edge_index shape [2, num_edges], got {tuple(data_batch.edge_index.shape)}.")
+    if data_batch.edge_index.dtype != torch.long:
+        raise TypeError(f"{context}: edge_index must have dtype torch.long, got {data_batch.edge_index.dtype}.")
+
+    num_nodes = data_batch.x.shape[0]
+    if data_batch.edge_index.numel() > 0:
+        edge_min = int(data_batch.edge_index.min().item())
+        edge_max = int(data_batch.edge_index.max().item())
+        if edge_min < 0 or edge_max >= num_nodes:
+            raise ValueError(
+                f"{context}: edge_index contains node ids outside [0, {num_nodes - 1}] "
+                f"(min={edge_min}, max={edge_max})."
+            )
+
+    if not hasattr(data_batch, "batch") or data_batch.batch is None:
+        raise ValueError(f"{context}: missing PyG batch vector.")
+    if data_batch.batch.ndim != 1:
+        raise ValueError(f"{context}: expected batch vector shape [num_nodes], got {tuple(data_batch.batch.shape)}.")
+    if data_batch.batch.numel() != num_nodes:
+        raise ValueError(f"{context}: batch vector length {data_batch.batch.numel()} does not match num_nodes {num_nodes}.")
+
+    num_graphs = int(data_batch.num_graphs)
+    if num_graphs <= 0:
+        raise ValueError(f"{context}: num_graphs must be positive, got {num_graphs}.")
+    if data_batch.batch.numel() > 0:
+        graph_max = int(data_batch.batch.max().item())
+        if graph_max >= num_graphs:
+            raise ValueError(f"{context}: batch vector references graph {graph_max}, but num_graphs={num_graphs}.")
+
+    y_tensor = y if y is not None else getattr(data_batch, "y", None)
+    if y_tensor is None:
+        raise ValueError(f"{context}: missing target tensor 'y'.")
+    if y_tensor.numel() % num_graphs != 0:
+        raise ValueError(
+            f"{context}: target values ({y_tensor.numel()}) cannot be reshaped across "
+            f"{num_graphs} graphs."
+        )
+
+    if y_predict is not None:
+        expected_y = y_tensor.view(num_graphs, -1)
+        if tuple(y_predict.shape) != tuple(expected_y.shape):
+            raise ValueError(
+                f"{context}: prediction shape {tuple(y_predict.shape)} does not match "
+                f"target shape {tuple(expected_y.shape)}."
+            )
+
+def _forward_batch(typ, model, batch, device, context):
+    if str(typ).lower() in ["gnn", "gcn", "gat"]:
+        data_batch = batch.to(device)
+        _validate_gnn_batch(data_batch, context=context)
+        y_predict = model(data_batch.x.float(), data_batch.edge_index, data_batch.batch)
+        y = data_batch.y.float().view(data_batch.num_graphs, -1)
+        _validate_gnn_batch(data_batch, y_predict=y_predict, y=y, context=context)
+        return y_predict, y
+
+    x, y = batch[0].float().to(device), batch[1].float().to(device)
+    return model(x), y
+
+def _new_epoch_stats():
+    return {
+        "loss_sum": 0.0,
+        "loss_weight": 0,
+        "metric_sse": 0.0,
+        "n": 0,
+        "target_min": float("inf"),
+        "target_max": -float("inf"),
+    }
+
+def _update_epoch_stats(stats, opt_loss, y_predict, y):
+    batch_weight = y.shape[0] if y.ndim > 0 else 1
+    stats["loss_sum"] += opt_loss.item()*batch_weight
+    stats["loss_weight"] += batch_weight
+    stats["target_min"] = min(stats["target_min"], float(y.min().item()))
+    stats["target_max"] = max(stats["target_max"], float(y.max().item()))
+
+    metric_mse_batch = torch.mean((y_predict.detach() - y) ** 2)
+    stats["metric_sse"] += metric_mse_batch.item()*y.numel()
+    stats["n"] += y.numel()
+
+def _finalize_epoch_stats(stats):
+    if stats["loss_weight"] == 0 or stats["n"] == 0:
+        raise ValueError("Cannot finalize epoch statistics for an empty dataloader.")
+    loss_avg = stats["loss_sum"]/stats["loss_weight"]
+    mse = stats["metric_sse"]/stats["n"]
+    rmse = math.sqrt(mse)
+    target_range = stats["target_max"] - stats["target_min"]
+    return loss_avg, mse, rmse, target_range
+
+def _evaluate_model(typ, model, lossf, dataloader, device, context="validation"):
+    stats = _new_epoch_stats()
+    model.eval()
+    with torch.no_grad():
+        for batch in dataloader:
+            y_predict, y = _forward_batch(typ, model, batch, device, context=context)
+            opt_loss = lossf(y_predict, y)
+            _update_epoch_stats(stats, opt_loss, y_predict, y)
+    return _finalize_epoch_stats(stats)
+
+def _rmse_target_value(RMSEtarget, target_range):
+    if RMSEtarget is True:
+        return 0.1*target_range*np.sqrt(1/12)
+    return float(RMSEtarget)
+
+# Predict function
 def predict_model(typ, model, test_dataloader):
     test_outputs = []
     truth = []
@@ -254,13 +328,7 @@ def predict_model(typ, model, test_dataloader):
     model.eval()
     with torch.no_grad():
         for batch in test_dataloader:
-            if typ.lower() == "gnn":
-                data_batch = batch.to(device)
-                y_predict = model(data_batch.x.float(), data_batch.edge_index, data_batch.batch)
-                y = data_batch.y.view(data_batch.num_graphs, -1)
-            else:
-                x, y = batch[0].float().to(device), batch[1].float().to(device)
-                y_predict = model(x)
+            y_predict, y = _forward_batch(typ, model, batch, device, context="prediction")
             test_outputs.append(y_predict.detach().cpu().numpy())
             truth.append(y.detach().cpu().numpy())
     if was_training:
@@ -269,55 +337,67 @@ def predict_model(typ, model, test_dataloader):
     truth = np.concatenate(truth)
     return test_outputs, truth
 
-def weights_init(m):
-    if isinstance(m, nn.Linear):
-        #nn.init.xavier_normal_(m.weight)
-        nn.init.kaiming_normal_(m.weight, nonlinearity='relu')
+# Weights initialization
+def make_weights_init(act="relu", bias_value=0.0, distribution="normal"):
+    act_name = _activation(act, return_name=True)
+    distribution = distribution.lower()
+
+    if distribution not in ["normal", "uniform"]:
+        raise ValueError("distribution must be either 'normal' or 'uniform'.")
+
+    def _init(m):
+        if not isinstance(m, nn.Linear):
+            return
+
+        if act_name == "relu":
+            init_fn = nn.init.kaiming_normal_ if distribution == "normal" else nn.init.kaiming_uniform_
+            init_fn(m.weight, nonlinearity="relu")
+        elif act_name in ["leakyrelu", "prelu", "rrelu"]:
+            negative_slope = getattr(act, "negative_slope", 0.01)
+            init_fn = nn.init.kaiming_normal_ if distribution == "normal" else nn.init.kaiming_uniform_
+            init_fn(m.weight, a=float(negative_slope), nonlinearity="leaky_relu")
+        else:
+            gain_name = act_name if act_name in ["linear", "sigmoid", "tanh", "selu"] else "linear"
+            gain = nn.init.calculate_gain(gain_name)
+            init_fn = nn.init.xavier_normal_ if distribution == "normal" else nn.init.xavier_uniform_
+            init_fn(m.weight, gain=gain)
+
         if m.bias is not None:
-            nn.init.constant_(m.bias, 0.01)
+            nn.init.constant_(m.bias, bias_value)
 
-def _activation(act):
-    if act == "relu":
-        act_f = nn.ReLU()
-    elif act == "sigmoid":
-        act_f = nn.Sigmoid()
-    elif act == "tanh":
-        act_f = nn.Tanh()
-    elif act == "leakyrelu":
-        act_f = nn.LeakyReLU()
-    elif act == "softplus":
-        act_f = nn.Softplus()
-    elif act == "elu":
-        act_f = nn.ELU()
-    elif act == "gelu":
-        act_f = nn.GELU()
-    elif act == "selu":
-        act_f = nn.SELU()
-    elif act == "swish":
-        act_f = nn.SiLU()
-    elif act == "hardtanh":
-        act_f = nn.Hardtanh()
-    elif act == "prelu":
-        act_f = nn.PReLU()
-    elif act == "rrelu":
-        act_f = nn.RReLU()
-    elif act == "softsign":
-        act_f = nn.Softsign()
-    elif act == "softshrink":
-        act_f = nn.Softshrink()
-    elif act == "hardswish":
-        act_f = nn.Hardswish()
-    elif act == "mish":
-        act_f = nn.Mish()
-    elif act == "tanhshrink":
-        act_f = nn.Tanhshrink()
-    elif act == "logsigmoid":
-        act_f = nn.LogSigmoid()
-    else:
-        print("[WARNING] Activation function not recognized. Using ReLU as default.")
-        act_f = nn.ReLU()
-    return act_f
+    _init.__name__ = f"weights_init_{act_name}_{distribution}"
+    _init.init_config = {
+        "act": act_name,
+        "bias_value": bias_value,
+        "distribution": distribution,
+    }
+    return _init
 
+def _infer_weight_init_activation(model):
+    for attr in ["_act", "act"]:
+        activation = getattr(model, attr, None)
+        if isinstance(activation, nn.Module):
+            return activation
+        if isinstance(activation, str):
+            return activation
+
+    for module in model.modules():
+        if isinstance(module, tuple(_activation(return_types=True).values())):
+            return module
+    return "linear"
+
+def resolve_weight_init(w_init, model):
+    if w_init is None:
+        return None
+    if isinstance(w_init, str):
+        if w_init.lower() == "auto":
+            return make_weights_init(act=_infer_weight_init_activation(model), bias_value=0.0)
+        raise ValueError("w_init must be None, 'auto', or a callable such as make_weights_init(...).")
+    if callable(w_init):
+        return w_init
+    raise TypeError("w_init must be None, 'auto', or a callable such as make_weights_init(...).")
+
+# EasyStopping algorithm
 class EarlyStopping:
     def __init__(self, patience=5, min_delta=0.0001, verbose=True):
         self.patience = patience
@@ -339,6 +419,55 @@ class EarlyStopping:
                 print(f" !!! Early stopping triggered after {self.patience} epochs without improvement !!!")
             self.early_stop = True  # Set flag for stopping
 
+# Other helper functions
+def _activation(act="relu", return_name=False, return_types=False):
+    activation_types = {
+        "relu": nn.ReLU,
+        "sigmoid": nn.Sigmoid,
+        "tanh": nn.Tanh,
+        "leakyrelu": nn.LeakyReLU,
+        "softplus": nn.Softplus,
+        "elu": nn.ELU,
+        "gelu": nn.GELU,
+        "selu": nn.SELU,
+        "swish": nn.SiLU,
+        "hardtanh": nn.Hardtanh,
+        "prelu": nn.PReLU,
+        "rrelu": nn.RReLU,
+        "softsign": nn.Softsign,
+        "softshrink": nn.Softshrink,
+        "hardswish": nn.Hardswish,
+        "mish": nn.Mish,
+        "tanhshrink": nn.Tanhshrink,
+        "logsigmoid": nn.LogSigmoid,
+    }
+
+    if return_types:
+        return activation_types
+
+    if act is None:
+        act_name = "linear"
+    elif isinstance(act, str):
+        act_name = act.strip().lower()
+    else:
+        act_name = None
+        for name, activation_type in activation_types.items():
+            if isinstance(act, activation_type):
+                act_name = name
+                break
+        if act_name is None:
+            act_name = act.__class__.__name__.lower()
+
+    if return_name:
+        return act_name
+
+    if act_name in activation_types:
+        act_f = activation_types[act_name]()
+    else:
+        print("[WARNING] Activation function not recognized. Using ReLU as default.")
+        act_f = nn.ReLU()
+    return act_f
+
 
 ### HYPERPARAMETER OPTIMIZATION
 
@@ -354,7 +483,9 @@ def objective(trial, model):
     batch_size = trial.suggest_categorical('batch_size', [1, 2, 8, 16])
     weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2, log=True)
 
-    lossf = model.losses if hasattr(model, "losses") else model.lossf
+    lossf = getattr(model, "lossf_cfg", None)
+    if lossf is None:
+        lossf = model.losses if hasattr(model, "losses") else model.lossf
     template_model = copy.deepcopy(model.model)
     model_instance = model.__class__(
         typ=model.typ,
@@ -367,7 +498,7 @@ def objective(trial, model):
         mechMode=getattr(model.data, "mechMode", "both"),
         scheduler=None,
         earlyStop=copy.deepcopy(model.earlyStop),
-        w_init=weights_init,
+        w_init="auto",
         device=model.device,
         optTrial=trial
     )
@@ -426,9 +557,126 @@ def load_bestParams(path="models/etc", name="sample"):
 
 
 ### Custom Loss Functions
-# TODO: GPU integration
+class CombinedCurveLoss(nn.Module):
+    """
+    Convenience wrapper for normalized curve-level losses. Weights with value 0 disable a term.
+    """
+    def __init__(
+        self,
+        mse_weight=0.1,
+        weighted_mse_weight=1.0,
+        derivative_weight=0.5,
+        peak_weight=0.2,
+        energy_weight=0.2,
+        peak_location_weight=0.05,
+        zone_boundaries=(67, 134),
+        zone_weights=(1.0, 5.0, 2.0),
+        x_values=None,
+        reduction="mean",
+        derivative_order=1,
+        normalization_eps=1e-8,
+        SoftPeak_beta=20.0,
+    ):
+        super().__init__()
+        reduction = reduction.lower()
+        if reduction not in ["mean", "sum"]:
+            raise ValueError("CombinedCurveLoss reduction must be 'mean' or 'sum'.")
 
-class CustomQuantileLoss(nn.Module):
+        self.mse_weight = float(mse_weight)
+        self.weighted_mse_weight = float(weighted_mse_weight)
+        self.derivative_weight = float(derivative_weight)
+        self.peak_weight = float(peak_weight)
+        self.energy_weight = float(energy_weight)
+        self.peak_location_weight = float(peak_location_weight)
+        self.reduction = reduction
+        self.derivative_order = int(derivative_order)
+        self.normalization_eps = float(normalization_eps)
+        self.SoftPeak_beta = float(SoftPeak_beta)
+
+        self.weighted_mse = WeightedCurveMSELoss(
+            zone_boundaries=zone_boundaries,
+            zone_weights=zone_weights,
+            reduction=reduction,
+            normalize_by_target_range=True,
+            eps=normalization_eps,
+        )
+        self.derivative = CurveDerivativeLoss(
+            x_values=x_values,
+            order=derivative_order,
+            reduction=reduction,
+            eps=normalization_eps,
+        )
+        self.peak = PeakStressLoss(reduction=reduction, normalize=True, eps=normalization_eps)
+        self.energy = StrainEnergyLoss(
+            x_values=x_values,
+            normalize=True,
+            reduction=reduction,
+            eps=normalization_eps,
+        )
+        self.peak_location = SoftPeakLocationLoss(
+            x_values=x_values,
+            beta=SoftPeak_beta,
+            reduction=reduction,
+            normalize=True,
+            eps=normalization_eps,
+        )
+
+    def _curve_value_scale(self, y_true):
+        if y_true.ndim == 1:
+            y_true = y_true.unsqueeze(0)
+        sample_scale = y_true.max(dim=1).values - y_true.min(dim=1).values
+        fallback = torch.maximum(sample_scale.max(), y_true.abs().max())
+        fallback = torch.where(
+            fallback > self.normalization_eps,
+            fallback,
+            torch.ones_like(fallback),
+        )
+        sample_scale = torch.where(sample_scale > self.normalization_eps, sample_scale, fallback)
+        return sample_scale.unsqueeze(1)
+
+    def _mse_component(self, y_pred, y_true):
+        err_sq = (y_pred - y_true) ** 2 / (self._curve_value_scale(y_true) ** 2)
+        if self.reduction == "sum":
+            return err_sq.sum()
+        return err_sq.mean()
+
+    def component_losses(self, y_pred: torch.Tensor, y_true: torch.Tensor, weighted=False):
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+        components = {}
+        if self.mse_weight:
+            components["mse"] = self._mse_component(y_pred, y_true)
+        if self.weighted_mse_weight:
+            components["weighted_mse"] = self.weighted_mse(y_pred, y_true)
+        if self.derivative_weight:
+            components["derivative"] = self.derivative(y_pred, y_true)
+        if self.peak_weight:
+            components["peak"] = self.peak(y_pred, y_true)
+        if self.energy_weight:
+            components["energy"] = self.energy(y_pred, y_true)
+        if self.peak_location_weight:
+            components["peak_location"] = self.peak_location(y_pred, y_true)
+
+        if not weighted:
+            return components
+        weights = {
+            "mse": self.mse_weight,
+            "weighted_mse": self.weighted_mse_weight,
+            "derivative": self.derivative_weight,
+            "peak": self.peak_weight,
+            "energy": self.energy_weight,
+            "peak_location": self.peak_location_weight,
+        }
+        return {name: weights[name] * value for name, value in components.items()}
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        total = y_true.new_tensor(0.0)
+        for component in self.component_losses(y_pred, y_true, weighted=True).values():
+            total = total + component
+        return total
+
+
+class QuantileLoss(nn.Module):
     def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=(50,130), err_type="L2"):
         super().__init__()
         self.register_buffer("quantiles", torch.tensor(quantiles, dtype=torch.float32))
@@ -485,14 +733,31 @@ class CustomQuantileLoss(nn.Module):
         # (Mathematically maps to the 1/(3n) normalization from the paper)
         return total_loss / y_true.numel()
 
-class CustomQuantileLossMATLAB(nn.Module):
+class QuantileLossMATLAB(nn.Module):
     """
     MATLAB-compatible forward loss matching qlmseRegressionLayerCustom.forwardLoss.
     Uses the same class style/signature as CustomQuantileLoss for pipeline compatibility.
     """
     def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=None, err_type="L2"):
         super().__init__()
-        self.register_buffer("quantiles", torch.tensor(quantiles, dtype=torch.float32))
+        # Backward compatibility: some legacy notebook cells passed a base loss
+        # module as first positional arg (e.g., nn.MSELoss(...)).
+        if isinstance(quantiles, nn.Module):
+            print("[WARNING] CustomQuantileLossMATLAB received a loss module as first argument; defaulting quantiles to [0.5, 0.5, 0.5].")
+            quantiles = [0.5, 0.5, 0.5]
+
+        if isinstance(quantiles, torch.Tensor):
+            quantiles = quantiles.detach().cpu().tolist()
+        elif not isinstance(quantiles, (list, tuple)):
+            if hasattr(quantiles, "tolist"):
+                quantiles = quantiles.tolist()
+            else:
+                raise TypeError("quantiles must be a list/tuple/tensor-like object of numeric values.")
+
+        if len(quantiles) < 3:
+            raise ValueError("quantiles must contain at least 3 values (one for each output zone).")
+
+        self.register_buffer("quantiles", torch.tensor(list(quantiles)[:3], dtype=torch.float32))
         self.zone_boundaries = zone_boundaries
         self.err_type = err_type
 
@@ -537,7 +802,7 @@ class CustomQuantileLossMATLAB(nn.Module):
         # MATLAB: loss = (loss1 + loss2 + loss3) / 3
         return total_loss / 3.0
 
-class CustomPhysicalRegularizationLoss(nn.Module):
+class PhysicalRegularizationLoss(nn.Module):
     """
     Penalizes high point-to-point oscillations in predicted output curves.
     - Oscillation penalty starts once |y_j - y_{j-1}| exceeds delta_tolerance.
@@ -570,7 +835,7 @@ class CustomPhysicalRegularizationLoss(nn.Module):
         return weights
 
     def forward(self, y_pred, y_true):
-        self.delta_tolerance = y_true.range() / 100
+        self.delta_tolerance = (y_true.max() - y_true.min()) / 100
 
         diffs = torch.abs(y_pred[:, 1:] - y_pred[:, :-1])
         excess = torch.relu(diffs - self.delta_tolerance)
@@ -585,7 +850,177 @@ class CustomPhysicalRegularizationLoss(nn.Module):
             return penalty
         return penalty.mean()
 
-class CustomStrainEnergyLoss(nn.Module):
+class WeightedCurveMSELoss(nn.Module):
+    """
+    MSE with pointwise or zone-based weights along the output curve.
+    """
+    def __init__(
+        self,
+        weights=None,
+        zone_boundaries=None,
+        zone_weights=None,
+        normalize_weights=True,
+        normalize_by_target_range=False,
+        reduction="mean",
+        eps=1e-8,
+    ):
+        super().__init__()
+        self.zone_boundaries = zone_boundaries
+        self.zone_weights = zone_weights
+        self.normalize_weights = bool(normalize_weights)
+        self.normalize_by_target_range = bool(normalize_by_target_range)
+        self.reduction = reduction.lower()
+        self.eps = float(eps)
+        if weights is None:
+            self.register_buffer("weights", torch.tensor([], dtype=torch.float32), persistent=False)
+        else:
+            self.register_buffer("weights", torch.tensor(weights, dtype=torch.float32), persistent=False)
+
+    def _weights_for(self, n_points, y_true):
+        if self.weights.numel() > 0:
+            if self.weights.numel() != n_points:
+                raise ValueError(f"weights length ({self.weights.numel()}) does not match output length ({n_points}).")
+            w = self.weights.to(y_true.device, y_true.dtype)
+        else:
+            if self.zone_boundaries is None:
+                b1 = n_points // 3
+                b2 = (2 * n_points) // 3
+            else:
+                if len(self.zone_boundaries) != 2:
+                    raise ValueError("zone_boundaries must be a tuple/list of length 2.")
+                b1, b2 = int(self.zone_boundaries[0]), int(self.zone_boundaries[1])
+            if not (0 < b1 < b2 < n_points):
+                raise ValueError(f"Invalid zone boundaries ({b1}, {b2}) for n_points={n_points}.")
+            zone_weights = [1.0, 5.0, 2.0] if self.zone_weights is None else list(self.zone_weights)
+            if len(zone_weights) != 3:
+                raise ValueError("zone_weights must contain exactly 3 values.")
+            w = y_true.new_ones(n_points)
+            w[:b1] = float(zone_weights[0])
+            w[b1:b2] = float(zone_weights[1])
+            w[b2:] = float(zone_weights[2])
+
+        if self.normalize_weights:
+            w = w / w.mean().clamp_min(torch.finfo(w.dtype).eps)
+        return w
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+
+        w = self._weights_for(y_true.shape[-1], y_true).unsqueeze(0)
+        loss = w * (y_pred - y_true) ** 2
+        if self.normalize_by_target_range:
+            y_scale = y_true.max(dim=1).values - y_true.min(dim=1).values
+            fallback = torch.maximum(y_scale.max(), y_true.abs().max())
+            fallback = torch.where(fallback > self.eps, fallback, torch.ones_like(fallback))
+            y_scale = torch.where(y_scale > self.eps, y_scale, fallback).unsqueeze(1)
+            loss = loss / (y_scale ** 2)
+        if self.reduction == "sum":
+            return loss.sum()
+        if self.reduction == "none":
+            return loss
+        return loss.mean()
+
+class CurveDerivativeLoss(nn.Module):
+    """
+    Penalizes mismatch in normalized point-to-point curve derivatives.
+    """
+    def __init__(self, x_values=None, order=1, reduction="mean", eps=1e-8):
+        super().__init__()
+        self.order = int(order)
+        self.reduction = reduction.lower()
+        self.eps = float(eps)
+        if self.order < 1:
+            raise ValueError("order must be >= 1.")
+        x_values = _coerce_curve_x_values(x_values)
+        if x_values is None:
+            self.register_buffer("x_values", torch.tensor([], dtype=torch.float32), persistent=False)
+        else:
+            self.register_buffer("x_values", torch.tensor(x_values, dtype=torch.float32), persistent=False)
+
+    def _x(self, n_points, y):
+        if self.x_values.numel() > 0:
+            if self.x_values.numel() != n_points:
+                raise ValueError(f"x_values length ({self.x_values.numel()}) does not match output length ({n_points}).")
+            x = self.x_values.to(y.device, y.dtype)
+        else:
+            x = torch.linspace(0.0, 1.0, steps=n_points, device=y.device, dtype=y.dtype)
+        x_span = (x.max() - x.min()).clamp_min(self.eps)
+        return (x - x.min()) / x_span
+
+    def _curve_value_scale(self, y):
+        sample_scale = y.max(dim=1).values - y.min(dim=1).values
+        fallback = torch.maximum(sample_scale.max(), y.abs().max())
+        fallback = torch.where(fallback > self.eps, fallback, torch.ones_like(fallback))
+        return torch.where(sample_scale > self.eps, sample_scale, fallback).unsqueeze(1)
+
+    def _normalized_derivative(self, y, y_scale):
+        x = self._x(y.shape[-1], y)
+        out = y / y_scale
+        for _ in range(self.order):
+            dx = (x[1:] - x[:-1]).abs().clamp_min(self.eps)
+            out = (out[:, 1:] - out[:, :-1]) / dx.unsqueeze(0)
+            x = 0.5 * (x[1:] + x[:-1])
+        return out
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+
+        y_scale = self._curve_value_scale(y_true)
+        diff_err = self._normalized_derivative(y_pred, y_scale) - self._normalized_derivative(y_true, y_scale)
+
+        loss = diff_err ** 2
+        if self.reduction == "sum":
+            return loss.sum()
+        if self.reduction == "none":
+            return loss
+        return loss.mean()
+
+class PeakStressLoss(nn.Module):
+    """
+    Penalizes mismatch in maximum curve value.
+    """
+    def __init__(self, reduction="mean", normalize=False, eps=1e-8):
+        super().__init__()
+        self.reduction = reduction.lower()
+        self.normalize = bool(normalize)
+        self.eps = float(eps)
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+
+        err = y_pred.max(dim=1).values - y_true.max(dim=1).values
+        if self.normalize:
+            y_scale = y_true.max(dim=1).values - y_true.min(dim=1).values
+            fallback = torch.maximum(y_scale.max(), y_true.abs().max())
+            fallback = torch.where(fallback > self.eps, fallback, torch.ones_like(fallback))
+            y_scale = torch.where(y_scale > self.eps, y_scale, fallback)
+            err = err / y_scale
+        loss = err ** 2
+        if self.reduction == "sum":
+            return loss.sum()
+        if self.reduction == "none":
+            return loss
+        return loss.mean()
+
+class StrainEnergyLoss(nn.Module):
     """
     Squared error between integrated predicted and target curves up to fracture index.
     fracture_indices can be:
@@ -593,10 +1028,13 @@ class CustomStrainEnergyLoss(nn.Module):
     - 1D tensor/list/ndarray of per-sample indices
     - callable(batch_size, n_points, device) -> indices
     """
-    def __init__(self, x_values=None, fracture_indices=None, reduction="mean"):
+    def __init__(self, x_values=None, fracture_indices=None, reduction="mean", normalize=False, eps=1e-8):
         super().__init__()
         self.fracture_indices = fracture_indices
         self.reduction = reduction.lower()
+        self.normalize = bool(normalize)
+        self.eps = float(eps)
+        x_values = _coerce_curve_x_values(x_values)
         if x_values is None:
             self.register_buffer("x_values", torch.tensor([], dtype=torch.float32), persistent=False)
         else:
@@ -645,9 +1083,20 @@ class CustomStrainEnergyLoss(nn.Module):
 
         err_sq_terms = []
         for i in range(batch_size):
+            end = int(fracture_idx[i].item()) + 1
             pred_int = self._integral_up_to(y_pred[i], fracture_idx[i])
             true_int = self._integral_up_to(y_true[i], fracture_idx[i])
-            err_sq_terms.append((pred_int - true_int) ** 2)
+            err = pred_int - true_int
+            if self.normalize:
+                if self.x_values.numel() > 0:
+                    x = self.x_values[:end].to(y_true.device, y_true.dtype)
+                    norm = torch.trapz(torch.abs(y_true[i, :end]), x)
+                else:
+                    norm = torch.trapz(torch.abs(y_true[i, :end]))
+                if bool((norm <= self.eps).item()):
+                    norm = y_true.new_tensor(1.0)
+                err = err / norm
+            err_sq_terms.append(err ** 2)
         err_sq = torch.stack(err_sq_terms)
 
         if self.reduction == "sum":
@@ -655,6 +1104,70 @@ class CustomStrainEnergyLoss(nn.Module):
         if self.reduction == "none":
             return err_sq
         return err_sq.mean()
+
+class SoftPeakLocationLoss(nn.Module):
+    """
+    Differentiable strain-at-peak loss using soft-argmax for predictions.
+    """
+    def __init__(self, x_values=None, beta=20.0, reduction="mean", normalize=False, eps=1e-8):
+        super().__init__()
+        self.beta = float(beta)
+        self.reduction = reduction.lower()
+        self.normalize = bool(normalize)
+        self.eps = float(eps)
+        x_values = _coerce_curve_x_values(x_values)
+        if x_values is None:
+            self.register_buffer("x_values", torch.tensor([], dtype=torch.float32), persistent=False)
+        else:
+            self.register_buffer("x_values", torch.tensor(x_values, dtype=torch.float32), persistent=False)
+
+    def _x(self, n_points, y):
+        if self.x_values.numel() > 0:
+            if self.x_values.numel() != n_points:
+                raise ValueError(f"x_values length ({self.x_values.numel()}) does not match output length ({n_points}).")
+            return self.x_values.to(y.device, y.dtype)
+        return torch.linspace(0.0, 1.0, steps=n_points, device=y.device, dtype=y.dtype)
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+        if y_pred.ndim == 1:
+            y_pred = y_pred.unsqueeze(0)
+            y_true = y_true.unsqueeze(0)
+        if y_pred.ndim != 2:
+            raise ValueError(f"Expected 2D tensors [batch, n_points], got ndim={y_pred.ndim}")
+
+        x = self._x(y_true.shape[-1], y_true)
+        y_scale = y_true.max(dim=1).values - y_true.min(dim=1).values
+        fallback = torch.maximum(y_scale.max(), y_true.abs().max())
+        fallback = torch.where(fallback > self.eps, fallback, torch.ones_like(fallback))
+        y_scale = torch.where(y_scale > self.eps, y_scale, fallback).unsqueeze(1)
+        pred_weights = torch.softmax(self.beta * y_pred / y_scale, dim=1)
+        pred_peak_x = (pred_weights * x.unsqueeze(0)).sum(dim=1)
+        true_peak_x = x[y_true.argmax(dim=1)]
+        err = pred_peak_x - true_peak_x
+        if self.normalize:
+            x_scale = (x.max() - x.min()).clamp_min(self.eps)
+            err = err / x_scale
+        loss = err ** 2
+        if self.reduction == "sum":
+            return loss.sum()
+        if self.reduction == "none":
+            return loss
+        return loss.mean()
+
+
+def _coerce_curve_x_values(x_values):
+    if x_values is None:
+        return None
+    if hasattr(x_values, "iloc") and getattr(x_values, "ndim", None) == 2:
+        row = x_values.iloc[0]
+        if hasattr(row, "iloc"):
+            row = row.iloc[1:]
+        return row.to_numpy(dtype=float) if hasattr(row, "to_numpy") else np.asarray(row, dtype=float)
+    if hasattr(x_values, "to_numpy"):
+        return x_values.to_numpy(dtype=float)
+    return x_values
 
 
 ### Plotting Functions
@@ -672,14 +1185,17 @@ def plot_loss(epoch, train, val=None):
     # plt.grid()
     plt.show()
 
-def plot_predictions(OUT_df, test_outputs, truth=None, mode="ut", indx=0):
+def plot_predictions(OUT_df, test_outputs, truth=None, mode="ut", indx=0, d_out=True):
     fig = plt.figure(figsize=(10, 5))
     x = OUT_df.iloc[0][1:].to_numpy()
-    y = OUT_df.iloc[1][1:].to_numpy()
+    if d_out:
+        y = OUT_df.iloc[1][1:].to_numpy()
+    else:
+        y = np.zeros_like(x)
 
-    plt.scatter(x, test_outputs[indx]+y, s=5, label=f"Prediction-{indx}", c="orangered")
+    plt.plot(x, test_outputs[indx]+y, "-", label=f"Prediction-{indx}", c="orangered")
     if truth is not None:
-        plt.scatter(x, truth[indx]+y, s=5, label=f"Truth-{indx}", c="darkgreen")
+        plt.plot(x, truth[indx]+y, "-", label=f"Truth-{indx}", c="darkgreen")
         plt.bar(x, absErr(truth[indx], test_outputs[indx]), width=(max(x)-min(x))/(len(x)), alpha=0.25, label="Error", color="gray")
     if mode.lower() == "ut":
         plt.ylabel("Macroscopic Stress ($\sigma$) [MPa]")
@@ -748,4 +1264,3 @@ def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
     nx.draw_networkx_edges(G, pos, alpha=0.5, width=0.5)
     
     plt.show()
-

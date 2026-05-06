@@ -21,15 +21,15 @@ def load_data(inputs, outputs, f_inputs=None, props=None):
     if props is not None:
         props_df = pd.read_csv(props, index_col=0, header=0)
 
-    dIN_df  = IN_df - IN_df.iloc[0].values
-    INfixed_cols = dIN_df.loc[:, (dIN_df == 0.0).all()].columns
-    dIN_df  = dIN_df.drop(columns=INfixed_cols) 
-    dOUT_df = OUTr_df - OUTr_df.iloc[1].values
-    dOUT_df = dOUT_df.drop(columns='0')
+    dINr_df  = IN_df - IN_df.iloc[0].values
+    INfixed_cols = dINr_df.loc[:, (dINr_df == 0.0).all()].columns
+    dIN_df  = dINr_df.drop(columns=INfixed_cols) 
+    dOUTr_df = OUTr_df - OUTr_df.iloc[1].values
+    dOUT_df = dOUTr_df.drop(columns='0')
     dOUT_df = dOUT_df.iloc[1:].sort_index()
     OUT_df = pd.concat([OUTr_df.iloc[[0]], OUTr_df.iloc[1:].sort_index()], axis=0)
     
-    return IN_df, OUT_df, INf_df, dIN_df, dOUT_df, props_df
+    return IN_df, OUT_df, INf_df, dIN_df, dOUT_df, dINr_df, dOUTr_df, props_df
 
 
 def UTprops(OUT_df):    
@@ -374,11 +374,12 @@ def load_akData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV_test_i
     train, val, test = [train_in, train_out], [val_in, val_out], [test_in, test_out]
     return train, val, test
 
-def split_data(dIN, dOUT, props, split=0.8):
+def split_data(dIN, dOUT, props, split=0.8, random_state=None):
+    val_random_state = None if random_state is None else int(random_state) + 1
     train_in, test_in, train_out, test_out, train_props, test_props = train_test_split(dIN, dOUT, props, train_size=split,
-                                                                                       random_state=None, shuffle=True, stratify=None)
+                                                                                       random_state=random_state, shuffle=True, stratify=None)
     train_in, val_in, train_out, val_out, train_props, val_props = train_test_split(train_in, train_out, train_props, train_size=split,
-                                                                                    random_state=None, shuffle=True, stratify=None)
+                                                                                    random_state=val_random_state, shuffle=True, stratify=None)
     
     train = [train_in, train_out, train_props]
     val = [val_in, val_out, val_props]
@@ -551,6 +552,7 @@ class PCA_(BaseEstimator, TransformerMixin):
         reconstructed_data = self.final_pca.inverse_transform(data)
         return reconstructed_data
 
+
 ### DATA Class and Helper Functions
 class DATA:
     def __init__(
@@ -560,6 +562,7 @@ class DATA:
         load=False,
         load_split=False,
         split_frac=0.8,
+        split_seed=None,
         save_split=False,
         LAT="FCC", 
         nnx=None,
@@ -572,13 +575,16 @@ class DATA:
         model="MLP", 
         freq=False,
         scale=False,
-        reduce_dim=False
+        reduce_dim=False,
+        round_decimals=None,
+        tr_params=None
     ):
         self.path = path
         self.path_add = path_add
         self.load = load
         self.load_split = load_split
         self.split_frac = split_frac
+        self.split_seed = None if split_seed is None or split_seed is False else int(split_seed)
         self.save_split = save_split
         self.LAT = LAT
         self.nnx = nnx
@@ -589,6 +595,8 @@ class DATA:
         self.nsims = nsims
         self.model = model
         self.freq = freq
+        self.round_decimals = None if round_decimals is None or round_decimals is False else int(round_decimals)
+        self.tr_params = _data_resolve_tr_params(tr_params)
         
         _data_validate_preprocess_config(scale=scale, reduce_dim=reduce_dim)
 
@@ -598,6 +606,11 @@ class DATA:
             _data_init_scaler(self, scale)
 
         self.reduce_dim = reduce_dim
+        if _data_is_node_model(self.model) and _data_target_configured(reduce_dim, "in"):
+            raise ValueError(
+                "DATA(model='tr'/'gnn'/'gcn'/'gat') does not support input dimensionality reduction before node tokenization. "
+                "Use reduce_dim=False or restrict reduce_dim to outputs."
+            )
         if reduce_dim:
             _data_init_reducer(self, reduce_dim)
 
@@ -627,6 +640,7 @@ class DATA:
         self.getDataPath()
         if load:
             self.loadData()
+            self.filterNodes()
             self.splitData()
             if self.save_split:
                 self.saveSplitData()
@@ -634,8 +648,7 @@ class DATA:
                 self.scaleData()
             if self.reduce_dim:
                 self.reduceData()
-            if self.model.lower() == "gnn":
-                self.GNNreshapeData()
+            self.reshapeData()
 
     def calcGeom(self):
         self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx, nny=self.nny)
@@ -667,6 +680,8 @@ class DATA:
             self.UT_INf_df, \
             self.UT_dIN_df, \
             self.UT_dOUT_df, \
+            self.UT_dINr_df, \
+            self.UT_dOUTr_df, \
             self.UT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allIN.csv", 
                                             self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allOUT.csv", 
                                             self.PATH+f"MLdata/{self.mechMode}-UT-{self.dis}-allINf.csv" if self.freq else None,
@@ -676,11 +691,10 @@ class DATA:
             if self.mechMode.lower() == "multi":
                 cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
             self.UT_props_df.columns = cols
+            self.UT_OUT_delta_baseline = _data_mode_output_delta_baseline(self, "UT")
 
             if self.nsims is not None:
-                self.UT_props_df, self.UT_OUT_df, self.UT_dOUT_df, self.UT_IN_df, self.UT_dIN_df = self.UT_props_df[:self.nsims], self.UT_OUT_df[:self.nsims], self.UT_dOUT_df[:self.nsims], self.UT_IN_df[:self.nsims], self.UT_dIN_df[:self.nsims]
-                if self.freq:
-                    self.UT_INf_df = self.UT_INf_df[:self.nsims]
+                _data_limit_mode_samples(self, "UT")
 
         if self.FTmechTest:
             self.FT_IN_df, \
@@ -688,6 +702,8 @@ class DATA:
             self.FT_INf_df, \
             self.FT_dIN_df, \
             self.FT_dOUT_df, \
+            self.FT_dINr_df, \
+            self.FT_dOUTr_df, \
             self.FT_props_df = load_data(self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allIN.csv", 
                                             self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allOUT.csv", 
                                             self.PATH+f"MLdata/{self.mechMode}-FT-{self.dis}-allINf.csv" if self.freq else None,
@@ -696,21 +712,62 @@ class DATA:
             if self.mechMode.lower() == "multi":
                 cols = ['Ductility', 'Strength', 'Stiffness', 'WoF', 'K_JIC', 'K_IC', 'Force', 'Displacement', 'Multi', 'FCL']
             self.FT_props_df.columns = cols
+            self.FT_OUT_delta_baseline = _data_mode_output_delta_baseline(self, "FT")
 
             if self.nsims is not None:
-                self.FT_props_df, self.FT_OUT_df, self.FT_dOUT_df, self.FT_IN_df, self.FT_dIN_df = self.FT_props_df[:self.nsims], self.FT_OUT_df[:self.nsims], self.FT_dOUT_df[:self.nsims], self.FT_IN_df[:self.nsims], self.FT_dIN_df[:self.nsims]
-                if self.freq:
-                    self.FT_INf_df = self.FT_INf_df[:self.nsims]
+                _data_limit_mode_samples(self, "FT")
 
         if self.UTmechTest and self.FTmechTest:
             self.common_props_df = self.UT_props_df
 
+    def filterNodes(self):
+        if not _data_is_node_model(self.model):
+            return
+
+        tol = self.geom.l * 1e-4
+
+        def _filter_mode(mode):
+            IN_df = getattr(self, f"{mode}_IN_df")
+            dINr_df = getattr(self, f"{mode}_dINr_df")
+
+            if IN_df.shape[1] % 2 != 0:
+                raise ValueError(f"{mode}: IN_df must have paired x/y columns; got {IN_df.shape[1]} columns.")
+            if dINr_df.shape[1] != IN_df.shape[1]:
+                raise ValueError(
+                    f"{mode}: dINr_df column count ({dINr_df.shape[1]}) must match "
+                    f"IN_df column count ({IN_df.shape[1]}) before node filtering."
+                )
+
+            columns = np.asarray(IN_df.columns)
+            ref_nodes = IN_df.iloc[0].to_numpy(dtype=float).reshape(-1, 2)
+            x = ref_nodes[:, 0]
+            y = ref_nodes[:, 1]
+            body_mask = (
+                (x >= -tol) &
+                (x <= self.geom.L + tol) &
+                (y >= -tol) &
+                (y <= self.geom.H + tol)
+            )
+
+            keep_columns = columns.reshape(-1, 2)[body_mask].reshape(-1).tolist()
+            setattr(self, f"{mode}_IN_full_df", IN_df.copy())
+            setattr(self, f"{mode}_dINr_full_df", dINr_df.copy())
+            setattr(self, f"{mode}_body_node_mask", body_mask.copy())
+            setattr(self, f"{mode}_body_columns", keep_columns)
+            setattr(self, f"{mode}_IN_df", IN_df.loc[:, keep_columns].copy())
+            setattr(self, f"{mode}_dINr_df", dINr_df.loc[:, keep_columns].copy())
+
+        if self.UTmechTest:
+            _filter_mode("UT")
+        if self.FTmechTest:
+            _filter_mode("FT")
+
     def splitData(self, split_name=None):
         if self.UTmechTest:
-            UT_IN_df = self.UT_dIN_df if self.d_data is not None and ("in" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_IN_df
+            UT_IN_df = _data_select_input_dataframe(self, "UT")
             UT_OUT_df = self.UT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_OUT_df.iloc[1:].drop(['0'], axis=1)
         if self.FTmechTest:
-            FT_IN_df = self.FT_dIN_df if self.d_data is not None and ("in" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_IN_df
+            FT_IN_df = _data_select_input_dataframe(self, "FT")
             FT_OUT_df = self.FT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.FT_OUT_df.iloc[1:].drop(['0'], axis=1)
 
         if split_name is None:
@@ -725,8 +782,8 @@ class DATA:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
             else:
-                common_idx = self.UT_dIN_df.index
-                for idx in [self.UT_dOUT_df.index, self.UT_props_df.index, self.FT_dIN_df.index, self.FT_dOUT_df.index, self.FT_props_df.index]:
+                common_idx = UT_IN_df.index
+                for idx in [UT_OUT_df.index, self.UT_props_df.index, FT_IN_df.index, FT_OUT_df.index, self.FT_props_df.index]:
                     common_idx = common_idx.intersection(idx)
                 self.common_idx = common_idx
 
@@ -734,7 +791,8 @@ class DATA:
                     UT_IN_df.loc[common_idx],
                     UT_OUT_df.loc[common_idx],
                     self.UT_props_df.loc[common_idx],
-                    split=self.split_frac
+                    split=self.split_frac,
+                    random_state=self.split_seed
                 )
                 train_idx = UT_train[0].index
                 val_idx = UT_val[0].index
@@ -748,7 +806,13 @@ class DATA:
             if self.load_split and UT_train is None:
                 UT_train, UT_val, UT_test = load_splitData(self.PATH, self.mechMode, "UT", self.dis, split_name=split_name)
             elif UT_train is None:
-                UT_train, UT_val, UT_test = split_data(UT_IN_df, UT_OUT_df, self.UT_props_df, split=self.split_frac)
+                UT_train, UT_val, UT_test = split_data(
+                    UT_IN_df,
+                    UT_OUT_df,
+                    self.UT_props_df,
+                    split=self.split_frac,
+                    random_state=self.split_seed
+                )
             self.UT_train_in_df, self.UT_train_out_df, self.UT_trainProps_df = UT_train
             self.UT_val_in_df, self.UT_val_out_df, self.UT_valProps_df       = UT_val
             self.UT_test_in_df, self.UT_test_out_df, self.UT_testProps_df    = UT_test
@@ -767,7 +831,13 @@ class DATA:
             if self.load_split and FT_train is None:
                 FT_train, FT_val, FT_test = load_splitData(self.PATH, self.mechMode, "FT", self.dis, split_name=split_name)
             elif FT_train is None:
-                FT_train, FT_val, FT_test = split_data(FT_IN_df, FT_OUT_df, self.FT_props_df, split=self.split_frac)
+                FT_train, FT_val, FT_test = split_data(
+                    FT_IN_df,
+                    FT_OUT_df,
+                    self.FT_props_df,
+                    split=self.split_frac,
+                    random_state=self.split_seed
+                )
             self.FT_train_in_df, self.FT_train_out_df, self.FT_trainProps_df = FT_train
             self.FT_val_in_df, self.FT_val_out_df, self.FT_valProps_df       = FT_val
             self.FT_test_in_df, self.FT_test_out_df, self.FT_testProps_df    = FT_test
@@ -912,22 +982,192 @@ class DATA:
 
         _data_update_reconstructors(self)
 
-    def GNNreshapeData(self):
+    def reshapeData(self):
+        model_name = self.model.lower()
+        if not _data_is_node_model(model_name):
+            return
+
+        feature_label = "TR" if model_name == "tr" else "GNN"
+
+        def _reshape_pairs(x, name):
+            if x.ndim < 2:
+                raise ValueError(f"{name} must have at least 2 dimensions before node reshape; got shape {x.shape}.")
+            if x.shape[-1] % 2 != 0:
+                raise ValueError(f"{name} last dimension must be divisible by 2 for node reshape; got shape {x.shape}.")
+            return x.reshape(*x.shape[:-1], x.shape[-1]//2, 2)
+
+        def _input_columns(mode, x):
+            train_df = getattr(self, f"{mode}_train_in_df", None)
+            if hasattr(train_df, "columns") and len(train_df.columns) == x.shape[-1]:
+                return list(train_df.columns)
+
+            in_df = getattr(self, f"{mode}_IN_df")
+            if hasattr(in_df, "columns") and len(in_df.columns) == x.shape[-1]:
+                return list(in_df.columns)
+
+            raise ValueError(
+                f"{mode}: cannot align node input columns. Input width is {x.shape[-1]}, "
+                f"but {mode}_IN_df has {len(in_df.columns)} columns. Regenerate saved splits "
+                f"with DATA(model='{model_name}') if you are loading an old split."
+            )
+
+        def _reference_features(mode, columns):
+            in_df = getattr(self, f"{mode}_IN_df")
+            ref_row = in_df.iloc[0]
+            if set(columns).issubset(set(in_df.columns)):
+                ref_values = ref_row.loc[columns].to_numpy(dtype=float)
+            elif len(ref_row) == len(columns):
+                ref_values = ref_row.to_numpy(dtype=float)
+            else:
+                raise ValueError(f"{mode}: reference coordinate row cannot be aligned with node input columns.")
+
+            if ref_values.size % 2 != 0:
+                raise ValueError(f"{mode}: reference coordinate count must be divisible by 2, got {ref_values.size}.")
+            ref_raw = ref_values.reshape(ref_values.size//2, 2)
+
+            x_raw = ref_raw[:, 0]
+            y_raw = ref_raw[:, 1]
+            x_min, x_max = np.min(x_raw), np.max(x_raw)
+            y_min, y_max = np.min(y_raw), np.max(y_raw)
+
+            if self.tr_params["coord_norm"]:
+                x_span = x_max - x_min
+                y_span = y_max - y_min
+                x_ref = np.zeros_like(x_raw) if np.isclose(x_span, 0.0) else (x_raw - x_min) / x_span
+                y_ref = np.zeros_like(y_raw) if np.isclose(y_span, 0.0) else (y_raw - y_min) / y_span
+            else:
+                x_ref, y_ref = x_raw, y_raw
+
+            tol = self.geom.l * 1e-4
+            flags = np.stack(
+                [
+                    np.isclose(x_raw, x_min, atol=tol).astype(float),
+                    np.isclose(x_raw, x_max, atol=tol).astype(float),
+                    np.isclose(y_raw, y_min, atol=tol).astype(float),
+                    np.isclose(y_raw, y_max, atol=tol).astype(float),
+                ],
+                axis=-1,
+            )
+            static_features = np.concatenate([np.stack([x_ref, y_ref], axis=-1), flags], axis=-1)
+            feature_names = ["dx", "dy", "x0", "y0", "on_left", "on_right", "on_bottom", "on_top"]
+            setattr(self, f"{mode}_{feature_label}_ref_coords", ref_raw.copy())
+            setattr(self, f"{mode}_{feature_label}_static_features", static_features.copy())
+            setattr(self, f"{mode}_{feature_label}_feature_names", feature_names)
+            setattr(self, f"{mode}_node_feature_names", feature_names)
+            return static_features
+
+        def _build_node_tokens(x, static_features, name):
+            delta = _reshape_pairs(x, name)
+            if not self.tr_params["geom_feats"]:
+                return delta
+            if delta.shape[-2] != static_features.shape[0]:
+                raise ValueError(
+                    f"{name}: reshaped node count {delta.shape[-2]} does not match "
+                    f"static feature node count {static_features.shape[0]}."
+                )
+
+            static_shape = delta.shape[:-2] + static_features.shape
+            static = np.broadcast_to(static_features, static_shape).astype(delta.dtype, copy=False)
+            return np.concatenate([delta, static], axis=-1)
+
+        def _reshape_mode(mode):
+            columns = _input_columns(mode, getattr(self, f"{mode}_train_in"))
+            static = _reference_features(mode, columns) if self.tr_params["geom_feats"] else None
+            if not self.tr_params["geom_feats"]:
+                feature_names = ["dx", "dy"]
+                setattr(self, f"{mode}_{feature_label}_feature_names", feature_names)
+                setattr(self, f"{mode}_node_feature_names", feature_names)
+
+            setattr(self, f"{mode}_train_in", _build_node_tokens(getattr(self, f"{mode}_train_in"), static, f"{mode}_train_in"))
+            setattr(self, f"{mode}_val_in", _build_node_tokens(getattr(self, f"{mode}_val_in"), static, f"{mode}_val_in"))
+            setattr(self, f"{mode}_test_in", _build_node_tokens(getattr(self, f"{mode}_test_in"), static, f"{mode}_test_in"))
+
         if self.UTmechTest:
-            self.UT_train_in = self.UT_train_in.reshape(*self.UT_train_in.shape[:-1], self.UT_train_in.shape[-1]//2, 2)
-            self.UT_val_in   = self.UT_val_in.reshape(*self.UT_val_in.shape[:-1], self.UT_val_in.shape[-1]//2, 2)
-            self.UT_test_in  = self.UT_test_in.reshape(*self.UT_test_in.shape[:-1], self.UT_test_in.shape[-1]//2, 2)
-        
+            _reshape_mode("UT")
         if self.FTmechTest:
-            self.FT_train_in = self.FT_train_in.reshape(*self.FT_train_in.shape[:-1], self.FT_train_in.shape[-1]//2, 2)
-            self.FT_val_in   = self.FT_val_in.reshape(*self.FT_val_in.shape[:-1], self.FT_val_in.shape[-1]//2, 2)
-            self.FT_test_in  = self.FT_test_in.reshape(*self.FT_test_in.shape[:-1], self.FT_test_in.shape[-1]//2, 2)
+            _reshape_mode("FT")
 
 #DATA Helper Functions
 def _data_to_numpy(x):
     if hasattr(x, "to_numpy"):
         return x.to_numpy(copy=True)
     return np.asarray(x).copy()
+
+def _data_is_node_model(model):
+    return str(model).lower() in ["tr", "gnn", "gcn", "gat"]
+
+def _data_resolve_tr_params(tr_params):
+    defaults = {
+        "geom_feats": True,
+        "coord_norm": True,
+    }
+    if tr_params is None:
+        return defaults.copy()
+    if not isinstance(tr_params, dict):
+        raise TypeError("tr_params must be None or a dict such as {'geom_feats': True, 'coord_norm': True}.")
+
+    aliases = {
+        "geom_features": "geom_feats",
+        "geometry_features": "geom_feats",
+        "tr_geom_features": "geom_feats",
+        "tr_geom_feats": "geom_feats",
+        "normalize_coords": "coord_norm",
+        "coord_normalize": "coord_norm",
+        "tr_coord_norm": "coord_norm",
+    }
+    resolved = defaults.copy()
+    for key, value in tr_params.items():
+        norm_key = aliases.get(str(key).lower(), str(key).lower())
+        if norm_key not in defaults:
+            raise ValueError(f"Unknown tr_params key '{key}'. Valid keys are {sorted(defaults)}.")
+        resolved[norm_key] = bool(value)
+    return resolved
+
+def _data_limit_mode_samples(data_obj, mode):
+    nsims = int(data_obj.nsims)
+    if nsims < 1:
+        raise ValueError("nsims must be >= 1 when provided.")
+
+    IN_df = getattr(data_obj, f"{mode}_IN_df")
+    OUT_df = getattr(data_obj, f"{mode}_OUT_df")
+    INf_df = getattr(data_obj, f"{mode}_INf_df")
+    dIN_df = getattr(data_obj, f"{mode}_dIN_df")
+    dINr_df = getattr(data_obj, f"{mode}_dINr_df")
+    dOUT_df = getattr(data_obj, f"{mode}_dOUT_df")
+    dOUTr_df = getattr(data_obj, f"{mode}_dOUTr_df")
+    props_df = getattr(data_obj, f"{mode}_props_df")
+
+    common_idx = dIN_df.index.intersection(dOUT_df.index).intersection(props_df.index)
+    if len(common_idx) == 0:
+        raise ValueError(f"{mode}: no common sample indices found for nsims subset.")
+    sample_idx = common_idx[:min(nsims, len(common_idx))]
+
+    setattr(data_obj, f"{mode}_IN_df", IN_df.loc[sample_idx].copy())
+    out_axis = OUT_df.iloc[[0]]
+    OUT_samples_df = OUT_df.iloc[1:]
+    setattr(data_obj, f"{mode}_OUT_df", pd.concat([out_axis, OUT_samples_df.loc[sample_idx]], axis=0))
+    if INf_df is not None:
+        setattr(data_obj, f"{mode}_INf_df", INf_df.loc[sample_idx].copy())
+    setattr(data_obj, f"{mode}_dIN_df", dIN_df.loc[sample_idx].copy())
+    setattr(data_obj, f"{mode}_dINr_df", dINr_df.loc[sample_idx].copy())
+    setattr(data_obj, f"{mode}_dOUT_df", dOUT_df.loc[sample_idx].copy())
+    dOUTr_axis = dOUTr_df.iloc[[0]]
+    dOUTr_samples = dOUTr_df.iloc[1:]
+    dOUTr_sample_idx = dOUTr_samples.index.intersection(sample_idx)
+    setattr(data_obj, f"{mode}_dOUTr_df", pd.concat([dOUTr_axis, dOUTr_samples.loc[dOUTr_sample_idx]], axis=0))
+    setattr(data_obj, f"{mode}_props_df", props_df.loc[sample_idx].copy())
+
+def _data_select_input_dataframe(data_obj, mode):
+    if _data_is_node_model(data_obj.model):
+        input_df = getattr(data_obj, f"{mode}_dINr_df").copy()
+    elif data_obj.d_data is not None and ("in" in data_obj.d_data.lower() or "all" in data_obj.d_data.lower()):
+        input_df = getattr(data_obj, f"{mode}_dIN_df")
+    else:
+        input_df = getattr(data_obj, f"{mode}_IN_df")
+
+    if data_obj.round_decimals is not None:
+        input_df = input_df.copy().round(data_obj.round_decimals)
+    return input_df
 
 def _data_target_configured(cfg, target):
     if not isinstance(cfg, (list, tuple)) or len(cfg) < 2:
@@ -940,6 +1180,36 @@ def _data_apply_inverse_steps(data, inverse_steps):
     for inverse_step in inverse_steps:
         out = inverse_step(out)
     return out
+
+def _data_uses_delta_output(data_obj):
+    d_data = getattr(data_obj, "d_data", None)
+    if d_data is None:
+        return False
+    scope = str(d_data).lower()
+    return ("out" in scope) or ("all" in scope)
+
+def _data_mode_output_delta_baseline(data_obj, mode):
+    baseline_attr = f"{mode}_OUT_delta_baseline"
+    if hasattr(data_obj, baseline_attr):
+        return getattr(data_obj, baseline_attr)
+
+    out_df = getattr(data_obj, f"{mode}_OUT_df")
+    d_out_df = getattr(data_obj, f"{mode}_dOUT_df")
+    out_columns = list(d_out_df.columns)
+    zero_rows = np.isclose(d_out_df.to_numpy(dtype=float), 0.0).all(axis=1)
+
+    if zero_rows.any():
+        baseline_idx = d_out_df.index[np.flatnonzero(zero_rows)[0]]
+        if baseline_idx in out_df.index:
+            return out_df.loc[baseline_idx, out_columns].to_numpy(dtype=float)
+
+    return out_df.iloc[1][out_columns].to_numpy(dtype=float)
+
+def _data_apply_output_delta_inverse(data_obj, mode, target, data):
+    if target != "out" or not _data_uses_delta_output(data_obj):
+        return data
+    baseline = np.asarray(_data_mode_output_delta_baseline(data_obj, mode), dtype=float)
+    return data + baseline
 
 def _data_update_reconstructors(data_obj):
     for mode, enabled in [("UT", data_obj.UTmechTest), ("FT", data_obj.FTmechTest)]:
@@ -972,10 +1242,16 @@ def _data_update_reconstructors(data_obj):
                     inverse_steps.append(getattr(data_obj, scaler_attr).inverse_transform)
 
             reconstructor_attr = f"{mode}_{target_token}reconstructor"
+            inverse_steps = tuple(inverse_steps)
+
+            def _reconstruct(data, inverse_steps=inverse_steps, mode=mode, target=target):
+                out = _data_apply_inverse_steps(data, inverse_steps)
+                return _data_apply_output_delta_inverse(data_obj, mode, target, out)
+
             setattr(
                 data_obj,
                 reconstructor_attr,
-                lambda data, inverse_steps=tuple(inverse_steps): _data_apply_inverse_steps(data, inverse_steps),
+                _reconstruct,
             )
 
 def _data_validate_preprocess_config(scale, reduce_dim):
@@ -1049,27 +1325,20 @@ def _data_init_scaler(data_obj, scale=None):
     elif "symm" in scale[0].lower():
         data_obj.scaler = SymmetricScaler()
 
-def _data_pca_components(reduce_dim):
-    accuracy = None
-    n_components = None
-    if isinstance(reduce_dim, (list, tuple)):
-        if len(reduce_dim) > 2:
-            accuracy = reduce_dim[2]
-        if len(reduce_dim) > 3:
-            n_components = reduce_dim[3]
-
-    if n_components is not None and n_components is not False:
-        return n_components
-    if accuracy is not None and accuracy is not False:
-        return accuracy
-    return 0.999999
-
 def _data_init_reducer(data_obj, reduce_dim=None):
     if reduce_dim is None:
         reduce_dim = data_obj.reduce_dim
 
     if reduce_dim[0].lower() == "pca":
-        data_obj.reducer = PCA(n_components=_data_pca_components(reduce_dim))
+        accuracy = reduce_dim[2] if len(reduce_dim) > 2 else None
+        n_components = reduce_dim[3] if len(reduce_dim) > 3 else None
+        if n_components is not None and n_components is not False:
+            pca_components = n_components
+        elif accuracy is not None and accuracy is not False:
+            pca_components = accuracy
+        else:
+            pca_components = 0.999999
+        data_obj.reducer = PCA(n_components=pca_components)
     elif reduce_dim[0].lower() == "autoencoder":
         data_obj.reducer = None
 
@@ -1153,4 +1422,5 @@ def _data_scale_reduced_target(scale, scale_reduced, target):
         # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dy[0], self.outParams2dy[1])
         # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dx[2], self.outParams2dx[3])
         # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dy[2], self.outParams2dy[3])
+
 
