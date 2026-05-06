@@ -347,8 +347,8 @@ class Geometry:
                 nnx, nny = 10, 10
                 self.totalNodes = int((nnx + 1) * (nny + 1)) + int(nnx * nny)
         elif self.LAT.lower() == "square":
-            totalNodes = int(round((nnx + 1) * (nny + 1)))
-            totalBracketNodes = int(round((nnx + 5) * 3 * 2))
+            totalNodes = int(round((self.nnx + 1) * (self.nny + 1)))
+            totalBracketNodes = int(round((self.nnx + 5) * 3 * 2))
             if mode and mode.lower() == "fracture":
                 self.totalNodes = totalNodes
             elif mode and mode.lower() == "ductile":
