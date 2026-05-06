@@ -82,24 +82,28 @@ def get_ductileData(CSVout, crit=0.25, delimiter=',', typ='n'):
 def calcUT(df):
     frac = int(df.y_sm.tolist()[0])
     df = df[1:].reset_index(drop=True)
-    e = df.x.tolist()
-    s_sm = df.y_sm.tolist()
+    e = np.asarray(df.x.tolist(), dtype=float)
+    s_sm = np.asarray(df.y_sm.tolist(), dtype=float)
     
     ductility = e[frac]
-    strength = max(s_sm)
-    stiff_rng = range(int(0.1*s_sm.index(strength)))
-    stiffness = np.average([s_sm[i+1]-s_sm[i] for i in stiff_rng])/np.average([e[i+1]-e[i] for i in stiff_rng])
+    strength = np.max(s_sm)
+    idx_Smax = int(np.argmax(s_sm))
     
-    idx_Smax = s_sm.index(strength)
-    idx_WoF = None
-    for si in s_sm[idx_Smax:]:
-        if si <= 0.01*strength:
-            idx_WoF = s_sm[1:].index(si)+1
-            break
-    if idx_WoF is not None:
-        work_of_frac = np.trapz(s_sm[:idx_WoF], e[:idx_WoF])
+    stiff_end = int(0.1 * idx_Smax)
+    if stiff_end < 2 or len(np.unique(e[:stiff_end + 1])) < 2:
+        stiffness = np.nan
     else:
-        work_of_frac = np.trapz(s_sm, e)
+        stiffness, _ = np.polyfit(e[:stiff_end + 1], s_sm[:stiff_end + 1], 1)
+
+    idx_WoF = None
+    for idx in range(idx_Smax, len(s_sm)):
+        if s_sm[idx] <= 0.01 * strength:
+            idx_WoF = idx
+            break
+    if idx_WoF is None:
+        idx_WoF = len(s_sm) - 1
+
+    work_of_frac = np.trapz(s_sm[:idx_WoF + 1], e[:idx_WoF + 1])
 
     return ductility, strength, stiffness, work_of_frac
 
@@ -135,15 +139,24 @@ def calc_FaW(a, W):
 
 def calc_Apl(d, F_sm, dd, P, frac, n):
     if n == 0:
-        slope_idx = int(0.15*d.index(dd))
-        slope = np.average([F_sm[i+1]-F_sm[i] for i in range(slope_idx)])/np.average([d[i+1]-d[i] for i in range(slope_idx)])
+        frac_idx = int(frac)
+        d = np.asarray(d, dtype=float)
+        F_sm = np.asarray(F_sm, dtype=float)
 
-        upper_curve = F_sm[:frac]
-        interval = dd / len(upper_curve)
-        F_integral = sum([Fi*interval for Fi in upper_curve])
+        if frac_idx <= 0 or frac_idx >= len(d):
+            return np.nan
 
-        d_slope = dd - (P/slope)
-        slope_integral = 0.5 * (dd - d_slope) * P
+        slope_idx = max(1, int(0.15 * frac_idx))
+        slope_d = d[:slope_idx + 1]
+        slope_F = F_sm[:slope_idx + 1]
+        if len(np.unique(slope_d)) < 2:
+            return np.nan
+        slope, _ = np.polyfit(slope_d, slope_F, 1)
+        if not np.isfinite(slope) or slope == 0:
+            return np.nan
+
+        F_integral = np.trapz(F_sm[:frac_idx + 1], d[:frac_idx + 1])
+        slope_integral = 0.5 * (P / slope) * P
 
         A_pl = F_integral - slope_integral
     else:
@@ -164,15 +177,15 @@ def calc_p_poly(lam_bar, rho_bar, a_W):
     ])
 
     C = np.array([
-        [ 0.30817 ,  2.1609  , -5.72   ,  6.2711 , -2.4512  ],
-        [ 0.61118 , -4.5341  , 12.698  , -14.428 ,  5.5896  ],
-        [ 0.098042,  2.3871  , -8.6206 , 10.742  , -4.3791  ],
-        [ 0.1443  ,  0.098426,  0.47793, -2.5788 ,  1.9266  ],
-        [-1.2451  ,  8.9848  , -22.996 , 26.09   , -11.037  ],
-        [ 0.85309 , -3.104   ,  7.3777 , -9.0334 ,  4.0197  ],
-        [-0.14716 ,  1.752   , -6.0346 ,  7.7217 , -3.3098  ],
-        [-0.16912 ,  0.82943 , -2.7216 ,  4.5667 , -2.6053  ],
-        [ 0.12556 , -0.35037 , -0.53346,  0.90753, -0.042327],
+        [ 0.30817 ,  2.1609  ,  -5.72   ,   6.2711 ,  -2.4512  ],
+        [ 0.61118 , -4.5341  ,  12.698  , -14.428  ,   5.5896  ],
+        [ 0.098042,  2.3871  ,  -8.6206 ,  10.742  ,  -4.3791  ],
+        [ 0.1443  ,  0.098426,   0.47793,  -2.5788 ,   1.9266  ],
+        [-1.2451  ,  8.9848  , -22.996  ,  26.09   , -11.037  ],
+        [ 0.85309 , -3.104   ,   7.3777 ,  -9.0334 ,   4.0197  ],
+        [-0.14716 ,  1.752   ,  -6.0346 ,   7.7217 ,  -3.3098  ],
+        [-0.16912 ,  0.82943 ,  -2.7216 ,   4.5667 ,  -2.6053  ],
+        [ 0.12556 , -0.35037 ,  -0.53346,   0.90753,  -0.042327],
     ])
 
     v_a = np.array([1.0, a_W, a_W**2, a_W**3, a_W**4])
@@ -195,14 +208,18 @@ def calc_FaW_aniso(a, W, C):
     return f_a_W
 
 def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):  
+    if not getattr(geom, "ftcalc_done", False):
+        geom.FTcalc()
+
     frac = int(df.y_sm.tolist()[0])
     df = df[1:].reset_index(drop=True)
     d = df.x.tolist()
     F_sm = df.y_sm.tolist()
     
-    W = geom.W
-    B = geom.B
-    ai = geom.ai
+    length_scale = 1e-3
+    W = geom.W * length_scale
+    B = geom.B * length_scale
+    ai = np.asarray(geom.ai, dtype=float) * length_scale
     if validation == True:
         E_eff_pe = E          # TODO: CHECK FT VAL
     

@@ -241,6 +241,7 @@ class Geometry:
         self.deltaNM = deltaNM
         self.B = 0.5 * self.W
         self.iso = iso
+        self.ftcalc_done = False
 
     def rDthickness(self, t=None, rD=None):
         if self.LAT.lower() == "fcc":
@@ -318,6 +319,9 @@ class Geometry:
         self.vol = vol
 
     def FTcalc(self):
+        if self.ftcalc_done:
+            return
+
         self.a0 = self.a0 - 0.25 * self.W
         if self.LAT.lower() == "fcc":
             self.ai = [self.a0 + ((self.l / 2) * (i)) for i in range(self.nnx)]
@@ -329,6 +333,7 @@ class Geometry:
             self.ai = [self.a0 + ((2 * self.l) * (i)) for i in range(self.nnx)]
         elif self.LAT.lower() == "hex":
             self.ai = [self.a0 + (((3.0 ** 0.5) * (self.l / 2)) * (i)) for i in range(self.nnx)]
+        self.ftcalc_done = True
 
     def nodeCount(self, mode=False, stiffMatrix=False):
         if self.LAT.lower() == "fcc" or self.LAT.lower() == "45square":
