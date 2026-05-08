@@ -61,6 +61,7 @@ if [ -n "${PATH_EXTRA:-}" ]; then
     PATH_EXTRA_PROVIDED=true
 fi
 PATH_EXTRA=${PATH_EXTRA:-}
+SUBMIT_P2_ROOT=${SUBMIT_P2_ROOT:-/data/home/$HPC_USER/p2}
 
 zip=false
 delete_scratch=true
@@ -87,6 +88,15 @@ if [ -z "$RUN_LABEL" ]; then
     RUN_LABEL=$(basename "$ML_SCRIPT")
     RUN_LABEL=${RUN_LABEL%.*}
 fi
+
+if [ "$PATH_EXTRA_PROVIDED" = false ] && [ -n "${SLURM_SUBMIT_DIR:-}" ]; then
+    case "$SLURM_SUBMIT_DIR" in
+        "$SUBMIT_P2_ROOT"/*)
+            PATH_EXTRA=${SLURM_SUBMIT_DIR#"$SUBMIT_P2_ROOT"/}
+            ;;
+    esac
+fi
+
 ARCHIVE_DIR=$ARCHIVE_ROOT/${PATH_EXTRA:+$PATH_EXTRA/}$RUN_LABEL/$SLURM_JOB_ID
 
 if [[ "$ML_SCRIPT" = /* ]]; then
@@ -227,6 +237,13 @@ trap finish EXIT
 /bin/echo "Submit directory: $SLURM_SUBMIT_DIR"
 /bin/echo "Script: $ML_SCRIPT"
 /bin/echo "Run label: $RUN_LABEL"
+/bin/echo "Archive path extra: ${PATH_EXTRA:-<none>}"
+
+mkdir -p "$SCRATCH_DIR"
+mkdir -p "$TRANSFER_DIR"
+mkdir -p "$ZIP_DIR"
+mkdir -p "$LOG_DIR"
+mkdir -p "$RESULT_DIR"
 
 # Load required modules.
 module load miniforge
@@ -252,12 +269,6 @@ if command -v nvidia-smi >/dev/null 2>&1; then
 else
     /bin/echo "nvidia-smi is not available in this environment."
 fi
-
-mkdir -p "$SCRATCH_DIR"
-mkdir -p "$TRANSFER_DIR"
-mkdir -p "$ZIP_DIR"
-mkdir -p "$LOG_DIR"
-mkdir -p "$RESULT_DIR"
 
 if [ ! -e "$SCRIPT_SRC" ]; then
     /bin/echo "ERROR: ML script not found: $SCRIPT_SRC"
