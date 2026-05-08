@@ -20,8 +20,15 @@ HPC_USER=${HPC_USER:-${USER:-exy053}}
 
 # ^^^ RENAME / EDIT FOR EACH ML RUN ^^^
 #
-# Submit examples:
+# Intended submit workflow:
+#   cd /data/home/exy053/p2/UT/MLP
 #   sbatch B1_ML-new.sh
+#
+# Keep a copy or symlink of this B1 script in the submit directory above.
+# The Python run script and resources folder are still copied from REPO_ROOT,
+# not from the submit directory.
+#
+# Other submit examples:
 #   sbatch B1_ML-new.sh A-HPC-1_run.py --epochs 3 --nsims 64
 #   ML_SCRIPT=A-HPC-1_run.py RUN_LABEL=trial-ut-mlp sbatch B1_ML-new.sh -- --epochs 3
 #
