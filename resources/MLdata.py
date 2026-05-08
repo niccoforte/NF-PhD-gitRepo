@@ -721,6 +721,8 @@ class DATA:
             self.PATH = pUTdisNodes
         elif self.path == 1:
             self.PATH = pTiLAT
+        elif self.path in ["hpc", "HPC"]:
+            self.PATH = "/data/SEMS-TaoLab/Niccolo-Forte/p2/"
         else:
             self.PATH = str(self.path)+"/"
     
