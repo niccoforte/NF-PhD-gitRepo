@@ -41,6 +41,11 @@ def parse_args():
     parser.add_argument("--dis", default="disNodes")
     parser.add_argument("--dN", type=float, default=0.2)
     parser.add_argument("--d-data", default="in")
+    parser.add_argument(
+        "--range-split",
+        action="store_true",
+        help="Force range-covering samples into training. Off by default for small smoke tests.",
+    )
     return parser.parse_args()
 
 
@@ -88,7 +93,7 @@ def main():
         load_split=args.split or False,
         split_frac=0.8,
         split_seed=args.seed,
-        range_split=(True, False),
+        range_split=(args.range_split, False),
         save_split=False,
         LAT=args.lat,
         dis=args.dis,
@@ -102,6 +107,16 @@ def main():
         reduce_dim=False,
         round_decimals=5,
     )
+
+    split_sizes = {}
+    for mode in ("UT", "FT"):
+        if getattr(data, f"{mode}mechTest", False):
+            split_sizes[mode] = {
+                "train": int(len(getattr(data, f"{mode}_train_in"))),
+                "val": int(len(getattr(data, f"{mode}_val_in"))),
+                "test": int(len(getattr(data, f"{mode}_test_in"))),
+            }
+    print(f"Split sizes: {split_sizes}")
 
     in_size = data.UT_train_in.shape[-1] if data.UTmechTest else data.FT_train_in.shape[-1]
     out_size = data.UT_train_out.shape[-1] if data.UTmechTest else data.FT_train_out.shape[-1]
@@ -132,7 +147,12 @@ def main():
     )
 
     model.train(n_epochs=args.epochs, verbose=1, plot=False)
-    model.evaluate_split("test", diagnostics=True, diag_plot=False)
+
+    eval_split = "test"
+    if any(sizes["test"] == 0 for sizes in split_sizes.values()):
+        eval_split = "val"
+        print("Test split is empty; evaluating the validation split instead.")
+    model.evaluate_split(eval_split, diagnostics=True, diag_plot=False)
 
     checkpoint = model.save(path=None, name=args.run_label)
 
@@ -145,19 +165,34 @@ def main():
         "FT_best_loss": getattr(model, "FT_best_loss", None),
         "FT_best_mse": getattr(model, "FT_best_mse", None),
         "FT_best_rmse": getattr(model, "FT_best_rmse", None),
-        "UT_prediction_summary": getattr(model, "UT_prediction_summary", None),
-        "FT_prediction_summary": getattr(model, "FT_prediction_summary", None),
+        "split_sizes": split_sizes,
+        "evaluation_split": eval_split,
+        "UT_prediction_summary": getattr(
+            model,
+            "UT_prediction_summary",
+            getattr(model, f"UT_{eval_split}_diagnostics", {}).get("summary")
+            if getattr(model, f"UT_{eval_split}_diagnostics", None) is not None else None,
+        ),
+        "FT_prediction_summary": getattr(
+            model,
+            "FT_prediction_summary",
+            getattr(model, f"FT_{eval_split}_diagnostics", {}).get("summary")
+            if getattr(model, f"FT_{eval_split}_diagnostics", None) is not None else None,
+        ),
     }
     write_json(results_dir / "metrics.json", metrics)
 
     predictions = {}
     for mode in ("UT", "FT"):
-        outputs = getattr(model, f"{mode}_test_outputs", None)
-        truth = getattr(model, f"{mode}_truth", None)
+        outputs = getattr(model, f"{mode}_{eval_split}_outputs", None)
+        truth = getattr(model, f"{mode}_{eval_split}_truth", None)
+        if eval_split == "test":
+            outputs = outputs if outputs is not None else getattr(model, f"{mode}_test_outputs", None)
+            truth = truth if truth is not None else getattr(model, f"{mode}_truth", None)
         if outputs is not None:
-            predictions[f"{mode}_outputs"] = outputs
+            predictions[f"{mode}_{eval_split}_outputs"] = outputs
         if truth is not None:
-            predictions[f"{mode}_truth"] = truth
+            predictions[f"{mode}_{eval_split}_truth"] = truth
     if predictions:
         np.savez(results_dir / "predictions.npz", **predictions)
 
