@@ -47,7 +47,11 @@ RUN_LABEL=${RUN_LABEL:-}
 
 # Conda/Mamba environment created beforehand on the cluster.
 # Leave empty to use the base Miniforge environment after module load.
-CONDA_ENV=${CONDA_ENV:-ml-gpu}
+CONDA_ENV=${CONDA_ENV:-nf-ml-gpu}
+CREATE_CONDA_ENV=${CREATE_CONDA_ENV:-false}
+PYTHON_VERSION=${PYTHON_VERSION:-3.11}
+PYTORCH_INDEX_URL=${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu118}
+ML_ENV_EXTRA_PIP=${ML_ENV_EXTRA_PIP:-}
 
 # Data and archive locations. MLdata.py appends "MLdata/..." to DATA(path=...),
 # so DATA_ROOT must be the parent directory containing MLdata, not MLdata itself.
@@ -114,6 +118,72 @@ sync_if_exists() {
     if [ -e "$src" ]; then
         mkdir -p "$dst"
         rsync -av "$src" "$dst/"
+    fi
+}
+
+init_conda_shell() {
+    if command -v conda >/dev/null 2>&1; then
+        local conda_base
+        conda_base=$(conda info --base)
+        if [ -f "$conda_base/etc/profile.d/conda.sh" ]; then
+            # shellcheck disable=SC1090
+            . "$conda_base/etc/profile.d/conda.sh"
+        fi
+    fi
+}
+
+conda_env_exists() {
+    local pkg_manager=$1
+    "$pkg_manager" env list | awk '{print $1}' | grep -Fxq "$CONDA_ENV"
+}
+
+create_conda_env_if_requested() {
+    if [ -z "$CONDA_ENV" ]; then
+        return
+    fi
+
+    local pkg_manager=mamba
+    if ! command -v "$pkg_manager" >/dev/null 2>&1; then
+        pkg_manager=conda
+    fi
+
+    if ! command -v "$pkg_manager" >/dev/null 2>&1; then
+        /bin/echo "ERROR: neither mamba nor conda is available after module load."
+        exit 3
+    fi
+
+    if conda_env_exists "$pkg_manager"; then
+        /bin/echo "Using existing conda environment: $CONDA_ENV"
+        return
+    fi
+
+    if [ "$CREATE_CONDA_ENV" != true ]; then
+        /bin/echo "ERROR: Conda environment '$CONDA_ENV' does not exist."
+        /bin/echo "Available environments:"
+        "$pkg_manager" env list
+        /bin/echo ""
+        /bin/echo "Create it once with:"
+        /bin/echo "  cd $SLURM_SUBMIT_DIR"
+        /bin/echo "  CREATE_CONDA_ENV=true sbatch B1_ML-new.sh"
+        /bin/echo ""
+        /bin/echo "Or submit using an existing environment:"
+        /bin/echo "  CONDA_ENV=<env_name> sbatch B1_ML-new.sh"
+        exit 3
+    fi
+
+    /bin/echo "Creating conda environment: $CONDA_ENV"
+    "$pkg_manager" create -y -n "$CONDA_ENV" "python=$PYTHON_VERSION" pip
+
+    conda activate "$CONDA_ENV"
+    python -m pip install --upgrade pip setuptools wheel
+    python -m pip install \
+        numpy scipy matplotlib pandas numexpr bottleneck sympy openpyxl ipywidgets \
+        scikit-learn networkx optuna torchbnn
+    python -m pip install torch torchvision torchaudio --index-url "$PYTORCH_INDEX_URL"
+    python -m pip install torch-geometric torchinfo gpytorch "botorch>=0.10.0"
+
+    if [ -n "$ML_ENV_EXTRA_PIP" ]; then
+        python -m pip install $ML_ENV_EXTRA_PIP
     fi
 }
 
@@ -247,8 +317,10 @@ mkdir -p "$RESULT_DIR"
 
 # Load required modules.
 module load miniforge
+init_conda_shell
+create_conda_env_if_requested
 if [ -n "$CONDA_ENV" ]; then
-    mamba activate "$CONDA_ENV"
+    conda activate "$CONDA_ENV"
 fi
 
 export PYTHONUNBUFFERED=1
