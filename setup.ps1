@@ -187,6 +187,28 @@ print("IMPORT_OK")
     }
 }
 
+function Verify-MLImport {
+    $script = @'
+import numpy as np
+import torch
+from resources.MLdata import DATA
+from resources.MLmodels import MODEL, MLP
+print("NUMPY_OK", np.__version__, hasattr(np, "trapz"))
+print("TORCH_OK", torch.__version__, torch.cuda.is_available())
+print("ML_IMPORT_OK")
+'@
+    $tmpPy = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString() + ".py")
+    try {
+        Set-Content -Path $tmpPy -Value $script
+        Invoke-Step -Exe "python" -CommandArgs @($tmpPy)
+    }
+    finally {
+        if (Test-Path $tmpPy) {
+            Remove-Item -LiteralPath $tmpPy -Force
+        }
+    }
+}
+
 Push-Location $RepoRoot
 try {
     if ($runPython -and -not (Get-Command python -ErrorAction SilentlyContinue)) {
@@ -219,11 +241,16 @@ try {
         Write-Host "=== Standard Python: enforce NumPy/Pandas binary compatibility ==="
         Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--upgrade", "numpy>=1.26,<2", "numexpr>=2.8.4", "bottleneck>=1.3.6")
 
+        Write-Host "=== Standard Python: enforce local PyTorch CPU compatibility ==="
+        Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--force-reinstall", "torch==2.6.0+cpu", "torchvision==0.21.0+cpu", "torchaudio==2.6.0+cpu", "--index-url", "https://download.pytorch.org/whl/cpu")
+        Invoke-Step -Exe "python" -CommandArgs @("-m", "pip", "install", "--disable-pip-version-check", "--force-reinstall", "numpy>=1.26,<2")
+
         Write-Host "=== Standard Python: install local resources package ==="
         Install-LocalPackage-Python -Root $RepoRoot
 
         Write-Host "=== Verify standard Python import ==="
         Verify-ResourcesImport -Exe "python" -PrefixArgs @()
+        Verify-MLImport
         Write-Host "PYTHON setup OK"
     }
 

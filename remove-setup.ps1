@@ -44,14 +44,19 @@ function Get-RequirementPackages {
 
     if (-not (Test-Path $Path)) { return @() }
 
-    return @(Get-Content $Path |
-        ForEach-Object { $_.Trim() } |
-        Where-Object {
-            $_ -and
-            -not $_.StartsWith('#') -and
-            -not $_.StartsWith('--') -and
-            -not $_.StartsWith('-e')
-        })
+    $packages = New-Object System.Collections.Generic.List[string]
+    foreach ($line in Get-Content $Path) {
+        $req = $line.Trim()
+        if (-not $req) { continue }
+        if ($req.StartsWith('#') -or $req.StartsWith('--') -or $req.StartsWith('-e')) { continue }
+        $req = ($req -split '\s+#', 2)[0].Trim()
+        if (-not $req) { continue }
+        if ($req -match '^[A-Za-z0-9_.-]+') {
+            $packages.Add($Matches[0])
+        }
+    }
+
+    return @($packages | Sort-Object -Unique)
 }
 
 function Remove-LegacyPth {
