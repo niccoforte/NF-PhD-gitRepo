@@ -72,9 +72,7 @@ delete_scratch=true
 copy_data_to_scratch=false
 
 SCRATCH_DIR=/gpfs/scratch/$HPC_USER/$SLURM_JOB_ID
-TRANSFER_DIR=$SCRATCH_DIR/transfer
 ZIP_DIR=$SCRATCH_DIR/zip
-LOG_DIR=$SCRATCH_DIR/logs
 RESULT_DIR=$SCRATCH_DIR/results
 RUN_METADATA_FILE=$SCRATCH_DIR/run_metadata.json
 
@@ -253,10 +251,8 @@ sync_run_outputs() {
     sync_if_exists "$SCRATCH_DIR/outputs" "$ARCHIVE_DIR/zip"
     sync_if_exists "$SCRATCH_DIR/figures" "$ARCHIVE_DIR/zip"
     sync_if_exists "$SCRATCH_DIR/plots" "$ARCHIVE_DIR/zip"
-    sync_if_exists "$SCRATCH_DIR/logs" "$ARCHIVE_DIR/zip"
     sync_if_exists "$SCRATCH_DIR/wandb" "$ARCHIVE_DIR/zip"
     sync_if_exists "$SCRATCH_DIR/lightning_logs" "$ARCHIVE_DIR/zip"
-    sync_if_exists "$TRANSFER_DIR" "$ARCHIVE_DIR/zip"
 
     find "$SCRATCH_DIR" -maxdepth 1 -type f \
         \( -name "*.csv" -o -name "*.json" -o -name "*.log" -o -name "*.mdl" \
@@ -279,9 +275,7 @@ finish() {
 
     if [ "$zip" = true ]; then
         mkdir -p "$ZIP_DIR"
-        tar -czf "$SCRATCH_DIR/C1_transfer-$RUN_LABEL-$SLURM_JOB_ID.tgz" -C "$SCRATCH_DIR" transfer
         tar -czf "$SCRATCH_DIR/C2_zip-$RUN_LABEL-$SLURM_JOB_ID.tgz" -C "$SCRATCH_DIR" zip
-        rsync -av "$SCRATCH_DIR/C1_transfer-$RUN_LABEL-$SLURM_JOB_ID.tgz" "$ARCHIVE_DIR/"
         rsync -av "$SCRATCH_DIR/C2_zip-$RUN_LABEL-$SLURM_JOB_ID.tgz" "$ARCHIVE_DIR/"
     fi
 
@@ -310,9 +304,7 @@ trap finish EXIT
 /bin/echo "Archive path extra: ${PATH_EXTRA:-<none>}"
 
 mkdir -p "$SCRATCH_DIR"
-mkdir -p "$TRANSFER_DIR"
 mkdir -p "$ZIP_DIR"
-mkdir -p "$LOG_DIR"
 mkdir -p "$RESULT_DIR"
 
 # Load required modules.
