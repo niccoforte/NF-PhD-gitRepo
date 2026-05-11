@@ -177,7 +177,7 @@ create_conda_env_if_requested() {
     conda activate "$CONDA_ENV"
     python -m pip install --upgrade pip setuptools wheel
     python -m pip install \
-        numpy scipy matplotlib pandas numexpr bottleneck sympy openpyxl ipywidgets \
+        "numpy>=1.26,<2" scipy matplotlib pandas numexpr bottleneck sympy openpyxl ipywidgets \
         scikit-learn networkx optuna torchbnn
     python -m pip install torch torchvision torchaudio --index-url "$PYTORCH_INDEX_URL"
     python -m pip install torch-geometric torchinfo gpytorch "botorch>=0.10.0"
