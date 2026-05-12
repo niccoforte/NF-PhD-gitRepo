@@ -242,7 +242,7 @@ class MODEL:
                 zone_boundaries=zone_boundaries,
             )
 
-    def _predict_mode(
+    def _predict_mode( #???
         self,
         mode,
         loader,
@@ -496,6 +496,40 @@ class MODEL:
     def save(self, path=None, name=None):
         return _model_save_checkpoint(self, path=path, name=name)
 
+    def to_json(self, path=None, indent=2):
+        metadata = _model_refresh_descriptor(self)
+        if path is None:
+            return metadata
+
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(metadata, indent=indent, sort_keys=True), encoding="utf-8")
+        if getattr(self, "data", None) is not None and hasattr(self.data, "to_json"):
+            self.data.to_json(path.with_name(f"{path.stem}_data.json"), indent=indent)
+        return str(path)
+
+    @classmethod
+    def from_json(
+        cls,
+        json_path,
+        data=None,
+        load_weights=True,
+        model_path=None,
+        device=None,
+        scan_matches_on_init=False,
+        **overrides,
+    ):
+        return _model_from_json(
+            cls,
+            json_path=json_path,
+            data=data,
+            load_weights=load_weights,
+            model_path=model_path,
+            device=device,
+            scan_matches_on_init=scan_matches_on_init,
+            **overrides,
+        )
+
     def load(self, model_path=None, match_current=False, strict_match=True, fallback_to_latest=False, require_descriptor_json=True):
         return _model_load_checkpoint(
             self,
@@ -671,6 +705,7 @@ class MLP(nn.Module):
         self.head_norm = _resolve_norm(head_norm)
         self.head_dropout = _resolve_dropout(head_dropout, None)
         self.bias = bias
+        self.act_name = _activation(act, return_name=True)
         
         self._act = _activation(act)
 
@@ -786,6 +821,8 @@ class Transformer(nn.Module):
         self.ff_mult = ff_mult
         self.token_size = token_size
         self.encoder_act = encoder_act
+        self.act_name = _activation(act, return_name=True)
+        self.encoder_act_name = _activation(act if encoder_act is None else encoder_act, return_name=True)
         self.block = block.lower()
         self.pool = pool.lower()
         self.use_cls_token = use_cls_token
@@ -1029,6 +1066,7 @@ class GNN(nn.Module):
         self.pool = pool.lower()
         self.heads = heads
         self.bias = bias
+        self.act_name = _activation(act, return_name=True)
         self.act = _activation(act)
 
         if self.block not in ["gcn", "gat"]:
@@ -1689,16 +1727,24 @@ def _mp_range_split_token(data):
         out_range = bool(getattr(data, "output_range_split", False))
     return f"in{_mp_bool_token(in_range)}-out{_mp_bool_token(out_range)}"
 
-def _mp_node_feature_token(data):
+def _mp_geom_feature_token(data):
     model_name = str(getattr(data, "model", "")).lower()
     if model_name not in ["tr", "gnn", "gcn", "gat"]:
         return None
-    tr_params = getattr(data, "tr_params", None)
-    if not isinstance(tr_params, dict):
-        return None
-    geom = _mp_bool_token(tr_params.get("geom_feats", False))
-    coord = _mp_bool_token(tr_params.get("coord_norm", False))
-    return f"nodeFeat-geom{geom}-coordNorm{coord}"
+    geom_feats = getattr(data, "geom_feats", None)
+    if isinstance(geom_feats, dict):
+        enabled = bool(geom_feats.get("enabled", geom_feats.get("geom_feats", False)))
+        coord_norm = bool(geom_feats.get("coord_norm", False)) if enabled else False
+    else:
+        tr_params = getattr(data, "tr_params", None)
+        if not isinstance(tr_params, dict):
+            enabled, coord_norm = False, False
+        else:
+            enabled = bool(tr_params.get("geom_feats", False))
+            coord_norm = bool(tr_params.get("coord_norm", False)) if enabled else False
+    if enabled:
+        return f"geomFeat-{_mp_bool_token(enabled)}-{_mp_bool_token(coord_norm)}"
+    return f"geomFeat-{_mp_bool_token(enabled)}"
 
 def _mp_data_descriptor(data, model_obj=None):
     if data is None:
@@ -1738,9 +1784,9 @@ def _mp_data_descriptor(data, model_obj=None):
     round_decimals = getattr(data, "round_decimals", None)
     parts.append(f"round-{_mp_slugify('None' if round_decimals is None else round_decimals, max_len=16, preserve_case=True)}")
 
-    node_feature_token = _mp_node_feature_token(data)
-    if node_feature_token is not None:
-        parts.append(node_feature_token)
+    geom_feature_token = _mp_geom_feature_token(data)
+    if geom_feature_token is not None:
+        parts.append(geom_feature_token)
 
     descriptor_obj = model_obj
     if descriptor_obj is None:
@@ -1829,7 +1875,7 @@ def _mp_collect_data_signature(model_obj):
     for key in (
         "mechMode", "LAT", "dis", "dN", "d_data", "nsims", "split_frac",
         "split_seed", "range_split", "input_range_split", "output_range_split",
-        "round_decimals", "tr_params", "model",
+        "round_decimals", "geom_feats", "model",
         "scale", "scale_reduced", "reduce_dim", "path", "path_add", "load_split",
         "UTmechTest", "FTmechTest",
     ):
@@ -1998,6 +2044,417 @@ def _mp_resolve_model_dir(model_obj, path):
         return path
     return os.path.join("models", path)
 
+def _model_tensor_values(value):
+    if torch.is_tensor(value):
+        if value.numel() == 0:
+            return None
+        return value.detach().cpu().flatten().tolist()
+    return None
+
+def _model_inner_config(model_obj):
+    model = model_obj.model
+    if isinstance(model, MLP):
+        return {
+            "class": "MLP",
+            "params": {
+                "in_size": model.in_size,
+                "h_size": list(model.h_size),
+                "out_size": model.out_size,
+                "act": getattr(model, "act_name", "relu"),
+                "block": model.block,
+                "norm": model.norm,
+                "dropout": model.dropout,
+                "bias": model.bias,
+                "head_norm": model.head_norm,
+                "head_dropout": model.head_dropout,
+            },
+        }
+    if isinstance(model, Transformer):
+        return {
+            "class": "Transformer",
+            "params": {
+                "in_size": model.in_size,
+                "seq_len": model.seq_len,
+                "h_size": list(model.h_size),
+                "out_size": model.out_size,
+                "d_model": model.d_model,
+                "n_heads": model.n_heads,
+                "n_layers": model.n_layers,
+                "ff_mult": model.ff_mult,
+                "token_size": model.token_size,
+                "act": getattr(model, "act_name", "gelu"),
+                "encoder_act": model.encoder_act,
+                "block": model.block,
+                "norm": model.norm,
+                "dropout": model.dropout,
+                "att_dropout": model.att_dropout,
+                "head_norm": model.head_norm,
+                "head_dropout": model.head_dropout,
+                "bias": model.bias,
+                "pool": model.pool,
+                "use_cls_token": model.use_cls_token,
+                "pos_encoding": model.pos_encoding,
+            },
+        }
+    if isinstance(model, GNN):
+        return {
+            "class": "GNN",
+            "params": {
+                "in_size": model.in_size,
+                "h_size": list(model.h_size),
+                "out_size": model.out_size,
+                "act": getattr(model, "act_name", "relu"),
+                "block": model.block,
+                "norm": model.norm,
+                "dropout": model.dropout,
+                "att_dropout": model.att_dropout,
+                "head_norm": model.head_norm,
+                "head_dropout": model.head_dropout,
+                "bias": model.bias,
+                "heads": model.heads,
+                "pool": model.pool,
+            },
+        }
+    return {
+        "class": model.__class__.__name__,
+        "params": {
+            key: _mp_to_serializable(value)
+            for key, value in vars(model).items()
+            if not key.startswith("_")
+            and isinstance(value, (str, int, float, bool, list, tuple, type(None), np.generic))
+        },
+    }
+
+def _model_loss_to_config(lossf):
+    if isinstance(lossf, dict):
+        return {
+            "kind": "task_losses",
+            "tasks": {str(key).upper(): _model_loss_to_config(value) for key, value in lossf.items()},
+        }
+    if isinstance(lossf, (list, tuple)):
+        return {
+            "kind": "loss_list",
+            "losses": [_model_loss_to_config(loss) for loss in lossf],
+        }
+
+    class_name = lossf.__class__.__name__
+    if isinstance(lossf, nn.MSELoss):
+        return {"class": "MSELoss", "params": {"reduction": lossf.reduction}}
+
+    params = {}
+    if class_name == "CombinedCurveLoss":
+        weighted_mse = getattr(lossf, "weighted_mse", None)
+        derivative = getattr(lossf, "derivative", None)
+        params = {
+            "mse_weight": getattr(lossf, "mse_weight", 0.1),
+            "weighted_mse_weight": getattr(lossf, "weighted_mse_weight", 1.0),
+            "derivative_weight": getattr(lossf, "derivative_weight", 0.5),
+            "peak_weight": getattr(lossf, "peak_weight", 0.2),
+            "energy_weight": getattr(lossf, "energy_weight", 0.2),
+            "peak_location_weight": getattr(lossf, "peak_location_weight", 0.05),
+            "zone_boundaries": _mp_to_serializable(getattr(weighted_mse, "zone_boundaries", None)),
+            "zone_weights": _mp_to_serializable(getattr(weighted_mse, "zone_weights", None)),
+            "x_values": _model_tensor_values(getattr(derivative, "x_values", None)),
+            "reduction": getattr(lossf, "reduction", "mean"),
+            "derivative_order": getattr(lossf, "derivative_order", 1),
+            "normalization_eps": getattr(lossf, "normalization_eps", 1e-8),
+            "SoftPeak_beta": getattr(lossf, "SoftPeak_beta", 20.0),
+        }
+        return {"class": class_name, "params": params}
+
+    if class_name in ["QuantileLoss", "QuantileLossMATLAB", "CustomQuantileLossMATLAB"]:
+        params = {
+            "quantiles": _model_tensor_values(getattr(lossf, "quantiles", None)),
+            "zone_boundaries": _mp_to_serializable(getattr(lossf, "zone_boundaries", None)),
+            "err_type": getattr(lossf, "err_type", "L2"),
+        }
+        return {"class": class_name, "params": params}
+
+    if class_name == "WeightedCurveMSELoss":
+        params = {
+            "weights": _model_tensor_values(getattr(lossf, "weights", None)),
+            "zone_boundaries": _mp_to_serializable(getattr(lossf, "zone_boundaries", None)),
+            "zone_weights": _mp_to_serializable(getattr(lossf, "zone_weights", None)),
+            "normalize_weights": getattr(lossf, "normalize_weights", True),
+            "normalize_by_target_range": getattr(lossf, "normalize_by_target_range", False),
+            "reduction": getattr(lossf, "reduction", "mean"),
+            "eps": getattr(lossf, "eps", 1e-8),
+        }
+        return {"class": class_name, "params": params}
+
+    if class_name == "CurveDerivativeLoss":
+        params = {
+            "x_values": _model_tensor_values(getattr(lossf, "x_values", None)),
+            "order": getattr(lossf, "order", 1),
+            "reduction": getattr(lossf, "reduction", "mean"),
+            "eps": getattr(lossf, "eps", 1e-8),
+        }
+        return {"class": class_name, "params": params}
+
+    if class_name == "PeakStressLoss":
+        params = {
+            "reduction": getattr(lossf, "reduction", "mean"),
+            "normalize": getattr(lossf, "normalize", False),
+            "eps": getattr(lossf, "eps", 1e-8),
+        }
+        return {"class": class_name, "params": params}
+
+    if class_name == "StrainEnergyLoss":
+        params = {
+            "x_values": _model_tensor_values(getattr(lossf, "x_values", None)),
+            "fracture_indices": _mp_to_serializable(getattr(lossf, "fracture_indices", None)),
+            "reduction": getattr(lossf, "reduction", "mean"),
+            "normalize": getattr(lossf, "normalize", False),
+            "eps": getattr(lossf, "eps", 1e-8),
+        }
+        return {"class": class_name, "params": params}
+
+    if class_name == "SoftPeakLocationLoss":
+        params = {
+            "x_values": _model_tensor_values(getattr(lossf, "x_values", None)),
+            "beta": getattr(lossf, "beta", 20.0),
+            "reduction": getattr(lossf, "reduction", "mean"),
+            "normalize": getattr(lossf, "normalize", False),
+            "eps": getattr(lossf, "eps", 1e-8),
+        }
+        return {"class": class_name, "params": params}
+
+    return {"class": class_name, "params": None}
+
+def _model_earlystop_config(early_stop):
+    if early_stop is None:
+        return None
+    return {
+        "class": early_stop.__class__.__name__,
+        "params": {
+            "patience": getattr(early_stop, "patience", 20),
+            "min_delta": getattr(early_stop, "min_delta", 0.0),
+            "verbose": getattr(early_stop, "verbose", False),
+        },
+    }
+
+def _model_reload_config(model_obj):
+    return {
+        "typ": model_obj.typ,
+        "model_config": _model_inner_config(model_obj),
+        "loss_config": _model_loss_to_config(model_obj.lossf_cfg),
+        "training_config": {
+            "opt": _mp_to_serializable(model_obj.opt),
+            "batch": model_obj.batch,
+            "lr": model_obj.lr,
+            "mechMode": getattr(model_obj, "mechMode", None),
+            "scheduler": _mp_to_serializable(getattr(model_obj, "scheduler_cfg", None)),
+            "earlyStop": _model_earlystop_config(getattr(model_obj, "earlyStop", None)),
+            "w_init": _mp_to_serializable(getattr(model_obj, "w_init", None)),
+            "device": str(getattr(model_obj, "device", "")),
+        },
+    }
+
+def _model_build_inner_model(model_config):
+    class_name = str(model_config.get("class", "")).lower()
+    params = dict(model_config.get("params") or {})
+    if class_name == "mlp":
+        return MLP(**params)
+    if class_name == "transformer":
+        return Transformer(**params)
+    if class_name == "gnn":
+        return GNN(**params)
+    raise ValueError(f"Unsupported model class in JSON reload config: '{model_config.get('class')}'.")
+
+def _model_build_loss_from_config(loss_config):
+    if loss_config is None:
+        return nn.MSELoss()
+    if isinstance(loss_config, dict) and loss_config.get("kind") == "task_losses":
+        return {key: _model_build_loss_from_config(value) for key, value in loss_config.get("tasks", {}).items()}
+    if isinstance(loss_config, dict) and loss_config.get("kind") == "loss_list":
+        return [_model_build_loss_from_config(value) for value in loss_config.get("losses", [])]
+
+    if not isinstance(loss_config, dict):
+        raise TypeError("loss_config must be a dictionary.")
+
+    class_name = loss_config.get("class")
+    params = dict(loss_config.get("params") or {})
+    if class_name == "MSELoss":
+        return nn.MSELoss(**params)
+
+    from resources.MLfunc import (
+        CombinedCurveLoss,
+        QuantileLoss,
+        QuantileLossMATLAB,
+        WeightedCurveMSELoss,
+        CurveDerivativeLoss,
+        PeakStressLoss,
+        StrainEnergyLoss,
+        SoftPeakLocationLoss,
+    )
+
+    builders = {
+        "CombinedCurveLoss": CombinedCurveLoss,
+        "QuantileLoss": QuantileLoss,
+        "QuantileLossMATLAB": QuantileLossMATLAB,
+        "CustomQuantileLossMATLAB": QuantileLossMATLAB,
+        "WeightedCurveMSELoss": WeightedCurveMSELoss,
+        "CurveDerivativeLoss": CurveDerivativeLoss,
+        "PeakStressLoss": PeakStressLoss,
+        "StrainEnergyLoss": StrainEnergyLoss,
+        "SoftPeakLocationLoss": SoftPeakLocationLoss,
+    }
+    if class_name not in builders:
+        raise ValueError(f"Unsupported loss class in JSON reload config: '{class_name}'.")
+    return builders[class_name](**params)
+
+def _model_build_earlystop(config):
+    if config is None:
+        return None
+    if not isinstance(config, dict):
+        raise TypeError("earlyStop config must be None or a dictionary.")
+    if config.get("class") != "EarlyStopping":
+        raise ValueError(f"Unsupported earlyStop class in JSON reload config: '{config.get('class')}'.")
+    from resources.MLfunc import EarlyStopping
+    return EarlyStopping(**dict(config.get("params") or {}))
+
+def _model_json_path_and_checkpoint(json_path, model_path=None):
+    path = Path(json_path)
+    if path.suffix.lower() == ".mdl":
+        mdl_path = path
+        json_file = path.with_suffix(".json")
+    else:
+        json_file = path
+        mdl_path = Path(model_path) if model_path is not None else path.with_suffix(".mdl")
+    return json_file, mdl_path
+
+def _model_load_data_from_sidecar(json_file):
+    data_file = json_file.with_name(f"{json_file.stem}_data.json")
+    if not data_file.exists():
+        return None
+    from resources.MLdata import DATA
+    return DATA.from_json(data_file)
+
+def _model_from_json(
+    cls,
+    json_path,
+    data=None,
+    load_weights=True,
+    model_path=None,
+    device=None,
+    scan_matches_on_init=False,
+    **overrides,
+):
+    json_file, mdl_path = _model_json_path_and_checkpoint(json_path, model_path=model_path)
+    descriptor = json.loads(json_file.read_text(encoding="utf-8"))
+    reload_config = descriptor.get("reload_config")
+    if reload_config is None:
+        reload_config = _model_reload_config_from_legacy_descriptor(descriptor)
+
+    if data is None:
+        data = _model_load_data_from_sidecar(json_file)
+    if data is None:
+        raise ValueError(
+            "MODEL.from_json requires a DATA object or a matching '<model_name>_data.json' sidecar file."
+        )
+
+    training_config = dict(reload_config.get("training_config") or {})
+    training_config.update(overrides.pop("training_config", {}))
+
+    typ = overrides.pop("typ", reload_config.get("typ"))
+    model = overrides.pop("model", _model_build_inner_model(reload_config["model_config"]))
+    lossf = overrides.pop("lossf", _model_build_loss_from_config(reload_config.get("loss_config")))
+    opt = overrides.pop("opt", training_config.get("opt", ("adam", 0.0)))
+    batch = overrides.pop("batch", training_config.get("batch", 32))
+    lr = overrides.pop("lr", training_config.get("lr", 1e-3))
+    mechMode = overrides.pop("mechMode", training_config.get("mechMode", getattr(data, "mechMode", "both")))
+    scheduler = overrides.pop("scheduler", training_config.get("scheduler", None))
+    earlyStop = overrides.pop("earlyStop", _model_build_earlystop(training_config.get("earlyStop")))
+    w_init = overrides.pop("w_init", training_config.get("w_init", None))
+    if device is None:
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(device)
+
+    model_obj = cls(
+        typ=typ,
+        model=model.to(device),
+        lossf=lossf,
+        opt=opt,
+        batch=batch,
+        lr=lr,
+        data=data,
+        mechMode=mechMode,
+        scheduler=scheduler,
+        earlyStop=earlyStop,
+        w_init=w_init,
+        device=device,
+        scan_matches_on_init=scan_matches_on_init,
+        **overrides,
+    )
+    model_obj.descriptor = descriptor
+
+    if load_weights:
+        model_obj.load(model_path=str(mdl_path), require_descriptor_json=False)
+    return model_obj
+
+def _model_reload_config_from_legacy_descriptor(descriptor):
+    model_signature = descriptor.get("model_signature", {})
+    model_attrs = dict(model_signature.get("model_attrs") or {})
+    model_class = model_signature.get("model_class")
+    supported = {"MLP", "Transformer", "GNN"}
+    if model_class not in supported:
+        raise ValueError(
+            "This JSON does not contain reload_config and its legacy model_signature cannot be "
+            f"rebuilt automatically for model_class={model_class!r}."
+        )
+
+    allowed = {
+        "MLP": {"in_size", "h_size", "out_size", "act", "block", "norm", "dropout", "bias", "head_norm", "head_dropout"},
+        "Transformer": {
+            "in_size", "seq_len", "h_size", "out_size", "d_model", "n_heads", "n_layers", "ff_mult",
+            "token_size", "act", "encoder_act", "block", "norm", "dropout", "att_dropout",
+            "head_norm", "head_dropout", "bias", "pool", "use_cls_token", "pos_encoding",
+        },
+        "GNN": {
+            "in_size", "h_size", "out_size", "act", "block", "norm", "dropout", "att_dropout",
+            "head_norm", "head_dropout", "bias", "heads", "pool",
+        },
+    }[model_class]
+    params = {key: value for key, value in model_attrs.items() if key in allowed}
+    if "act" not in params:
+        params["act"] = "gelu" if model_class == "Transformer" else "relu"
+
+    losses = model_signature.get("losses") or ["MSELoss"]
+    loss_name = losses[0] if len(losses) == 1 else None
+    loss_config = {"class": "MSELoss", "params": {"reduction": "mean"}}
+    if loss_name == "QuantileLossMATLAB" or loss_name == "CustomQuantileLossMATLAB":
+        loss_config = {"class": "QuantileLossMATLAB", "params": {}}
+    elif loss_name == "QuantileLoss":
+        loss_config = {"class": "QuantileLoss", "params": {}}
+
+    early_stop_cfg = None
+    early_stop = model_signature.get("earlyStop")
+    if isinstance(early_stop, dict) and early_stop.get("class") == "EarlyStopping":
+        attrs = dict(early_stop.get("attrs") or {})
+        early_stop_cfg = {
+            "class": "EarlyStopping",
+            "params": {
+                "patience": attrs.get("patience", 20),
+                "min_delta": attrs.get("min_delta", 0.0),
+                "verbose": attrs.get("verbose", False),
+            },
+        }
+
+    return {
+        "typ": model_signature.get("typ", model_class),
+        "model_config": {"class": model_class, "params": params},
+        "loss_config": loss_config,
+        "training_config": {
+            "opt": (model_signature.get("optimizer") or {}).get("opt_cfg", ("adam", model_signature.get("weight_decay", 0.0))),
+            "batch": model_signature.get("batch", 32),
+            "lr": model_signature.get("lr", 1e-3),
+            "mechMode": model_signature.get("mechMode", "both"),
+            "scheduler": (model_signature.get("scheduler") or {}).get("scheduler_cfg"),
+            "earlyStop": early_stop_cfg,
+            "w_init": (model_signature.get("w_init") or {}).get("name"),
+        },
+    }
+
 def _model_refresh_descriptor(model_obj, path=None, name=None):
     metrics = {}
     for key in (
@@ -2023,6 +2480,7 @@ def _model_refresh_descriptor(model_obj, path=None, name=None):
         "coarse_setup_hash": _mp_json_sha1(coarse_signature),
         "exact_setup_signature": exact_signature,
         "exact_setup_hash": _mp_json_sha1(exact_signature),
+        "reload_config": _model_reload_config(model_obj),
         "metrics": metrics,
     }
     model_obj.descriptor["descriptor_created_at"] = datetime.datetime.now().isoformat(timespec="seconds")
@@ -2045,6 +2503,8 @@ def _model_scan_matching_checkpoints(model_obj, search_root="models", recursive=
 
     json_iter = root_dir.rglob("*.json") if recursive else root_dir.glob("*.json")
     for meta_file in json_iter:
+        if meta_file.name.endswith("_data.json") or meta_file.name in {"best_params.json", "best_trial_user_attrs.json"}:
+            continue
         try:
             with open(meta_file, "r", encoding="utf-8") as f:
                 metadata = json.load(f)
@@ -2204,6 +2664,8 @@ def _model_save_checkpoint(model_obj, path=None, name=None):
     torch.save(payload, model_file)
     with open(meta_file, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, sort_keys=True)
+    if getattr(model_obj, "data", None) is not None and hasattr(model_obj.data, "to_json"):
+        model_obj.data.to_json(os.path.join(path, f"{name}_data.json"))
     return model_file
 
 def _model_load_checkpoint(

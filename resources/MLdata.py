@@ -2,6 +2,9 @@
 from resources.calculations import calcUT, calcFT
 from resources.lattices import Geometry, effProperties
 
+import json
+from pathlib import Path
+
 from matplotlib.gridspec import GridSpec
 
 from torch.utils.data.dataset import Dataset
@@ -625,6 +628,7 @@ class DATA:
         scale=False,
         reduce_dim=False,
         round_decimals=None,
+        geom_feats=None,
         tr_params=None
     ):
         self.path = path
@@ -647,7 +651,11 @@ class DATA:
         self.model = model
         self.freq = freq
         self.round_decimals = None if round_decimals is None or round_decimals is False else int(round_decimals)
-        self.tr_params = _data_resolve_tr_params(tr_params)
+        self.geom_feats = _data_resolve_geom_feats(geom_feats=geom_feats, tr_params=tr_params)
+        self.tr_params = {
+            "geom_feats": self.geom_feats["enabled"],
+            "coord_norm": self.geom_feats["coord_norm"],
+        }
         
         _data_validate_preprocess_config(scale=scale, reduce_dim=reduce_dim)
 
@@ -700,6 +708,28 @@ class DATA:
             if self.reduce_dim:
                 self.reduceData()
             self.reshapeData()
+
+    def to_json(self, path=None, indent=2):
+        payload = _data_to_json_payload(self)
+        if path is None:
+            path = _data_default_json_path(self)
+
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload, indent=indent, sort_keys=True), encoding="utf-8")
+        return str(path)
+
+    @classmethod
+    def from_json(cls, path, **overrides):
+        path = Path(path)
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        config = payload.get("data_config", payload.get("config", payload))
+        if not isinstance(config, dict):
+            raise ValueError(f"DATA JSON at '{path}' does not contain a valid data_config dictionary.")
+
+        config = dict(config)
+        config.update(overrides)
+        return cls(**config)
 
     def calcGeom(self):
         self.geom = Geometry(LAT=self.LAT, l=10, nnx=self.nnx, nny=self.nny)
@@ -1110,7 +1140,7 @@ class DATA:
             x_min, x_max = np.min(x_raw), np.max(x_raw)
             y_min, y_max = np.min(y_raw), np.max(y_raw)
 
-            if self.tr_params["coord_norm"]:
+            if self.geom_feats["coord_norm"]:
                 x_span = x_max - x_min
                 y_span = y_max - y_min
                 x_ref = np.zeros_like(x_raw) if np.isclose(x_span, 0.0) else (x_raw - x_min) / x_span
@@ -1138,7 +1168,7 @@ class DATA:
 
         def _build_node_tokens(x, static_features, name):
             delta = _reshape_pairs(x, name)
-            if not self.tr_params["geom_feats"]:
+            if not self.geom_feats["enabled"]:
                 return delta
             if delta.shape[-2] != static_features.shape[0]:
                 raise ValueError(
@@ -1152,8 +1182,8 @@ class DATA:
 
         def _reshape_mode(mode):
             columns = _input_columns(mode, getattr(self, f"{mode}_train_in"))
-            static = _reference_features(mode, columns) if self.tr_params["geom_feats"] else None
-            if not self.tr_params["geom_feats"]:
+            static = _reference_features(mode, columns) if self.geom_feats["enabled"] else None
+            if not self.geom_feats["enabled"]:
                 feature_names = ["dx", "dy"]
                 setattr(self, f"{mode}_{feature_label}_feature_names", feature_names)
                 setattr(self, f"{mode}_node_feature_names", feature_names)
@@ -1168,6 +1198,94 @@ class DATA:
             _reshape_mode("FT")
 
 #DATA Helper Functions
+def _data_json_safe(value):
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, np.generic):
+        return value.item()
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, tuple):
+        return [_data_json_safe(v) for v in value]
+    if isinstance(value, list):
+        return [_data_json_safe(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _data_json_safe(v) for k, v in value.items()}
+    return str(value)
+
+def _data_constructor_config(data_obj):
+    geom_feats = getattr(data_obj, "geom_feats", None)
+    if isinstance(geom_feats, dict):
+        geom_feats_cfg = [
+            bool(geom_feats.get("enabled", False)),
+            bool(geom_feats.get("coord_norm", False)),
+        ]
+    else:
+        geom_feats_cfg = [False, False]
+
+    return {
+        "path": _data_json_safe(getattr(data_obj, "path", 1)),
+        "path_add": _data_json_safe(getattr(data_obj, "path_add", "")),
+        "load": bool(getattr(data_obj, "load", False)),
+        "load_split": _data_json_safe(getattr(data_obj, "load_split", False)),
+        "split_frac": _data_json_safe(getattr(data_obj, "split_frac", 0.8)),
+        "split_seed": _data_json_safe(getattr(data_obj, "split_seed", None)),
+        "range_split": _data_json_safe(getattr(data_obj, "range_split", (True, False))),
+        "save_split": bool(getattr(data_obj, "save_split", False)),
+        "LAT": _data_json_safe(getattr(data_obj, "LAT", "FCC")),
+        "nnx": _data_json_safe(getattr(data_obj, "nnx", None)),
+        "nny": _data_json_safe(getattr(data_obj, "nny", None)),
+        "dis": _data_json_safe(getattr(data_obj, "dis", "disNodes")),
+        "dN": _data_json_safe(getattr(data_obj, "dN", 20)),
+        "d_data": _data_json_safe(getattr(data_obj, "d_data", "all")),
+        "mechMode": _data_json_safe(getattr(data_obj, "mechMode", "MULTI")),
+        "nsims": _data_json_safe(getattr(data_obj, "nsims", None)),
+        "model": _data_json_safe(getattr(data_obj, "model", "MLP")),
+        "freq": bool(getattr(data_obj, "freq", False)),
+        "scale": _data_json_safe(getattr(data_obj, "scale", False)),
+        "reduce_dim": _data_json_safe(getattr(data_obj, "reduce_dim", False)),
+        "round_decimals": _data_json_safe(getattr(data_obj, "round_decimals", None)),
+        "geom_feats": geom_feats_cfg,
+    }
+
+def _data_shape_summary(data_obj):
+    shapes = {}
+    for key in (
+        "UT_train_in", "UT_train_out", "UT_val_in", "UT_val_out", "UT_test_in", "UT_test_out",
+        "FT_train_in", "FT_train_out", "FT_val_in", "FT_val_out", "FT_test_in", "FT_test_out",
+    ):
+        if hasattr(data_obj, key):
+            shapes[key] = list(np.shape(getattr(data_obj, key)))
+    return shapes
+
+def _data_to_json_payload(data_obj):
+    return {
+        "version": 1,
+        "class": "DATA",
+        "data_config": _data_constructor_config(data_obj),
+        "resolved": {
+            "range_split": _data_json_safe(getattr(data_obj, "range_split", None)),
+            "input_range_split": bool(getattr(data_obj, "input_range_split", False)),
+            "output_range_split": bool(getattr(data_obj, "output_range_split", False)),
+            "geom_feats": _data_json_safe(getattr(data_obj, "geom_feats", None)),
+            "UTmechTest": bool(getattr(data_obj, "UTmechTest", False)),
+            "FTmechTest": bool(getattr(data_obj, "FTmechTest", False)),
+        },
+        "shapes": _data_shape_summary(data_obj),
+    }
+
+def _data_default_json_path(data_obj):
+    from resources.MLmodels import _mp_data_descriptor
+
+    if getattr(data_obj, "path", None) == 0:
+        base = Path("models") / "Akash"
+    else:
+        ut = bool(getattr(data_obj, "UTmechTest", False))
+        ft = bool(getattr(data_obj, "FTmechTest", False))
+        task = "multi" if (ut and ft) else ("ut" if ut else ("ft" if ft else "other"))
+        base = Path("models") / task
+    return base / _mp_data_descriptor(data_obj) / "data.json"
+
 def _data_to_numpy(x):
     if hasattr(x, "to_numpy"):
         return x.to_numpy(copy=True)
@@ -1218,32 +1336,69 @@ def _data_resolve_range_split(range_split):
 
     raise TypeError("range_split must be bool, None, tuple/list like (input_range, output_range), or dict.")
 
-def _data_resolve_tr_params(tr_params):
-    defaults = {
-        "geom_feats": True,
-        "coord_norm": True,
-    }
-    if tr_params is None:
-        return defaults.copy()
-    if not isinstance(tr_params, dict):
-        raise TypeError("tr_params must be None or a dict such as {'geom_feats': True, 'coord_norm': True}.")
-
+def _data_resolve_geom_feats(geom_feats=None, tr_params=None):
     aliases = {
-        "geom_features": "geom_feats",
-        "geometry_features": "geom_feats",
-        "tr_geom_features": "geom_feats",
-        "tr_geom_feats": "geom_feats",
+        "enabled": "enabled",
+        "enable": "enabled",
+        "include": "enabled",
+        "include_geom": "enabled",
+        "geom": "enabled",
+        "geom_feat": "enabled",
+        "geom_feats": "enabled",
+        "geom_feature": "enabled",
+        "geom_features": "enabled",
+        "geometry_features": "enabled",
+        "tr_geom_features": "enabled",
+        "tr_geom_feats": "enabled",
+        "coord_norm": "coord_norm",
+        "coordnorm": "coord_norm",
         "normalize_coords": "coord_norm",
         "coord_normalize": "coord_norm",
         "tr_coord_norm": "coord_norm",
     }
-    resolved = defaults.copy()
-    for key, value in tr_params.items():
-        norm_key = aliases.get(str(key).lower(), str(key).lower())
-        if norm_key not in defaults:
-            raise ValueError(f"Unknown tr_params key '{key}'. Valid keys are {sorted(defaults)}.")
-        resolved[norm_key] = bool(value)
+
+    def _resolve(value, source_name, default=(False, False)):
+        if value is None:
+            enabled, coord_norm = default
+            return {"enabled": bool(enabled), "coord_norm": bool(coord_norm)}
+        if isinstance(value, bool):
+            return {"enabled": value, "coord_norm": value}
+        if isinstance(value, (list, tuple)):
+            if len(value) == 0:
+                return {"enabled": False, "coord_norm": False}
+            if len(value) > 2:
+                raise ValueError(f"{source_name} supports at most two booleans: (include_geom_features, normalize_coordinates).")
+            enabled = bool(value[0])
+            coord_norm = bool(value[1]) if len(value) > 1 else enabled
+            return {"enabled": enabled, "coord_norm": coord_norm}
+        if isinstance(value, dict):
+            resolved = {"enabled": bool(default[0]), "coord_norm": bool(default[1])}
+            for key, item in value.items():
+                norm_key = aliases.get(str(key).strip().lower(), str(key).strip().lower())
+                if norm_key not in resolved:
+                    raise ValueError(
+                        f"Unknown {source_name} key '{key}'. Valid keys refer to geometry features or coordinate normalization."
+                    )
+                resolved[norm_key] = bool(item)
+            if not resolved["enabled"]:
+                resolved["coord_norm"] = False
+            return resolved
+        raise TypeError(f"{source_name} must be None, bool, tuple/list, or dict.")
+
+    if geom_feats is not None:
+        resolved = _resolve(geom_feats, "geom_feats", default=(False, False))
+    elif tr_params is not None:
+        resolved = _resolve(tr_params, "tr_params", default=(False, False))
+    else:
+        resolved = {"enabled": False, "coord_norm": False}
+
+    if not resolved["enabled"]:
+        resolved["coord_norm"] = False
     return resolved
+
+def _data_resolve_tr_params(tr_params):
+    resolved = _data_resolve_geom_feats(geom_feats=None, tr_params=tr_params)
+    return {"geom_feats": resolved["enabled"], "coord_norm": resolved["coord_norm"]}
 
 def _data_limit_mode_samples(data_obj, mode):
     nsims = int(data_obj.nsims)

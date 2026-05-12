@@ -2151,7 +2151,18 @@ def make_hOpt_objective(
     device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     RMSEtarget=False,
     return_model=False,
+    save_best_model=False,
+    best_model_dir=None,
+    best_model_name="best_model",
 ):
+    def _is_new_best(trial, score):
+        best_previous = None
+        for old_trial in trial.study.get_trials(deepcopy=False, states=(optuna.trial.TrialState.COMPLETE,)):
+            if old_trial.number == trial.number or old_trial.value is None:
+                continue
+            best_previous = old_trial.value if best_previous is None else min(best_previous, old_trial.value)
+        return best_previous is None or score <= best_previous
+
     def _objective(trial):
         from resources.MLmodels import MODEL
 
@@ -2200,6 +2211,15 @@ def make_hOpt_objective(
         trial.set_user_attr("loss_params", loss_params)
         trial.set_user_attr("train_params", {k: v for k, v in train_params.items() if k != "earlyStop"})
         trial.set_user_attr("task_scores", values)
+        if save_best_model and best_model_dir is not None and _is_new_best(trial, score):
+            saved_model = _hopt_save_best_model(
+                model_instance,
+                save_dir=best_model_dir,
+                trial=trial,
+                score=score,
+                name=best_model_name,
+            )
+            trial.set_user_attr("best_model_checkpoint", saved_model)
         if return_model:
             trial.set_user_attr("model_instance", model_instance)
         return score
@@ -2308,6 +2328,29 @@ def hOpt(
     
     return study
 
+def _hopt_save_best_model(model_instance, save_dir, trial, score, name="best_model"):
+    os.makedirs(save_dir, exist_ok=True)
+    model_file = model_instance.save(path=save_dir, name=name)
+    meta_file = os.path.join(save_dir, f"{name}.json")
+
+    if os.path.exists(meta_file):
+        with open(meta_file, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+        metadata["save_context"] = "hpo_best_trial"
+        metadata["hpo_best_trial"] = {
+            "trial_number": int(trial.number),
+            "objective_value": float(score),
+            "params": _hopt_json_safe(trial.params),
+            "user_attrs": _hopt_json_safe({
+                key: value for key, value in trial.user_attrs.items()
+                if key != "model_instance"
+            }),
+        }
+        with open(meta_file, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, sort_keys=True)
+
+    return model_file
+
 def hOpt_model(
     typ,
     data,
@@ -2327,8 +2370,18 @@ def hOpt_model(
     RMSEtarget=False,
     show_progress_bar=False,
     study_dir=None,
+    save_best_model=None,
+    best_model_name="best_model",
 ):
     typ = str(typ).lower()
+    study_name = name if name is not None else f"{typ}_hOpt"
+    if save and study_dir is None and path is None:
+        study_dir = _hopt_model_study_dir(typ, data, study_name)
+    legacy_path = "models/etc" if path is None else path
+    save_dir = str(study_dir) if study_dir is not None else f"{legacy_path}/{study_name}/HPO"
+    if save_best_model is None:
+        save_best_model = bool(save)
+
     objective_fn = make_hOpt_objective(
         typ=typ,
         data=data,
@@ -2338,11 +2391,10 @@ def hOpt_model(
         mechMode=mechMode,
         device=device,
         RMSEtarget=RMSEtarget,
+        save_best_model=bool(save and save_best_model),
+        best_model_dir=save_dir if save else None,
+        best_model_name=best_model_name,
     )
-    study_name = name if name is not None else f"{typ}_hOpt"
-    if save and study_dir is None and path is None:
-        study_dir = _hopt_model_study_dir(typ, data, study_name)
-    legacy_path = "models/etc" if path is None else path
     return hOpt(
         objective_fn,
         n_trials=n_trials,
@@ -2375,6 +2427,8 @@ def hOpt_compare(
     n_jobs=1,
     RMSEtarget=False,
     show_progress_bar=False,
+    save_best_model=None,
+    best_model_name="best_model",
 ):
     studies = {}
     compare_study_base_dir = _hopt_compare_study_base_dir(typs, data, name) if save and path is None else None
@@ -2404,6 +2458,8 @@ def hOpt_compare(
             RMSEtarget=RMSEtarget,
             show_progress_bar=show_progress_bar,
             study_dir=study_dir,
+            save_best_model=save_best_model,
+            best_model_name=best_model_name,
         )
         studies[typ_key] = study
 
