@@ -1728,9 +1728,6 @@ def _mp_range_split_token(data):
     return f"in{_mp_bool_token(in_range)}-out{_mp_bool_token(out_range)}"
 
 def _mp_geom_feature_token(data):
-    model_name = str(getattr(data, "model", "")).lower()
-    if model_name not in ["tr", "gnn", "gcn", "gat"]:
-        return None
     geom_feats = getattr(data, "geom_feats", None)
     if isinstance(geom_feats, dict):
         enabled = bool(geom_feats.get("enabled", geom_feats.get("geom_feats", False)))
