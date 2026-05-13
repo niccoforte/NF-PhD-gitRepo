@@ -2,18 +2,19 @@
 #SBATCH -J ML_GPU_NEW
 #SBATCH -o %x.o%j
 #SBATCH -p gpushort
-#SBATCH -n 8
-#SBATCH --cpus-per-gpu=8
+#SBATCH -n 12
+#SBATCH --cpus-per-gpu=12
 #SBATCH -t 1:0:0
-#SBATCH --mem-per-cpu=11G
+#SBATCH --mem-per-cpu=7500M
 #SBATCH --gres=gpu:1
 
 # For gpu partition runs
 ##SBATCH -p gpu
 ##SBATCH -t 240:0:0
 # For andrena partitioin runs
-##SBATCH -p andrena
-##SBATCH -t 240:0:0
+#SBATCH -p andrena
+#SBATCH -A pilot_andrena
+#SBATCH -t 240:0:0
 ##SBATCH --exclusive   # for 4 GPUs, full A100 node.
 
 # Optional GPU type constraints:
