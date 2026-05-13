@@ -54,18 +54,13 @@ fi
 RUN_LABEL=${RUN_LABEL:-}
 
 # Conda/Mamba environment created beforehand on the cluster.
+# Create/update it with B0_ML-env-setup.sh when needed.
 # Leave empty to use the base Miniforge environment after module load.
 CONDA_ENV=${CONDA_ENV:-nf-ml-gpu}
-CREATE_CONDA_ENV=${CREATE_CONDA_ENV:-false}
-PYTHON_VERSION=${PYTHON_VERSION:-3.11}
-PYTORCH_INDEX_URL=${PYTORCH_INDEX_URL:-https://download.pytorch.org/whl/cu118}
-ML_ENV_EXTRA_PIP=${ML_ENV_EXTRA_PIP:-}
 
 # Data and archive locations. MLdata.py appends "MLdata/..." to DATA(path=...),
 # so DATA_ROOT must be the parent directory containing MLdata, not MLdata itself.
 # With this default, Python should use DATA(path=os.environ["ML_DATA_ROOT"], ...).
-# Optional automation: if Python writes JSON to os.environ["ML_RUN_METADATA"],
-# this script uses task/model_type/run_label to choose the final archive path.
 DATA_ROOT=${DATA_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 ARCHIVE_ROOT=${ARCHIVE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 PATH_EXTRA_PROVIDED=false
@@ -77,12 +72,10 @@ SUBMIT_P2_ROOT=${SUBMIT_P2_ROOT:-/data/home/$HPC_USER/p2}
 
 zip=false
 delete_scratch=true
-copy_data_to_scratch=false
 
 SCRATCH_DIR=/gpfs/scratch/$HPC_USER/$SLURM_JOB_ID
 ZIP_DIR=$SCRATCH_DIR/zip
 RESULT_DIR=$SCRATCH_DIR/results
-RUN_METADATA_FILE=$SCRATCH_DIR/run_metadata.json
 
 if [ "$#" -gt 0 ]; then
     if [ "$1" = "--" ]; then
@@ -93,6 +86,23 @@ if [ "$#" -gt 0 ]; then
     fi
 fi
 ML_ARGS=("$@")
+
+if [ "$RUN_LABEL_PROVIDED" = false ]; then
+    for ((i = 0; i < ${#ML_ARGS[@]}; i++)); do
+        case "${ML_ARGS[$i]}" in
+            --run-label=*)
+                RUN_LABEL=${ML_ARGS[$i]#--run-label=}
+                RUN_LABEL_PROVIDED=true
+                ;;
+            --run-label)
+                if [ $((i + 1)) -lt ${#ML_ARGS[@]} ]; then
+                    RUN_LABEL=${ML_ARGS[$((i + 1))]}
+                    RUN_LABEL_PROVIDED=true
+                fi
+                ;;
+        esac
+    done
+fi
 
 if [ -z "$RUN_LABEL" ]; then
     RUN_LABEL=$(basename "$ML_SCRIPT")
@@ -139,115 +149,11 @@ init_conda_shell() {
 }
 
 conda_env_exists() {
-    local pkg_manager=$1
-    "$pkg_manager" env list | awk '{print $1}' | grep -Fxq "$CONDA_ENV"
-}
-
-create_conda_env_if_requested() {
     if [ -z "$CONDA_ENV" ]; then
-        return
+        return 0
     fi
 
-    local pkg_manager=mamba
-    if ! command -v "$pkg_manager" >/dev/null 2>&1; then
-        pkg_manager=conda
-    fi
-
-    if ! command -v "$pkg_manager" >/dev/null 2>&1; then
-        /bin/echo "ERROR: neither mamba nor conda is available after module load."
-        exit 3
-    fi
-
-    if conda_env_exists "$pkg_manager"; then
-        /bin/echo "Using existing conda environment: $CONDA_ENV"
-        return
-    fi
-
-    if [ "$CREATE_CONDA_ENV" != true ]; then
-        /bin/echo "ERROR: Conda environment '$CONDA_ENV' does not exist."
-        /bin/echo "Available environments:"
-        "$pkg_manager" env list
-        /bin/echo ""
-        /bin/echo "Create it once with:"
-        /bin/echo "  cd $SLURM_SUBMIT_DIR"
-        /bin/echo "  CREATE_CONDA_ENV=true sbatch B1_ML-new.sh"
-        /bin/echo ""
-        /bin/echo "Or submit using an existing environment:"
-        /bin/echo "  CONDA_ENV=<env_name> sbatch B1_ML-new.sh"
-        exit 3
-    fi
-
-    /bin/echo "Creating conda environment: $CONDA_ENV"
-    "$pkg_manager" create -y -n "$CONDA_ENV" "python=$PYTHON_VERSION" pip
-
-    conda activate "$CONDA_ENV"
-    python -m pip install --upgrade pip setuptools wheel
-    python -m pip install \
-        "numpy>=1.26,<2" scipy matplotlib pandas numexpr bottleneck sympy openpyxl ipywidgets \
-        scikit-learn networkx optuna torchbnn
-    python -m pip install torch torchvision torchaudio --index-url "$PYTORCH_INDEX_URL"
-    python -m pip install torch-geometric torchinfo gpytorch "botorch>=0.10.0"
-
-    if [ -n "$ML_ENV_EXTRA_PIP" ]; then
-        python -m pip install $ML_ENV_EXTRA_PIP
-    fi
-}
-
-apply_run_metadata() {
-    if [ ! -f "$RUN_METADATA_FILE" ] || ! command -v python >/dev/null 2>&1; then
-        return
-    fi
-
-    local meta_assignments
-    meta_assignments=$(python - "$RUN_METADATA_FILE" <<'PY'
-import json
-import shlex
-import sys
-
-with open(sys.argv[1], "r", encoding="utf-8") as f:
-    meta = json.load(f)
-
-def get(*keys):
-    for key in keys:
-        value = meta.get(key)
-        if value is not None and str(value).strip() != "":
-            return str(value).strip()
-    return ""
-
-task = get("task", "target", "mechMode", "mech_mode").upper()
-model_type = get("model_type", "model", "typ").upper()
-path_extra = get("path_extra", "archive_subdir")
-if not path_extra and task and model_type:
-    path_extra = f"{task}/{model_type}"
-
-values = {
-    "META_PATH_EXTRA": path_extra,
-    "META_RUN_LABEL": get("run_label", "experiment", "name"),
-    "META_ARCHIVE_ROOT": get("archive_root"),
-}
-
-for key, value in values.items():
-    if value:
-        print(f"{key}={shlex.quote(value)}")
-PY
-)
-
-    if [ -n "$meta_assignments" ]; then
-        eval "$meta_assignments"
-    fi
-
-    if [ "$PATH_EXTRA_PROVIDED" = false ] && [ -n "${META_PATH_EXTRA:-}" ]; then
-        PATH_EXTRA=$META_PATH_EXTRA
-    fi
-    if [ "$RUN_LABEL_PROVIDED" = false ] && [ -n "${META_RUN_LABEL:-}" ]; then
-        RUN_LABEL=$META_RUN_LABEL
-    fi
-    if [ -n "${META_ARCHIVE_ROOT:-}" ]; then
-        ARCHIVE_ROOT=$META_ARCHIVE_ROOT
-    fi
-
-    ARCHIVE_DIR=$ARCHIVE_ROOT/${PATH_EXTRA:+$PATH_EXTRA/}$RUN_LABEL/$SLURM_JOB_ID
-    /bin/echo "Metadata archive path: $ARCHIVE_DIR"
+    conda env list | awk '{print $1}' | grep -Fxq "$CONDA_ENV"
 }
 
 sync_run_outputs() {
@@ -277,7 +183,6 @@ finish() {
     local status=$?
     set +e
 
-    apply_run_metadata
     /bin/echo "Archiving outputs at: $(date)"
     sync_run_outputs
 
@@ -318,8 +223,12 @@ mkdir -p "$RESULT_DIR"
 # Load required modules.
 module load miniforge
 init_conda_shell
-create_conda_env_if_requested
 if [ -n "$CONDA_ENV" ]; then
+    if ! conda_env_exists; then
+        /bin/echo "ERROR: Conda environment '$CONDA_ENV' does not exist."
+        /bin/echo "Create/update it with: bash $ML_CODE_DIR/B0_ML-env-setup.sh"
+        exit 3
+    fi
     conda activate "$CONDA_ENV"
 fi
 
@@ -328,7 +237,6 @@ export MPLBACKEND=Agg
 export PYTHONPATH=$SCRATCH_DIR:${PYTHONPATH:-}
 export ML_DATA_ROOT=$DATA_ROOT
 export ML_RESULTS_DIR=$RESULT_DIR
-export ML_RUN_METADATA=$RUN_METADATA_FILE
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_GPU:-$SLURM_NTASKS}
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
@@ -351,12 +259,6 @@ fi
 # Copy only the shared framework and the one run-specific script to scratch.
 rsync -av "$REPO_ROOT/resources/" "$SCRATCH_DIR/resources/"
 rsync -av "$SCRIPT_SRC" "$SCRIPT_LOCAL"
-
-if [ "$copy_data_to_scratch" = true ]; then
-    mkdir -p "$SCRATCH_DIR/data"
-    rsync -av "$DATA_ROOT/" "$SCRATCH_DIR/data/"
-    export ML_DATA_ROOT=$SCRATCH_DIR/data
-fi
 
 cd "$SCRATCH_DIR"
 /bin/echo "Working in scratch directory: $(pwd)"
