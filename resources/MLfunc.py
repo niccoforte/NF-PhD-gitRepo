@@ -1700,7 +1700,6 @@ def _coerce_curve_x_values(x_values):
 
 
 ### Plotting Functions
-
 def plot_loss(epoch, train, val=None):
     fig = plt.figure(figsize=(10, 5))
     plt.plot(np.linspace(1, epoch, len(train)), train, label="Training", c="darkblue")
@@ -1766,7 +1765,6 @@ def plot_Distribution(train_in1, test_outputs, truth=None, typ="contour"):
 
 
 ### GNN Functions
-
 def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
     for batch in loader:
         dat = batch.get_example(0)
