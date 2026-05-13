@@ -35,7 +35,6 @@ from torch_geometric.nn import GCNConv, GATConv, global_mean_pool, global_add_po
 from torchinfo import summary
 from sklearn.gaussian_process import GaussianProcessRegressor as GPR
 
-from torch.serialization import safe_globals
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
 from botorch.optim import optimize_acqf
@@ -109,7 +108,7 @@ class MODEL:
         if scan_matches_on_init:
             self.match_scan = _model_scan_matching_checkpoints(
                 self,
-                search_root="models",
+                search_root=None,
                 recursive=True,
                 print_results=True,
             )
@@ -242,7 +241,7 @@ class MODEL:
                 zone_boundaries=zone_boundaries,
             )
 
-    def _predict_mode( #???
+    def _predict_mode(
         self,
         mode,
         loader,
@@ -321,6 +320,9 @@ class MODEL:
                              d_out=False)
             plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=worst,
                              d_out=False)
+
+        if getattr(self, "save_dir", None) is not None:
+            _model_save_results(self, eval_split=split)
 
         return outputs, truth
 
@@ -484,7 +486,7 @@ class MODEL:
     def find_matching_checkpoint(self, path=None, strict=True):
         return _model_find_matching_checkpoint(self, path=path, strict=strict)
 
-    def scan_matching_checkpoints(self, search_root="models", recursive=True, print_results=True):
+    def scan_matching_checkpoints(self, search_root=None, recursive=True, print_results=True):
         self.match_scan = _model_scan_matching_checkpoints(
             self,
             search_root=search_root,
@@ -495,6 +497,15 @@ class MODEL:
 
     def save(self, path=None, name=None):
         return _model_save_checkpoint(self, path=path, name=name)
+
+    def save_results(self, path=None, run_config=None, eval_split="test", metadata=None):
+        return _model_save_results(
+            self,
+            path=path,
+            run_config=run_config,
+            eval_split=eval_split,
+            metadata=metadata,
+        )
 
     def to_json(self, path=None, indent=2):
         metadata = _model_refresh_descriptor(self)
@@ -1533,11 +1544,11 @@ def _model_scheduler(optimizer, scheduler):
         _, mode, factor, patience, threshold = scheduler[:5]
     elif name in ["min", "max"]:
         if len(scheduler) < 4:
-            raise ValueError("legacy plateau scheduler must be (mode, factor, patience, threshold).")
+            raise ValueError("plateau scheduler shorthand must be (mode, factor, patience, threshold).")
         mode, factor, patience, threshold = scheduler[:4]
     else:
         raise ValueError(
-            "Unsupported scheduler configuration. Use legacy (mode, factor, patience, threshold) "
+            "Unsupported scheduler configuration. Use shorthand (mode, factor, patience, threshold) "
             "or explicit ('plateau', mode, factor, patience, threshold)."
         )
 
@@ -1694,26 +1705,6 @@ def _mp_format_num(value):
         return f"{val:.1e}"
     return f"{val:.4g}"
 
-def _mp_format_filename_num(value):
-    try:
-        from decimal import Decimal, InvalidOperation
-        try:
-            dec = Decimal(str(value))
-        except InvalidOperation:
-            return str(value)
-    except Exception:
-        return str(value)
-
-    if dec == dec.to_integral_value():
-        return str(int(dec))
-
-    sign = "m" if dec < 0 else ""
-    text = format(abs(dec).normalize(), "f")
-    if "." in text:
-        whole, frac = text.split(".", 1)
-        text = f"{whole}{frac.rstrip('0')}"
-    return f"{sign}{text}"
-
 def _mp_bool_token(value):
     return "True" if bool(value) else "False"
 
@@ -1806,6 +1797,81 @@ def _mp_data_descriptor(data, model_obj=None):
 
     return "_".join(parts) if parts else "data-default"
 
+def _mp_run_root():
+    root = os.environ.get("ML_RUN_ROOT")
+    if root is None or str(root).strip() == "":
+        root = "Z:/p2" if os.name == "nt" else "/data/SEMS-TaoLab/Niccolo-Forte/p2"
+    return Path(root)
+
+def _mp_archive_root():
+    root = os.environ.get("ML_ARCHIVE_ROOT")
+    if root is None or str(root).strip() == "":
+        return None
+    return Path(root)
+
+def _mp_archive_path(path):
+    archive_root = _mp_archive_root()
+    if archive_root is None or path is None:
+        return None
+    path = Path(path)
+    try:
+        return str(archive_root / path.relative_to(_mp_run_root()))
+    except ValueError:
+        return None
+
+def _mp_task_token(data):
+    ut = bool(getattr(data, "UTmechTest", False))
+    ft = bool(getattr(data, "FTmechTest", False))
+    if ut and ft:
+        return "MULTI"
+    if ut:
+        return "UT"
+    if ft:
+        return "FT"
+    mech_mode = str(getattr(data, "mechMode", "OTHER")).strip().upper()
+    return mech_mode if mech_mode else "OTHER"
+
+def _mp_model_type_token(model_obj=None, typ=None, model=None):
+    if typ is None and model_obj is not None:
+        typ = getattr(model_obj, "typ", None)
+    if model is None and model_obj is not None:
+        model = getattr(model_obj, "model", None)
+    typ = str(typ or "").lower()
+    block = str(getattr(model, "block", "")).lower()
+    if typ in ["gnn", "gcn", "gat"] and block in ["gcn", "gat"]:
+        token = block
+    else:
+        token = typ or block or "model"
+    return _mp_slugify(token, default="model", preserve_case=True).upper()
+
+def _mp_run_context_prefix():
+    raw = str(os.environ.get("ML_RUN_CONTEXT", "")).strip().lower()
+    return "HPC-" if raw == "hpc" else ""
+
+def _mp_run_descriptor(model_obj, name=None):
+    if name is not None and str(name).strip():
+        return _mp_slugify(name, max_len=96, preserve_case=True)
+    data = getattr(model_obj, "data", None)
+    task = _mp_task_token(data).lower()
+    model_type = _mp_model_type_token(model_obj).lower()
+    timestamp = datetime.datetime.now().strftime("%y%m%d-%H%M%S")
+    return f"{_mp_run_context_prefix()}{task}-{model_type}-{timestamp}"
+
+def _mp_model_base_dir(model_obj):
+    data = getattr(model_obj, "data", None)
+    if data is None:
+        raise ValueError("MODEL save/load requires model_obj.data to build the ML run path.")
+    return _mp_run_root() / _mp_task_token(data) / _mp_data_descriptor(data, model_obj=model_obj) / _mp_model_type_token(model_obj)
+
+def _mp_latest_run_dir(model_obj):
+    base = _mp_model_base_dir(model_obj)
+    if not base.exists():
+        raise FileNotFoundError(f"Model run base directory does not exist: {base}")
+    run_dirs = [p for p in base.iterdir() if p.is_dir() and p.name != "HPO"]
+    if not run_dirs:
+        raise FileNotFoundError(f"No model run directories found in: {base}")
+    return sorted(run_dirs, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+
 def _mp_to_serializable(value):
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
@@ -1819,6 +1885,23 @@ def _mp_to_serializable(value):
         return [_mp_to_serializable(v) for v in value]
     if isinstance(value, dict):
         return {str(k): _mp_to_serializable(v) for k, v in value.items()}
+    return str(value)
+
+def _mp_result_serializable(value):
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, np.generic):
+        return value.item()
+    if torch.is_tensor(value):
+        return value.detach().cpu().tolist()
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [_mp_result_serializable(v) for v in value]
+    if isinstance(value, dict):
+        return {str(k): _mp_result_serializable(v) for k, v in value.items()}
     return str(value)
 
 def _mp_component_signature(component):
@@ -2016,30 +2099,10 @@ def _mp_build_setup_signature(model_obj, include_data_values=True):
         signature["data_value_fingerprints"] = fp
     return signature
 
-def _mp_resolve_model_dir(model_obj, path):
+def _mp_resolve_model_dir(model_obj, path=None, name=None):
     if path is None:
-        data = getattr(model_obj, "data", None)
-        typ = str(getattr(model_obj, "typ", "")).lower()
-        block = str(getattr(model_obj.model, "block", "")).lower()
-        model_type = block if typ in ["gnn", "gcn", "gat"] and block in ["gcn", "gat"] else typ
-        model_type = _mp_slugify(model_type, default="model")
-        if data is None:
-            data_desc = "data-default"
-        else:
-            data_desc = _mp_data_descriptor(data, model_obj=model_obj)
-
-        if data is not None and getattr(data, "path", None) == 0:
-            return os.path.join("models", "Akash", data_desc, model_type)
-        ut = bool(getattr(data, "UTmechTest", False))
-        ft = bool(getattr(data, "FTmechTest", False))
-        task = "multi" if (ut and ft) else ("ut" if ut else ("ft" if ft else "other"))
-        return os.path.join("models", task, data_desc, model_type)
-    path = str(path)
-    if os.path.isabs(path):
-        return path
-    if path.startswith("models") or path.startswith("models/") or path.startswith("models\\"):
-        return path
-    return os.path.join("models", path)
+        return _mp_model_base_dir(model_obj) / _mp_run_descriptor(model_obj, name=name)
+    return Path(path)
 
 def _model_tensor_values(value):
     if torch.is_tensor(value):
@@ -2159,7 +2222,7 @@ def _model_loss_to_config(lossf):
         }
         return {"class": class_name, "params": params}
 
-    if class_name in ["QuantileLoss", "QuantileLossMATLAB", "CustomQuantileLossMATLAB"]:
+    if class_name in ["QuantileLoss", "QuantileLossMATLAB"]:
         params = {
             "quantiles": _model_tensor_values(getattr(lossf, "quantiles", None)),
             "zone_boundaries": _mp_to_serializable(getattr(lossf, "zone_boundaries", None)),
@@ -2289,7 +2352,6 @@ def _model_build_loss_from_config(loss_config):
         "CombinedCurveLoss": CombinedCurveLoss,
         "QuantileLoss": QuantileLoss,
         "QuantileLossMATLAB": QuantileLossMATLAB,
-        "CustomQuantileLossMATLAB": QuantileLossMATLAB,
         "WeightedCurveMSELoss": WeightedCurveMSELoss,
         "CurveDerivativeLoss": CurveDerivativeLoss,
         "PeakStressLoss": PeakStressLoss,
@@ -2341,7 +2403,7 @@ def _model_from_json(
     descriptor = json.loads(json_file.read_text(encoding="utf-8"))
     reload_config = descriptor.get("reload_config")
     if reload_config is None:
-        reload_config = _model_reload_config_from_legacy_descriptor(descriptor)
+        raise ValueError(f"MODEL JSON does not contain reload_config: {json_file}")
 
     if data is None:
         data = _model_load_data_from_sidecar(json_file)
@@ -2389,69 +2451,6 @@ def _model_from_json(
         model_obj.load(model_path=str(mdl_path), require_descriptor_json=False)
     return model_obj
 
-def _model_reload_config_from_legacy_descriptor(descriptor):
-    model_signature = descriptor.get("model_signature", {})
-    model_attrs = dict(model_signature.get("model_attrs") or {})
-    model_class = model_signature.get("model_class")
-    supported = {"MLP", "Transformer", "GNN"}
-    if model_class not in supported:
-        raise ValueError(
-            "This JSON does not contain reload_config and its legacy model_signature cannot be "
-            f"rebuilt automatically for model_class={model_class!r}."
-        )
-
-    allowed = {
-        "MLP": {"in_size", "h_size", "out_size", "act", "block", "norm", "dropout", "bias", "head_norm", "head_dropout"},
-        "Transformer": {
-            "in_size", "seq_len", "h_size", "out_size", "d_model", "n_heads", "n_layers", "ff_mult",
-            "token_size", "act", "encoder_act", "block", "norm", "dropout", "att_dropout",
-            "head_norm", "head_dropout", "bias", "pool", "use_cls_token", "pos_encoding",
-        },
-        "GNN": {
-            "in_size", "h_size", "out_size", "act", "block", "norm", "dropout", "att_dropout",
-            "head_norm", "head_dropout", "bias", "heads", "pool",
-        },
-    }[model_class]
-    params = {key: value for key, value in model_attrs.items() if key in allowed}
-    if "act" not in params:
-        params["act"] = "gelu" if model_class == "Transformer" else "relu"
-
-    losses = model_signature.get("losses") or ["MSELoss"]
-    loss_name = losses[0] if len(losses) == 1 else None
-    loss_config = {"class": "MSELoss", "params": {"reduction": "mean"}}
-    if loss_name == "QuantileLossMATLAB" or loss_name == "CustomQuantileLossMATLAB":
-        loss_config = {"class": "QuantileLossMATLAB", "params": {}}
-    elif loss_name == "QuantileLoss":
-        loss_config = {"class": "QuantileLoss", "params": {}}
-
-    early_stop_cfg = None
-    early_stop = model_signature.get("earlyStop")
-    if isinstance(early_stop, dict) and early_stop.get("class") == "EarlyStopping":
-        attrs = dict(early_stop.get("attrs") or {})
-        early_stop_cfg = {
-            "class": "EarlyStopping",
-            "params": {
-                "patience": attrs.get("patience", 20),
-                "min_delta": attrs.get("min_delta", 0.0),
-                "verbose": attrs.get("verbose", False),
-            },
-        }
-
-    return {
-        "typ": model_signature.get("typ", model_class),
-        "model_config": {"class": model_class, "params": params},
-        "loss_config": loss_config,
-        "training_config": {
-            "opt": (model_signature.get("optimizer") or {}).get("opt_cfg", ("adam", model_signature.get("weight_decay", 0.0))),
-            "batch": model_signature.get("batch", 32),
-            "lr": model_signature.get("lr", 1e-3),
-            "mechMode": model_signature.get("mechMode", "both"),
-            "scheduler": (model_signature.get("scheduler") or {}).get("scheduler_cfg"),
-            "earlyStop": early_stop_cfg,
-            "w_init": (model_signature.get("w_init") or {}).get("name"),
-        },
-    }
-
 def _model_refresh_descriptor(model_obj, path=None, name=None):
     metrics = {}
     for key in (
@@ -2480,11 +2479,26 @@ def _model_refresh_descriptor(model_obj, path=None, name=None):
         "reload_config": _model_reload_config(model_obj),
         "metrics": metrics,
     }
+    try:
+        data = getattr(model_obj, "data", None)
+        model_obj.descriptor["run_layout"] = {
+            "root": str(_mp_run_root()),
+            "archive_root": str(_mp_archive_root()) if _mp_archive_root() is not None else None,
+            "task": _mp_task_token(data),
+            "data_descriptor": _mp_data_descriptor(data, model_obj=model_obj),
+            "model": _mp_model_type_token(model_obj),
+            "run_descriptor": Path(path).name if path is not None else None,
+            "results_dir": str(Path(path) / "results") if path is not None else None,
+            "archive_run_dir": _mp_archive_path(path),
+            "archive_results_dir": _mp_archive_path(Path(path) / "results") if path is not None else None,
+        }
+    except Exception:
+        pass
     model_obj.descriptor["descriptor_created_at"] = datetime.datetime.now().isoformat(timespec="seconds")
     return model_obj.descriptor
 
-def _model_scan_matching_checkpoints(model_obj, search_root="models", recursive=True, print_results=True):
-    root_dir = Path(search_root)
+def _model_scan_matching_checkpoints(model_obj, search_root=None, recursive=True, print_results=True):
+    root_dir = Path(search_root) if search_root is not None else _mp_model_base_dir(model_obj)
     matches = {"strict": [], "coarse": []}
     if not root_dir.exists():
         if print_results:
@@ -2542,9 +2556,7 @@ def _model_scan_matching_checkpoints(model_obj, search_root="models", recursive=
     return matches
 
 def _model_find_matching_checkpoint(model_obj, path=None, strict=True, recursive=True):
-    search_roots = [Path(_mp_resolve_model_dir(model_obj, path))]
-    if path is None:
-        search_roots.append(Path("models"))
+    search_roots = [Path(path)] if path is not None else [Path(_mp_model_base_dir(model_obj))]
 
     matches = {"strict": [], "coarse": []}
     seen_roots = set()
@@ -2570,80 +2582,16 @@ def _model_find_matching_checkpoint(model_obj, path=None, strict=True, recursive
     candidates = sorted(candidates, key=lambda p: Path(p).stat().st_mtime, reverse=True)
     return candidates[0]
 
-def _mp_loss_filename_token(model_obj):
-    losses = []
-    if hasattr(model_obj, "losses"):
-        for lf in model_obj.losses:
-            losses.append(getattr(lf, "__class__", type(lf)).__name__)
-    losses = list(dict.fromkeys(losses))
-    return f"loss-{_mp_slugify('-'.join(losses) if losses else 'None', max_len=48, preserve_case=True)}"
-
-def _mp_early_stop_filename_token(model_obj):
-    es = getattr(model_obj, "earlyStop", None)
-    if es is None:
-        return "earlyStop-None"
-    patience = getattr(es, "patience", None)
-    if patience is not None:
-        return f"earlyStop-patience{_mp_slugify(patience, max_len=16, preserve_case=True)}"
-    return f"earlyStop-{_mp_slugify(es.__class__.__name__, max_len=24, preserve_case=True)}"
-
-def _mp_w_init_filename_token(model_obj):
-    w_init = getattr(model_obj, "w_init", None)
-    if not w_init:
-        return "wInit-None"
-    raw = "Auto" if isinstance(w_init, str) and w_init.lower() == "auto" else w_init
-    return f"wInit-{_mp_slugify(raw, max_len=24, preserve_case=True)}"
-
-def _mp_scheduler_filename_token(model_obj):
-    sch_cfg = getattr(model_obj, "scheduler_cfg", None)
-    if sch_cfg is None or sch_cfg is False:
-        return "sch-None"
-    if isinstance(sch_cfg, (list, tuple)) and len(sch_cfg) >= 3:
-        sch_name = str(sch_cfg[0]).strip().lower()
-        if sch_name in ["plateau", "reduce", "reduce_on_plateau", "reducelronplateau"] and len(sch_cfg) >= 5:
-            mode_raw, factor_raw, patience_raw, threshold_raw = sch_cfg[1], sch_cfg[2], sch_cfg[3], sch_cfg[4]
-        else:
-            mode_raw, factor_raw, patience_raw = sch_cfg[0], sch_cfg[1], sch_cfg[2]
-            threshold_raw = sch_cfg[3] if len(sch_cfg) >= 4 else None
-        parts = [
-            "sch",
-            _mp_slugify(str(mode_raw).strip().lower(), max_len=16),
-            _mp_slugify(_mp_format_filename_num(factor_raw), max_len=16),
-            _mp_slugify(patience_raw, max_len=16, preserve_case=True),
-        ]
-        if threshold_raw is not None:
-            parts.append(_mp_slugify(_mp_format_filename_num(threshold_raw), max_len=16))
-        return "-".join(parts)
-    return "sch-Custom"
-
 def _model_save_checkpoint(model_obj, path=None, name=None):
-    path = _mp_resolve_model_dir(model_obj, path)
-    os.makedirs(path, exist_ok=True)
-    if name is None:
-        lr_tok = f"lr-{_mp_slugify(_mp_format_filename_num(model_obj.lr), max_len=16)}"
-        b_tok = f"batch-{_mp_slugify(model_obj.batch, max_len=16)}"
-        weight_decay = _mp_weight_decay(model_obj)
-        wd_tok = f"wd-{_mp_slugify(_mp_format_filename_num(weight_decay), default='na', max_len=16)}"
-        opt_name = "opt-None"
-        ut_opt = getattr(model_obj, "UT_opt", None)
-        ft_opt = getattr(model_obj, "FT_opt", None)
-        primary_opt_name = ut_opt.__class__.__name__ if ut_opt is not None else (ft_opt.__class__.__name__ if ft_opt is not None else None)
-        if primary_opt_name is not None:
-            opt_name = f"opt-{_mp_slugify(primary_opt_name, max_len=12, preserve_case=True)}"
-        sch_tok = _mp_scheduler_filename_token(model_obj)
-        es_tok = _mp_early_stop_filename_token(model_obj)
-        wi_tok = _mp_w_init_filename_token(model_obj)
-        loss_tok = _mp_loss_filename_token(model_obj)
-        cfg = {"model": _mp_collect_model_signature(model_obj), "data": _mp_collect_data_signature(model_obj)}
-        cfg_hash = _mp_json_sha1(cfg)[:8]
-        ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-        parts = [f"date-{ts}", opt_name, lr_tok, b_tok, wd_tok, loss_tok, es_tok, wi_tok, sch_tok, f"setupHash-{cfg_hash}"]
-        name = "_".join(parts)
-    name = str(name)
-    if name.endswith(".mdl"):
-        name = name[:-4]
+    save_dir = Path(_mp_resolve_model_dir(model_obj, path=path, name=name if path is None else None))
+    save_dir.mkdir(parents=True, exist_ok=True)
 
-    metadata = _model_refresh_descriptor(model_obj, path=path, name=name)
+    file_stem = "model" if path is None else (name or "model")
+    file_stem = str(file_stem)
+    if file_stem.endswith(".mdl"):
+        file_stem = file_stem[:-4]
+
+    metadata = _model_refresh_descriptor(model_obj, path=str(save_dir), name=file_stem)
     payload = {"version": 2}
     if hasattr(model_obj, "UT_model"):
         payload["UT_model_state_dict"] = model_obj.UT_model.state_dict()
@@ -2656,14 +2604,128 @@ def _model_save_checkpoint(model_obj, path=None, name=None):
     else:
         payload["model_state_dict"] = model_obj.model.state_dict()
     payload["metadata"] = metadata
-    model_file = os.path.join(path, f"{name}.mdl")
-    meta_file = os.path.join(path, f"{name}.json")
+    model_file = save_dir / f"{file_stem}.mdl"
+    meta_file = save_dir / f"{file_stem}.json"
     torch.save(payload, model_file)
     with open(meta_file, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, sort_keys=True)
     if getattr(model_obj, "data", None) is not None and hasattr(model_obj.data, "to_json"):
-        model_obj.data.to_json(os.path.join(path, f"{name}_data.json"))
-    return model_file
+        model_obj.data.to_json(save_dir / f"{file_stem}_data.json")
+
+    model_obj.save_dir = str(save_dir)
+    model_obj.model_file = str(model_file)
+    model_obj.run_descriptor = save_dir.name
+    model_obj.results_dir = str(save_dir / "results")
+    _model_save_results(model_obj, eval_split="test")
+    return str(model_file)
+
+def _model_active_modes(model_obj):
+    data = getattr(model_obj, "data", None)
+    modes = []
+    for mode in ("UT", "FT"):
+        if bool(getattr(data, f"{mode}mechTest", False)):
+            modes.append(mode)
+    return modes
+
+def _model_split_size_summary(model_obj):
+    data = getattr(model_obj, "data", None)
+    split_sizes = {}
+    for mode in _model_active_modes(model_obj):
+        split_sizes[mode] = {}
+        for split in ("train", "val", "test"):
+            value = getattr(data, f"{mode}_{split}_in", None)
+            split_sizes[mode][split] = int(len(value)) if value is not None else None
+    return split_sizes
+
+def _model_prediction_attr(model_obj, mode, split, kind):
+    attr = f"{mode}_{split}_{kind}"
+    value = getattr(model_obj, attr, None)
+    if value is None and split == "test":
+        fallback = f"{mode}_{'truth' if kind == 'truth' else 'test_outputs'}"
+        value = getattr(model_obj, fallback, None)
+    return value
+
+def _model_save_results(model_obj, path=None, run_config=None, eval_split="test", metadata=None):
+    if path is None:
+        save_dir = getattr(model_obj, "save_dir", None)
+        if save_dir is None:
+            raise ValueError("Call MODEL.save() before MODEL.save_results(), or pass path explicitly.")
+        results_dir = Path(save_dir) / "results"
+    else:
+        results_dir = Path(path)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    eval_split = str(eval_split).lower()
+    metrics = {
+        "saved_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "model_file": getattr(model_obj, "model_file", None),
+        "run_dir": getattr(model_obj, "save_dir", None),
+        "archive_run_dir": _mp_archive_path(getattr(model_obj, "save_dir", None)),
+        "results_dir": str(results_dir),
+        "archive_results_dir": _mp_archive_path(results_dir),
+        "run_descriptor": getattr(model_obj, "run_descriptor", None),
+        "device": str(getattr(model_obj, "device", None)),
+        "model_type": _mp_model_type_token(model_obj),
+        "run_config": _mp_result_serializable(run_config or {}),
+        "metadata": _mp_result_serializable(metadata or {}),
+        "split_sizes": _model_split_size_summary(model_obj),
+        "evaluation_split": eval_split,
+    }
+
+    for mode in _model_active_modes(model_obj):
+        for key in ("best_epoch", "best_loss", "best_mse", "best_rmse"):
+            attr = f"{mode}_{key}"
+            if hasattr(model_obj, attr):
+                metrics[attr] = _mp_result_serializable(getattr(model_obj, attr))
+        for key in ("mae", "mse", "rmse", "mean_sum_abs_err", "best", "worst"):
+            attr = f"{mode}_{key}" if eval_split == "test" else f"{mode}_{eval_split}_{key}"
+            if hasattr(model_obj, attr):
+                metrics[attr] = _mp_result_serializable(getattr(model_obj, attr))
+
+        summary = getattr(model_obj, f"{mode}_prediction_summary", None)
+        diag = getattr(model_obj, f"{mode}_{eval_split}_diagnostics", None)
+        if summary is None and isinstance(diag, dict):
+            summary = diag.get("summary")
+        if summary is not None:
+            metrics[f"{mode}_prediction_summary"] = _mp_result_serializable(summary)
+
+    with open(results_dir / "metrics.json", "w", encoding="utf-8") as f:
+        json.dump(metrics, f, indent=2, sort_keys=True)
+
+    predictions = {}
+    for mode in _model_active_modes(model_obj):
+        outputs = _model_prediction_attr(model_obj, mode, eval_split, "outputs")
+        truth = _model_prediction_attr(model_obj, mode, eval_split, "truth")
+        if outputs is not None:
+            predictions[f"{mode}_{eval_split}_outputs"] = np.asarray(outputs)
+        if truth is not None:
+            predictions[f"{mode}_{eval_split}_truth"] = np.asarray(truth)
+    if predictions:
+        np.savez(results_dir / "predictions.npz", **predictions)
+
+    diag_summary = {}
+    for mode in _model_active_modes(model_obj):
+        diag = getattr(model_obj, f"{mode}_{eval_split}_diagnostics", None)
+        if diag is None and eval_split == "test":
+            diag = getattr(model_obj, f"{mode}_diagnostics", None)
+        if not isinstance(diag, dict):
+            continue
+        if "summary" in diag:
+            diag_summary[mode] = _mp_result_serializable(diag["summary"])
+        for key, suffix in (
+            ("sample_metrics", "sample_metrics"),
+            ("point_metrics", "point_metrics"),
+            ("zone_metrics", "zone_metrics"),
+        ):
+            value = diag.get(key)
+            if hasattr(value, "to_csv"):
+                value.to_csv(results_dir / f"{mode}_{eval_split}_{suffix}.csv", index=True)
+    if diag_summary:
+        with open(results_dir / "diagnostics_summary.json", "w", encoding="utf-8") as f:
+            json.dump(diag_summary, f, indent=2, sort_keys=True)
+
+    model_obj.results_dir = str(results_dir)
+    return str(results_dir)
 
 def _model_load_checkpoint(
     model_obj,
@@ -2677,9 +2739,11 @@ def _model_load_checkpoint(
     if model_path is not None and str(model_path).lower().endswith(".mdl"):
         model_file = Path(model_path)
     else:
-        model_dir = Path(_mp_resolve_model_dir(model_obj, model_path))
+        if model_path is None:
+            model_dir = Path(_mp_model_base_dir(model_obj))
+        else:
+            model_dir = Path(model_path)
         if match_current:
-            # With no explicit directory, match search also scans models/ for older naming layouts.
             matched = _model_find_matching_checkpoint(
                 model_obj,
                 path=model_path,
@@ -2689,11 +2753,11 @@ def _model_load_checkpoint(
             if matched is not None:
                 model_file = Path(matched)
             elif fallback_to_latest:
-                # Fallback is constrained to the provided/default lowest-level descriptor directory only.
-                candidates = sorted(model_dir.glob("*.mdl"), key=lambda p: p.stat().st_mtime, reverse=True)
+                latest_dir = _mp_latest_run_dir(model_obj) if model_path is None else model_dir
+                candidates = sorted(latest_dir.glob("*.mdl"), key=lambda p: p.stat().st_mtime, reverse=True)
                 if len(candidates) == 0:
                     raise FileNotFoundError(
-                        f"No model checkpoints found in '{model_dir}'. "
+                        f"No model checkpoints found in '{latest_dir}'. "
                         f"No strict match found for current setup either."
                     )
                 model_file = candidates[0]
@@ -2703,10 +2767,11 @@ def _model_load_checkpoint(
                     f"Use strict_match=False for coarse matching or fallback_to_latest=True."
                 )
         else:
-            candidates = sorted(model_dir.glob("*.mdl"), key=lambda p: p.stat().st_mtime, reverse=True)
+            load_dir = _mp_latest_run_dir(model_obj) if model_path is None else model_dir
+            candidates = sorted(load_dir.glob("*.mdl"), key=lambda p: p.stat().st_mtime, reverse=True)
             if len(candidates) == 0:
                 raise FileNotFoundError(
-                    f"No model checkpoints found in '{model_dir}'. Pass a full .mdl file path via model_path "
+                    f"No model checkpoints found in '{load_dir}'. Pass a full .mdl file path via model_path "
                     "or verify the directory."
                 )
             model_file = candidates[0]
@@ -2753,6 +2818,10 @@ def _model_load_checkpoint(
         model_obj.descriptor = loaded_descriptor
     else:
         _model_refresh_descriptor(model_obj, path=str(model_file.parent), name=model_file.stem)
+    model_obj.save_dir = str(model_file.parent)
+    model_obj.model_file = str(model_file)
+    model_obj.run_descriptor = model_file.parent.name
+    model_obj.results_dir = str(model_file.parent / "results")
     return str(model_file)
 
 # ML model classes helpers

@@ -31,47 +31,48 @@ prompt_default() {
     printf -v "$var_name" "%s" "$value"
 }
 
-PATH_EXTRA=${PATH_EXTRA:-${1:-}}
-RUN_LABEL=${RUN_LABEL:-${2:-}}
-JOB_ID=${JOB_ID:-${3:-}}
+RUN_PATH=${RUN_PATH:-}
 
-prompt_default PATH_EXTRA "Archive path extra, e.g. UT/GAT"
-prompt_default RUN_LABEL "Run label, e.g. ut-gat-1h"
-prompt_default JOB_ID "Slurm job ID, or all"
-prompt_default LOCAL_ROOT "Local root" "$LOCAL_ROOT"
-
-REMOTE_BASE=$REMOTE_ROOT/${PATH_EXTRA#/}/$RUN_LABEL
-LOCAL_BASE=$LOCAL_ROOT/${PATH_EXTRA#/}/$RUN_LABEL
-
-mkdir -p "$LOCAL_BASE"
-
-transfer_job() {
-    local job_id=$1
-    local remote_zip=$REMOTE_BASE/$job_id/zip
-    local local_job=$LOCAL_BASE/$job_id
-
-    mkdir -p "$local_job"
-    echo "Remote: $REMOTE:$remote_zip"
-    echo "Local:  $local_job"
-    (
-        cd "$local_job"
-        scp -r "$REMOTE:$remote_zip" .
-    )
-}
-
-if [ "$JOB_ID" = "all" ]; then
-    echo "Finding jobs under: $REMOTE:$REMOTE_BASE"
-    JOB_IDS=$(ssh "$REMOTE" "for d in '$REMOTE_BASE'/*; do [ -d \"\$d\" ] && basename \"\$d\"; done")
-    if [ -z "$JOB_IDS" ]; then
-        echo "No jobs found under: $REMOTE_BASE"
-        exit 1
-    fi
-    for job_id in $JOB_IDS; do
-        transfer_job "$job_id"
-    done
-else
-    transfer_job "$JOB_ID"
+if [ -z "$RUN_PATH" ] && [ "$#" -ge 4 ]; then
+    TASK=$1
+    DATA_DESCRIPTOR=$2
+    MODEL_NAME=$3
+    RUN_DESCRIPTOR=$4
+    RUN_PATH=$TASK/$DATA_DESCRIPTOR/$MODEL_NAME/$RUN_DESCRIPTOR
+elif [ -z "$RUN_PATH" ] && [ "$#" -ge 1 ]; then
+    RUN_PATH=$1
 fi
 
+if [ -z "$RUN_PATH" ]; then
+    TASK=${TASK:-}
+    DATA_DESCRIPTOR=${DATA_DESCRIPTOR:-}
+    MODEL_NAME=${MODEL_NAME:-}
+    RUN_DESCRIPTOR=${RUN_DESCRIPTOR:-}
+
+    prompt_default TASK "Task, e.g. UT, FT, MULTI"
+    prompt_default DATA_DESCRIPTOR "Data descriptor"
+    prompt_default MODEL_NAME "Model, e.g. MLP, GAT, GCN, TR"
+    prompt_default RUN_DESCRIPTOR "Run descriptor, e.g. HPC-ut-gat-260513-143012, HPO/my-study, or all"
+
+    if [ "$RUN_DESCRIPTOR" = "all" ]; then
+        RUN_PATH=$TASK/$DATA_DESCRIPTOR/$MODEL_NAME
+    else
+        RUN_PATH=$TASK/$DATA_DESCRIPTOR/$MODEL_NAME/$RUN_DESCRIPTOR
+    fi
+fi
+
+prompt_default LOCAL_ROOT "Local root" "$LOCAL_ROOT"
+
+RUN_PATH=${RUN_PATH#/}
+REMOTE_PATH=$REMOTE_ROOT/$RUN_PATH
+LOCAL_PATH=$LOCAL_ROOT/$RUN_PATH
+LOCAL_PARENT=$(dirname "$LOCAL_PATH")
+
+mkdir -p "$LOCAL_PARENT"
+
+echo "Remote: $REMOTE:$REMOTE_PATH"
+echo "Local:  $LOCAL_PATH"
+scp -r "$REMOTE:$REMOTE_PATH" "$LOCAL_PARENT/"
+
 echo "Transfer complete."
-echo "Saved under: $LOCAL_BASE"
+echo "Saved under: $LOCAL_PATH"

@@ -319,7 +319,6 @@ def plot_curve(OUT_df, mode, idx=None, q=15, compare_ax=None):
             idxs = idxs
         else:
             idxs = random.sample(idxs, q)
-            print(idxs)
         
         for idxx in idxs:
             d = OUT_df.loc[idxx].tolist()[1:]
@@ -364,17 +363,6 @@ def load_splitData(PATH, mechMode, orgMode, dis, split_name=None):
     testProps  = pd.read_csv(f"{PATH}MLdata/split-{split_name}/{mechMode}-{orgMode}-{dis}-testProps.csv", index_col=0, header=0).to_numpy()
 
     train, val, test = [train_in, train_out, trainProps], [val_in, val_out, valProps], [test_in, test_out, testProps]
-    return train, val, test
-
-def load_akData(CSV_train_in, CSV_train_out, CSV_val_in, CSV_val_out, CSV_test_in, CSV_test_out):
-    train_in   = pd.read_csv(CSV_train_in, index_col=0, header=0).to_numpy()
-    train_out  = pd.read_csv(CSV_train_out, index_col=0, header=0).to_numpy()
-    val_in     = pd.read_csv(CSV_val_in, index_col=0, header=0).to_numpy()
-    val_out    = pd.read_csv(CSV_val_out, index_col=0, header=0).to_numpy()
-    test_in    = pd.read_csv(CSV_test_in, index_col=0, header=0).to_numpy()
-    test_out   = pd.read_csv(CSV_test_out, index_col=0, header=0).to_numpy()
-
-    train, val, test = [train_in, train_out], [val_in, val_out], [test_in, test_out]
     return train, val, test
 
 def split_data(IN, OUT, props, split=0.8, random_state=None, force_train_idx=None):
@@ -1275,15 +1263,9 @@ def _data_to_json_payload(data_obj):
     }
 
 def _data_default_json_path(data_obj):
-    from resources.MLmodels import _mp_data_descriptor
+    from resources.MLmodels import _mp_data_descriptor, _mp_run_root, _mp_task_token
 
-    if getattr(data_obj, "path", None) == 0:
-        base = Path("models") / "Akash"
-    else:
-        ut = bool(getattr(data_obj, "UTmechTest", False))
-        ft = bool(getattr(data_obj, "FTmechTest", False))
-        task = "multi" if (ut and ft) else ("ut" if ut else ("ft" if ft else "other"))
-        base = Path("models") / task
+    base = _mp_run_root() / _mp_task_token(data_obj)
     return base / _mp_data_descriptor(data_obj) / "data.json"
 
 def _data_to_numpy(x):
@@ -1395,10 +1377,6 @@ def _data_resolve_geom_feats(geom_feats=None, tr_params=None):
     if not resolved["enabled"]:
         resolved["coord_norm"] = False
     return resolved
-
-def _data_resolve_tr_params(tr_params):
-    resolved = _data_resolve_geom_feats(geom_feats=None, tr_params=tr_params)
-    return {"geom_feats": resolved["enabled"], "coord_norm": resolved["coord_norm"]}
 
 def _data_limit_mode_samples(data_obj, mode):
     nsims = int(data_obj.nsims)
@@ -1640,81 +1618,5 @@ def _data_scale_reduced_target(scale, scale_reduced, target):
     if not scale_reduced:
         return False
     return ("all" in scale[1].lower()) or (target in scale[1].lower())
-
-
-
-
-
-
-# if format == 1 and model.lower() == "mlp" or model.lower() == "gpr":
-#     self.load_DisDist_v1()
-# elif format == 2 and model.lower() == "mlp":
-#     self.load_DisDist_v2()
-
-
-    # def load_DisDist_v1(self):
-    #     self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
-
-    #     train_out1 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
-    #     self.dx_out1 = train_out1[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2,1)
-    #     self.dy_out1 = train_out1[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2,1)
-    
-    # def load_DisDist_v2(self):
-    #     self.train_in1 = self.perIN_df.to_numpy().reshape(len(self.perIN_df)//2, 2)
-    #     self.train_in2 = np.array([self.train_in1.flatten()]*2)
-
-    #     train_out2 = self.train_in.reshape(len(self.train_in),len(self.train_in[0])//2,2)
-    #     dx_out2 = train_out2[:,:,0].reshape(len(self.train_in),len(self.train_in[0])//2)
-    #     self.dx_out2 = np.stack((dx_out2, dx_out2), axis=1)
-    #     dy_out2 = train_out2[:,:,1].reshape(len(self.train_in),len(self.train_in[0])//2)
-    #     self.dy_out2 = np.stack((dy_out2, dy_out2), axis=1)
-
-
-
-#### Normalisation and Standardization Data Class Variables
-        # self.inParams = dataParams(self.all_in)
-        # self.outParams = dataParams(self.all_out)
-
-        # self.train_inST = standardize(self.train_in, self.inParams[0], self.inParams[1])
-        # self.train_outST = standardize(self.train_out, self.outParams[0], self.outParams[1])
-        # self.val_inST = standardize(self.val_in, self.inParams[0], self.inParams[1])
-        # self.val_outST = standardize(self.val_out, self.outParams[0], self.outParams[1])
-        # self.test_inST = standardize(self.test_in, self.inParams[0], self.inParams[1])
-        # self.test_outST = standardize(self.test_out, self.outParams[0], self.outParams[1])
-        # self.all_inST = standardize(self.all_in, self.inParams[0], self.inParams[1])
-        # self.all_outST = standardize(self.all_out, self.outParams[0], self.outParams[1])
-        
-        # self.train_inNM = normalize(self.train_in, self.inParams[2], self.inParams[3])
-        # self.train_outNM = normalize(self.train_out, self.outParams[2], self.outParams[3])
-        # self.val_inNM = normalize(self.val_in, self.inParams[2], self.inParams[3])
-        # self.val_outNM = normalize(self.val_out, self.outParams[2], self.outParams[3])
-        # self.test_inNM = normalize(self.test_in, self.inParams[2], self.inParams[3])
-        # self.test_outNM = normalize(self.test_out, self.outParams[2], self.outParams[3])
-        # self.all_inNM = normalize(self.all_in, self.inParams[2], self.inParams[3])
-        # self.all_outNM = normalize(self.all_out, self.outParams[2], self.outParams[3])
-
-
-        # self.inParams1 = dataParams(self.train_in1)
-        # self.train_in1ST = standardize(self.train_in1, self.inParams1[0], self.inParams1[1])
-        # self.train_in1NM = normalize(self.train_in1, self.inParams1[2], self.inParams1[3])
-
-        # self.outParams1dx = dataParams(self.dx_out1)
-        # self.outParams1dy = dataParams(self.dy_out1)
-        # self.dx_out1ST = standardize(self.dx_out1, self.outParams1dx[0], self.outParams1dx[1])
-        # self.dy_out1ST = standardize(self.dy_out1, self.outParams1dy[0], self.outParams1dy[1])
-        # self.dx_out1NM = normalize(self.dx_out1, self.outParams1dx[2], self.outParams1dx[3])
-        # self.dy_out1NM = normalize(self.dy_out1, self.outParams1dy[2], self.outParams1dy[3])
-        
-
-        # self.inParams2 = dataParams(self.train_in2)
-        # self.train_in2ST = standardize(self.train_in2, self.inParams2[0], self.inParams2[1])
-        # self.train_in2NM = normalize(self.train_in2, self.inParams2[2], self.inParams2[3])
-
-        # self.outParams2dx = dataParams(self.dx_out2)
-        # self.outParams2dy = dataParams(self.dx_out2)
-        # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dx[0], self.outParams2dx[1])
-        # self.dx_out2ST = standardize(self.dx_out2, self.outParams2dy[0], self.outParams2dy[1])
-        # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dx[2], self.outParams2dx[3])
-        # self.dx_out2NM = normalize(self.dx_out2, self.outParams2dy[2], self.outParams2dy[3])
 
 

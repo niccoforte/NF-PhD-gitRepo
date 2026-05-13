@@ -237,9 +237,6 @@ def main():
         torch.cuda.manual_seed_all(args.seed)
         torch.backends.cudnn.benchmark = True
 
-    results_dir = Path(os.environ.get("ML_RESULTS_DIR", "results"))
-    results_dir.mkdir(parents=True, exist_ok=True)
-
     run_config = vars(args).copy()
     run_config.update({
         "model_type": model_type,
@@ -259,7 +256,6 @@ def main():
     metadata_path = os.environ.get("ML_RUN_METADATA")
     if metadata_path:
         write_json(metadata_path, metadata)
-    write_json(results_dir / "run_metadata.json", metadata)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
@@ -330,51 +326,12 @@ def main():
         print("Test split is empty; evaluating the validation split instead.")
     model.evaluate_split(eval_split, diagnostics=True, diag_plot=False)
 
-    checkpoint = model.save(path=None, name=args.run_label)
-
-    metrics = {
-        "checkpoint": checkpoint,
-        "device": str(device),
-        "model_type": model_type,
-        "run_config": run_config,
-        "UT_best_epoch": getattr(model, "UT_best_epoch", None),
-        "UT_best_loss": getattr(model, "UT_best_loss", None),
-        "UT_best_mse": getattr(model, "UT_best_mse", None),
-        "UT_best_rmse": getattr(model, "UT_best_rmse", None),
-        "FT_best_epoch": getattr(model, "FT_best_epoch", None),
-        "FT_best_loss": getattr(model, "FT_best_loss", None),
-        "FT_best_mse": getattr(model, "FT_best_mse", None),
-        "FT_best_rmse": getattr(model, "FT_best_rmse", None),
-        "split_sizes": split_sizes,
-        "evaluation_split": eval_split,
-        "UT_prediction_summary": getattr(
-            model,
-            "UT_prediction_summary",
-            getattr(model, f"UT_{eval_split}_diagnostics", {}).get("summary")
-            if getattr(model, f"UT_{eval_split}_diagnostics", None) is not None else None,
-        ),
-        "FT_prediction_summary": getattr(
-            model,
-            "FT_prediction_summary",
-            getattr(model, f"FT_{eval_split}_diagnostics", {}).get("summary")
-            if getattr(model, f"FT_{eval_split}_diagnostics", None) is not None else None,
-        ),
-    }
-    write_json(results_dir / "metrics.json", metrics)
-
-    predictions = {}
-    for mode in ("UT", "FT"):
-        outputs = getattr(model, f"{mode}_{eval_split}_outputs", None)
-        truth = getattr(model, f"{mode}_{eval_split}_truth", None)
-        if eval_split == "test":
-            outputs = outputs if outputs is not None else getattr(model, f"{mode}_test_outputs", None)
-            truth = truth if truth is not None else getattr(model, f"{mode}_truth", None)
-        if outputs is not None:
-            predictions[f"{mode}_{eval_split}_outputs"] = outputs
-        if truth is not None:
-            predictions[f"{mode}_{eval_split}_truth"] = truth
-    if predictions:
-        np.savez(results_dir / "predictions.npz", **predictions)
+    checkpoint = model.save(path=None, name=None)
+    results_dir = model.save_results(
+        run_config=run_config,
+        eval_split=eval_split,
+        metadata=metadata,
+    )
 
     print(f"Saved checkpoint: {checkpoint}")
     print(f"Saved trial results in: {results_dir}")

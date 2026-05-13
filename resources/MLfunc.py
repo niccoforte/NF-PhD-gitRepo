@@ -8,8 +8,6 @@ import optuna
 import json
 import copy
 
-from sklearn.model_selection import GridSearchCV
-
 
 def absErr(A, B, typ=None, axis=None):
     if typ == "mean":
@@ -326,13 +324,17 @@ def predict_model(typ, model, test_dataloader):
     device = next(model.parameters()).device
     was_training = model.training
     model.eval()
-    with torch.no_grad():
-        for batch in test_dataloader:
-            y_predict, y = _forward_batch(typ, model, batch, device, context="prediction")
-            test_outputs.append(y_predict.detach().cpu().numpy())
-            truth.append(y.detach().cpu().numpy())
-    if was_training:
-        model.train()
+    try:
+        with torch.no_grad():
+            for batch in test_dataloader:
+                y_predict, y = _forward_batch(typ, model, batch, device, context="prediction")
+                test_outputs.append(y_predict.detach().cpu().numpy())
+                truth.append(y.detach().cpu().numpy())
+    finally:
+        if was_training:
+            model.train()
+    if not test_outputs:
+        raise ValueError("Cannot predict from an empty dataloader.")
     test_outputs = np.concatenate(test_outputs)
     truth = np.concatenate(truth)
     return test_outputs, truth
@@ -1206,7 +1208,7 @@ class CombinedCurveLoss(nn.Module):
 
 
 class QuantileLoss(nn.Module):
-    def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=(50,130), err_type="L2"):
+    def __init__(self, quantiles=(0.5, 0.5, 0.5), zone_boundaries=(50, 130), err_type="L2"):
         super().__init__()
         self.register_buffer("quantiles", torch.tensor(quantiles, dtype=torch.float32))
         self.zone_boundaries = zone_boundaries
@@ -1265,16 +1267,9 @@ class QuantileLoss(nn.Module):
 class QuantileLossMATLAB(nn.Module):
     """
     MATLAB-compatible forward loss matching qlmseRegressionLayerCustom.forwardLoss.
-    Uses the same class style/signature as CustomQuantileLoss for pipeline compatibility.
     """
-    def __init__(self, quantiles=[0.5, 0.5, 0.5], zone_boundaries=None, err_type="L2"):
+    def __init__(self, quantiles=(0.5, 0.5, 0.5), zone_boundaries=None, err_type="L2"):
         super().__init__()
-        # Backward compatibility: some legacy notebook cells passed a base loss
-        # module as first positional arg (e.g., nn.MSELoss(...)).
-        if isinstance(quantiles, nn.Module):
-            print("[WARNING] CustomQuantileLossMATLAB received a loss module as first argument; defaulting quantiles to [0.5, 0.5, 0.5].")
-            quantiles = [0.5, 0.5, 0.5]
-
         if isinstance(quantiles, torch.Tensor):
             quantiles = quantiles.detach().cpu().tolist()
         elif not isinstance(quantiles, (list, tuple)):
@@ -1328,56 +1323,7 @@ class QuantileLossMATLAB(nn.Module):
             zone_loss = zone_term.sum(dim=1).mean()
             total_loss = total_loss + zone_loss
 
-        # MATLAB: loss = (loss1 + loss2 + loss3) / 3
         return total_loss / 3.0
-
-class PhysicalRegularizationLoss(nn.Module):
-    """
-    Penalizes high point-to-point oscillations in predicted output curves.
-    - Oscillation penalty starts once |y_j - y_{j-1}| exceeds delta_tolerance.
-    - Penalty weight decays after epsilon_tolerance as epsilon increases.
-    """
-    def __init__(
-        self,
-        delta_tolerance=0.0,
-        epsilon_tolerance=1.0,
-        epsilon_decay=2.0,
-        oscillation_power=2.0,
-        reduction="mean",
-    ):
-        super().__init__()
-        self.delta_tolerance = float(delta_tolerance)
-        self.epsilon_tolerance = float(epsilon_tolerance)
-        self.epsilon_decay = float(epsilon_decay)
-        self.oscillation_power = float(oscillation_power)
-        self.reduction = reduction.lower()
-
-    def _epsilon_weights(self, n_diffs, y_pred):
-        # Differences are defined between consecutive points; use mid-point epsilon.
-        eps = torch.linspace(0.0, 1.0, steps=n_diffs + 1, device=y_pred.device, dtype=y_pred.dtype)
-        eps_mid = 0.5 * (eps[1:] + eps[:-1])
-        weights = torch.where(
-            eps_mid <= self.epsilon_tolerance,
-            torch.ones_like(eps_mid),
-            torch.exp(-self.epsilon_decay * (eps_mid - self.epsilon_tolerance)),
-        )
-        return weights
-
-    def forward(self, y_pred, y_true):
-        self.delta_tolerance = (y_true.max() - y_true.min()) / 100
-
-        diffs = torch.abs(y_pred[:, 1:] - y_pred[:, :-1])
-        excess = torch.relu(diffs - self.delta_tolerance)
-        if self.oscillation_power != 1.0:
-            excess = excess ** self.oscillation_power
-        weights = self._epsilon_weights(diffs.shape[1], y_pred).unsqueeze(0)
-        penalty = excess * weights
-
-        if self.reduction == "sum":
-            return penalty.sum()
-        if self.reduction == "none":
-            return penalty
-        return penalty.mean()
 
 class WeightedCurveMSELoss(nn.Module):
     """
@@ -1794,10 +1740,6 @@ def visualize_graphNetwork(loader, pos=None, colors=None, layout="kk"):
 
 
 ### HYPERPARAMETER OPTIMIZATION
-def GPR_hOpt(data, gpr, params, cv=5, verb=0):
-    grid_search = GridSearchCV(gpr, params, cv=cv, scoring=None, verbose=verb)
-    return grid_search.fit(data[0], data[1])
-
 def _hopt_get(cfg, key, default=None):
     if cfg is None:
         return default
@@ -1813,11 +1755,9 @@ def _hopt_by_typ(value, typ):
     return value.get(typ, value.get("default"))
 
 def _hopt_task_token(data):
-    if data is None:
-        return "other"
-    ut = bool(getattr(data, "UTmechTest", False))
-    ft = bool(getattr(data, "FTmechTest", False))
-    return "multi" if (ut and ft) else ("ut" if ut else ("ft" if ft else "other"))
+    from resources.MLmodels import _mp_task_token
+
+    return _mp_task_token(data)
 
 def _hopt_model_type_token(typ):
     from resources.MLmodels import _mp_slugify
@@ -1825,7 +1765,7 @@ def _hopt_model_type_token(typ):
     typ = str(typ).lower()
     if typ not in ["mlp", "tr", "gnn", "gcn", "gat"]:
         raise ValueError("typ must be one of ['mlp', 'tr', 'gnn', 'gcn', 'gat'].")
-    return _mp_slugify(typ, default="model")
+    return _mp_slugify(typ, default="model", preserve_case=True).upper()
 
 def _hopt_data_descriptor(data):
     from resources.MLmodels import _mp_data_descriptor
@@ -1833,9 +1773,9 @@ def _hopt_data_descriptor(data):
     return _mp_data_descriptor(data)
 
 def _hopt_task_base_dir(data):
-    if data is not None and getattr(data, "path", None) == 0:
-        return os.path.join("models", "Akash")
-    return os.path.join("models", _hopt_task_token(data))
+    from resources.MLmodels import _mp_run_root
+
+    return str(_mp_run_root() / _hopt_task_token(data))
 
 def _hopt_data_base_dir(data):
     return os.path.join(_hopt_task_base_dir(data), _hopt_data_descriptor(data))
@@ -1857,7 +1797,9 @@ def _hopt_compare_study_base_dir(typs, data, name):
         base_dir = _hopt_data_base_dir(typ_data[0])
     else:
         task_dirs = {_hopt_task_base_dir(d) for d in typ_data}
-        base_dir = next(iter(task_dirs)) if len(task_dirs) == 1 else "models"
+        if len(task_dirs) != 1:
+            raise ValueError("HPO comparison studies with multiple task roots need an explicit path or study_dir.")
+        base_dir = next(iter(task_dirs))
     return os.path.join(base_dir, "HPO", str(name))
 
 def _hopt_sample(trial, name, spec, default=None):
@@ -2224,53 +2166,12 @@ def make_hOpt_objective(
 
     return _objective
 
-def objective(trial, model):
-    """Legacy objective for a preconfigured MODEL template."""
-    if not hasattr(model, "data") or not hasattr(model, "model"):
-        raise ValueError("objective expects a configured MODEL instance template.")
-
-    lr = trial.suggest_float('lr', 1e-5, 1e-2, log=True)
-    batch_size = trial.suggest_categorical('batch_size', [1, 2, 8, 16])
-    weight_decay = trial.suggest_float('weight_decay', 1e-8, 1e-2, log=True)
-
-    lossf = getattr(model, "lossf_cfg", None)
-    if lossf is None:
-        lossf = model.losses if hasattr(model, "losses") else model.lossf
-    template_model = copy.deepcopy(model.model)
-    model_instance = model.__class__(
-        typ=model.typ,
-        model=template_model,
-        lossf=lossf,
-        opt=("adam", weight_decay),
-        batch=batch_size,
-        lr=lr,
-        data=model.data,
-        mechMode=getattr(model.data, "mechMode", "both"),
-        scheduler=None,
-        earlyStop=copy.deepcopy(model.earlyStop),
-        w_init="auto",
-        device=model.device,
-        optTrial=trial,
-        scan_matches_on_init=False
-    )
-
-    model_instance.train(n_epochs=50, verbose=50)
-    losses = []
-    if getattr(model_instance.data, "UTmechTest", False) and hasattr(model_instance, "UT_best_loss"):
-        losses.append(model_instance.UT_best_loss)
-    if getattr(model_instance.data, "FTmechTest", False) and hasattr(model_instance, "FT_best_loss"):
-        losses.append(model_instance.FT_best_loss)
-
-    if not losses:
-        raise ValueError("objective could not find UT/FT best loss values after training.")
-    return float(np.mean(losses))
-
 def hOpt(
     objective,
     n_trials=50,
     prnt=False,
     save=False,
-    path="models/etc",
+    path=None,
     name="sample",
     sampler=None,
     pruner=None,
@@ -2287,7 +2188,9 @@ def hOpt(
         pruner = optuna.pruners.PatientPruner(base_pruner, patience=5) if hasattr(optuna.pruners, "PatientPruner") else base_pruner
 
     if save:
-        save_dir = str(study_dir) if study_dir is not None else f"{path}/{name}/HPO"
+        if study_dir is None and path is None:
+            raise ValueError("hOpt(save=True) requires study_dir or path.")
+        save_dir = str(study_dir) if study_dir is not None else str(path)
         os.makedirs(save_dir, exist_ok=True)
         storage_name = f"sqlite:///{save_dir.replace(os.sep, '/')}/full_study.db"
         study_name = name
@@ -2318,7 +2221,7 @@ def hOpt(
 
     if save:
         best_params = best_trial.params
-        save_dir = str(study_dir) if study_dir is not None else f"{path}/{name}/HPO"
+        save_dir = str(study_dir) if study_dir is not None else str(path)
         with open(f"{save_dir}/best_params.json", "w") as f:
             json.dump(best_params, f, indent=4)
         with open(f"{save_dir}/best_trial_user_attrs.json", "w") as f:
@@ -2347,6 +2250,17 @@ def _hopt_save_best_model(model_instance, save_dir, trial, score, name="best_mod
         with open(meta_file, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, sort_keys=True)
 
+    model_instance.evaluate_split("val", diagnostics=True, diag_plot=False)
+    model_instance.save_results(
+        path=os.path.join(save_dir, f"{name}_results"),
+        eval_split="val",
+        metadata={
+            "save_context": "hpo_best_trial",
+            "trial_number": int(trial.number),
+            "objective_value": float(score),
+            "params": _hopt_json_safe(trial.params),
+        },
+    )
     return model_file
 
 def hOpt_model(
@@ -2375,8 +2289,7 @@ def hOpt_model(
     study_name = name if name is not None else f"{typ}_hOpt"
     if save and study_dir is None and path is None:
         study_dir = _hopt_model_study_dir(typ, data, study_name)
-    legacy_path = "models/etc" if path is None else path
-    save_dir = str(study_dir) if study_dir is not None else f"{legacy_path}/{study_name}/HPO"
+    save_dir = str(study_dir) if study_dir is not None else str(path)
     if save_best_model is None:
         save_best_model = bool(save)
 
@@ -2398,7 +2311,7 @@ def hOpt_model(
         n_trials=n_trials,
         prnt=prnt,
         save=save,
-        path=legacy_path,
+        path=path,
         name=study_name,
         seed=seed,
         timeout=timeout,
@@ -2492,8 +2405,10 @@ def _hopt_json_safe(value):
         return value
     return str(value)
 
-def load_bestParams(path="models/etc", name="sample", study_dir=None):
-    save_dir = str(study_dir) if study_dir is not None else f"{path}/{name}/HPO"
+def load_bestParams(path=None, study_dir=None):
+    if study_dir is None and path is None:
+        raise ValueError("load_bestParams requires study_dir or path.")
+    save_dir = str(study_dir) if study_dir is not None else str(path)
     with open(f"{save_dir}/best_params.json", "r") as f:
         best_params = json.load(f)
 
