@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH -J ML_GPU_TRIAL
+#SBATCH -J ML_GPU_NEW
 #SBATCH -o %x.o%j
 #SBATCH -p gpushort
 #SBATCH -n 8
@@ -7,12 +7,19 @@
 #SBATCH -t 1:0:0
 #SBATCH --mem-per-cpu=11G
 #SBATCH --gres=gpu:1
-# For longer production runs, switch the partition and runtime to:
-#   #SBATCH -p gpu
-#   #SBATCH -t 240:0:0
+
+# For gpu partition runs
+##SBATCH -p gpu
+##SBATCH -t 240:0:0
+# For andrena partitioin runs
+##SBATCH -p andrena
+##SBATCH -t 240:0:0
+##SBATCH --exclusive   # for 4 GPUs, full A100 node.
+
 # Optional GPU type constraints:
-#   #SBATCH --constraint=ampere
-#   #SBATCH --constraint=hopper
+##SBATCH --constraint=ampere  # A100
+##SBATCH --constraint=hopper  # H100/H200
+
 
 set -euo pipefail
 
