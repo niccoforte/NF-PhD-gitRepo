@@ -1028,7 +1028,6 @@ def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True)
 
     return artifacts
 
-
 def _postprocess_select_model_pair(run_dir, prefer_hpo_best=True):
     run_dir = Path(run_dir)
     if prefer_hpo_best:
@@ -1066,7 +1065,6 @@ def _postprocess_select_model_pair(run_dir, prefer_hpo_best=True):
     jsons = sorted(jsons, key=lambda p: p.stat().st_mtime, reverse=True)
     return jsons[0], jsons[0].with_suffix(".mdl")
 
-
 def _postprocess_hpo_model_jsons(hpo_dir):
     hpo_dir = Path(hpo_dir)
     if not hpo_dir.exists():
@@ -1077,7 +1075,6 @@ def _postprocess_hpo_model_jsons(hpo_dir):
             candidates.append(candidate)
     return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)
 
-
 def _postprocess_nearest_hpo_dir(path):
     path = Path(path)
     for candidate in [path] + list(path.parents):
@@ -1087,11 +1084,9 @@ def _postprocess_nearest_hpo_dir(path):
             return candidate
     return None
 
-
 def _postprocess_existing_file(path):
     path = Path(path)
     return path if path.exists() else None
-
 
 def _postprocess_results_dir(artifacts):
     model_json = artifacts.get("model_json")
@@ -1117,7 +1112,6 @@ def _postprocess_results_dir(artifacts):
             return candidate
     return run_dir / "results"
 
-
 def postprocess_output_dir(artifacts, label=None, create=True):
     """Return the stable post-processing output directory under the run results folder."""
     results_dir = artifacts.get("results_dir")
@@ -1132,7 +1126,6 @@ def postprocess_output_dir(artifacts, label=None, create=True):
     if create:
         out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
-
 
 def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
     """List recent saved model runs under a local run root."""
@@ -1172,7 +1165,6 @@ def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
     if max_runs is not None:
         df = df.head(int(max_runs))
     return df
-
 
 def postprocess_load_artifacts(artifacts):
     """Load saved metadata, scalar metrics, predictions, HPO files, and diagnostic CSVs."""
@@ -1218,6 +1210,37 @@ def postprocess_load_artifacts(artifacts):
 
     return loaded
 
+def postprocess_load_data(data_json, data_path_override=None, auto_path_root=None, **overrides):
+    """
+    Load a DATA sidecar JSON while allowing the saved DATA constructor path to
+    be replaced by a local path such as Z:/p2.
+    """
+    from resources.MLdata import DATA
+
+    data_json = Path(data_json)
+    payload = json.loads(data_json.read_text(encoding="utf-8"))
+    config = payload.get("data_config", payload.get("config", payload))
+    if not isinstance(config, dict):
+        raise ValueError(f"DATA JSON at '{data_json}' does not contain a valid data_config dictionary.")
+
+    config = dict(config)
+    if isinstance(data_path_override, str) and data_path_override.lower() == "auto":
+        if _postprocess_should_auto_override_data_path(config.get("path")):
+            if auto_path_root is None:
+                raise ValueError("data_path_override='auto' requires auto_path_root.")
+            config["path"] = str(auto_path_root)
+    elif data_path_override is not None:
+        config["path"] = str(data_path_override)
+    config.update(overrides)
+    return DATA(**config)
+
+def _postprocess_should_auto_override_data_path(saved_path):
+    if saved_path is None:
+        return False
+    text = str(saved_path).strip().replace("\\", "/").lower()
+    if text in ["hpc"]:
+        return True
+    return text.startswith("/data/")
 
 def postprocess_available_evaluations(loaded):
     """Summarize which mode/split prediction arrays and diagnostic tables are available."""
@@ -1254,7 +1277,6 @@ def postprocess_available_evaluations(loaded):
         rows.append(row)
     return pd.DataFrame(rows).sort_values(["mode", "split"]).reset_index(drop=True) if rows else pd.DataFrame()
 
-
 def postprocess_attach_results(model_obj, loaded):
     """Attach saved predictions and scalar metrics to a MODEL object using framework attribute names."""
     if model_obj is None:
@@ -1275,7 +1297,6 @@ def postprocess_attach_results(model_obj, loaded):
         if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "outputs":
             setattr(model_obj, f"{parts[0].upper()}_test_outputs", value)
     return model_obj
-
 
 def postprocess_build_diagnostics(
     data,
@@ -1344,7 +1365,6 @@ def postprocess_build_diagnostics(
 
     return diagnostics
 
-
 def postprocess_save_open_figures(out_dir, prefix="", formats=("png",), dpi=250, close=False):
     """Save all currently open matplotlib figures into a post-processing folder."""
     out_dir = Path(out_dir)
@@ -1365,13 +1385,11 @@ def postprocess_save_open_figures(out_dir, prefix="", formats=("png",), dpi=250,
             plt.close(fig)
     return saved
 
-
 def _postprocess_slug(text, default="figure"):
     text = str(text or default).strip()
     text = "".join(ch if ch.isalnum() or ch in ["-", "_", "."] else "-" for ch in text)
     text = "-".join(part for part in text.split("-") if part)
     return text[:96] if text else default
-
 
 # Weights initialization
 def make_weights_init(act="relu", bias_value=0.0, distribution="normal"):
