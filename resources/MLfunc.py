@@ -7,6 +7,7 @@ import networkx as nx
 import optuna
 import json
 import copy
+from pathlib import Path
 
 
 def absErr(A, B, typ=None, axis=None):
@@ -954,6 +955,423 @@ def plot_activation_summary(summary_or_activations, figsize=(10, 5)):
     fig.tight_layout()
     plt.show()
     return fig, (ax1, ax2)
+
+### Post-processing helpers
+
+def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True):
+    """
+    Resolve a saved ML run, model JSON, model checkpoint, or HPO directory into
+    the artifact paths used by the post-processing notebook.
+    """
+    path = Path(run_path).expanduser()
+    if not path.is_absolute() and run_root is not None:
+        path = Path(run_root).expanduser() / path
+    path = path.resolve() if path.exists() else path
+
+    artifacts = {
+        "input_path": path,
+        "run_dir": None,
+        "model_json": None,
+        "model_mdl": None,
+        "data_json": None,
+        "results_dir": None,
+        "metrics_json": None,
+        "predictions_npz": None,
+        "diagnostics_summary_json": None,
+        "hpo_dir": None,
+        "hpo_best_params_json": None,
+        "hpo_best_trial_user_attrs_json": None,
+        "hpo_candidate_model_jsons": [],
+        "is_hpo": False,
+        "warnings": [],
+    }
+
+    if path.suffix.lower() in [".json", ".mdl"]:
+        model_json = path.with_suffix(".json")
+        model_mdl = path.with_suffix(".mdl")
+        run_dir = path.parent
+    elif path.is_dir():
+        run_dir = path
+        model_json, model_mdl = _postprocess_select_model_pair(run_dir, prefer_hpo_best=prefer_hpo_best)
+    else:
+        run_dir = path
+        model_json = None
+        model_mdl = None
+        artifacts["warnings"].append(f"Input path does not exist yet: {path}")
+
+    artifacts["run_dir"] = run_dir
+    artifacts["model_json"] = model_json if model_json is not None and model_json.exists() else None
+    artifacts["model_mdl"] = model_mdl if model_mdl is not None and model_mdl.exists() else None
+
+    if model_json is not None:
+        data_json = model_json.with_name(f"{model_json.stem}_data.json")
+        artifacts["data_json"] = data_json if data_json.exists() else None
+        artifacts["hpo_dir"] = _postprocess_nearest_hpo_dir(model_json.parent)
+        artifacts["is_hpo"] = artifacts["hpo_dir"] is not None or model_json.stem == "best_model"
+
+    hpo_dir = artifacts["hpo_dir"] if artifacts["hpo_dir"] is not None else run_dir
+    if hpo_dir is not None and Path(hpo_dir).is_dir():
+        best_params = Path(hpo_dir) / "best_params.json"
+        best_attrs = Path(hpo_dir) / "best_trial_user_attrs.json"
+        artifacts["hpo_best_params_json"] = best_params if best_params.exists() else None
+        artifacts["hpo_best_trial_user_attrs_json"] = best_attrs if best_attrs.exists() else None
+        artifacts["hpo_candidate_model_jsons"] = _postprocess_hpo_model_jsons(Path(hpo_dir))
+        if artifacts["hpo_best_params_json"] is not None or artifacts["hpo_candidate_model_jsons"]:
+            artifacts["is_hpo"] = True
+
+    artifacts["results_dir"] = _postprocess_results_dir(artifacts)
+    results_dir = artifacts["results_dir"]
+    if results_dir is not None:
+        artifacts["metrics_json"] = _postprocess_existing_file(results_dir / "metrics.json")
+        artifacts["predictions_npz"] = _postprocess_existing_file(results_dir / "predictions.npz")
+        artifacts["diagnostics_summary_json"] = _postprocess_existing_file(results_dir / "diagnostics_summary.json")
+
+    return artifacts
+
+
+def _postprocess_select_model_pair(run_dir, prefer_hpo_best=True):
+    run_dir = Path(run_dir)
+    if prefer_hpo_best:
+        for candidate in [
+            run_dir / "best_model.json",
+            run_dir / "model.json",
+        ]:
+            if candidate.exists() and candidate.with_suffix(".mdl").exists():
+                return candidate, candidate.with_suffix(".mdl")
+
+        hpo_candidates = _postprocess_hpo_model_jsons(run_dir)
+        if hpo_candidates:
+            return hpo_candidates[0], hpo_candidates[0].with_suffix(".mdl")
+
+    jsons = []
+    skip_names = {
+        "metrics.json",
+        "diagnostics_summary.json",
+        "best_params.json",
+        "best_trial_user_attrs.json",
+    }
+    for candidate in run_dir.glob("*.json"):
+        if candidate.name.endswith("_data.json") or candidate.name in skip_names:
+            continue
+        if candidate.with_suffix(".mdl").exists():
+            jsons.append(candidate)
+    if not jsons:
+        for candidate in run_dir.rglob("*.json"):
+            if candidate.name.endswith("_data.json") or candidate.name in skip_names:
+                continue
+            if candidate.with_suffix(".mdl").exists():
+                jsons.append(candidate)
+    if not jsons:
+        return None, None
+    jsons = sorted(jsons, key=lambda p: p.stat().st_mtime, reverse=True)
+    return jsons[0], jsons[0].with_suffix(".mdl")
+
+
+def _postprocess_hpo_model_jsons(hpo_dir):
+    hpo_dir = Path(hpo_dir)
+    if not hpo_dir.exists():
+        return []
+    candidates = []
+    for candidate in hpo_dir.rglob("best_model.json"):
+        if candidate.with_suffix(".mdl").exists():
+            candidates.append(candidate)
+    return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def _postprocess_nearest_hpo_dir(path):
+    path = Path(path)
+    for candidate in [path] + list(path.parents):
+        if candidate.name.upper() == "HPO":
+            return candidate
+        if (candidate / "best_params.json").exists() or (candidate / "best_trial_user_attrs.json").exists():
+            return candidate
+    return None
+
+
+def _postprocess_existing_file(path):
+    path = Path(path)
+    return path if path.exists() else None
+
+
+def _postprocess_results_dir(artifacts):
+    model_json = artifacts.get("model_json")
+    run_dir = artifacts.get("run_dir")
+    if model_json is not None:
+        model_json = Path(model_json)
+        if model_json.stem == "best_model":
+            best_results = model_json.parent / "best_model_results"
+            if best_results.exists():
+                return best_results
+        results = model_json.parent / "results"
+        if results.exists():
+            return results
+        best_results = model_json.parent / "best_model_results"
+        if best_results.exists():
+            return best_results
+        return results
+    if run_dir is None:
+        return None
+    run_dir = Path(run_dir)
+    for candidate in [run_dir / "best_model_results", run_dir / "results"]:
+        if candidate.exists():
+            return candidate
+    return run_dir / "results"
+
+
+def postprocess_output_dir(artifacts, label=None, create=True):
+    """Return the stable post-processing output directory under the run results folder."""
+    results_dir = artifacts.get("results_dir")
+    if results_dir is None:
+        run_dir = artifacts.get("run_dir")
+        if run_dir is None:
+            raise ValueError("Cannot create post-processing directory without a run or results directory.")
+        results_dir = Path(run_dir) / "results"
+    out_dir = Path(results_dir) / "postProcessing"
+    if label is not None and str(label).strip():
+        out_dir = out_dir / str(label).strip()
+    if create:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+
+def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
+    """List recent saved model runs under a local run root."""
+    root = Path(run_root).expanduser()
+    rows = []
+    columns = ["run_dir", "model_json", "model_mdl", "results_dir", "is_hpo", "modified"]
+    if not root.exists():
+        return pd.DataFrame(columns=columns)
+    skip_names = {
+        "metrics.json",
+        "diagnostics_summary.json",
+        "best_params.json",
+        "best_trial_user_attrs.json",
+    }
+    for model_json in root.rglob("*.json"):
+        if model_json.name.endswith("_data.json") or model_json.name in skip_names:
+            continue
+        if not model_json.with_suffix(".mdl").exists():
+            continue
+        artifacts = postprocess_resolve_artifacts(model_json, prefer_hpo_best=include_hpo)
+        if artifacts["is_hpo"] and not include_hpo:
+            continue
+        rows.append(
+            {
+                "run_dir": str(artifacts.get("run_dir")),
+                "model_json": str(model_json),
+                "model_mdl": str(model_json.with_suffix(".mdl")),
+                "results_dir": str(artifacts.get("results_dir")),
+                "is_hpo": bool(artifacts.get("is_hpo", False)),
+                "modified": datetime.datetime.fromtimestamp(model_json.stat().st_mtime),
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    df = pd.DataFrame(rows).drop_duplicates(subset=["model_json"])
+    df = df.sort_values("modified", ascending=False).reset_index(drop=True)
+    if max_runs is not None:
+        df = df.head(int(max_runs))
+    return df
+
+
+def postprocess_load_artifacts(artifacts):
+    """Load saved metadata, scalar metrics, predictions, HPO files, and diagnostic CSVs."""
+    loaded = {
+        "descriptor": None,
+        "data_descriptor": None,
+        "metrics": {},
+        "diagnostics_summary": {},
+        "predictions": {},
+        "diagnostic_tables": {},
+        "hpo": {},
+    }
+    for key, target in [
+        ("descriptor", artifacts.get("model_json")),
+        ("data_descriptor", artifacts.get("data_json")),
+        ("metrics", artifacts.get("metrics_json")),
+        ("diagnostics_summary", artifacts.get("diagnostics_summary_json")),
+    ]:
+        if target is not None and Path(target).exists():
+            with open(target, "r", encoding="utf-8") as f:
+                loaded[key] = json.load(f)
+
+    for key, target in [
+        ("best_params", artifacts.get("hpo_best_params_json")),
+        ("best_trial_user_attrs", artifacts.get("hpo_best_trial_user_attrs_json")),
+    ]:
+        if target is not None and Path(target).exists():
+            with open(target, "r", encoding="utf-8") as f:
+                loaded["hpo"][key] = json.load(f)
+
+    predictions_npz = artifacts.get("predictions_npz")
+    if predictions_npz is not None and Path(predictions_npz).exists():
+        with np.load(predictions_npz, allow_pickle=False) as npz:
+            loaded["predictions"] = {key: npz[key] for key in npz.files}
+
+    results_dir = artifacts.get("results_dir")
+    if results_dir is not None and Path(results_dir).exists():
+        for csv_file in Path(results_dir).glob("*_metrics.csv"):
+            try:
+                loaded["diagnostic_tables"][csv_file.stem] = pd.read_csv(csv_file, index_col=0)
+            except Exception:
+                loaded["diagnostic_tables"][csv_file.stem] = pd.read_csv(csv_file)
+
+    return loaded
+
+
+def postprocess_available_evaluations(loaded):
+    """Summarize which mode/split prediction arrays and diagnostic tables are available."""
+    row_map = {}
+    predictions = loaded.get("predictions", {})
+    tables = loaded.get("diagnostic_tables", {})
+    for key in set(predictions.keys()):
+        parts = key.split("_")
+        if len(parts) < 3:
+            continue
+        mode, split, kind = parts[0].upper(), parts[1].lower(), "_".join(parts[2:])
+        if kind not in ["outputs", "truth"]:
+            continue
+        row_map.setdefault((mode, split), {"mode": mode, "split": split})
+
+    for key in set(tables.keys()):
+        parts = key.split("_")
+        if len(parts) < 3:
+            continue
+        mode, split = parts[0].upper(), parts[1].lower()
+        row_map.setdefault((mode, split), {"mode": mode, "split": split})
+
+    rows = []
+    for (mode, split), row in row_map.items():
+        row.update(
+            {
+                "outputs": f"{mode}_{split}_outputs" in predictions,
+                "truth": f"{mode}_{split}_truth" in predictions,
+                "sample_metrics": f"{mode}_{split}_sample_metrics" in tables,
+                "point_metrics": f"{mode}_{split}_point_metrics" in tables,
+                "zone_metrics": f"{mode}_{split}_zone_metrics" in tables,
+            }
+        )
+        rows.append(row)
+    return pd.DataFrame(rows).sort_values(["mode", "split"]).reset_index(drop=True) if rows else pd.DataFrame()
+
+
+def postprocess_attach_results(model_obj, loaded):
+    """Attach saved predictions and scalar metrics to a MODEL object using framework attribute names."""
+    if model_obj is None:
+        return None
+    metrics = loaded.get("metrics", {})
+    for key, value in metrics.items():
+        if isinstance(key, str) and (key.startswith("UT_") or key.startswith("FT_")):
+            try:
+                setattr(model_obj, key, value)
+            except Exception:
+                pass
+
+    for key, value in loaded.get("predictions", {}).items():
+        setattr(model_obj, key, value)
+        parts = key.split("_")
+        if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "truth":
+            setattr(model_obj, f"{parts[0].upper()}_truth", value)
+        if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "outputs":
+            setattr(model_obj, f"{parts[0].upper()}_test_outputs", value)
+    return model_obj
+
+
+def postprocess_build_diagnostics(
+    data,
+    loaded,
+    mode="UT",
+    split="test",
+    zone_boundaries=None,
+    prefer_saved_tables=True,
+    recompute_from_predictions=True,
+):
+    """
+    Build an in-memory diagnostics dictionary from saved predictions and saved
+    diagnostic CSVs. This does not run the model.
+    """
+    mode = str(mode).upper()
+    split = str(split).lower()
+    predictions = loaded.get("predictions", {})
+    outputs = predictions.get(f"{mode}_{split}_outputs")
+    truth = predictions.get(f"{mode}_{split}_truth")
+    if outputs is None or truth is None:
+        return None
+
+    if recompute_from_predictions:
+        train_truth = getattr(data, f"{mode}_train_out", None) if data is not None else None
+        try:
+            diagnostics = curve_performance_diagnostics(
+                outputs,
+                truth,
+                x_values=getattr(data, f"{mode}_OUT_df", None) if data is not None else None,
+                train_truth=train_truth,
+                zone_boundaries=zone_boundaries,
+            )
+        except ValueError:
+            diagnostics = curve_performance_diagnostics(
+                outputs,
+                truth,
+                x_values=getattr(data, f"{mode}_OUT_df", None) if data is not None else None,
+                train_truth=train_truth,
+                zone_boundaries=None,
+            )
+    else:
+        diagnostics = {
+            "summary": {},
+            "sample_metrics": None,
+            "point_metrics": None,
+            "zone_metrics": None,
+            "x": np.arange(np.asarray(outputs).shape[1], dtype=float),
+            "y_pred": np.asarray(outputs, dtype=float),
+            "y_true": np.asarray(truth, dtype=float),
+        }
+
+    diag_summary = loaded.get("diagnostics_summary", {})
+    if isinstance(diag_summary, dict):
+        saved_summary = diag_summary.get(mode, diag_summary.get(mode.lower()))
+        if isinstance(saved_summary, dict):
+            diagnostics["summary"].update(saved_summary)
+
+    if prefer_saved_tables:
+        tables = loaded.get("diagnostic_tables", {})
+        for key in ["sample_metrics", "point_metrics", "zone_metrics"]:
+            saved = tables.get(f"{mode}_{split}_{key}")
+            if saved is not None:
+                diagnostics[key] = saved
+        if diagnostics.get("point_metrics") is not None and "x" in diagnostics["point_metrics"].columns:
+            diagnostics["x"] = diagnostics["point_metrics"]["x"].to_numpy(dtype=float)
+
+    return diagnostics
+
+
+def postprocess_save_open_figures(out_dir, prefix="", formats=("png",), dpi=250, close=False):
+    """Save all currently open matplotlib figures into a post-processing folder."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    saved = []
+    prefix = f"{prefix}_" if prefix else ""
+    for num in plt.get_fignums():
+        fig = plt.figure(num)
+        title = ""
+        if fig.axes:
+            title = fig.axes[0].get_title()
+        stem = _postprocess_slug(title or f"figure_{num:02d}")
+        for fmt in formats:
+            path = out_dir / f"{prefix}{stem}.{fmt}"
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            saved.append(path)
+        if close:
+            plt.close(fig)
+    return saved
+
+
+def _postprocess_slug(text, default="figure"):
+    text = str(text or default).strip()
+    text = "".join(ch if ch.isalnum() or ch in ["-", "_", "."] else "-" for ch in text)
+    text = "-".join(part for part in text.split("-") if part)
+    return text[:96] if text else default
+
 
 # Weights initialization
 def make_weights_init(act="relu", bias_value=0.0, distribution="normal"):
