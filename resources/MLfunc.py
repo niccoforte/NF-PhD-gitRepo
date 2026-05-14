@@ -35,7 +35,6 @@ def rmse(A, B, typ=False, axis=None):
         return np.sqrt((A - B)**2)
 
 ### GAUSSIAN PROCESS FUNCTIONS
-
 def plot_Kmatrix(gpr, x=None):
     if x is not None:
         K_pre = gpr.K(x)
@@ -957,7 +956,6 @@ def plot_activation_summary(summary_or_activations, figsize=(10, 5)):
     return fig, (ax1, ax2)
 
 ### Post-processing helpers
-
 def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True):
     """
     Resolve a saved ML run, model JSON, model checkpoint, or HPO directory into
