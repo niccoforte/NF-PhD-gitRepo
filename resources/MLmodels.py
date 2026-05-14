@@ -1692,111 +1692,6 @@ def _mp_slugify(value, default="na", max_len=64, preserve_case=False):
         return default
     return text[:max_len]
 
-def _mp_format_num(value):
-    try:
-        val = float(value)
-    except (TypeError, ValueError):
-        return str(value)
-    if np.isclose(val, round(val)):
-        return str(int(round(val)))
-    if val == 0:
-        return "0"
-    if abs(val) >= 1e3 or abs(val) < 1e-2:
-        return f"{val:.1e}"
-    return f"{val:.4g}"
-
-def _mp_bool_token(value):
-    return "True" if bool(value) else "False"
-
-def _mp_range_split_token(data):
-    range_split = getattr(data, "range_split", None)
-    if isinstance(range_split, dict):
-        in_range = bool(range_split.get("input", False))
-        out_range = bool(range_split.get("output", False))
-    else:
-        in_range = bool(getattr(data, "input_range_split", False))
-        out_range = bool(getattr(data, "output_range_split", False))
-    return f"in{_mp_bool_token(in_range)}-out{_mp_bool_token(out_range)}"
-
-def _mp_geom_feature_token(data):
-    geom_feats = getattr(data, "geom_feats", None)
-    if isinstance(geom_feats, dict):
-        enabled = bool(geom_feats.get("enabled", geom_feats.get("geom_feats", False)))
-        coord_norm = bool(geom_feats.get("coord_norm", False)) if enabled else False
-    else:
-        tr_params = getattr(data, "tr_params", None)
-        if not isinstance(tr_params, dict):
-            enabled, coord_norm = False, False
-        else:
-            enabled = bool(tr_params.get("geom_feats", False))
-            coord_norm = bool(tr_params.get("coord_norm", False)) if enabled else False
-    if enabled:
-        return f"geomFeat-{_mp_bool_token(enabled)}-{_mp_bool_token(coord_norm)}"
-    return f"geomFeat-{_mp_bool_token(enabled)}"
-
-def _mp_data_descriptor(data, model_obj=None):
-    if data is None:
-        return "data-default"
-
-    parts = []
-    for key in ["LAT", "dis"]:
-        if hasattr(data, key):
-            val = getattr(data, key)
-            if val is not None and str(val).strip():
-                parts.append(_mp_slugify(val, max_len=24, preserve_case=True))
-
-    if hasattr(data, "dN") and getattr(data, "dN") is not None:
-        parts.append(f"dN-{_mp_slugify(_mp_format_num(getattr(data, 'dN')), max_len=24, preserve_case=True)}")
-
-    path_add = getattr(data, "path_add", None)
-    if path_add is not None and str(path_add).strip():
-        parts.append(f"pathAdd-{_mp_slugify(path_add, max_len=24, preserve_case=True)}")
-
-    if hasattr(data, "d_data") and getattr(data, "d_data") is not None:
-        parts.append(f"data-{_mp_slugify(getattr(data, 'd_data'), max_len=24, preserve_case=True)}")
-
-    nsims = getattr(data, "nsims", None)
-    parts.append(f"nSims-{_mp_slugify('all' if nsims is None else nsims, max_len=24, preserve_case=True)}")
-
-    load_split = getattr(data, "load_split", False)
-    if load_split:
-        split_desc = f"split-load-{_mp_slugify(load_split, max_len=24, preserve_case=True)}" if isinstance(load_split, str) else "split-load"
-    else:
-        split_frac = getattr(data, "split_frac", None)
-        split_frac = "na" if split_frac is None else _mp_format_num(split_frac)
-        split_seed = getattr(data, "split_seed", None)
-        split_seed = "None" if split_seed is None else split_seed
-        split_desc = f"split-frac-{_mp_slugify(split_frac, max_len=16)}-seed-{_mp_slugify(split_seed, max_len=16, preserve_case=True)}-range-{_mp_range_split_token(data)}"
-    parts.append(split_desc)
-
-    round_decimals = getattr(data, "round_decimals", None)
-    parts.append(f"round-{_mp_slugify('None' if round_decimals is None else round_decimals, max_len=16, preserve_case=True)}")
-
-    geom_feature_token = _mp_geom_feature_token(data)
-    if geom_feature_token is not None:
-        parts.append(geom_feature_token)
-
-    descriptor_obj = model_obj
-    if descriptor_obj is None:
-        class _DescriptorObj:
-            def __init__(self, data):
-                self.data = data
-        descriptor_obj = _DescriptorObj(data)
-
-    if getattr(data, "scale", None):
-        scale_sig = _mp_scaler_signature(descriptor_obj)
-        parts.append(f"scale-{_mp_slugify(getattr(data, 'scale', None), max_len=16, preserve_case=True)}-cfgHash{_mp_json_sha1(scale_sig)[:6]}")
-    else:
-        parts.append("scale-None")
-
-    if getattr(data, "reduce_dim", None):
-        reducer_sig = _mp_reducer_signature(descriptor_obj)
-        parts.append(f"rDim-{_mp_slugify(getattr(data, 'reduce_dim', None), max_len=16, preserve_case=True)}-cfgHash{_mp_json_sha1(reducer_sig)[:6]}")
-    else:
-        parts.append("rDim-None")
-
-    return "_".join(parts) if parts else "data-default"
-
 def _mp_run_root():
     root = os.environ.get("ML_RUN_ROOT")
     if root is None or str(root).strip() == "":
@@ -1879,7 +1774,7 @@ def _mp_model_base_dir(model_obj):
     data = getattr(model_obj, "data", None)
     if data is None:
         raise ValueError("MODEL save/load requires model_obj.data to build the ML run path.")
-    return _mp_run_root() / _mp_task_token(data) / _mp_data_descriptor(data, model_obj=model_obj) / _mp_model_type_token(model_obj)
+    return _mp_run_root() / _mp_task_token(data) / _mp_model_type_token(model_obj)
 
 def _mp_latest_run_dir(model_obj):
     base = _mp_model_base_dir(model_obj)
@@ -2503,7 +2398,6 @@ def _model_refresh_descriptor(model_obj, path=None, name=None):
             "root": str(_mp_run_root()),
             "archive_root": str(_mp_archive_root()) if _mp_archive_root() is not None else None,
             "task": _mp_task_token(data),
-            "data_descriptor": _mp_data_descriptor(data, model_obj=model_obj),
             "model": _mp_model_type_token(model_obj),
             "run_descriptor": Path(path).name if path is not None else None,
             "results_dir": str(Path(path) / "results") if path is not None else None,

@@ -1787,21 +1787,13 @@ def _hopt_model_type_token(typ):
 
     return _mp_model_type_token(typ=_hopt_normalize_typ(typ))
 
-def _hopt_data_descriptor(data):
-    from resources.MLmodels import _mp_data_descriptor
-
-    return _mp_data_descriptor(data)
-
 def _hopt_task_base_dir(data):
     from resources.MLmodels import _mp_run_root
 
     return str(_mp_run_root() / _hopt_task_token(data))
 
-def _hopt_data_base_dir(data):
-    return os.path.join(_hopt_task_base_dir(data), _hopt_data_descriptor(data))
-
 def _hopt_model_base_dir(typ, data):
-    return os.path.join(_hopt_data_base_dir(data), _hopt_model_type_token(typ))
+    return os.path.join(_hopt_task_base_dir(data), _hopt_model_type_token(typ))
 
 def _hopt_model_study_dir(typ, data, name):
     return os.path.join(_hopt_model_base_dir(typ, data), "HPO", _hopt_context_name(name))
@@ -1814,7 +1806,7 @@ def _hopt_compare_study_base_dir(typs, data, name):
         raise ValueError(f"No DATA object supplied for typ(s): {missing}.")
 
     if len({id(d) for d in typ_data}) == 1:
-        base_dir = _hopt_data_base_dir(typ_data[0])
+        base_dir = _hopt_task_base_dir(typ_data[0])
     else:
         task_dirs = {_hopt_task_base_dir(d) for d in typ_data}
         if len(task_dirs) != 1:

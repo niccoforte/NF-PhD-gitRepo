@@ -1263,10 +1263,10 @@ def _data_to_json_payload(data_obj):
     }
 
 def _data_default_json_path(data_obj):
-    from resources.MLmodels import _mp_data_descriptor, _mp_run_root, _mp_task_token
+    from resources.MLmodels import _mp_run_root, _mp_task_token
 
     base = _mp_run_root() / _mp_task_token(data_obj)
-    return base / _mp_data_descriptor(data_obj) / "data.json"
+    return base / "data.json"
 
 def _data_to_numpy(x):
     if hasattr(x, "to_numpy"):
