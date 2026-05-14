@@ -1745,14 +1745,37 @@ def _hopt_get(cfg, key, default=None):
         return default
     return cfg.get(key, default) if isinstance(cfg, dict) else default
 
+def _hopt_supported_typ_error():
+    return "typ must be one of ['MLP', 'Transformer', 'GNN', 'GCN', 'GAT']."
+
+def _hopt_context_name(name):
+    from resources.MLmodels import _mp_run_context_prefix
+
+    name = str(name)
+    prefix = _mp_run_context_prefix()
+    if prefix and not name.lower().startswith(prefix.lower()):
+        return f"{prefix}{name}"
+    return name
+
+def _hopt_normalize_typ(typ):
+    typ = str(typ).strip().lower()
+    aliases = {"transformer": "tr"}
+    typ = aliases.get(typ, typ)
+    if typ not in ["mlp", "tr", "gnn", "gcn", "gat"]:
+        raise ValueError(_hopt_supported_typ_error())
+    return typ
+
 def _hopt_by_typ(value, typ):
     if not isinstance(value, dict):
         return value
-    typ = str(typ).lower()
-    typ_keys = {"mlp", "tr", "gnn", "gcn", "gat", "default"}
-    if not any(key in value for key in typ_keys):
+    typ = _hopt_normalize_typ(typ)
+    lookup = {str(key).strip().lower(): item for key, item in value.items()}
+    typ_keys = {"mlp", "tr", "transformer", "gnn", "gcn", "gat", "default"}
+    if not any(key in lookup for key in typ_keys):
         return value
-    return value.get(typ, value.get("default"))
+    if typ == "tr":
+        return lookup.get("tr", lookup.get("transformer", lookup.get("default")))
+    return lookup.get(typ, lookup.get("default"))
 
 def _hopt_task_token(data):
     from resources.MLmodels import _mp_task_token
@@ -1760,12 +1783,9 @@ def _hopt_task_token(data):
     return _mp_task_token(data)
 
 def _hopt_model_type_token(typ):
-    from resources.MLmodels import _mp_slugify
+    from resources.MLmodels import _mp_model_type_token
 
-    typ = str(typ).lower()
-    if typ not in ["mlp", "tr", "gnn", "gcn", "gat"]:
-        raise ValueError("typ must be one of ['mlp', 'tr', 'gnn', 'gcn', 'gat'].")
-    return _mp_slugify(typ, default="model", preserve_case=True).upper()
+    return _mp_model_type_token(typ=_hopt_normalize_typ(typ))
 
 def _hopt_data_descriptor(data):
     from resources.MLmodels import _mp_data_descriptor
@@ -1784,10 +1804,10 @@ def _hopt_model_base_dir(typ, data):
     return os.path.join(_hopt_data_base_dir(data), _hopt_model_type_token(typ))
 
 def _hopt_model_study_dir(typ, data, name):
-    return os.path.join(_hopt_model_base_dir(typ, data), "HPO", str(name))
+    return os.path.join(_hopt_model_base_dir(typ, data), "HPO", _hopt_context_name(name))
 
 def _hopt_compare_study_base_dir(typs, data, name):
-    typ_keys = [str(typ).lower() for typ in typs]
+    typ_keys = [_hopt_normalize_typ(typ) for typ in typs]
     typ_data = [_hopt_by_typ(data, typ) for typ in typ_keys]
     if any(d is None for d in typ_data):
         missing = [typ for typ, d in zip(typ_keys, typ_data) if d is None]
@@ -1800,7 +1820,7 @@ def _hopt_compare_study_base_dir(typs, data, name):
         if len(task_dirs) != 1:
             raise ValueError("HPO comparison studies with multiple task roots need an explicit path or study_dir.")
         base_dir = next(iter(task_dirs))
-    return os.path.join(base_dir, "HPO", str(name))
+    return os.path.join(base_dir, "HPO", _hopt_context_name(name))
 
 def _hopt_sample(trial, name, spec, default=None):
     if callable(spec):
@@ -1848,7 +1868,7 @@ def _hopt_primary_mode(data):
     return "UT" if getattr(data, "UTmechTest", False) else "FT"
 
 def _hopt_io_sizes(data, typ):
-    typ = str(typ).lower()
+    typ = _hopt_normalize_typ(typ)
     x, y = _hopt_mode_data(data, _hopt_primary_mode(data))
     x_shape = np.asarray(x).shape
     y_shape = np.asarray(y).shape
@@ -1880,10 +1900,10 @@ def _hopt_io_sizes(data, typ):
             )
         return {"in_size": int(x_shape[-1]), "out_size": out_size}
 
-    raise ValueError("typ must be one of ['mlp', 'tr', 'gnn', 'gcn', 'gat'].")
+    raise ValueError(_hopt_supported_typ_error())
 
 def hOpt_suggest_model_params(trial, typ, data, search_space=None):
-    typ = str(typ).lower()
+    typ = _hopt_normalize_typ(typ)
     cfg = _hopt_get(search_space, "model", search_space)
     io = _hopt_io_sizes(data, typ)
 
@@ -1958,12 +1978,12 @@ def hOpt_suggest_model_params(trial, typ, data, search_space=None):
         }
         return params
 
-    raise ValueError("typ must be one of ['mlp', 'tr', 'gnn', 'gcn', 'gat'].")
+    raise ValueError(_hopt_supported_typ_error())
 
 def hOpt_build_model(typ, params):
     from resources.MLmodels import MLP, Transformer, GNN
 
-    typ = str(typ).lower()
+    typ = _hopt_normalize_typ(typ)
     if typ == "mlp":
         return MLP(**params)
     if typ == "tr":
@@ -1973,7 +1993,7 @@ def hOpt_build_model(typ, params):
         if typ in ["gcn", "gat"]:
             params["block"] = typ
         return GNN(**params)
-    raise ValueError("typ must be one of ['mlp', 'tr', 'gnn', 'gcn', 'gat'].")
+    raise ValueError(_hopt_supported_typ_error())
 
 def _hopt_curve_x_values(data, mode):
     out_df = getattr(data, f"{mode}_OUT_df", None)
@@ -2035,7 +2055,7 @@ def hOpt_build_loss(loss_params, data, loss_cfg=None):
     return task_losses
 
 def hOpt_suggest_training_params(trial, typ=None, train_cfg=None):
-    typ = str(typ).lower() if typ is not None else None
+    typ = _hopt_normalize_typ(typ) if typ is not None else None
     default_batches = [4, 8, 16, 32] if typ in ["gnn", "gcn", "gat"] else [8, 16, 32, 64]
     opt_name = _hopt_sample(trial, "optimizer", _hopt_get(train_cfg, "optimizer", ["adamw", "adam"]), "adamw")
     params = {
@@ -2285,8 +2305,8 @@ def hOpt_model(
     save_best_model=None,
     best_model_name="best_model",
 ):
-    typ = str(typ).lower()
-    study_name = name if name is not None else f"{typ}_hOpt"
+    typ = _hopt_normalize_typ(typ)
+    study_name = _hopt_context_name(name if name is not None else f"{_hopt_model_type_token(typ)}_hOpt")
     if save and study_dir is None and path is None:
         study_dir = _hopt_model_study_dir(typ, data, study_name)
     save_dir = str(study_dir) if study_dir is not None else str(path)
@@ -2344,12 +2364,13 @@ def hOpt_compare(
     studies = {}
     compare_study_base_dir = _hopt_compare_study_base_dir(typs, data, name) if save and path is None else None
     for typ in typs:
-        typ_key = str(typ).lower()
+        typ_key = _hopt_normalize_typ(typ)
         typ_data = _hopt_by_typ(data, typ_key)
         if typ_data is None:
             raise ValueError(f"No DATA object supplied for typ='{typ}'.")
-        study_name = f"{name}_{typ_key}"
-        study_dir = os.path.join(compare_study_base_dir, typ_key) if compare_study_base_dir is not None else None
+        typ_folder = _hopt_model_type_token(typ_key)
+        study_name = f"{_hopt_context_name(name)}_{typ_folder}"
+        study_dir = os.path.join(compare_study_base_dir, typ_folder) if compare_study_base_dir is not None else None
         study = hOpt_model(
             typ=typ_key,
             data=typ_data,

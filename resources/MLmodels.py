@@ -1831,6 +1831,23 @@ def _mp_task_token(data):
     mech_mode = str(getattr(data, "mechMode", "OTHER")).strip().upper()
     return mech_mode if mech_mode else "OTHER"
 
+def _mp_model_type_label(token):
+    key = str(token or "").strip().lower()
+    labels = {
+        "mlp": "MLP",
+        "gnn": "GNN",
+        "gcn": "GCN",
+        "gat": "GAT",
+        "tr": "Transformer",
+        "transformer": "Transformer",
+        "autoencoder": "Autoencoder",
+        "auto-encoder": "Autoencoder",
+        "ae": "Autoencoder",
+    }
+    if key in labels:
+        return labels[key]
+    return _mp_slugify(token, default="model", preserve_case=True)
+
 def _mp_model_type_token(model_obj=None, typ=None, model=None):
     if typ is None and model_obj is not None:
         typ = getattr(model_obj, "typ", None)
@@ -1841,8 +1858,9 @@ def _mp_model_type_token(model_obj=None, typ=None, model=None):
     if typ in ["gnn", "gcn", "gat"] and block in ["gcn", "gat"]:
         token = block
     else:
-        token = typ or block or "model"
-    return _mp_slugify(token, default="model", preserve_case=True).upper()
+        model_class = model.__class__.__name__ if model is not None else "model"
+        token = typ or block or model_class
+    return _mp_model_type_label(token)
 
 def _mp_run_context_prefix():
     raw = str(os.environ.get("ML_RUN_CONTEXT", "")).strip().lower()
