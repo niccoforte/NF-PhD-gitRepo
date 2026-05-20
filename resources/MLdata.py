@@ -617,7 +617,9 @@ class DATA:
         reduce_dim=False,
         round_decimals=None,
         geom_feats=None,
-        tr_params=None
+        tr_params=None,
+        output_kind="curve",
+        field_config=None
     ):
         self.path = path
         self.path_add = path_add
@@ -637,6 +639,10 @@ class DATA:
         self.d_data = d_data
         self.nsims = nsims
         self.model = model
+        self.output_kind = str(output_kind).strip().lower()
+        if self.output_kind not in ["curve", "field"]:
+            raise ValueError("output_kind must be 'curve' or 'field'.")
+        self.field_config = {} if field_config is None else field_config
         self.freq = freq
         self.round_decimals = None if round_decimals is None or round_decimals is False else int(round_decimals)
         self.geom_feats = _data_resolve_geom_feats(geom_feats=geom_feats, tr_params=tr_params)
@@ -653,6 +659,11 @@ class DATA:
             _data_init_scaler(self, scale)
 
         self.reduce_dim = reduce_dim
+        if self.output_kind == "field":
+            if not _data_is_node_model(self.model):
+                raise ValueError("DATA(output_kind='field') currently requires model='GNN', 'GCN', 'GAT', or 'TR'.")
+            if _data_target_configured(reduce_dim, "out"):
+                raise ValueError("DATA(output_kind='field') does not currently support output dimensionality reduction.")
         if _data_is_node_model(self.model) and _data_target_configured(reduce_dim, "in"):
             raise ValueError(
                 "DATA(model='tr'/'gnn'/'gcn'/'gat') does not support input dimensionality reduction before node tokenization. "
@@ -745,6 +756,10 @@ class DATA:
             self.PATH = str(self.path)+"/"
     
     def loadData(self):
+        if self.output_kind == "field":
+            self.loadFieldData()
+            return
+
         if self.UTmechTest:
             self.UT_IN_df, \
             self.UT_OUT_df, \
@@ -791,6 +806,20 @@ class DATA:
         if self.UTmechTest and self.FTmechTest:
             self.common_props_df = self.UT_props_df
 
+    def loadFieldData(self):
+        if self.UTmechTest:
+            _data_load_field_mode(self, "UT")
+            if self.nsims is not None:
+                _data_limit_mode_samples(self, "UT")
+
+        if self.FTmechTest:
+            _data_load_field_mode(self, "FT")
+            if self.nsims is not None:
+                _data_limit_mode_samples(self, "FT")
+
+        if self.UTmechTest and self.FTmechTest:
+            self.common_props_df = self.UT_props_df
+
     def filterNodes(self):
         if not _data_is_node_model(self.model):
             return
@@ -827,6 +856,8 @@ class DATA:
             setattr(self, f"{mode}_body_columns", keep_columns)
             setattr(self, f"{mode}_IN_df", IN_df.loc[:, keep_columns].copy())
             setattr(self, f"{mode}_dINr_df", dINr_df.loc[:, keep_columns].copy())
+            if self.output_kind == "field":
+                _data_filter_field_nodes(self, mode, input_body_mask=body_mask)
 
         if self.UTmechTest:
             _filter_mode("UT")
@@ -834,6 +865,10 @@ class DATA:
             _filter_mode("FT")
 
     def splitData(self, split_name=None):
+        if self.output_kind == "field":
+            self.splitFieldData(split_name=split_name)
+            return
+
         if self.UTmechTest:
             UT_IN_df = _data_select_input_dataframe(self, "UT")
             UT_OUT_df = self.UT_dOUT_df if self.d_data is not None and ("out" in self.d_data.lower() or "all" in self.d_data.lower()) else self.UT_OUT_df.iloc[1:].drop(['0'], axis=1)
@@ -951,8 +986,95 @@ class DATA:
             self.FT_testProps = _data_to_numpy(self.FT_testProps_df)
 
         _data_update_reconstructors(self)
+
+    def splitFieldData(self, split_name=None):
+        if self.load_split:
+            raise ValueError("Saved split loading for output_kind='field' is not implemented yet. Use split_seed for reproducible field splits.")
+        if split_name is None:
+            split_name = self.load_split if self.load_split else datetime.datetime.now()
+
+        def _force_range_idx(input_df=None, props_df=None):
+            force_idx = pd.Index([])
+            if self.input_range_split and input_df is not None:
+                force_idx = force_idx.union(_data_range_split_indices(input_df))
+            if self.output_range_split and props_df is not None:
+                force_idx = force_idx.union(_data_range_split_indices(props_df))
+            return force_idx if len(force_idx) > 0 else None
+
+        if self.UTmechTest:
+            UT_IN_df = _data_select_input_dataframe(self, "UT")
+        if self.FTmechTest:
+            FT_IN_df = _data_select_input_dataframe(self, "FT")
+
+        UT_train_idx = UT_val_idx = UT_test_idx = None
+        FT_train_idx = FT_val_idx = FT_test_idx = None
+
+        shared_multi_split = (self.UTmechTest and self.FTmechTest)
+        if shared_multi_split:
+            common_idx = UT_IN_df.index
+            for idx in [
+                self.UT_props_df.index,
+                pd.Index(self.UT_field_index),
+                FT_IN_df.index,
+                self.FT_props_df.index,
+                pd.Index(self.FT_field_index),
+            ]:
+                common_idx = common_idx.intersection(idx)
+            self.common_idx = common_idx
+
+            force_train_idx = pd.Index([])
+            UT_force_idx = _force_range_idx(UT_IN_df.loc[common_idx], self.UT_props_df.loc[common_idx])
+            FT_force_idx = _force_range_idx(FT_IN_df.loc[common_idx], self.FT_props_df.loc[common_idx])
+            if UT_force_idx is not None:
+                force_train_idx = force_train_idx.union(UT_force_idx)
+            if FT_force_idx is not None:
+                force_train_idx = force_train_idx.union(FT_force_idx)
+            force_train_idx = force_train_idx if len(force_train_idx) > 0 else None
+            if force_train_idx is not None:
+                self.common_range_split_idx = force_train_idx
+
+            UT_train_idx, UT_val_idx, UT_test_idx = _data_split_indices(
+                UT_IN_df.loc[common_idx],
+                self.UT_props_df.loc[common_idx],
+                split=self.split_frac,
+                random_state=self.split_seed,
+                force_train_idx=force_train_idx,
+            )
+            FT_train_idx, FT_val_idx, FT_test_idx = UT_train_idx, UT_val_idx, UT_test_idx
+
+        if self.UTmechTest:
+            if UT_train_idx is None:
+                force_train_idx = _force_range_idx(UT_IN_df, self.UT_props_df)
+                if force_train_idx is not None:
+                    self.UT_range_split_idx = force_train_idx
+                UT_train_idx, UT_val_idx, UT_test_idx = _data_split_indices(
+                    UT_IN_df,
+                    self.UT_props_df,
+                    split=self.split_frac,
+                    random_state=self.split_seed,
+                    force_train_idx=force_train_idx,
+                )
+            _data_assign_field_split(self, "UT", UT_IN_df, UT_train_idx, UT_val_idx, UT_test_idx)
+
+        if self.FTmechTest:
+            if FT_train_idx is None:
+                force_train_idx = _force_range_idx(FT_IN_df, self.FT_props_df)
+                if force_train_idx is not None:
+                    self.FT_range_split_idx = force_train_idx
+                FT_train_idx, FT_val_idx, FT_test_idx = _data_split_indices(
+                    FT_IN_df,
+                    self.FT_props_df,
+                    split=self.split_frac,
+                    random_state=self.split_seed,
+                    force_train_idx=force_train_idx,
+                )
+            _data_assign_field_split(self, "FT", FT_IN_df, FT_train_idx, FT_val_idx, FT_test_idx)
+
+        _data_update_reconstructors(self)
     
     def saveSplitData(self, split_name=None):
+        if self.output_kind == "field":
+            raise ValueError("Saved split writing for output_kind='field' is not implemented yet. Use split_seed for reproducible field splits.")
         if split_name is None:
             split_name = self.save_split if self.save_split else datetime.datetime.now()
         if self.UTmechTest:
@@ -979,14 +1101,14 @@ class DATA:
         if self.UTmechTest:
             if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.UT_INscaler = clone(self.scaler)
-                self.UT_train_in = self.UT_INscaler.fit_transform(self.UT_train_in)
-                self.UT_val_in   = self.UT_INscaler.transform(self.UT_val_in)
-                self.UT_test_in  = self.UT_INscaler.transform(self.UT_test_in)
+                self.UT_train_in = _data_fit_transform_array(self.UT_INscaler, self.UT_train_in)
+                self.UT_val_in   = _data_transform_array(self.UT_INscaler, self.UT_val_in)
+                self.UT_test_in  = _data_transform_array(self.UT_INscaler, self.UT_test_in)
             if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.UT_OUTscaler = clone(self.scaler)
-                self.UT_train_out = self.UT_OUTscaler.fit_transform(self.UT_train_out)
-                self.UT_val_out   = self.UT_OUTscaler.transform(self.UT_val_out)
-                self.UT_test_out  = self.UT_OUTscaler.transform(self.UT_test_out)
+                self.UT_train_out = _data_fit_transform_array(self.UT_OUTscaler, self.UT_train_out)
+                self.UT_val_out   = _data_transform_array(self.UT_OUTscaler, self.UT_val_out)
+                self.UT_test_out  = _data_transform_array(self.UT_OUTscaler, self.UT_test_out)
             if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.UT_PROPscaler = clone(self.scaler)
                 self.UT_trainProps = self.UT_PROPscaler.fit_transform(self.UT_trainProps.T).T
@@ -996,14 +1118,14 @@ class DATA:
         if self.FTmechTest:
             if "in" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.FT_INscaler = clone(self.scaler)
-                self.FT_train_in = self.FT_INscaler.fit_transform(self.FT_train_in)
-                self.FT_val_in   = self.FT_INscaler.transform(self.FT_val_in)
-                self.FT_test_in  = self.FT_INscaler.transform(self.FT_test_in)
+                self.FT_train_in = _data_fit_transform_array(self.FT_INscaler, self.FT_train_in)
+                self.FT_val_in   = _data_transform_array(self.FT_INscaler, self.FT_val_in)
+                self.FT_test_in  = _data_transform_array(self.FT_INscaler, self.FT_test_in)
             if "out" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.FT_OUTscaler = clone(self.scaler)
-                self.FT_train_out = self.FT_OUTscaler.fit_transform(self.FT_train_out)
-                self.FT_val_out   = self.FT_OUTscaler.transform(self.FT_val_out)
-                self.FT_test_out  = self.FT_OUTscaler.transform(self.FT_test_out)
+                self.FT_train_out = _data_fit_transform_array(self.FT_OUTscaler, self.FT_train_out)
+                self.FT_val_out   = _data_transform_array(self.FT_OUTscaler, self.FT_val_out)
+                self.FT_test_out  = _data_transform_array(self.FT_OUTscaler, self.FT_test_out)
             if "props" in self.scale[1].lower() or "all" in self.scale[1].lower():
                 self.FT_PROPscaler = clone(self.scaler)
                 self.FT_trainProps = self.FT_PROPscaler.fit_transform(self.FT_trainProps.T).T
@@ -1229,6 +1351,8 @@ def _data_constructor_config(data_obj):
         "mechMode": _data_json_safe(getattr(data_obj, "mechMode", "MULTI")),
         "nsims": _data_json_safe(getattr(data_obj, "nsims", None)),
         "model": _data_json_safe(getattr(data_obj, "model", "MLP")),
+        "output_kind": _data_json_safe(getattr(data_obj, "output_kind", "curve")),
+        "field_config": _data_json_safe(getattr(data_obj, "field_config", {})),
         "freq": bool(getattr(data_obj, "freq", False)),
         "scale": _data_json_safe(getattr(data_obj, "scale", False)),
         "reduce_dim": _data_json_safe(getattr(data_obj, "reduce_dim", False)),
@@ -1241,6 +1365,8 @@ def _data_shape_summary(data_obj):
     for key in (
         "UT_train_in", "UT_train_out", "UT_val_in", "UT_val_out", "UT_test_in", "UT_test_out",
         "FT_train_in", "FT_train_out", "FT_val_in", "FT_val_out", "FT_test_in", "FT_test_out",
+        "UT_train_valid_mask", "UT_val_valid_mask", "UT_test_valid_mask",
+        "FT_train_valid_mask", "FT_val_valid_mask", "FT_test_valid_mask",
     ):
         if hasattr(data_obj, key):
             shapes[key] = list(np.shape(getattr(data_obj, key)))
@@ -1256,6 +1382,7 @@ def _data_to_json_payload(data_obj):
             "input_range_split": bool(getattr(data_obj, "input_range_split", False)),
             "output_range_split": bool(getattr(data_obj, "output_range_split", False)),
             "geom_feats": _data_json_safe(getattr(data_obj, "geom_feats", None)),
+            "output_kind": _data_json_safe(getattr(data_obj, "output_kind", "curve")),
             "UTmechTest": bool(getattr(data_obj, "UTmechTest", False)),
             "FTmechTest": bool(getattr(data_obj, "FTmechTest", False)),
         },
@@ -1272,6 +1399,20 @@ def _data_to_numpy(x):
     if hasattr(x, "to_numpy"):
         return x.to_numpy(copy=True)
     return np.asarray(x).copy()
+
+def _data_apply_transform_array(transform_fn, x):
+    arr = np.asarray(x, dtype=float)
+    if arr.ndim <= 2:
+        return transform_fn(arr)
+    shape = arr.shape
+    out = transform_fn(arr.reshape(-1, shape[-1]))
+    return np.asarray(out).reshape(shape)
+
+def _data_fit_transform_array(transformer, x):
+    return _data_apply_transform_array(transformer.fit_transform, x)
+
+def _data_transform_array(transformer, x):
+    return _data_apply_transform_array(transformer.transform, x)
 
 def _data_is_node_model(model):
     return str(model).lower() in ["tr", "gnn", "gcn", "gat"]
@@ -1378,10 +1519,356 @@ def _data_resolve_geom_feats(geom_feats=None, tr_params=None):
         resolved["coord_norm"] = False
     return resolved
 
+def _data_field_mode_config(data_obj, mode):
+    cfg = getattr(data_obj, "field_config", None) or {}
+    if not isinstance(cfg, dict):
+        raise TypeError("field_config must be a dictionary when output_kind='field'.")
+    merged = {key: value for key, value in cfg.items() if str(key).upper() not in ["UT", "FT"]}
+    mode_cfg = cfg.get(mode, cfg.get(mode.lower(), {}))
+    if mode_cfg is None:
+        mode_cfg = {}
+    if not isinstance(mode_cfg, dict):
+        raise TypeError(f"field_config['{mode}'] must be a dictionary.")
+    merged.update(mode_cfg)
+    return merged
+
+def _data_field_path(data_obj, mode):
+    cfg = _data_field_mode_config(data_obj, mode)
+    for key in ["path", "file", "npz", "field_path"]:
+        if key in cfg and cfg[key]:
+            path = Path(str(cfg[key]))
+            if not path.is_absolute():
+                path = Path(data_obj.PATH) / path
+            return path
+    filename = cfg.get("filename", f"{data_obj.mechMode}-{mode}-{data_obj.dis}-field.npz")
+    return Path(data_obj.PATH) / "MLdata" / filename
+
+def _data_field_npz_key(npz, candidates, required=True):
+    files = set(npz.files)
+    for key in candidates:
+        if key in files:
+            return key
+    if required:
+        raise KeyError(f"Field npz is missing one of the required keys: {candidates}.")
+    return None
+
+def _data_npz_string_array(npz, candidates, default=None):
+    key = _data_field_npz_key(npz, candidates, required=False)
+    if key is None:
+        return default
+    values = npz[key]
+    return np.asarray(values).astype(str)
+
+def _data_field_layout_to_sfnc(values, layout, frame_values=None, node_labels=None, components=None):
+    arr = np.asarray(values, dtype=float)
+    if arr.ndim != 4:
+        raise ValueError(f"Field values must be 4D, got shape {arr.shape}.")
+    layout = str(layout or "sfnc").strip().lower()
+    aliases = {
+        "sfnc": "sfnc",
+        "sample_frame_node_component": "sfnc",
+        "sample_frames_nodes_components": "sfnc",
+        "snfc": "snfc",
+        "sample_node_frame_component": "snfc",
+        "sample_nodes_frames_components": "snfc",
+    }
+    layout = aliases.get(layout, layout)
+    if layout == "sfnc":
+        return arr
+    if layout == "snfc":
+        return arr.transpose(0, 2, 1, 3)
+    if layout == "auto":
+        n_frames = len(frame_values) if frame_values is not None else None
+        n_nodes = len(node_labels) if node_labels is not None else None
+        if n_frames is not None and arr.shape[1] == n_frames:
+            return arr
+        if n_nodes is not None and arr.shape[1] == n_nodes:
+            return arr.transpose(0, 2, 1, 3)
+        return arr
+    raise ValueError("field layout must be one of 'sfnc', 'snfc', or 'auto'.")
+
+def _data_field_select_components(values, valid_mask, available_components, requested_components):
+    available_components = [str(c) for c in available_components]
+    if requested_components is None:
+        return values, valid_mask, available_components
+    requested = [str(c) for c in requested_components]
+
+    selected_values = []
+    selected_masks = []
+    selected_names = []
+    lookup = {name.lower(): idx for idx, name in enumerate(available_components)}
+    for name in requested:
+        key = name.lower()
+        if key in ["umag", "u_mag", "magnitude", "|u|"]:
+            if "u1" not in lookup or "u2" not in lookup:
+                raise ValueError("Requested displacement magnitude, but available components do not include U1 and U2.")
+            u1 = values[..., lookup["u1"]]
+            u2 = values[..., lookup["u2"]]
+            m1 = valid_mask[..., lookup["u1"]]
+            m2 = valid_mask[..., lookup["u2"]]
+            selected_values.append(np.sqrt(u1 ** 2 + u2 ** 2)[..., None])
+            selected_masks.append((m1 & m2)[..., None])
+            selected_names.append("Umag")
+            continue
+        if key not in lookup:
+            raise ValueError(f"Requested field component '{name}' is not available. Available: {available_components}")
+        idx = lookup[key]
+        selected_values.append(values[..., idx:idx+1])
+        selected_masks.append(valid_mask[..., idx:idx+1])
+        selected_names.append(available_components[idx])
+
+    return np.concatenate(selected_values, axis=-1), np.concatenate(selected_masks, axis=-1), selected_names
+
+def _data_field_flatten(values, valid_mask):
+    values = np.asarray(values, dtype=float)
+    valid_mask = np.asarray(valid_mask, dtype=bool)
+    if values.ndim != 4:
+        raise ValueError(f"Field values must have shape [samples, frames, nodes, components], got {values.shape}.")
+    flat = values.transpose(0, 2, 1, 3).reshape(values.shape[0], values.shape[2], values.shape[1] * values.shape[3])
+    flat_mask = valid_mask.transpose(0, 2, 1, 3).reshape(valid_mask.shape[0], valid_mask.shape[2], valid_mask.shape[1] * valid_mask.shape[3])
+    flat = flat.copy()
+    flat[~flat_mask] = np.nan
+    return flat, flat_mask
+
+def _data_field_take(data_obj, mode, idx):
+    idx = pd.Index(idx)
+    field_index = pd.Index(getattr(data_obj, f"{mode}_field_index"))
+    positions = field_index.get_indexer(idx)
+    if np.any(positions < 0):
+        missing = idx[positions < 0].tolist()
+        raise KeyError(f"{mode}: field outputs are missing sample indices {missing[:10]}.")
+    values = getattr(data_obj, f"{mode}_field_values")[positions]
+    mask = getattr(data_obj, f"{mode}_field_valid_mask")[positions]
+    return _data_field_flatten(values, mask)
+
+def _data_load_field_mode(data_obj, mode):
+    cfg = _data_field_mode_config(data_obj, mode)
+    input_path = Path(data_obj.PATH) / "MLdata" / f"{data_obj.mechMode}-{mode}-{data_obj.dis}-allIN.csv"
+    props_path = Path(data_obj.PATH) / "MLdata" / f"{data_obj.mechMode}-{data_obj.dis}-allProps.csv"
+    field_path = _data_field_path(data_obj, mode)
+    if not input_path.exists():
+        raise FileNotFoundError(f"{mode}: input CSV not found: {input_path}")
+    if not field_path.exists():
+        raise FileNotFoundError(f"{mode}: field output npz not found: {field_path}")
+
+    IN_df = pd.read_csv(input_path, index_col=0, header=0)
+    dINr_df = IN_df - IN_df.iloc[0].values
+    INfixed_cols = dINr_df.loc[:, (dINr_df == 0.0).all()].columns
+    dIN_df = dINr_df.drop(columns=INfixed_cols)
+    props_df = pd.read_csv(props_path, index_col=0, header=0) if props_path.exists() else pd.DataFrame(index=IN_df.index)
+
+    with np.load(field_path, allow_pickle=True) as npz:
+        values_key = _data_field_npz_key(npz, ["Y", "U", "field", "values", "outputs", "field_values"])
+        values = np.asarray(npz[values_key], dtype=float)
+        frame_values = np.asarray(npz[_data_field_npz_key(npz, ["frame_values", "frames", "times"], required=False)]) if _data_field_npz_key(npz, ["frame_values", "frames", "times"], required=False) else None
+        node_labels = np.asarray(npz[_data_field_npz_key(npz, ["node_labels", "nodes", "labels"], required=False)]) if _data_field_npz_key(npz, ["node_labels", "nodes", "labels"], required=False) else None
+        node_coords = np.asarray(npz[_data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False)], dtype=float) if _data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False) else None
+        elems = np.asarray(npz[_data_field_npz_key(npz, ["elems", "elements", "connectivity"], required=False)]) if _data_field_npz_key(npz, ["elems", "elements", "connectivity"], required=False) else None
+        sample_ids = np.asarray(npz[_data_field_npz_key(npz, ["sample_ids", "ids", "indices", "index"], required=False)]) if _data_field_npz_key(npz, ["sample_ids", "ids", "indices", "index"], required=False) else None
+        available_components = _data_npz_string_array(npz, ["components", "component_names", "variables"], default=None)
+        mask_key = _data_field_npz_key(npz, ["valid_mask", "mask"], required=False)
+        valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
+
+    if available_components is None:
+        available_components = [f"c{i}" for i in range(values.shape[-1])]
+        if values.shape[-1] == 2:
+            available_components = ["U1", "U2"]
+
+    values = _data_field_layout_to_sfnc(
+        values,
+        cfg.get("layout", "auto"),
+        frame_values=frame_values,
+        node_labels=node_labels,
+        components=available_components,
+    )
+    valid_mask = _data_field_layout_to_sfnc(
+        valid_mask.astype(float),
+        cfg.get("layout", "auto"),
+        frame_values=frame_values,
+        node_labels=node_labels,
+        components=available_components,
+    ).astype(bool)
+
+    requested_components = cfg.get("components", ("U1", "U2"))
+    values, valid_mask, components = _data_field_select_components(
+        values,
+        valid_mask,
+        available_components,
+        requested_components,
+    )
+
+    drop_frame0 = bool(cfg.get("drop_frame0", True))
+    if drop_frame0 and values.shape[1] > 1:
+        values = values[:, 1:, :, :]
+        valid_mask = valid_mask[:, 1:, :, :]
+        if frame_values is not None and len(frame_values) == values.shape[1] + 1:
+            frame_values = frame_values[1:]
+
+    if sample_ids is None:
+        if values.shape[0] != len(IN_df):
+            raise ValueError(
+                f"{mode}: field sample count ({values.shape[0]}) does not match input rows ({len(IN_df)}), "
+                "and the npz has no sample_ids key."
+            )
+        field_index = pd.Index(IN_df.index)
+    else:
+        field_index = pd.Index(sample_ids)
+
+    common_idx = IN_df.index.intersection(field_index)
+    if len(common_idx) == 0:
+        field_index_str = pd.Index(field_index.astype(str))
+        input_index_str = pd.Index(IN_df.index.astype(str))
+        common_str = input_index_str.intersection(field_index_str)
+        if len(common_str) == 0:
+            raise ValueError(f"{mode}: no common sample ids between input CSV and field npz.")
+        input_lookup = dict(zip(input_index_str, IN_df.index))
+        field_lookup = dict(zip(field_index_str, field_index))
+        common_idx = pd.Index([input_lookup[i] for i in common_str])
+        field_index = pd.Index([input_lookup.get(str(i), i) for i in field_index])
+
+    keep_positions = field_index.get_indexer(common_idx)
+    values = values[keep_positions]
+    valid_mask = valid_mask[keep_positions]
+    field_index = pd.Index(common_idx)
+    IN_df = IN_df.loc[field_index]
+    dIN_df = dIN_df.loc[field_index]
+    dINr_df = dINr_df.loc[field_index]
+    props_df = props_df.loc[field_index] if len(props_df.index) else pd.DataFrame(index=field_index)
+
+    if frame_values is None:
+        frame_values = np.arange(values.shape[1])
+    if node_labels is None:
+        node_labels = np.arange(values.shape[2]) + 1
+    if node_coords is None:
+        if IN_df.shape[1] % 2 == 0 and IN_df.shape[1] // 2 == values.shape[2]:
+            node_coords = IN_df.iloc[0].to_numpy(dtype=float).reshape(-1, 2)
+        else:
+            node_coords = None
+
+    setattr(data_obj, f"{mode}_IN_df", IN_df)
+    setattr(data_obj, f"{mode}_OUT_df", None)
+    setattr(data_obj, f"{mode}_INf_df", None)
+    setattr(data_obj, f"{mode}_dIN_df", dIN_df)
+    setattr(data_obj, f"{mode}_dINr_df", dINr_df)
+    setattr(data_obj, f"{mode}_dOUT_df", None)
+    setattr(data_obj, f"{mode}_dOUTr_df", None)
+    setattr(data_obj, f"{mode}_props_df", props_df)
+    setattr(data_obj, f"{mode}_field_path", str(field_path))
+    setattr(data_obj, f"{mode}_field_index", field_index)
+    setattr(data_obj, f"{mode}_field_values", values)
+    setattr(data_obj, f"{mode}_field_valid_mask", valid_mask)
+    setattr(data_obj, f"{mode}_field_frame_values", np.asarray(frame_values))
+    setattr(data_obj, f"{mode}_field_node_labels", np.asarray(node_labels))
+    setattr(data_obj, f"{mode}_field_node_coords", None if node_coords is None else np.asarray(node_coords, dtype=float))
+    setattr(data_obj, f"{mode}_field_elems", elems)
+    setattr(data_obj, f"{mode}_field_components", components)
+    setattr(data_obj, f"{mode}_field_shape", (int(values.shape[1]), int(values.shape[2]), int(values.shape[3])))
+
+def _data_filter_field_nodes(data_obj, mode, input_body_mask=None):
+    values = getattr(data_obj, f"{mode}_field_values", None)
+    if values is None:
+        return
+    n_nodes = values.shape[2]
+    mask = None
+    if input_body_mask is not None and len(input_body_mask) == n_nodes:
+        mask = np.asarray(input_body_mask, dtype=bool)
+    else:
+        coords = getattr(data_obj, f"{mode}_field_node_coords", None)
+        if coords is not None and len(coords) == n_nodes:
+            tol = data_obj.geom.l * 1e-4
+            coords = np.asarray(coords, dtype=float)
+            mask = (
+                (coords[:, 0] >= -tol) &
+                (coords[:, 0] <= data_obj.geom.L + tol) &
+                (coords[:, 1] >= -tol) &
+                (coords[:, 1] <= data_obj.geom.H + tol)
+            )
+
+    if mask is None:
+        raise ValueError(
+            f"{mode}: cannot determine body-node mask for field outputs. "
+            "Provide field coords0/node_coords in the npz or make field nodes match input nodes."
+        )
+    if int(mask.sum()) == 0:
+        raise ValueError(f"{mode}: body-node mask removed every field node.")
+
+    setattr(data_obj, f"{mode}_field_values", values[:, :, mask, :])
+    setattr(data_obj, f"{mode}_field_valid_mask", getattr(data_obj, f"{mode}_field_valid_mask")[:, :, mask, :])
+    for attr in ["field_node_labels", "field_node_coords"]:
+        name = f"{mode}_{attr}"
+        value = getattr(data_obj, name, None)
+        if value is not None and len(value) == n_nodes:
+            setattr(data_obj, name, np.asarray(value)[mask])
+    setattr(data_obj, f"{mode}_field_shape", (
+        int(getattr(data_obj, f"{mode}_field_values").shape[1]),
+        int(getattr(data_obj, f"{mode}_field_values").shape[2]),
+        int(getattr(data_obj, f"{mode}_field_values").shape[3]),
+    ))
+
+def _data_split_indices(IN, props, split=0.8, random_state=None, force_train_idx=None):
+    dummy_out = pd.DataFrame({"dummy": np.zeros(len(IN), dtype=float)}, index=IN.index)
+    dummy_props = props if props is not None and len(props.index) else pd.DataFrame(index=IN.index)
+    train, val, test = split_data(IN, dummy_out, dummy_props, split=split, random_state=random_state, force_train_idx=force_train_idx)
+    return train[0].index, val[0].index, test[0].index
+
+def _data_assign_field_split(data_obj, mode, input_df, train_idx, val_idx, test_idx):
+    props_df = getattr(data_obj, f"{mode}_props_df")
+
+    train_out, train_mask = _data_field_take(data_obj, mode, train_idx)
+    val_out, val_mask = _data_field_take(data_obj, mode, val_idx)
+    test_out, test_mask = _data_field_take(data_obj, mode, test_idx)
+
+    setattr(data_obj, f"{mode}_train_in_df", input_df.loc[train_idx])
+    setattr(data_obj, f"{mode}_val_in_df", input_df.loc[val_idx])
+    setattr(data_obj, f"{mode}_test_in_df", input_df.loc[test_idx])
+    setattr(data_obj, f"{mode}_train_out_df", pd.DataFrame(index=train_idx))
+    setattr(data_obj, f"{mode}_val_out_df", pd.DataFrame(index=val_idx))
+    setattr(data_obj, f"{mode}_test_out_df", pd.DataFrame(index=test_idx))
+    setattr(data_obj, f"{mode}_trainProps_df", props_df.loc[train_idx])
+    setattr(data_obj, f"{mode}_valProps_df", props_df.loc[val_idx])
+    setattr(data_obj, f"{mode}_testProps_df", props_df.loc[test_idx])
+
+    setattr(data_obj, f"{mode}_train_in", _data_to_numpy(getattr(data_obj, f"{mode}_train_in_df")))
+    setattr(data_obj, f"{mode}_val_in", _data_to_numpy(getattr(data_obj, f"{mode}_val_in_df")))
+    setattr(data_obj, f"{mode}_test_in", _data_to_numpy(getattr(data_obj, f"{mode}_test_in_df")))
+    setattr(data_obj, f"{mode}_train_out", train_out)
+    setattr(data_obj, f"{mode}_val_out", val_out)
+    setattr(data_obj, f"{mode}_test_out", test_out)
+    setattr(data_obj, f"{mode}_train_valid_mask", train_mask)
+    setattr(data_obj, f"{mode}_val_valid_mask", val_mask)
+    setattr(data_obj, f"{mode}_test_valid_mask", test_mask)
+    setattr(data_obj, f"{mode}_trainProps", _data_to_numpy(getattr(data_obj, f"{mode}_trainProps_df")))
+    setattr(data_obj, f"{mode}_valProps", _data_to_numpy(getattr(data_obj, f"{mode}_valProps_df")))
+    setattr(data_obj, f"{mode}_testProps", _data_to_numpy(getattr(data_obj, f"{mode}_testProps_df")))
+
 def _data_limit_mode_samples(data_obj, mode):
     nsims = int(data_obj.nsims)
     if nsims < 1:
         raise ValueError("nsims must be >= 1 when provided.")
+
+    if getattr(data_obj, "output_kind", "curve") == "field":
+        IN_df = getattr(data_obj, f"{mode}_IN_df")
+        INf_df = getattr(data_obj, f"{mode}_INf_df")
+        dIN_df = getattr(data_obj, f"{mode}_dIN_df")
+        dINr_df = getattr(data_obj, f"{mode}_dINr_df")
+        props_df = getattr(data_obj, f"{mode}_props_df")
+        field_index = pd.Index(getattr(data_obj, f"{mode}_field_index"))
+        common_idx = IN_df.index.intersection(props_df.index).intersection(field_index)
+        if len(common_idx) == 0:
+            raise ValueError(f"{mode}: no common sample indices found for nsims subset.")
+        sample_idx = common_idx[:min(nsims, len(common_idx))]
+        positions = field_index.get_indexer(sample_idx)
+
+        setattr(data_obj, f"{mode}_IN_df", IN_df.loc[sample_idx].copy())
+        if INf_df is not None:
+            setattr(data_obj, f"{mode}_INf_df", INf_df.loc[sample_idx].copy())
+        setattr(data_obj, f"{mode}_dIN_df", dIN_df.loc[sample_idx].copy())
+        setattr(data_obj, f"{mode}_dINr_df", dINr_df.loc[sample_idx].copy())
+        setattr(data_obj, f"{mode}_props_df", props_df.loc[sample_idx].copy())
+        setattr(data_obj, f"{mode}_field_index", pd.Index(sample_idx))
+        setattr(data_obj, f"{mode}_field_values", getattr(data_obj, f"{mode}_field_values")[positions])
+        setattr(data_obj, f"{mode}_field_valid_mask", getattr(data_obj, f"{mode}_field_valid_mask")[positions])
+        return
 
     IN_df = getattr(data_obj, f"{mode}_IN_df")
     OUT_df = getattr(data_obj, f"{mode}_OUT_df")
@@ -1450,7 +1937,7 @@ def _data_target_configured(cfg, target):
 def _data_apply_inverse_steps(data, inverse_steps):
     out = data
     for inverse_step in inverse_steps:
-        out = inverse_step(out)
+        out = _data_apply_transform_array(inverse_step, out)
     return out
 
 def _data_uses_delta_output(data_obj):
@@ -1478,6 +1965,8 @@ def _data_mode_output_delta_baseline(data_obj, mode):
     return out_df.iloc[1][out_columns].to_numpy(dtype=float)
 
 def _data_apply_output_delta_inverse(data_obj, mode, target, data):
+    if getattr(data_obj, "output_kind", "curve") == "field":
+        return data
     if target != "out" or not _data_uses_delta_output(data_obj):
         return data
     baseline = np.asarray(_data_mode_output_delta_baseline(data_obj, mode), dtype=float)

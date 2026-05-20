@@ -11,9 +11,14 @@ from resources.MLfunc import (
     plot_curve_diagnostics,
     plot_prediction_error_curves,
     plot_curve_correlation_matrix,
+    field_performance_diagnostics,
+    print_field_diagnostics,
+    plot_field_diagnostics,
+    plot_field_sample,
     collect_layer_activations,
     summarize_activations,
     plot_activation_summary,
+    MaskedFieldMSELoss,
     absErr,
     _activation,
     visualize_graphNetwork,
@@ -266,13 +271,8 @@ class MODEL:
         else:
             setattr(self, f"{mode}_{split}_truth", truth)
 
-        err = absErr(outputs, truth, typ="sum", axis=1)
-        best = err.tolist().index(min(err))
-        worst = err.tolist().index(max(err))
-        mae = float(np.mean(np.abs(outputs - truth)))
-        mse = float(np.mean((outputs - truth) ** 2))
-        rmse = float(np.sqrt(mse))
-        mean_sum_abs_err = float(np.mean(err))
+        field_output = _model_is_field_output(self.data)
+        err, best, worst, mae, mse, rmse, mean_sum_abs_err = _model_basic_prediction_metrics(outputs, truth)
         for name, value in [
             ("err", err),
             ("best", best),
@@ -291,35 +291,53 @@ class MODEL:
         print(f"Best prediction: {best}, Worst prediction: {worst}")
 
         if diagnostics:
-            diag = _model_curve_diagnostics(
-                self,
-                mode,
-                outputs,
-                truth,
-                split=split,
-                zone_boundaries=zone_boundaries,
-            )
+            if field_output:
+                diag = _model_field_diagnostics(self, mode, outputs, truth, split=split)
+            else:
+                diag = _model_curve_diagnostics(
+                    self,
+                    mode,
+                    outputs,
+                    truth,
+                    split=split,
+                    zone_boundaries=zone_boundaries,
+                )
             setattr(self, f"{mode}_{split}_diagnostics", diag)
             if split == "test":
                 setattr(self, f"{mode}_diagnostics", diag)
                 setattr(self, f"{mode}_prediction_summary", diag["summary"])
-            print_curve_diagnostics(diag, label=f"{mode} {split}")
+            if field_output:
+                print_field_diagnostics(diag, label=f"{mode} {split}")
+            else:
+                print_curve_diagnostics(diag, label=f"{mode} {split}")
             if diag_plot:
-                plot_curve_diagnostics(
-                    getattr(self.data, f"{mode}_OUT_df"),
-                    outputs,
-                    truth,
-                    diagnostics=diag,
-                    mode=mode_lower,
-                    max_samples=diag_samples,
-                    sort_by="rmse",
-                )
+                if field_output:
+                    plot_field_diagnostics(diag)
+                else:
+                    plot_curve_diagnostics(
+                        getattr(self.data, f"{mode}_OUT_df"),
+                        outputs,
+                        truth,
+                        diagnostics=diag,
+                        mode=mode_lower,
+                        max_samples=diag_samples,
+                        sort_by="rmse",
+                    )
 
         if plot:
-            plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=best,
-                             d_out=False)
-            plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=worst,
-                             d_out=False)
+            if field_output:
+                diag = getattr(self, f"{mode}_{split}_diagnostics", None)
+                if diag is None:
+                    diag = _model_field_diagnostics(self, mode, outputs, truth, split=split)
+                node_coords = getattr(self.data, f"{mode}_field_node_coords", None)
+                if node_coords is not None:
+                    plot_field_sample(diag, sample=best, frame=-1, component=0, node_coords=node_coords)
+                    plot_field_sample(diag, sample=worst, frame=-1, component=0, node_coords=node_coords)
+            else:
+                plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=best,
+                                 d_out=False)
+                plot_predictions(getattr(self.data, f"{mode}_OUT_df"), outputs, truth=truth, mode=mode_lower, indx=worst,
+                                 d_out=False)
 
         if getattr(self, "save_dir", None) is not None:
             _model_save_results(self, eval_split=split)
@@ -375,7 +393,13 @@ class MODEL:
         if outputs is None or truth is None:
             raise ValueError(f"No stored {mode} {split} predictions. Run predict() or evaluate_split('{split}') first.")
         if diagnostics is None:
-            diagnostics = _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+            diagnostics = (
+                _model_field_diagnostics(self, mode, outputs, truth, split=split)
+                if _model_is_field_output(self.data)
+                else _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+            )
+        if _model_is_field_output(self.data):
+            return plot_field_diagnostics(diagnostics)
         return plot_curve_diagnostics(
             getattr(self.data, f"{mode}_OUT_df"),
             outputs,
@@ -400,7 +424,13 @@ class MODEL:
         if outputs is None or truth is None:
             raise ValueError(f"No stored {mode} {split} predictions. Run predict() or evaluate_split('{split}') first.")
         if diagnostics is None:
-            diagnostics = _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+            diagnostics = (
+                _model_field_diagnostics(self, mode, outputs, truth, split=split)
+                if _model_is_field_output(self.data)
+                else _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+            )
+        if _model_is_field_output(self.data):
+            return plot_field_diagnostics(diagnostics)
         return plot_prediction_error_curves(
             getattr(self.data, f"{mode}_OUT_df"),
             outputs,
@@ -425,7 +455,11 @@ class MODEL:
                 truth = getattr(self, f"{mode}_truth", None)
             if outputs is None or truth is None:
                 raise ValueError(f"No stored {mode} {split} predictions. Run predict() or evaluate_split('{split}') first.")
+            if _model_is_field_output(self.data):
+                raise ValueError("plot_correlation_matrix is currently curve-only for this framework.")
             diagnostics = _model_curve_diagnostics(self, mode, outputs, truth, split=split)
+        if _model_is_field_output(self.data):
+            raise ValueError("plot_correlation_matrix is currently curve-only for this framework.")
         return plot_curve_correlation_matrix(diagnostics, columns=columns, method=method)
 
     def activation_diagnostics(
@@ -549,63 +583,6 @@ class MODEL:
             strict_match=strict_match,
             fallback_to_latest=fallback_to_latest,
             require_descriptor_json=require_descriptor_json,
-        )
-
-
-def _model_reconstruct_output(data, mode, values):
-    reconstructor = getattr(data, f"{mode}_OUTreconstructor", None)
-    values = np.asarray(values, dtype=float)
-    return reconstructor(values) if callable(reconstructor) else values
-
-def _model_split_truth(data, mode, split):
-    attr = f"{mode}_{split}_out"
-    if not hasattr(data, attr):
-        return None
-    return _model_reconstruct_output(data, mode, getattr(data, attr))
-
-def _model_task_zone_boundaries(model_obj, mode):
-    losses = getattr(model_obj, f"{mode}_losses", None)
-    if losses is None:
-        losses = getattr(model_obj, "losses", [])
-    for loss in losses:
-        zone_boundaries = getattr(loss, "zone_boundaries", None)
-        if zone_boundaries is not None:
-            return tuple(zone_boundaries)
-        weighted_mse = getattr(loss, "weighted_mse", None)
-        zone_boundaries = getattr(weighted_mse, "zone_boundaries", None)
-        if zone_boundaries is not None:
-            return tuple(zone_boundaries)
-    return None
-
-def _model_zone_boundaries_for_mode(model_obj, mode, zone_boundaries):
-    if isinstance(zone_boundaries, dict):
-        return zone_boundaries.get(mode, zone_boundaries.get(mode.lower()))
-    if zone_boundaries is not None:
-        return zone_boundaries
-    return _model_task_zone_boundaries(model_obj, mode)
-
-def _model_curve_diagnostics(model_obj, mode, outputs, truth, split="test", zone_boundaries=None):
-    mode = mode.upper()
-    zone_cfg = _model_zone_boundaries_for_mode(model_obj, mode, zone_boundaries)
-    train_truth = _model_split_truth(model_obj.data, mode, "train")
-    try:
-        return curve_performance_diagnostics(
-            outputs,
-            truth,
-            x_values=getattr(model_obj.data, f"{mode}_OUT_df"),
-            train_truth=train_truth,
-            zone_boundaries=zone_cfg,
-        )
-    except ValueError as exc:
-        if zone_cfg is None:
-            raise
-        print(f"{mode} {split} diagnostics warning: {exc} Falling back to equal thirds.")
-        return curve_performance_diagnostics(
-            outputs,
-            truth,
-            x_values=getattr(model_obj.data, f"{mode}_OUT_df"),
-            train_truth=train_truth,
-            zone_boundaries=None,
         )
 
 
@@ -844,8 +821,8 @@ class Transformer(nn.Module):
         self.head_norm = self.norm if isinstance(head_norm, str) and head_norm.lower() == "same" else _resolve_norm(head_norm)
         self.head_dropout = _resolve_dropout(head_dropout, self.dropout)
         self.bias = bias
-        if self.pool not in ["mean", "add", "max", "cls"]:
-            raise ValueError("pool must be one of ['mean', 'add', 'max', 'cls'].")
+        if self.pool not in ["mean", "add", "max", "cls", "node"]:
+            raise ValueError("pool must be one of ['mean', 'add', 'max', 'cls', 'node'].")
         if self.pool == "cls" and not self.use_cls_token:
             raise ValueError("pool='cls' requires use_cls_token=True.")
 
@@ -936,6 +913,8 @@ class Transformer(nn.Module):
         self._init_positional_encoding(seq_len)
 
     def _pool_tokens(self, x):
+        if self.pool == "node":
+            return x[:, 1:, :] if self.use_cls_token else x
         if self.pool == "cls":
             if not self.use_cls_token:
                 raise ValueError("pool='cls' requires use_cls_token=True.")
@@ -948,12 +927,15 @@ class Transformer(nn.Module):
             return tokens.sum(dim=1)
         if self.pool == "max":
             return tokens.max(dim=1).values
-        raise ValueError("pool must be one of ['mean', 'add', 'max', 'cls'].")
+        raise ValueError("pool must be one of ['mean', 'add', 'max', 'cls', 'node'].")
 
     def _apply_head_norm(self, x):
         if self.head_normL is None:
             return x
         if isinstance(self.head_normL, nn.BatchNorm1d):
+            if x.dim() == 3:
+                shape = x.shape
+                return self.head_normL(x.reshape(-1, shape[-1])).reshape(shape)
             return self.head_normL(x)
         return self.head_normL(x)
 
@@ -1082,6 +1064,8 @@ class GNN(nn.Module):
 
         if self.block not in ["gcn", "gat"]:
             raise ValueError("block must be either 'gcn' or 'gat'.")
+        if self.pool not in ["mean", "add", "node"]:
+            raise ValueError("pool must be one of ['mean', 'add', 'node'].")
 
         if len(h_size) == 0:
             self.GconvIN = None
@@ -1125,12 +1109,14 @@ class GNN(nn.Module):
                 if self.dropoutL is not None:
                     x = self.dropoutL(x)
 
-        if self.pool == "mean":
+        if self.pool == "node":
+            pass
+        elif self.pool == "mean":
             x = global_mean_pool(x, batch)
         elif self.pool == "add":
             x = global_add_pool(x, batch)
         else:
-            raise ValueError("pool must be either 'mean' or 'add'.")
+            raise ValueError("pool must be one of ['mean', 'add', 'node'].")
 
         if self.head_norm:
             x = self.head_normL(x)
@@ -1643,7 +1629,10 @@ def _model_make_task_components(mode, typ, model, opt, lr, data, batch, dataload
         })
         return components
 
-    if mode == "UT":
+    if _model_is_field_output(data):
+        train_x, val_x, test_x = getattr(data, f"{mode}_train_in"), getattr(data, f"{mode}_val_in"), getattr(data, f"{mode}_test_in")
+        train_y, val_y, test_y = getattr(data, f"{mode}_train_out"), getattr(data, f"{mode}_val_out"), getattr(data, f"{mode}_test_out")
+    elif mode == "UT":
         train_x, val_x, test_x = data.UT_train_in, data.UT_val_in, data.UT_test_in
         train_y, val_y, test_y = data.UT_train_out, data.UT_val_out, data.UT_test_out
     elif getattr(data, "UTmechTest", False):
@@ -1674,6 +1663,107 @@ def _model_make_task_components(mode, typ, model, opt, lr, data, batch, dataload
 def _model_assign_task_components(model_obj, mode, components):
     for name, value in components.items():
         setattr(model_obj, f"{mode}_{name}", value)
+
+def _model_reconstruct_output(data, mode, values):
+    reconstructor = getattr(data, f"{mode}_OUTreconstructor", None)
+    values = np.asarray(values, dtype=float)
+    return reconstructor(values) if callable(reconstructor) else values
+
+def _model_output_kind(data):
+    return str(getattr(data, "output_kind", "curve")).strip().lower()
+
+def _model_is_field_output(data):
+    return _model_output_kind(data) == "field"
+
+def _model_basic_prediction_metrics(outputs, truth):
+    outputs = np.asarray(outputs, dtype=float)
+    truth = np.asarray(truth, dtype=float)
+    valid = np.isfinite(outputs) & np.isfinite(truth)
+    err = outputs - truth
+    abs_err = np.where(valid, np.abs(err), np.nan)
+    sq_err = np.where(valid, err ** 2, np.nan)
+
+    sample_axes = tuple(range(1, outputs.ndim)) if outputs.ndim > 1 else None
+    if sample_axes:
+        sample_err = np.nansum(abs_err, axis=sample_axes)
+    else:
+        sample_err = abs_err
+    finite_sample_err = np.where(np.isfinite(sample_err), sample_err, np.inf)
+    best = int(np.argmin(finite_sample_err)) if finite_sample_err.size else 0
+    worst = int(np.argmax(np.where(np.isfinite(sample_err), sample_err, -np.inf))) if finite_sample_err.size else 0
+
+    mae = float(np.nanmean(abs_err)) if np.any(np.isfinite(abs_err)) else np.nan
+    mse = float(np.nanmean(sq_err)) if np.any(np.isfinite(sq_err)) else np.nan
+    rmse = float(np.sqrt(mse)) if np.isfinite(mse) else np.nan
+    mean_sum_abs_err = float(np.nanmean(sample_err)) if np.any(np.isfinite(sample_err)) else np.nan
+    return sample_err, best, worst, mae, mse, rmse, mean_sum_abs_err
+
+def _model_split_truth(data, mode, split):
+    attr = f"{mode}_{split}_out"
+    if not hasattr(data, attr):
+        return None
+    return _model_reconstruct_output(data, mode, getattr(data, attr))
+
+def _model_task_zone_boundaries(model_obj, mode):
+    losses = getattr(model_obj, f"{mode}_losses", None)
+    if losses is None:
+        losses = getattr(model_obj, "losses", [])
+    for loss in losses:
+        zone_boundaries = getattr(loss, "zone_boundaries", None)
+        if zone_boundaries is not None:
+            return tuple(zone_boundaries)
+        weighted_mse = getattr(loss, "weighted_mse", None)
+        zone_boundaries = getattr(weighted_mse, "zone_boundaries", None)
+        if zone_boundaries is not None:
+            return tuple(zone_boundaries)
+    return None
+
+def _model_zone_boundaries_for_mode(model_obj, mode, zone_boundaries):
+    if isinstance(zone_boundaries, dict):
+        return zone_boundaries.get(mode, zone_boundaries.get(mode.lower()))
+    if zone_boundaries is not None:
+        return zone_boundaries
+    return _model_task_zone_boundaries(model_obj, mode)
+
+def _model_curve_diagnostics(model_obj, mode, outputs, truth, split="test", zone_boundaries=None):
+    mode = mode.upper()
+    zone_cfg = _model_zone_boundaries_for_mode(model_obj, mode, zone_boundaries)
+    train_truth = _model_split_truth(model_obj.data, mode, "train")
+    try:
+        return curve_performance_diagnostics(
+            outputs,
+            truth,
+            x_values=getattr(model_obj.data, f"{mode}_OUT_df"),
+            train_truth=train_truth,
+            zone_boundaries=zone_cfg,
+        )
+    except ValueError as exc:
+        if zone_cfg is None:
+            raise
+        print(f"{mode} {split} diagnostics warning: {exc} Falling back to equal thirds.")
+        return curve_performance_diagnostics(
+            outputs,
+            truth,
+            x_values=getattr(model_obj.data, f"{mode}_OUT_df"),
+            train_truth=train_truth,
+            zone_boundaries=None,
+        )
+
+def _model_field_diagnostics(model_obj, mode, outputs, truth, split="test"):
+    mode = mode.upper()
+    train_truth = _model_split_truth(model_obj.data, mode, "train")
+    return field_performance_diagnostics(
+        outputs,
+        truth,
+        field_shape=getattr(model_obj.data, f"{mode}_field_shape", None),
+        frame_values=getattr(model_obj.data, f"{mode}_field_frame_values", None),
+        components=getattr(model_obj.data, f"{mode}_field_components", None),
+        node_labels=getattr(model_obj.data, f"{mode}_field_node_labels", None),
+        node_coords=getattr(model_obj.data, f"{mode}_field_node_coords", None),
+        train_truth=train_truth,
+    )
+
+
 
 # MODEL saving and loading helpers
 def _mp_slugify(value, default="na", max_len=64, preserve_case=False):
@@ -1868,7 +1958,7 @@ def _mp_collect_data_signature(model_obj):
     for key in (
         "mechMode", "LAT", "dis", "dN", "d_data", "nsims", "split_frac",
         "split_seed", "range_split", "input_range_split", "output_range_split",
-        "round_decimals", "geom_feats", "model",
+        "round_decimals", "geom_feats", "model", "output_kind", "field_config",
         "scale", "scale_reduced", "reduce_dim", "path", "path_add", "load_split",
         "UTmechTest", "FTmechTest",
     ):
@@ -2113,6 +2203,8 @@ def _model_loss_to_config(lossf):
     class_name = lossf.__class__.__name__
     if isinstance(lossf, nn.MSELoss):
         return {"class": "MSELoss", "params": {"reduction": lossf.reduction}}
+    if isinstance(lossf, MaskedFieldMSELoss):
+        return {"class": "MaskedFieldMSELoss", "params": {"reduction": lossf.reduction, "eps": lossf.eps}}
 
     params = {}
     if class_name == "CombinedCurveLoss":
@@ -2259,6 +2351,7 @@ def _model_build_loss_from_config(loss_config):
         PeakStressLoss,
         StrainEnergyLoss,
         SoftPeakLocationLoss,
+        MaskedFieldMSELoss,
     )
 
     builders = {
@@ -2270,6 +2363,7 @@ def _model_build_loss_from_config(loss_config):
         "PeakStressLoss": PeakStressLoss,
         "StrainEnergyLoss": StrainEnergyLoss,
         "SoftPeakLocationLoss": SoftPeakLocationLoss,
+        "MaskedFieldMSELoss": MaskedFieldMSELoss,
     }
     if class_name not in builders:
         raise ValueError(f"Unsupported loss class in JSON reload config: '{class_name}'.")
@@ -2628,6 +2722,9 @@ def _model_save_results(model_obj, path=None, run_config=None, eval_split="test"
             ("sample_metrics", "sample_metrics"),
             ("point_metrics", "point_metrics"),
             ("zone_metrics", "zone_metrics"),
+            ("frame_metrics", "frame_metrics"),
+            ("component_metrics", "component_metrics"),
+            ("node_metrics", "node_metrics"),
         ):
             value = diag.get(key)
             if hasattr(value, "to_csv"):

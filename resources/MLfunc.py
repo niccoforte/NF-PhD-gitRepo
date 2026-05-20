@@ -205,6 +205,38 @@ def train_model(
     print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with LOSS: {best_loss:.6f}, MSE: {best_mse:.6f} and RMSE: {best_rmse[1]:.6f} ==================")
     return model, epoch, train_lossLog, val_lossLog, best_loss, best_mse, best_rmse, best_epoch
 
+def _gnn_fixed_node_count(data_batch, context="GNN batch"):
+    num_graphs = int(data_batch.num_graphs)
+    counts = torch.bincount(data_batch.batch, minlength=num_graphs)
+    if counts.numel() == 0:
+        raise ValueError(f"{context}: empty graph batch.")
+    if not torch.all(counts == counts[0]):
+        raise ValueError(
+            f"{context}: node-level outputs require a fixed node count per graph in a batch; "
+            f"got counts {counts.detach().cpu().tolist()}."
+        )
+    return int(counts[0].item())
+
+def _gnn_node_tensor_to_graph_tensor(tensor, data_batch, context="GNN batch"):
+    nodes_per_graph = _gnn_fixed_node_count(data_batch, context=context)
+    num_graphs = int(data_batch.num_graphs)
+    if tensor.shape[0] != data_batch.x.shape[0]:
+        raise ValueError(
+            f"{context}: node-level tensor first dimension ({tensor.shape[0]}) must match "
+            f"batched node count ({data_batch.x.shape[0]})."
+        )
+    return tensor.reshape(num_graphs, nodes_per_graph, *tensor.shape[1:])
+
+def _is_gnn_node_prediction(data_batch, y_predict, y_tensor):
+    return (
+        torch.is_tensor(y_predict)
+        and torch.is_tensor(y_tensor)
+        and y_predict.ndim >= 2
+        and y_tensor.ndim >= 2
+        and y_predict.shape[0] == data_batch.x.shape[0]
+        and y_tensor.shape[0] == data_batch.x.shape[0]
+    )
+
 def _validate_gnn_batch(data_batch, y_predict=None, y=None, context="GNN batch"):
     if not hasattr(data_batch, "x") or data_batch.x is None:
         raise ValueError(f"{context}: missing node feature tensor 'x'.")
@@ -253,6 +285,13 @@ def _validate_gnn_batch(data_batch, y_predict=None, y=None, context="GNN batch")
         )
 
     if y_predict is not None:
+        if tuple(y_predict.shape) == tuple(y_tensor.shape):
+            return
+
+        if _is_gnn_node_prediction(data_batch, y_predict, y_tensor):
+            _gnn_fixed_node_count(data_batch, context=context)
+            return
+
         expected_y = y_tensor.view(num_graphs, -1)
         if tuple(y_predict.shape) != tuple(expected_y.shape):
             raise ValueError(
@@ -265,7 +304,12 @@ def _forward_batch(typ, model, batch, device, context):
         data_batch = batch.to(device)
         _validate_gnn_batch(data_batch, context=context)
         y_predict = model(data_batch.x.float(), data_batch.edge_index, data_batch.batch)
-        y = data_batch.y.float().view(data_batch.num_graphs, -1)
+        y_raw = data_batch.y.float()
+        if _is_gnn_node_prediction(data_batch, y_predict, y_raw):
+            y_predict = _gnn_node_tensor_to_graph_tensor(y_predict, data_batch, context=context)
+            y = _gnn_node_tensor_to_graph_tensor(y_raw, data_batch, context=context)
+        else:
+            y = y_raw.view(data_batch.num_graphs, -1)
         _validate_gnn_batch(data_batch, y_predict=y_predict, y=y, context=context)
         return y_predict, y
 
@@ -286,12 +330,18 @@ def _update_epoch_stats(stats, opt_loss, y_predict, y):
     batch_weight = y.shape[0] if y.ndim > 0 else 1
     stats["loss_sum"] += opt_loss.item()*batch_weight
     stats["loss_weight"] += batch_weight
-    stats["target_min"] = min(stats["target_min"], float(y.min().item()))
-    stats["target_max"] = max(stats["target_max"], float(y.max().item()))
+    valid = torch.isfinite(y) & torch.isfinite(y_predict.detach())
+    if not torch.any(valid):
+        return
 
-    metric_mse_batch = torch.mean((y_predict.detach() - y) ** 2)
-    stats["metric_sse"] += metric_mse_batch.item()*y.numel()
-    stats["n"] += y.numel()
+    y_valid = y[valid]
+    yp_valid = y_predict.detach()[valid]
+    stats["target_min"] = min(stats["target_min"], float(y_valid.min().item()))
+    stats["target_max"] = max(stats["target_max"], float(y_valid.max().item()))
+
+    err = yp_valid - y_valid
+    stats["metric_sse"] += torch.sum(err ** 2).item()
+    stats["n"] += int(y_valid.numel())
 
 def _finalize_epoch_stats(stats):
     if stats["loss_weight"] == 0 or stats["n"] == 0:
@@ -840,6 +890,307 @@ def plot_curve_diagnostics(
     plt.show()
     return fig, axes
 
+# Field diagnostics
+def _field_to_frame_node_component(data, field_shape=None, name="field"):
+    arr = np.asarray(data, dtype=float)
+    if arr.ndim == 4:
+        return arr
+
+    if arr.ndim != 3:
+        raise ValueError(f"{name} must have shape [samples, nodes, node_outputs] or [samples, frames, nodes, components].")
+    if field_shape is None:
+        raise ValueError(f"{name} needs field_shape=(frames, nodes, components) to reconstruct field tensors.")
+
+    n_frames, n_nodes, n_components = [int(v) for v in field_shape]
+    expected = n_frames * n_components
+    if arr.shape[1] != n_nodes or arr.shape[2] != expected:
+        raise ValueError(
+            f"{name} shape {arr.shape} is incompatible with field_shape={tuple(field_shape)}. "
+            f"Expected [samples, {n_nodes}, {expected}]."
+        )
+    return arr.reshape(arr.shape[0], n_nodes, n_frames, n_components).transpose(0, 2, 1, 3)
+
+def _field_metric(err, valid, reducer=np.nanmean):
+    values = np.where(valid, err, np.nan)
+    if not np.any(np.isfinite(values)):
+        return np.nan
+    return float(reducer(values))
+
+def _field_rmse(err, valid):
+    mse_value = _field_metric(err ** 2, valid, reducer=np.nanmean)
+    return float(np.sqrt(mse_value)) if np.isfinite(mse_value) else np.nan
+
+def _field_mae(err, valid):
+    return _field_metric(np.abs(err), valid, reducer=np.nanmean)
+
+def _field_valid_fraction(valid):
+    valid = np.asarray(valid, dtype=bool)
+    if valid.size == 0:
+        return np.nan
+    return float(np.mean(valid))
+
+def _field_nanstd(arr, axis=None):
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return np.nanstd(arr, axis=axis)
+
+def field_performance_diagnostics(
+    y_pred,
+    y_true,
+    field_shape=None,
+    frame_values=None,
+    components=None,
+    node_labels=None,
+    node_coords=None,
+    train_truth=None,
+    eps=1e-12,
+):
+    """
+    Compute masked diagnostics for node-wise field outputs.
+
+    y_pred/y_true may be [samples, nodes, frames*components] or
+    [samples, frames, nodes, components]. Invalid truth values should be NaN.
+    """
+    pred = _field_to_frame_node_component(y_pred, field_shape=field_shape, name="y_pred")
+    true = _field_to_frame_node_component(y_true, field_shape=field_shape, name="y_true")
+    if pred.shape != true.shape:
+        raise ValueError(f"Field prediction and truth shapes must match; got {pred.shape} and {true.shape}.")
+
+    n_samples, n_frames, n_nodes, n_components = pred.shape
+    if frame_values is None:
+        frame_values = np.arange(n_frames)
+    frame_values = np.asarray(frame_values)
+    if frame_values.size != n_frames:
+        frame_values = np.arange(n_frames)
+
+    if components is None:
+        components = [f"c{i}" for i in range(n_components)]
+    components = [str(c) for c in components]
+    if len(components) != n_components:
+        components = [f"c{i}" for i in range(n_components)]
+
+    if node_labels is None:
+        node_labels = np.arange(n_nodes)
+    node_labels = np.asarray(node_labels)
+    if node_labels.size != n_nodes:
+        node_labels = np.arange(n_nodes)
+
+    valid = np.isfinite(true) & np.isfinite(pred)
+    err = pred - true
+
+    sample_rows = []
+    for i in range(n_samples):
+        sample_valid = valid[i]
+        sample_rows.append({
+            "sample": i,
+            "sample_mae": _field_mae(err[i], sample_valid),
+            "sample_mse": _field_metric(err[i] ** 2, sample_valid, reducer=np.nanmean),
+            "sample_rmse": _field_rmse(err[i], sample_valid),
+            "sample_bias": _field_metric(err[i], sample_valid, reducer=np.nanmean),
+            "valid_fraction": _field_valid_fraction(sample_valid),
+        })
+    sample_metrics = pd.DataFrame(sample_rows)
+
+    frame_rows = []
+    for frame_idx in range(n_frames):
+        frame_valid = valid[:, frame_idx, :, :]
+        frame_rows.append({
+            "frame": frame_idx,
+            "frame_value": frame_values[frame_idx],
+            "mae": _field_mae(err[:, frame_idx, :, :], frame_valid),
+            "mse": _field_metric(err[:, frame_idx, :, :] ** 2, frame_valid, reducer=np.nanmean),
+            "rmse": _field_rmse(err[:, frame_idx, :, :], frame_valid),
+            "bias": _field_metric(err[:, frame_idx, :, :], frame_valid, reducer=np.nanmean),
+            "valid_fraction": _field_valid_fraction(frame_valid),
+        })
+    frame_metrics = pd.DataFrame(frame_rows)
+
+    component_rows = []
+    for comp_idx, comp_name in enumerate(components):
+        comp_valid = valid[:, :, :, comp_idx]
+        component_rows.append({
+            "component": comp_name,
+            "mae": _field_mae(err[:, :, :, comp_idx], comp_valid),
+            "mse": _field_metric(err[:, :, :, comp_idx] ** 2, comp_valid, reducer=np.nanmean),
+            "rmse": _field_rmse(err[:, :, :, comp_idx], comp_valid),
+            "bias": _field_metric(err[:, :, :, comp_idx], comp_valid, reducer=np.nanmean),
+            "valid_fraction": _field_valid_fraction(comp_valid),
+        })
+    component_metrics = pd.DataFrame(component_rows)
+
+    node_rows = []
+    for node_idx, node_label in enumerate(node_labels):
+        node_valid = valid[:, :, node_idx, :]
+        row = {
+            "node": node_idx,
+            "node_label": node_label,
+            "mae": _field_mae(err[:, :, node_idx, :], node_valid),
+            "mse": _field_metric(err[:, :, node_idx, :] ** 2, node_valid, reducer=np.nanmean),
+            "rmse": _field_rmse(err[:, :, node_idx, :], node_valid),
+            "bias": _field_metric(err[:, :, node_idx, :], node_valid, reducer=np.nanmean),
+            "valid_fraction": _field_valid_fraction(node_valid),
+        }
+        if node_coords is not None and len(node_coords) == n_nodes:
+            row["x"] = float(node_coords[node_idx][0])
+            row["y"] = float(node_coords[node_idx][1])
+        node_rows.append(row)
+    node_metrics = pd.DataFrame(node_rows)
+
+    pred_masked = np.where(valid, pred, np.nan)
+    true_masked = np.where(valid, true, np.nan)
+    pred_std = _field_nanstd(pred_masked, axis=0)
+    true_std = _field_nanstd(true_masked, axis=0)
+    std_ratio = pred_std / np.maximum(true_std, eps)
+
+    if train_truth is not None:
+        train_field = _field_to_frame_node_component(train_truth, field_shape=field_shape, name="train_truth")
+        baseline_field = np.nanmean(train_field, axis=0)
+        baseline_source = "train_mean_field"
+    else:
+        baseline_field = np.nanmean(true_masked, axis=0)
+        baseline_source = "truth_mean_field"
+    baseline_err = baseline_field.reshape(1, n_frames, n_nodes, n_components) - true
+    baseline_rmse = _field_rmse(baseline_err, np.isfinite(true))
+
+    mse_value = _field_metric(err ** 2, valid, reducer=np.nanmean)
+    rmse_value = float(np.sqrt(mse_value)) if np.isfinite(mse_value) else np.nan
+    mae_value = _field_mae(err, valid)
+    summary = {
+        "mae": mae_value,
+        "mse": mse_value,
+        "rmse": rmse_value,
+        "bias": _field_metric(err, valid, reducer=np.nanmean),
+        "valid_fraction": _field_valid_fraction(valid),
+        "collapse_ratio": float(np.nanmean(std_ratio)) if np.any(np.isfinite(std_ratio)) else np.nan,
+        "mean_field_baseline_source": baseline_source,
+        "mean_field_baseline_rmse": baseline_rmse,
+        "skill_vs_mean_field_rmse": float(1.0 - rmse_value / baseline_rmse)
+        if np.isfinite(rmse_value) and baseline_rmse > eps else np.nan,
+        "n_samples": int(n_samples),
+        "n_frames": int(n_frames),
+        "n_nodes": int(n_nodes),
+        "n_components": int(n_components),
+    }
+
+    return {
+        "summary": summary,
+        "sample_metrics": sample_metrics,
+        "frame_metrics": frame_metrics,
+        "component_metrics": component_metrics,
+        "node_metrics": node_metrics,
+        "y_pred": pred,
+        "y_true": true,
+        "valid_mask": valid,
+        "field_shape": (n_frames, n_nodes, n_components),
+        "frame_values": frame_values,
+        "components": components,
+        "node_labels": node_labels,
+        "node_coords": node_coords,
+        "pred_std": pred_std,
+        "true_std": true_std,
+        "std_ratio": std_ratio,
+        "baseline_field": baseline_field,
+    }
+
+def print_field_diagnostics(diagnostics, label="Field"):
+    summary = diagnostics.get("summary", diagnostics)
+    print(
+        f"{label} prediction diagnostics | "
+        f"RMSE: {_fmt_metric(summary.get('rmse'))} | "
+        f"MAE: {_fmt_metric(summary.get('mae'))} | "
+        f"mean-field RMSE: {_fmt_metric(summary.get('mean_field_baseline_rmse'))} | "
+        f"skill vs mean field: {_fmt_metric(summary.get('skill_vs_mean_field_rmse'), 3)} | "
+        f"collapse ratio: {_fmt_metric(summary.get('collapse_ratio'), 3)} | "
+        f"valid: {_fmt_metric(summary.get('valid_fraction'), 3)}"
+    )
+
+def plot_field_diagnostics(diagnostics, figsize=(15, 4)):
+    frame_metrics = diagnostics["frame_metrics"]
+    component_metrics = diagnostics["component_metrics"]
+    sample_metrics = diagnostics["sample_metrics"]
+    summary = diagnostics["summary"]
+
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    ax = axes[0]
+    ax.plot(frame_metrics["frame"], frame_metrics["rmse"], marker="o", linewidth=1.5)
+    ax.set_title("Frame RMSE")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("RMSE")
+
+    ax = axes[1]
+    ax.bar(component_metrics["component"].astype(str), component_metrics["rmse"])
+    ax.set_title("Component RMSE")
+    ax.set_xlabel("Component")
+    ax.set_ylabel("RMSE")
+
+    ax = axes[2]
+    values = sample_metrics["sample_rmse"].to_numpy(dtype=float)
+    values = values[np.isfinite(values)]
+    ax.hist(values, bins=min(30, max(5, int(np.sqrt(len(values))) if len(values) else 5)), color="tab:blue", alpha=0.8)
+    ax.axvline(summary.get("mean_field_baseline_rmse", np.nan), color="gray", linestyle="--", linewidth=1.5)
+    ax.set_title("Sample RMSE")
+    ax.set_xlabel("RMSE")
+    ax.set_ylabel("Count")
+
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_sample(
+    diagnostics,
+    sample=0,
+    frame=-1,
+    component=0,
+    node_coords=None,
+    cmap="coolwarm",
+    figsize=(15, 4),
+):
+    pred = diagnostics["y_pred"]
+    true = diagnostics["y_true"]
+    valid = diagnostics["valid_mask"]
+    coords = node_coords if node_coords is not None else diagnostics.get("node_coords")
+    if coords is None:
+        raise ValueError("plot_field_sample requires node_coords.")
+    coords = np.asarray(coords, dtype=float)
+
+    n_samples, n_frames, _, n_components = pred.shape
+    sample = int(sample)
+    frame = int(frame) % n_frames
+    component = int(component) % n_components
+    if sample < 0 or sample >= n_samples:
+        raise IndexError(f"sample must be in [0, {n_samples - 1}], got {sample}.")
+
+    truth_values = true[sample, frame, :, component]
+    pred_values = pred[sample, frame, :, component]
+    err_values = pred_values - truth_values
+    valid_values = valid[sample, frame, :, component]
+    vmax = np.nanpercentile(np.abs(np.concatenate([truth_values[valid_values], pred_values[valid_values]])), 98) if np.any(valid_values) else 1.0
+    vmax = max(float(vmax), 1e-12)
+    err_vmax = np.nanpercentile(np.abs(err_values[valid_values]), 98) if np.any(valid_values) else 1.0
+    err_vmax = max(float(err_vmax), 1e-12)
+
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    for ax, values, title, limit in [
+        (axes[0], truth_values, "Truth", vmax),
+        (axes[1], pred_values, "Prediction", vmax),
+        (axes[2], err_values, "Prediction - Truth", err_vmax),
+    ]:
+        im = ax.scatter(
+            coords[:, 0],
+            coords[:, 1],
+            c=np.where(valid_values, values, np.nan),
+            cmap=cmap,
+            vmin=-limit if title != "Prediction - Truth" else -limit,
+            vmax=limit,
+            s=22,
+        )
+        ax.set_title(title)
+        ax.set_aspect("equal", adjustable="box")
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+# Activation diagnostics
 def collect_layer_activations(typ, model, dataloader, layer_names=None, max_batches=1, device=None):
     if device is None:
         device = next(model.parameters()).device
@@ -955,499 +1306,6 @@ def plot_activation_summary(summary_or_activations, figsize=(10, 5)):
     plt.show()
     return fig, (ax1, ax2)
 
-### Post-processing helpers
-def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True):
-    """
-    Resolve a saved ML run, model JSON, model checkpoint, or HPO directory into
-    the artifact paths used by the post-processing notebook.
-    """
-    path = Path(run_path).expanduser()
-    if not path.is_absolute() and run_root is not None:
-        path = Path(run_root).expanduser() / path
-    path = path.resolve() if path.exists() else path
-
-    artifacts = {
-        "input_path": path,
-        "run_dir": None,
-        "model_json": None,
-        "model_mdl": None,
-        "data_json": None,
-        "results_dir": None,
-        "metrics_json": None,
-        "predictions_npz": None,
-        "diagnostics_summary_json": None,
-        "hpo_dir": None,
-        "hpo_best_params_json": None,
-        "hpo_best_trial_user_attrs_json": None,
-        "hpo_candidate_model_jsons": [],
-        "is_hpo": False,
-        "warnings": [],
-    }
-
-    if path.suffix.lower() in [".json", ".mdl"]:
-        model_json = path.with_suffix(".json")
-        model_mdl = path.with_suffix(".mdl")
-        run_dir = path.parent
-    elif path.is_dir():
-        run_dir = path
-        model_json, model_mdl = _postprocess_select_model_pair(run_dir, prefer_hpo_best=prefer_hpo_best)
-    else:
-        run_dir = path
-        model_json = None
-        model_mdl = None
-        artifacts["warnings"].append(f"Input path does not exist yet: {path}")
-
-    artifacts["run_dir"] = run_dir
-    artifacts["model_json"] = model_json if model_json is not None and model_json.exists() else None
-    artifacts["model_mdl"] = model_mdl if model_mdl is not None and model_mdl.exists() else None
-
-    if model_json is not None:
-        data_json = model_json.with_name(f"{model_json.stem}_data.json")
-        artifacts["data_json"] = data_json if data_json.exists() else None
-        artifacts["hpo_dir"] = _postprocess_nearest_hpo_dir(model_json.parent)
-        artifacts["is_hpo"] = artifacts["hpo_dir"] is not None or model_json.stem == "best_model"
-
-    hpo_dir = artifacts["hpo_dir"] if artifacts["hpo_dir"] is not None else run_dir
-    if hpo_dir is not None and Path(hpo_dir).is_dir():
-        best_params = Path(hpo_dir) / "best_params.json"
-        best_attrs = Path(hpo_dir) / "best_trial_user_attrs.json"
-        artifacts["hpo_best_params_json"] = best_params if best_params.exists() else None
-        artifacts["hpo_best_trial_user_attrs_json"] = best_attrs if best_attrs.exists() else None
-        artifacts["hpo_candidate_model_jsons"] = _postprocess_hpo_model_jsons(Path(hpo_dir))
-        if artifacts["hpo_best_params_json"] is not None or artifacts["hpo_candidate_model_jsons"]:
-            artifacts["is_hpo"] = True
-
-    artifacts["results_dir"] = _postprocess_results_dir(artifacts)
-    results_dir = artifacts["results_dir"]
-    if results_dir is not None:
-        artifacts["metrics_json"] = _postprocess_existing_file(results_dir / "metrics.json")
-        artifacts["predictions_npz"] = _postprocess_existing_file(results_dir / "predictions.npz")
-        artifacts["diagnostics_summary_json"] = _postprocess_existing_file(results_dir / "diagnostics_summary.json")
-
-    return artifacts
-
-def _postprocess_select_model_pair(run_dir, prefer_hpo_best=True):
-    run_dir = Path(run_dir)
-    if prefer_hpo_best:
-        for candidate in [
-            run_dir / "best_model.json",
-            run_dir / "model.json",
-        ]:
-            if candidate.exists() and candidate.with_suffix(".mdl").exists():
-                return candidate, candidate.with_suffix(".mdl")
-
-        hpo_candidates = _postprocess_hpo_model_jsons(run_dir)
-        if hpo_candidates:
-            return hpo_candidates[0], hpo_candidates[0].with_suffix(".mdl")
-
-    jsons = []
-    skip_names = {
-        "metrics.json",
-        "diagnostics_summary.json",
-        "best_params.json",
-        "best_trial_user_attrs.json",
-    }
-    for candidate in run_dir.glob("*.json"):
-        if candidate.name.endswith("_data.json") or candidate.name in skip_names:
-            continue
-        if candidate.with_suffix(".mdl").exists():
-            jsons.append(candidate)
-    if not jsons:
-        for candidate in run_dir.rglob("*.json"):
-            if candidate.name.endswith("_data.json") or candidate.name in skip_names:
-                continue
-            if candidate.with_suffix(".mdl").exists():
-                jsons.append(candidate)
-    if not jsons:
-        return None, None
-    jsons = sorted(jsons, key=lambda p: p.stat().st_mtime, reverse=True)
-    return jsons[0], jsons[0].with_suffix(".mdl")
-
-def _postprocess_hpo_model_jsons(hpo_dir):
-    hpo_dir = Path(hpo_dir)
-    if not hpo_dir.exists():
-        return []
-    candidates = []
-    for candidate in hpo_dir.rglob("best_model.json"):
-        if candidate.with_suffix(".mdl").exists():
-            candidates.append(candidate)
-    return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)
-
-def _postprocess_nearest_hpo_dir(path):
-    path = Path(path)
-    for candidate in [path] + list(path.parents):
-        if candidate.name.upper() == "HPO":
-            return candidate
-        if (candidate / "best_params.json").exists() or (candidate / "best_trial_user_attrs.json").exists():
-            return candidate
-    return None
-
-def _postprocess_existing_file(path):
-    path = Path(path)
-    return path if path.exists() else None
-
-def _postprocess_results_dir(artifacts):
-    model_json = artifacts.get("model_json")
-    run_dir = artifacts.get("run_dir")
-    if model_json is not None:
-        model_json = Path(model_json)
-        if model_json.stem == "best_model":
-            best_results = model_json.parent / "best_model_results"
-            if best_results.exists():
-                return best_results
-        results = model_json.parent / "results"
-        if results.exists():
-            return results
-        best_results = model_json.parent / "best_model_results"
-        if best_results.exists():
-            return best_results
-        return results
-    if run_dir is None:
-        return None
-    run_dir = Path(run_dir)
-    for candidate in [run_dir / "best_model_results", run_dir / "results"]:
-        if candidate.exists():
-            return candidate
-    return run_dir / "results"
-
-def postprocess_output_dir(artifacts, label=None, create=True):
-    """Return the stable post-processing output directory under the run results folder."""
-    results_dir = artifacts.get("results_dir")
-    if results_dir is None:
-        run_dir = artifacts.get("run_dir")
-        if run_dir is None:
-            raise ValueError("Cannot create post-processing directory without a run or results directory.")
-        results_dir = Path(run_dir) / "results"
-    out_dir = Path(results_dir) / "postProcessing"
-    if label is not None and str(label).strip():
-        out_dir = out_dir / str(label).strip()
-    if create:
-        out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir
-
-def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
-    """List recent saved model runs under a local run root."""
-    root = Path(run_root).expanduser()
-    rows = []
-    columns = ["run_dir", "model_json", "model_mdl", "results_dir", "is_hpo", "modified"]
-    if not root.exists():
-        return pd.DataFrame(columns=columns)
-    skip_names = {
-        "metrics.json",
-        "diagnostics_summary.json",
-        "best_params.json",
-        "best_trial_user_attrs.json",
-    }
-    for model_json in root.rglob("*.json"):
-        if model_json.name.endswith("_data.json") or model_json.name in skip_names:
-            continue
-        if not model_json.with_suffix(".mdl").exists():
-            continue
-        artifacts = postprocess_resolve_artifacts(model_json, prefer_hpo_best=include_hpo)
-        if artifacts["is_hpo"] and not include_hpo:
-            continue
-        rows.append(
-            {
-                "run_dir": str(artifacts.get("run_dir")),
-                "model_json": str(model_json),
-                "model_mdl": str(model_json.with_suffix(".mdl")),
-                "results_dir": str(artifacts.get("results_dir")),
-                "is_hpo": bool(artifacts.get("is_hpo", False)),
-                "modified": datetime.datetime.fromtimestamp(model_json.stat().st_mtime),
-            }
-        )
-    if not rows:
-        return pd.DataFrame(columns=columns)
-    df = pd.DataFrame(rows).drop_duplicates(subset=["model_json"])
-    df = df.sort_values("modified", ascending=False).reset_index(drop=True)
-    if max_runs is not None:
-        df = df.head(int(max_runs))
-    return df
-
-def postprocess_load_artifacts(artifacts):
-    """Load saved metadata, scalar metrics, predictions, HPO files, and diagnostic CSVs."""
-    loaded = {
-        "descriptor": None,
-        "data_descriptor": None,
-        "metrics": {},
-        "diagnostics_summary": {},
-        "predictions": {},
-        "diagnostic_tables": {},
-        "hpo": {},
-    }
-    for key, target in [
-        ("descriptor", artifacts.get("model_json")),
-        ("data_descriptor", artifacts.get("data_json")),
-        ("metrics", artifacts.get("metrics_json")),
-        ("diagnostics_summary", artifacts.get("diagnostics_summary_json")),
-    ]:
-        if target is not None and Path(target).exists():
-            with open(target, "r", encoding="utf-8") as f:
-                loaded[key] = json.load(f)
-
-    for key, target in [
-        ("best_params", artifacts.get("hpo_best_params_json")),
-        ("best_trial_user_attrs", artifacts.get("hpo_best_trial_user_attrs_json")),
-    ]:
-        if target is not None and Path(target).exists():
-            with open(target, "r", encoding="utf-8") as f:
-                loaded["hpo"][key] = json.load(f)
-
-    predictions_npz = artifacts.get("predictions_npz")
-    if predictions_npz is not None and Path(predictions_npz).exists():
-        with np.load(predictions_npz, allow_pickle=False) as npz:
-            loaded["predictions"] = {key: npz[key] for key in npz.files}
-
-    results_dir = artifacts.get("results_dir")
-    if results_dir is not None and Path(results_dir).exists():
-        for csv_file in Path(results_dir).glob("*_metrics.csv"):
-            try:
-                loaded["diagnostic_tables"][csv_file.stem] = pd.read_csv(csv_file, index_col=0)
-            except Exception:
-                loaded["diagnostic_tables"][csv_file.stem] = pd.read_csv(csv_file)
-
-    return loaded
-
-def postprocess_load_data(data_json, data_path_override=None, auto_path_root=None, **overrides):
-    """
-    Load a DATA sidecar JSON while allowing the saved DATA constructor path to
-    be replaced by a local path such as Z:/p2.
-    """
-    from resources.MLdata import DATA
-
-    data_json = Path(data_json)
-    payload = json.loads(data_json.read_text(encoding="utf-8"))
-    config = payload.get("data_config", payload.get("config", payload))
-    if not isinstance(config, dict):
-        raise ValueError(f"DATA JSON at '{data_json}' does not contain a valid data_config dictionary.")
-
-    config = dict(config)
-    if isinstance(data_path_override, str) and data_path_override.lower() == "auto":
-        if _postprocess_should_auto_override_data_path(config.get("path")):
-            if auto_path_root is None:
-                raise ValueError("data_path_override='auto' requires auto_path_root.")
-            config["path"] = str(auto_path_root)
-    elif data_path_override is not None:
-        config["path"] = str(data_path_override)
-    config.update(overrides)
-    return DATA(**config)
-
-def _postprocess_should_auto_override_data_path(saved_path):
-    if saved_path is None:
-        return False
-    text = str(saved_path).strip().replace("\\", "/").lower()
-    if text in ["hpc"]:
-        return True
-    return text.startswith("/data/")
-
-def postprocess_available_evaluations(loaded):
-    """Summarize which mode/split prediction arrays and diagnostic tables are available."""
-    row_map = {}
-    predictions = loaded.get("predictions", {})
-    tables = loaded.get("diagnostic_tables", {})
-    for key in set(predictions.keys()):
-        parts = key.split("_")
-        if len(parts) < 3:
-            continue
-        mode, split, kind = parts[0].upper(), parts[1].lower(), "_".join(parts[2:])
-        if kind not in ["outputs", "truth"]:
-            continue
-        row_map.setdefault((mode, split), {"mode": mode, "split": split})
-
-    for key in set(tables.keys()):
-        parts = key.split("_")
-        if len(parts) < 3:
-            continue
-        mode, split = parts[0].upper(), parts[1].lower()
-        row_map.setdefault((mode, split), {"mode": mode, "split": split})
-
-    rows = []
-    for (mode, split), row in row_map.items():
-        row.update(
-            {
-                "outputs": f"{mode}_{split}_outputs" in predictions,
-                "truth": f"{mode}_{split}_truth" in predictions,
-                "sample_metrics": f"{mode}_{split}_sample_metrics" in tables,
-                "point_metrics": f"{mode}_{split}_point_metrics" in tables,
-                "zone_metrics": f"{mode}_{split}_zone_metrics" in tables,
-            }
-        )
-        rows.append(row)
-    return pd.DataFrame(rows).sort_values(["mode", "split"]).reset_index(drop=True) if rows else pd.DataFrame()
-
-def postprocess_attach_results(model_obj, loaded):
-    """Attach saved predictions and scalar metrics to a MODEL object using framework attribute names."""
-    if model_obj is None:
-        return None
-    metrics = loaded.get("metrics", {})
-    for key, value in metrics.items():
-        if isinstance(key, str) and (key.startswith("UT_") or key.startswith("FT_")):
-            try:
-                setattr(model_obj, key, value)
-            except Exception:
-                pass
-
-    for key, value in loaded.get("predictions", {}).items():
-        setattr(model_obj, key, value)
-        parts = key.split("_")
-        if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "truth":
-            setattr(model_obj, f"{parts[0].upper()}_truth", value)
-        if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "outputs":
-            setattr(model_obj, f"{parts[0].upper()}_test_outputs", value)
-    return model_obj
-
-def postprocess_build_diagnostics(
-    data,
-    loaded,
-    mode="UT",
-    split="test",
-    zone_boundaries=None,
-    prefer_saved_tables=True,
-    recompute_from_predictions=True,
-):
-    """
-    Build an in-memory diagnostics dictionary from saved predictions and saved
-    diagnostic CSVs. This does not run the model.
-    """
-    mode = str(mode).upper()
-    split = str(split).lower()
-    predictions = loaded.get("predictions", {})
-    outputs = predictions.get(f"{mode}_{split}_outputs")
-    truth = predictions.get(f"{mode}_{split}_truth")
-    if outputs is None or truth is None:
-        return None
-
-    if recompute_from_predictions:
-        train_truth = getattr(data, f"{mode}_train_out", None) if data is not None else None
-        try:
-            diagnostics = curve_performance_diagnostics(
-                outputs,
-                truth,
-                x_values=getattr(data, f"{mode}_OUT_df", None) if data is not None else None,
-                train_truth=train_truth,
-                zone_boundaries=zone_boundaries,
-            )
-        except ValueError:
-            diagnostics = curve_performance_diagnostics(
-                outputs,
-                truth,
-                x_values=getattr(data, f"{mode}_OUT_df", None) if data is not None else None,
-                train_truth=train_truth,
-                zone_boundaries=None,
-            )
-    else:
-        diagnostics = {
-            "summary": {},
-            "sample_metrics": None,
-            "point_metrics": None,
-            "zone_metrics": None,
-            "x": np.arange(np.asarray(outputs).shape[1], dtype=float),
-            "y_pred": np.asarray(outputs, dtype=float),
-            "y_true": np.asarray(truth, dtype=float),
-        }
-
-    diag_summary = loaded.get("diagnostics_summary", {})
-    if isinstance(diag_summary, dict):
-        saved_summary = diag_summary.get(mode, diag_summary.get(mode.lower()))
-        if isinstance(saved_summary, dict):
-            diagnostics["summary"].update(saved_summary)
-
-    if prefer_saved_tables:
-        tables = loaded.get("diagnostic_tables", {})
-        for key in ["sample_metrics", "point_metrics", "zone_metrics"]:
-            saved = tables.get(f"{mode}_{split}_{key}")
-            if saved is not None:
-                diagnostics[key] = saved
-        if diagnostics.get("point_metrics") is not None and "x" in diagnostics["point_metrics"].columns:
-            diagnostics["x"] = diagnostics["point_metrics"]["x"].to_numpy(dtype=float)
-
-    return diagnostics
-
-def postprocess_save_open_figures(out_dir, prefix="", formats=("png",), dpi=250, close=False):
-    """Save all currently open matplotlib figures into a post-processing folder."""
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
-    saved = []
-    prefix = f"{prefix}_" if prefix else ""
-    for num in plt.get_fignums():
-        fig = plt.figure(num)
-        title = ""
-        if fig.axes:
-            title = fig.axes[0].get_title()
-        stem = _postprocess_slug(title or f"figure_{num:02d}")
-        for fmt in formats:
-            path = out_dir / f"{prefix}{stem}.{fmt}"
-            fig.savefig(path, dpi=dpi, bbox_inches="tight")
-            saved.append(path)
-        if close:
-            plt.close(fig)
-    return saved
-
-def _postprocess_slug(text, default="figure"):
-    text = str(text or default).strip()
-    text = "".join(ch if ch.isalnum() or ch in ["-", "_", "."] else "-" for ch in text)
-    text = "-".join(part for part in text.split("-") if part)
-    return text[:96] if text else default
-
-# Weights initialization
-def make_weights_init(act="relu", bias_value=0.0, distribution="normal"):
-    act_name = _activation(act, return_name=True)
-    distribution = distribution.lower()
-
-    if distribution not in ["normal", "uniform"]:
-        raise ValueError("distribution must be either 'normal' or 'uniform'.")
-
-    def _init(m):
-        if not isinstance(m, nn.Linear):
-            return
-
-        if act_name == "relu":
-            init_fn = nn.init.kaiming_normal_ if distribution == "normal" else nn.init.kaiming_uniform_
-            init_fn(m.weight, nonlinearity="relu")
-        elif act_name in ["leakyrelu", "prelu", "rrelu"]:
-            negative_slope = getattr(act, "negative_slope", 0.01)
-            init_fn = nn.init.kaiming_normal_ if distribution == "normal" else nn.init.kaiming_uniform_
-            init_fn(m.weight, a=float(negative_slope), nonlinearity="leaky_relu")
-        else:
-            gain_name = act_name if act_name in ["linear", "sigmoid", "tanh", "selu"] else "linear"
-            gain = nn.init.calculate_gain(gain_name)
-            init_fn = nn.init.xavier_normal_ if distribution == "normal" else nn.init.xavier_uniform_
-            init_fn(m.weight, gain=gain)
-
-        if m.bias is not None:
-            nn.init.constant_(m.bias, bias_value)
-
-    _init.__name__ = f"weights_init_{act_name}_{distribution}"
-    _init.init_config = {
-        "act": act_name,
-        "bias_value": bias_value,
-        "distribution": distribution,
-    }
-    return _init
-
-def _infer_weight_init_activation(model):
-    for attr in ["_act", "act"]:
-        activation = getattr(model, attr, None)
-        if isinstance(activation, nn.Module):
-            return activation
-        if isinstance(activation, str):
-            return activation
-
-    for module in model.modules():
-        if isinstance(module, tuple(_activation(return_types=True).values())):
-            return module
-    return "linear"
-
-def resolve_weight_init(w_init, model):
-    if w_init is None:
-        return None
-    if isinstance(w_init, str):
-        if w_init.lower() == "auto":
-            return make_weights_init(act=_infer_weight_init_activation(model), bias_value=0.0)
-        raise ValueError("w_init must be None, 'auto', or a callable such as make_weights_init(...).")
-    if callable(w_init):
-        return w_init
-    raise TypeError("w_init must be None, 'auto', or a callable such as make_weights_init(...).")
 
 # EasyStopping algorithm
 class EarlyStopping:
@@ -1465,7 +1323,7 @@ class EarlyStopping:
             self.counter = 0
         else:
             self.counter += 1
-        
+
         if self.counter >= self.patience:
             if self.verbose:
                 print(f" !!! Early stopping triggered after {self.patience} epochs without improvement !!!")
@@ -1641,6 +1499,36 @@ class CombinedCurveLoss(nn.Module):
         return total
 
 
+class MaskedFieldMSELoss(nn.Module):
+    """
+    MSE for field outputs with invalid/missing targets masked by NaN or an optional mask.
+    """
+    def __init__(self, reduction="mean", eps=1e-8):
+        super().__init__()
+        reduction = str(reduction).lower()
+        if reduction not in ["mean", "sum"]:
+            raise ValueError("MaskedFieldMSELoss reduction must be 'mean' or 'sum'.")
+        self.reduction = reduction
+        self.eps = float(eps)
+
+    def forward(self, y_pred: torch.Tensor, y_true: torch.Tensor, mask=None) -> torch.Tensor:
+        if y_pred.shape != y_true.shape:
+            raise ValueError(f"Shape mismatch: y_pred shape {y_pred.shape} != y_true shape {y_true.shape}")
+
+        valid = torch.isfinite(y_true) & torch.isfinite(y_pred)
+        if mask is not None:
+            mask = torch.as_tensor(mask, dtype=torch.bool, device=y_true.device)
+            valid = valid & torch.broadcast_to(mask, y_true.shape)
+
+        if not torch.any(valid):
+            return torch.nan_to_num(y_pred, nan=0.0, posinf=0.0, neginf=0.0).sum() * 0.0
+
+        err_sq = (y_pred[valid] - y_true[valid]) ** 2
+        if self.reduction == "sum":
+            return err_sq.sum()
+        return err_sq.sum() / torch.clamp(valid.sum().to(err_sq.dtype), min=self.eps)
+
+
 class QuantileLoss(nn.Module):
     def __init__(self, quantiles=(0.5, 0.5, 0.5), zone_boundaries=(50, 130), err_type="L2"):
         super().__init__()
@@ -1694,7 +1582,7 @@ class QuantileLoss(nn.Module):
                 zone_loss = torch.where(err < 0, (1 - lmbda) * err_sq, lmbda * err_sq)
             total_loss = total_loss + zone_loss.sum()
 
-        # Average out the loss over all points in the batch 
+        # Average out the loss over all points in the batch
         # (Mathematically maps to the 1/(3n) normalization from the paper)
         return total_loss / y_true.numel()
 
@@ -2140,8 +2028,615 @@ def plot_Distribution(train_in1, test_outputs, truth=None, typ="contour"):
         ax.set_ylabel('y')
         ax.set_zlabel('z')
         ctr = ax.plot_trisurf(x_, y_, val_, cmap="viridis")
-        plt.colorbar(ctr) 
+        plt.colorbar(ctr)
     plt.show()
+
+
+### ML Post-processing helpers
+def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True):
+    """
+    Resolve a saved ML run, model JSON, model checkpoint, or HPO directory into
+    the artifact paths used by the post-processing notebook.
+    """
+    path = Path(run_path).expanduser()
+    if not path.is_absolute() and run_root is not None:
+        path = Path(run_root).expanduser() / path
+    path = path.resolve() if path.exists() else path
+
+    artifacts = {
+        "input_path": path,
+        "run_dir": None,
+        "model_json": None,
+        "model_mdl": None,
+        "data_json": None,
+        "results_dir": None,
+        "metrics_json": None,
+        "predictions_npz": None,
+        "diagnostics_summary_json": None,
+        "hpo_dir": None,
+        "hpo_best_params_json": None,
+        "hpo_best_trial_user_attrs_json": None,
+        "hpo_candidate_model_jsons": [],
+        "is_hpo": False,
+        "warnings": [],
+    }
+
+    if path.suffix.lower() in [".json", ".mdl"]:
+        model_json = path.with_suffix(".json")
+        model_mdl = path.with_suffix(".mdl")
+        run_dir = path.parent
+    elif path.is_dir():
+        run_dir = path
+        model_json, model_mdl = _postprocess_select_model_pair(run_dir, prefer_hpo_best=prefer_hpo_best)
+    else:
+        run_dir = path
+        model_json = None
+        model_mdl = None
+        artifacts["warnings"].append(f"Input path does not exist yet: {path}")
+
+    artifacts["run_dir"] = run_dir
+    artifacts["model_json"] = model_json if model_json is not None and model_json.exists() else None
+    artifacts["model_mdl"] = model_mdl if model_mdl is not None and model_mdl.exists() else None
+
+    if model_json is not None:
+        data_json = model_json.with_name(f"{model_json.stem}_data.json")
+        artifacts["data_json"] = data_json if data_json.exists() else None
+        artifacts["hpo_dir"] = _postprocess_nearest_hpo_dir(model_json.parent)
+        artifacts["is_hpo"] = artifacts["hpo_dir"] is not None or model_json.stem == "best_model"
+
+    hpo_dir = artifacts["hpo_dir"] if artifacts["hpo_dir"] is not None else run_dir
+    if hpo_dir is not None and Path(hpo_dir).is_dir():
+        best_params = Path(hpo_dir) / "best_params.json"
+        best_attrs = Path(hpo_dir) / "best_trial_user_attrs.json"
+        artifacts["hpo_best_params_json"] = best_params if best_params.exists() else None
+        artifacts["hpo_best_trial_user_attrs_json"] = best_attrs if best_attrs.exists() else None
+        artifacts["hpo_candidate_model_jsons"] = _postprocess_hpo_model_jsons(Path(hpo_dir))
+        if artifacts["hpo_best_params_json"] is not None or artifacts["hpo_candidate_model_jsons"]:
+            artifacts["is_hpo"] = True
+
+    artifacts["results_dir"] = _postprocess_results_dir(artifacts)
+    results_dir = artifacts["results_dir"]
+    if results_dir is not None:
+        artifacts["metrics_json"] = _postprocess_existing_file(results_dir / "metrics.json")
+        artifacts["predictions_npz"] = _postprocess_existing_file(results_dir / "predictions.npz")
+        artifacts["diagnostics_summary_json"] = _postprocess_existing_file(results_dir / "diagnostics_summary.json")
+
+    return artifacts
+
+def _postprocess_select_model_pair(run_dir, prefer_hpo_best=True):
+    run_dir = Path(run_dir)
+    if prefer_hpo_best:
+        for candidate in [
+            run_dir / "best_model.json",
+            run_dir / "model.json",
+        ]:
+            if candidate.exists() and candidate.with_suffix(".mdl").exists():
+                return candidate, candidate.with_suffix(".mdl")
+
+        hpo_candidates = _postprocess_hpo_model_jsons(run_dir)
+        if hpo_candidates:
+            return hpo_candidates[0], hpo_candidates[0].with_suffix(".mdl")
+
+    jsons = []
+    skip_names = {
+        "metrics.json",
+        "diagnostics_summary.json",
+        "best_params.json",
+        "best_trial_user_attrs.json",
+    }
+    for candidate in run_dir.glob("*.json"):
+        if candidate.name.endswith("_data.json") or candidate.name in skip_names:
+            continue
+        if candidate.with_suffix(".mdl").exists():
+            jsons.append(candidate)
+    if not jsons:
+        for candidate in run_dir.rglob("*.json"):
+            if candidate.name.endswith("_data.json") or candidate.name in skip_names:
+                continue
+            if candidate.with_suffix(".mdl").exists():
+                jsons.append(candidate)
+    if not jsons:
+        return None, None
+    jsons = sorted(jsons, key=lambda p: p.stat().st_mtime, reverse=True)
+    return jsons[0], jsons[0].with_suffix(".mdl")
+
+def _postprocess_hpo_model_jsons(hpo_dir):
+    hpo_dir = Path(hpo_dir)
+    if not hpo_dir.exists():
+        return []
+    candidates = []
+    for candidate in hpo_dir.rglob("best_model.json"):
+        if candidate.with_suffix(".mdl").exists():
+            candidates.append(candidate)
+    return sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)
+
+def _postprocess_nearest_hpo_dir(path):
+    path = Path(path)
+    for candidate in [path] + list(path.parents):
+        if candidate.name.upper() == "HPO":
+            return candidate
+        if (candidate / "best_params.json").exists() or (candidate / "best_trial_user_attrs.json").exists():
+            return candidate
+    return None
+
+def _postprocess_existing_file(path):
+    path = Path(path)
+    return path if path.exists() else None
+
+def _postprocess_results_dir(artifacts):
+    model_json = artifacts.get("model_json")
+    run_dir = artifacts.get("run_dir")
+    if model_json is not None:
+        model_json = Path(model_json)
+        if model_json.stem == "best_model":
+            best_results = model_json.parent / "best_model_results"
+            if best_results.exists():
+                return best_results
+        results = model_json.parent / "results"
+        if results.exists():
+            return results
+        best_results = model_json.parent / "best_model_results"
+        if best_results.exists():
+            return best_results
+        return results
+    if run_dir is None:
+        return None
+    run_dir = Path(run_dir)
+    for candidate in [run_dir / "best_model_results", run_dir / "results"]:
+        if candidate.exists():
+            return candidate
+    return run_dir / "results"
+
+def postprocess_output_dir(artifacts, label=None, create=True):
+    """Return the stable post-processing output directory under the run results folder."""
+    results_dir = artifacts.get("results_dir")
+    if results_dir is None:
+        run_dir = artifacts.get("run_dir")
+        if run_dir is None:
+            raise ValueError("Cannot create post-processing directory without a run or results directory.")
+        results_dir = Path(run_dir) / "results"
+    out_dir = Path(results_dir) / "postProcessing"
+    if label is not None and str(label).strip():
+        out_dir = out_dir / str(label).strip()
+    if create:
+        out_dir.mkdir(parents=True, exist_ok=True)
+    return out_dir
+
+def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
+    """List recent saved model runs under a local run root."""
+    root = Path(run_root).expanduser()
+    rows = []
+    columns = ["run_dir", "model_json", "model_mdl", "results_dir", "is_hpo", "modified"]
+    if not root.exists():
+        return pd.DataFrame(columns=columns)
+    skip_names = {
+        "metrics.json",
+        "diagnostics_summary.json",
+        "best_params.json",
+        "best_trial_user_attrs.json",
+    }
+    for model_json in root.rglob("*.json"):
+        if model_json.name.endswith("_data.json") or model_json.name in skip_names:
+            continue
+        if not model_json.with_suffix(".mdl").exists():
+            continue
+        artifacts = postprocess_resolve_artifacts(model_json, prefer_hpo_best=include_hpo)
+        if artifacts["is_hpo"] and not include_hpo:
+            continue
+        rows.append(
+            {
+                "run_dir": str(artifacts.get("run_dir")),
+                "model_json": str(model_json),
+                "model_mdl": str(model_json.with_suffix(".mdl")),
+                "results_dir": str(artifacts.get("results_dir")),
+                "is_hpo": bool(artifacts.get("is_hpo", False)),
+                "modified": datetime.datetime.fromtimestamp(model_json.stat().st_mtime),
+            }
+        )
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    df = pd.DataFrame(rows).drop_duplicates(subset=["model_json"])
+    df = df.sort_values("modified", ascending=False).reset_index(drop=True)
+    if max_runs is not None:
+        df = df.head(int(max_runs))
+    return df
+
+def postprocess_load_artifacts(artifacts):
+    """Load saved metadata, scalar metrics, predictions, HPO files, and diagnostic CSVs."""
+    loaded = {
+        "descriptor": None,
+        "data_descriptor": None,
+        "metrics": {},
+        "diagnostics_summary": {},
+        "predictions": {},
+        "diagnostic_tables": {},
+        "hpo": {},
+    }
+    for key, target in [
+        ("descriptor", artifacts.get("model_json")),
+        ("data_descriptor", artifacts.get("data_json")),
+        ("metrics", artifacts.get("metrics_json")),
+        ("diagnostics_summary", artifacts.get("diagnostics_summary_json")),
+    ]:
+        if target is not None and Path(target).exists():
+            with open(target, "r", encoding="utf-8") as f:
+                loaded[key] = json.load(f)
+
+    for key, target in [
+        ("best_params", artifacts.get("hpo_best_params_json")),
+        ("best_trial_user_attrs", artifacts.get("hpo_best_trial_user_attrs_json")),
+    ]:
+        if target is not None and Path(target).exists():
+            with open(target, "r", encoding="utf-8") as f:
+                loaded["hpo"][key] = json.load(f)
+
+    predictions_npz = artifacts.get("predictions_npz")
+    if predictions_npz is not None and Path(predictions_npz).exists():
+        with np.load(predictions_npz, allow_pickle=False) as npz:
+            loaded["predictions"] = {key: npz[key] for key in npz.files}
+
+    results_dir = artifacts.get("results_dir")
+    if results_dir is not None and Path(results_dir).exists():
+        for csv_file in Path(results_dir).glob("*_metrics.csv"):
+            try:
+                loaded["diagnostic_tables"][csv_file.stem] = pd.read_csv(csv_file, index_col=0)
+            except Exception:
+                loaded["diagnostic_tables"][csv_file.stem] = pd.read_csv(csv_file)
+
+    return loaded
+
+def postprocess_load_data(data_json, data_path_override=None, auto_path_root=None, **overrides):
+    """
+    Load a DATA sidecar JSON while allowing the saved DATA constructor path to
+    be replaced by a local path such as Z:/p2.
+    """
+    from resources.MLdata import DATA
+
+    data_json = Path(data_json)
+    payload = json.loads(data_json.read_text(encoding="utf-8"))
+    config = payload.get("data_config", payload.get("config", payload))
+    if not isinstance(config, dict):
+        raise ValueError(f"DATA JSON at '{data_json}' does not contain a valid data_config dictionary.")
+
+    config = dict(config)
+    if isinstance(data_path_override, str) and data_path_override.lower() == "auto":
+        if _postprocess_should_auto_override_data_path(config.get("path")):
+            if auto_path_root is None:
+                raise ValueError("data_path_override='auto' requires auto_path_root.")
+            config["path"] = str(auto_path_root)
+    elif data_path_override is not None:
+        config["path"] = str(data_path_override)
+    config.update(overrides)
+    return DATA(**config)
+
+def _postprocess_should_auto_override_data_path(saved_path):
+    if saved_path is None:
+        return False
+    text = str(saved_path).strip().replace("\\", "/").lower()
+    if text in ["hpc"]:
+        return True
+    return text.startswith("/data/")
+
+def _postprocess_saved_output_kind(loaded):
+    descriptor = loaded.get("data_descriptor", {}) if isinstance(loaded, dict) else {}
+    if not isinstance(descriptor, dict):
+        return None
+    config = descriptor.get("data_config", descriptor.get("config", descriptor))
+    if isinstance(config, dict):
+        output_kind = config.get("output_kind")
+        if output_kind is not None:
+            return str(output_kind).lower()
+    return None
+
+def _postprocess_is_field_output(data, loaded=None, outputs=None):
+    if data is not None and str(getattr(data, "output_kind", "curve")).lower() == "field":
+        return True
+    if loaded is not None and _postprocess_saved_output_kind(loaded) == "field":
+        return True
+    if outputs is not None and np.asarray(outputs).ndim == 4:
+        return True
+    return False
+
+def _postprocess_saved_summary(loaded, mode):
+    diag_summary = loaded.get("diagnostics_summary", {}) if isinstance(loaded, dict) else {}
+    if not isinstance(diag_summary, dict):
+        return {}
+    saved_summary = diag_summary.get(mode, diag_summary.get(mode.lower(), {}))
+    return saved_summary if isinstance(saved_summary, dict) else {}
+
+def _postprocess_field_metadata(data, loaded, mode, outputs=None):
+    summary = _postprocess_saved_summary(loaded, mode)
+    field_shape = getattr(data, f"{mode}_field_shape", None) if data is not None else None
+    outputs_arr = np.asarray(outputs) if outputs is not None else None
+
+    if field_shape is None and outputs_arr is not None and outputs_arr.ndim == 4:
+        field_shape = outputs_arr.shape[1:4]
+    if field_shape is None:
+        keys = ("n_frames", "n_nodes", "n_components")
+        if all(key in summary for key in keys):
+            field_shape = tuple(int(summary[key]) for key in keys)
+    if field_shape is not None:
+        field_shape = tuple(int(v) for v in field_shape)
+
+    frame_values = getattr(data, f"{mode}_field_frame_values", None) if data is not None else None
+    components = getattr(data, f"{mode}_field_components", None) if data is not None else None
+    node_labels = getattr(data, f"{mode}_field_node_labels", None) if data is not None else None
+    node_coords = getattr(data, f"{mode}_field_node_coords", None) if data is not None else None
+
+    if field_shape is not None:
+        n_frames, n_nodes, n_components = field_shape
+        if frame_values is None:
+            frame_values = np.arange(n_frames)
+        if components is None:
+            components = [f"c{i}" for i in range(n_components)]
+        if node_labels is None:
+            node_labels = np.arange(n_nodes)
+
+    return {
+        "field_shape": field_shape,
+        "frame_values": frame_values,
+        "components": components,
+        "node_labels": node_labels,
+        "node_coords": node_coords,
+    }
+
+def _postprocess_reconstruct_output(data, mode, values):
+    reconstructor = getattr(data, f"{mode}_OUTreconstructor", None) if data is not None else None
+    return reconstructor(values) if callable(reconstructor) else values
+
+def _postprocess_train_truth(data, mode):
+    if data is None:
+        return None
+    values = getattr(data, f"{mode}_train_out", None)
+    if values is None:
+        return None
+    return _postprocess_reconstruct_output(data, mode, values)
+
+def postprocess_available_evaluations(loaded):
+    """Summarize which mode/split prediction arrays and diagnostic tables are available."""
+    row_map = {}
+    predictions = loaded.get("predictions", {})
+    tables = loaded.get("diagnostic_tables", {})
+    for key in set(predictions.keys()):
+        parts = key.split("_")
+        if len(parts) < 3:
+            continue
+        mode, split, kind = parts[0].upper(), parts[1].lower(), "_".join(parts[2:])
+        if kind not in ["outputs", "truth"]:
+            continue
+        row_map.setdefault((mode, split), {"mode": mode, "split": split})
+
+    for key in set(tables.keys()):
+        parts = key.split("_")
+        if len(parts) < 3:
+            continue
+        mode, split = parts[0].upper(), parts[1].lower()
+        row_map.setdefault((mode, split), {"mode": mode, "split": split})
+
+    rows = []
+    for (mode, split), row in row_map.items():
+        row.update(
+            {
+                "outputs": f"{mode}_{split}_outputs" in predictions,
+                "truth": f"{mode}_{split}_truth" in predictions,
+                "sample_metrics": f"{mode}_{split}_sample_metrics" in tables,
+                "point_metrics": f"{mode}_{split}_point_metrics" in tables,
+                "zone_metrics": f"{mode}_{split}_zone_metrics" in tables,
+                "frame_metrics": f"{mode}_{split}_frame_metrics" in tables,
+                "component_metrics": f"{mode}_{split}_component_metrics" in tables,
+                "node_metrics": f"{mode}_{split}_node_metrics" in tables,
+            }
+        )
+        rows.append(row)
+    return pd.DataFrame(rows).sort_values(["mode", "split"]).reset_index(drop=True) if rows else pd.DataFrame()
+
+def postprocess_attach_results(model_obj, loaded):
+    """Attach saved predictions and scalar metrics to a MODEL object using framework attribute names."""
+    if model_obj is None:
+        return None
+    metrics = loaded.get("metrics", {})
+    for key, value in metrics.items():
+        if isinstance(key, str) and (key.startswith("UT_") or key.startswith("FT_")):
+            try:
+                setattr(model_obj, key, value)
+            except Exception:
+                pass
+
+    for key, value in loaded.get("predictions", {}).items():
+        setattr(model_obj, key, value)
+        parts = key.split("_")
+        if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "truth":
+            setattr(model_obj, f"{parts[0].upper()}_truth", value)
+        if len(parts) >= 3 and parts[1].lower() == "test" and parts[-1] == "outputs":
+            setattr(model_obj, f"{parts[0].upper()}_test_outputs", value)
+    return model_obj
+
+def postprocess_build_diagnostics(
+    data,
+    loaded,
+    mode="UT",
+    split="test",
+    zone_boundaries=None,
+    prefer_saved_tables=True,
+    recompute_from_predictions=True,
+):
+    """
+    Build an in-memory diagnostics dictionary from saved predictions and saved
+    diagnostic CSVs. This does not run the model.
+    """
+    mode = str(mode).upper()
+    split = str(split).lower()
+    predictions = loaded.get("predictions", {})
+    outputs = predictions.get(f"{mode}_{split}_outputs")
+    truth = predictions.get(f"{mode}_{split}_truth")
+    if outputs is None or truth is None:
+        return None
+
+    is_field = _postprocess_is_field_output(data, loaded=loaded, outputs=outputs)
+    if recompute_from_predictions:
+        train_truth = _postprocess_train_truth(data, mode)
+        if is_field:
+            metadata = _postprocess_field_metadata(data, loaded, mode, outputs=outputs)
+            if np.asarray(outputs).ndim == 3 and metadata["field_shape"] is None:
+                raise ValueError(
+                    "Field predictions are saved as [samples, nodes, outputs], so "
+                    "postprocess_build_diagnostics needs a loaded field DATA object "
+                    "or saved diagnostics_summary with n_frames, n_nodes, and n_components."
+                )
+            diagnostics = field_performance_diagnostics(
+                outputs,
+                truth,
+                train_truth=train_truth,
+                **metadata,
+            )
+        else:
+            try:
+                diagnostics = curve_performance_diagnostics(
+                    outputs,
+                    truth,
+                    x_values=getattr(data, f"{mode}_OUT_df", None) if data is not None else None,
+                    train_truth=train_truth,
+                    zone_boundaries=zone_boundaries,
+                )
+            except ValueError:
+                diagnostics = curve_performance_diagnostics(
+                    outputs,
+                    truth,
+                    x_values=getattr(data, f"{mode}_OUT_df", None) if data is not None else None,
+                    train_truth=train_truth,
+                    zone_boundaries=None,
+                )
+    elif is_field:
+        metadata = _postprocess_field_metadata(data, loaded, mode, outputs=outputs)
+        pred = _field_to_frame_node_component(outputs, field_shape=metadata["field_shape"], name="y_pred")
+        true = _field_to_frame_node_component(truth, field_shape=metadata["field_shape"], name="y_true")
+        diagnostics = {
+            "summary": {},
+            "sample_metrics": None,
+            "frame_metrics": None,
+            "component_metrics": None,
+            "node_metrics": None,
+            "y_pred": pred,
+            "y_true": true,
+            "valid_mask": np.isfinite(true) & np.isfinite(pred),
+            **metadata,
+        }
+    else:
+        diagnostics = {
+            "summary": {},
+            "sample_metrics": None,
+            "point_metrics": None,
+            "zone_metrics": None,
+            "x": np.arange(np.asarray(outputs).shape[1], dtype=float),
+            "y_pred": np.asarray(outputs, dtype=float),
+            "y_true": np.asarray(truth, dtype=float),
+        }
+
+    saved_summary = _postprocess_saved_summary(loaded, mode)
+    if saved_summary:
+        diagnostics["summary"].update(saved_summary)
+
+    if prefer_saved_tables:
+        tables = loaded.get("diagnostic_tables", {})
+        table_keys = ["sample_metrics", "frame_metrics", "component_metrics", "node_metrics"] if is_field else [
+            "sample_metrics",
+            "point_metrics",
+            "zone_metrics",
+        ]
+        for key in table_keys:
+            saved = tables.get(f"{mode}_{split}_{key}")
+            if saved is not None:
+                diagnostics[key] = saved
+        if not is_field and diagnostics.get("point_metrics") is not None and "x" in diagnostics["point_metrics"].columns:
+            diagnostics["x"] = diagnostics["point_metrics"]["x"].to_numpy(dtype=float)
+
+    return diagnostics
+
+def postprocess_save_open_figures(out_dir, prefix="", formats=("png",), dpi=250, close=False):
+    """Save all currently open matplotlib figures into a post-processing folder."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    saved = []
+    prefix = f"{prefix}_" if prefix else ""
+    for num in plt.get_fignums():
+        fig = plt.figure(num)
+        title = ""
+        if fig.axes:
+            title = fig.axes[0].get_title()
+        stem = _postprocess_slug(title or f"figure_{num:02d}")
+        for fmt in formats:
+            path = out_dir / f"{prefix}{stem}.{fmt}"
+            fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            saved.append(path)
+        if close:
+            plt.close(fig)
+    return saved
+
+def _postprocess_slug(text, default="figure"):
+    text = str(text or default).strip()
+    text = "".join(ch if ch.isalnum() or ch in ["-", "_", "."] else "-" for ch in text)
+    text = "-".join(part for part in text.split("-") if part)
+    return text[:96] if text else default
+
+# Weights initialization
+def make_weights_init(act="relu", bias_value=0.0, distribution="normal"):
+    act_name = _activation(act, return_name=True)
+    distribution = distribution.lower()
+
+    if distribution not in ["normal", "uniform"]:
+        raise ValueError("distribution must be either 'normal' or 'uniform'.")
+
+    def _init(m):
+        if not isinstance(m, nn.Linear):
+            return
+
+        if act_name == "relu":
+            init_fn = nn.init.kaiming_normal_ if distribution == "normal" else nn.init.kaiming_uniform_
+            init_fn(m.weight, nonlinearity="relu")
+        elif act_name in ["leakyrelu", "prelu", "rrelu"]:
+            negative_slope = getattr(act, "negative_slope", 0.01)
+            init_fn = nn.init.kaiming_normal_ if distribution == "normal" else nn.init.kaiming_uniform_
+            init_fn(m.weight, a=float(negative_slope), nonlinearity="leaky_relu")
+        else:
+            gain_name = act_name if act_name in ["linear", "sigmoid", "tanh", "selu"] else "linear"
+            gain = nn.init.calculate_gain(gain_name)
+            init_fn = nn.init.xavier_normal_ if distribution == "normal" else nn.init.xavier_uniform_
+            init_fn(m.weight, gain=gain)
+
+        if m.bias is not None:
+            nn.init.constant_(m.bias, bias_value)
+
+    _init.__name__ = f"weights_init_{act_name}_{distribution}"
+    _init.init_config = {
+        "act": act_name,
+        "bias_value": bias_value,
+        "distribution": distribution,
+    }
+    return _init
+
+def _infer_weight_init_activation(model):
+    for attr in ["_act", "act"]:
+        activation = getattr(model, attr, None)
+        if isinstance(activation, nn.Module):
+            return activation
+        if isinstance(activation, str):
+            return activation
+
+    for module in model.modules():
+        if isinstance(module, tuple(_activation(return_types=True).values())):
+            return module
+    return "linear"
+
+def resolve_weight_init(w_init, model):
+    if w_init is None:
+        return None
+    if isinstance(w_init, str):
+        if w_init.lower() == "auto":
+            return make_weights_init(act=_infer_weight_init_activation(model), bias_value=0.0)
+        raise ValueError("w_init must be None, 'auto', or a callable such as make_weights_init(...).")
+    if callable(w_init):
+        return w_init
+    raise TypeError("w_init must be None, 'auto', or a callable such as make_weights_init(...).")
 
 
 ### GNN Functions
@@ -2215,6 +2710,12 @@ def _hopt_task_token(data):
     from resources.MLmodels import _mp_task_token
 
     return _mp_task_token(data)
+
+def _hopt_output_kind(data):
+    return str(getattr(data, "output_kind", "curve")).lower()
+
+def _hopt_is_field_output(data):
+    return _hopt_output_kind(data) == "field"
 
 def _hopt_model_type_token(typ):
     from resources.MLmodels import _mp_model_type_token
@@ -2295,6 +2796,10 @@ def _hopt_primary_mode(data):
 
 def _hopt_io_sizes(data, typ):
     typ = _hopt_normalize_typ(typ)
+    field_output = _hopt_is_field_output(data)
+    if field_output and typ == "mlp":
+        raise ValueError("Field-output HPO supports Transformer/GNN-style node inputs only; MLP is curve-only here.")
+
     x, y = _hopt_mode_data(data, _hopt_primary_mode(data))
     x_shape = np.asarray(x).shape
     y_shape = np.asarray(y).shape
@@ -2332,6 +2837,7 @@ def hOpt_suggest_model_params(trial, typ, data, search_space=None):
     typ = _hopt_normalize_typ(typ)
     cfg = _hopt_get(search_space, "model", search_space)
     io = _hopt_io_sizes(data, typ)
+    field_output = _hopt_is_field_output(data)
 
     act = _hopt_sample(trial, f"{typ}_act", _hopt_get(cfg, "act", ["relu", "gelu", "elu", "mish"]), "relu")
     norm = _hopt_sample(trial, f"{typ}_norm", _hopt_get(cfg, "norm", [None, "layer"]), None)
@@ -2360,8 +2866,12 @@ def hOpt_suggest_model_params(trial, typ, data, search_space=None):
         if len(head_options) == 0:
             raise ValueError(f"No valid Transformer n_heads choices divide d_model={d_model}.")
         n_heads = int(trial.suggest_categorical("tr_n_heads", head_options))
-        pool = _hopt_sample(trial, "tr_pool", _hopt_get(cfg, "pool", ["mean", "cls", "add", "max"]), "mean")
-        use_cls_token = True if pool == "cls" else bool(_hopt_sample(trial, "tr_use_cls_token", _hopt_get(cfg, "use_cls_token", [True, False]), True))
+        if field_output:
+            pool = "node"
+            use_cls_token = bool(_hopt_sample(trial, "tr_use_cls_token", _hopt_get(cfg, "use_cls_token", [False, True]), False))
+        else:
+            pool = _hopt_sample(trial, "tr_pool", _hopt_get(cfg, "pool", ["mean", "cls", "add", "max"]), "mean")
+            use_cls_token = True if pool == "cls" else bool(_hopt_sample(trial, "tr_use_cls_token", _hopt_get(cfg, "use_cls_token", [True, False]), True))
         head_depth = int(_hopt_sample(trial, "tr_head_depth", _hopt_get(cfg, "head_depth", [0, 1, 2]), 1))
         head_width = int(_hopt_sample(trial, "tr_head_width", _hopt_get(cfg, "head_width", [64, 128, 256, 512]), 128))
         params = {
@@ -2400,7 +2910,7 @@ def hOpt_suggest_model_params(trial, typ, data, search_space=None):
             "head_norm": _hopt_sample(trial, f"{typ}_head_norm", _hopt_get(cfg, "head_norm", [None, "layer"]), None),
             "head_dropout": head_dropout,
             "heads": int(_hopt_sample(trial, f"{typ}_heads", _hopt_get(cfg, "heads", [1, 2, 4, 8]), 1)) if block == "gat" else 1,
-            "pool": _hopt_sample(trial, f"{typ}_pool", _hopt_get(cfg, "pool", ["mean", "add"]), "mean"),
+            "pool": "node" if field_output else _hopt_sample(trial, f"{typ}_pool", _hopt_get(cfg, "pool", ["mean", "add"]), "mean"),
         }
         return params
 
@@ -2439,7 +2949,23 @@ def _hopt_loss_task_cfg(loss_cfg, mode):
             task_cfg.setdefault(key, value)
     return task_cfg
 
-def hOpt_suggest_loss_params(trial, loss_cfg=None):
+def hOpt_suggest_loss_params(trial, loss_cfg=None, data=None):
+    if data is not None and _hopt_is_field_output(data):
+        family = _hopt_sample(
+            trial,
+            "loss_family",
+            _hopt_get(loss_cfg, "family", ["field_mse"]),
+            "field_mse",
+        )
+        family = str(family).lower()
+        if family not in ["field_mse", "masked_mse", "masked_field_mse", "mse", "nn.mse", "mse_loss"]:
+            raise ValueError("Field-output HPO currently supports only masked field MSE loss.")
+        return {
+            "family": "field_mse",
+            "reduction": _hopt_sample(trial, "loss_reduction", _hopt_get(loss_cfg, "reduction", ["mean"]), "mean"),
+            "eps": float(_hopt_sample(trial, "loss_eps", _hopt_get(loss_cfg, "eps", {"type": "fixed", "value": 1e-12}), 1e-12)),
+        }
+
     family = _hopt_sample(trial, "loss_family", _hopt_get(loss_cfg, "family", ["combined"]), "combined")
     if family.lower() in ["mse", "nn.mse", "mse_loss"]:
         return {"family": "mse"}
@@ -2462,6 +2988,16 @@ def hOpt_suggest_loss_params(trial, loss_cfg=None):
     return params
 
 def hOpt_build_loss(loss_params, data, loss_cfg=None):
+    if _hopt_is_field_output(data):
+        family = str(loss_params.get("family", "field_mse")).lower()
+        if family not in ["field_mse", "masked_mse", "masked_field_mse", "mse", "nn.mse", "mse_loss"]:
+            raise ValueError("Field-output HPO currently supports only masked field MSE loss.")
+        params = {
+            "reduction": loss_params.get("reduction", _hopt_get(loss_cfg, "reduction", "mean")),
+            "eps": float(loss_params.get("eps", _hopt_get(loss_cfg, "eps", 1e-12))),
+        }
+        return MaskedFieldMSELoss(**params)
+
     if loss_params.get("family", "combined") == "mse":
         return nn.MSELoss()
 
@@ -2553,7 +3089,7 @@ def make_hOpt_objective(
         from resources.MLmodels import MODEL
 
         model_params = hOpt_suggest_model_params(trial, typ, data, search_space=model_space)
-        loss_params = hOpt_suggest_loss_params(trial, loss_cfg=loss_space)
+        loss_params = hOpt_suggest_loss_params(trial, loss_cfg=loss_space, data=data)
         train_params = hOpt_suggest_training_params(trial, typ=typ, train_cfg=train_space)
 
         model = hOpt_build_model(typ, model_params)
