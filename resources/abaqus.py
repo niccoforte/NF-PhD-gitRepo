@@ -1,14 +1,26 @@
-from abaqus import *
-from abaqusConstants import *
-from caeModules import *
-from odbAccess import *
+try: from abaqus import *
+except Exception: pass
+try: from abaqusConstants import *
+except Exception: pass
+try: from caeModules import *
+except Exception: pass
+try: from odbAccess import *
+except Exception: pass
+
 import numpy as np
 import math
+import os
+import re
 from fractions import Fraction
 from resources.lattices import Geometry, insidePoint, pStrainProperties
 
 randX_all = None
 randY_all = None
+
+
+# =============================================================================
+# A1 simulation generation helpers
+# =============================================================================
 
 def node(
     latticeType,
@@ -973,6 +985,11 @@ def random_low_alias_freq(dx=10.0, q_max=20, tol=1e-6):
         if not is_well_approximable(alpha, q_max=q_max, tol=tol):
             return f
 
+
+# =============================================================================
+# A2_INpostProcess.py helpers
+# =============================================================================
+
 def export_frequencies(inpFile, expFile):
     with open(inpFile, 'r') as f:
         lines = f.readlines()
@@ -1045,6 +1062,11 @@ def export_struts(inpFile, expFile):
     with open(expFile, 'w') as f:
         for thick in thicks:
             f.write(str(thick) + '\n')
+
+
+# =============================================================================
+# A2_OUTpostProcess.py helpers
+# =============================================================================
 
 def nodes_in_set(ra, name, prefix='Node '):
     pairs = set()
@@ -1227,6 +1249,141 @@ def get_FracData(Job, expected_steps=201):
         STEPS_OUT.append(OUT)
     odb.close()
     return STEPS_OUT
+
+
+# =============================================================================
+# A2_FieldOUTpostProcess.py helpers
+# =============================================================================
+
+def _field_sample_number(stem):
+    if "-per-" in stem.lower():
+        return "0"
+    numbers = re.findall(r"\d+", stem)
+    return numbers[-1] if numbers else ""
+
+def _field_mode_label(mode):
+    return "FT" if str(mode).lower().startswith("frac") or str(mode).lower() == "ft" else "UT"
+
+def _read_inp_nodes_for_field(inpFile, totalNodes, mode="ductile"):
+    with open(inpFile, 'r') as f:
+        lines = f.readlines()
+
+    nodes_start = int([lines.index(line) for line in lines if "*Node" in line][0]) + 1
+    nodes_end = nodes_start + int(totalNodes)
+    node_lines = lines[nodes_start:nodes_end]
+    nodes = [[float(i.strip().strip('\n')) for i in line.split(",")[:3]] for line in node_lines]
+    nodes = np.array(nodes)
+
+    if mode.lower().startswith("frac") and len(nodes) > 2:
+        nodes = np.delete(nodes, [0, 2], axis=0)
+
+    return nodes
+
+def _field_tuple_data(value):
+    try:
+        return tuple(value)
+    except TypeError:
+        return (value,)
+
+def _first_available_field(frame, field_names=("UT", "U")):
+    for field_name in field_names:
+        if field_name in frame.fieldOutputs.keys():
+            return field_name
+    raise KeyError("None of the requested field outputs {} are present.".format(field_names))
+
+def get_UfieldData(Job, nodeLabels, field_names=("UT", "U"), dtype="float32"):
+    odb = openOdb(path=Job, readOnly=True)
+    try:
+        step = odb.steps["Step-1"] if "Step-1" in odb.steps.keys() else list(odb.steps.values())[-1]
+        frames = list(step.frames)
+        if len(frames) == 0:
+            raise RuntimeError("{} has no frames in the selected step.".format(Job))
+
+        used_field = _first_available_field(frames[0], field_names=field_names)
+        label_to_pos = {int(label): idx for idx, label in enumerate(nodeLabels)}
+
+        U = np.full((len(frames), len(nodeLabels), 2), np.nan, dtype=np.dtype(dtype))
+        valid_mask = np.zeros(U.shape, dtype=bool)
+        frame_values = np.asarray([float(frame.frameValue) for frame in frames], dtype=float)
+
+        for frame_idx, frame in enumerate(frames):
+            if used_field not in frame.fieldOutputs.keys():
+                continue
+            uField = frame.fieldOutputs[used_field]
+            for val in uField.values:
+                if not hasattr(val, "nodeLabel"):
+                    continue
+                pos = label_to_pos.get(int(val.nodeLabel))
+                if pos is None:
+                    continue
+                data = _field_tuple_data(val.data)
+                for comp_idx in range(min(2, len(data))):
+                    U[frame_idx, pos, comp_idx] = float(data[comp_idx])
+                    valid_mask[frame_idx, pos, comp_idx] = True
+    finally:
+        odb.close()
+
+    return U, valid_mask, frame_values, ["U1", "U2"], used_field
+
+def export_UfieldNPZ(Job, inpFile, expFile, totalNodes, mode="ductile", sample_id=None, dtype="float32"):
+    stem = os.path.splitext(os.path.basename(Job))[0]
+    nodes = _read_inp_nodes_for_field(inpFile, totalNodes=totalNodes, mode=mode)
+    node_labels = nodes[:, 0].astype(int)
+    node_coords = nodes[:, 1:3].astype(np.dtype(dtype))
+
+    U, valid_mask, frame_values, components, used_field = get_UfieldData(
+        Job,
+        node_labels,
+        field_names=("UT", "U"),
+        dtype=dtype,
+    )
+
+    sample_number = _field_sample_number(stem)
+    if sample_id is None:
+        sample_id = sample_number
+    task = _field_mode_label(mode)
+
+    expDir = os.path.dirname(expFile)
+    if expDir and not os.path.exists(expDir):
+        os.makedirs(expDir)
+
+    np.savez_compressed(
+        expFile,
+        Y=U,
+        valid_mask=valid_mask,
+        frame_values=frame_values,
+        node_labels=node_labels,
+        node_coords=node_coords,
+        coords0=node_coords,
+        components=np.asarray(components, dtype=str),
+        field_names=np.asarray([used_field], dtype=str),
+        field_family=np.asarray(["u"], dtype=str),
+        sample_id=np.asarray([sample_id], dtype=str),
+        sample_ids=np.asarray([sample_id], dtype=str),
+        sample_stem=np.asarray([stem], dtype=str),
+        sample_stems=np.asarray([stem], dtype=str),
+        sample_number=np.asarray([sample_number], dtype=str),
+        sample_numbers=np.asarray([sample_number], dtype=str),
+        source=np.asarray(["odb"], dtype=str),
+        mode=np.asarray([task], dtype=str),
+        layout=np.asarray(["fnc"], dtype=str),
+        source_odb_path=np.asarray([Job], dtype=str),
+        source_inp_path=np.asarray([inpFile], dtype=str),
+    )
+
+    return {
+        "path": expFile,
+        "stem": stem,
+        "mode": task,
+        "shape": U.shape,
+        "field_name": used_field,
+        "valid_fraction": float(valid_mask.mean()) if valid_mask.size else np.nan,
+    }
+
+
+# =============================================================================
+# A3_ContinuumPP.py helpers
+# =============================================================================
 
 def export_Udata(job, totalNodes, mode="ductile"):
     odb = openOdb(path=job)
