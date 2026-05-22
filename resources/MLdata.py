@@ -104,16 +104,16 @@ def remove_outliers(IN_df, OUT_df, dIN_df, dOUT_df, props_df, INf_df=None, manua
         if INf_df is not None:
             INf_df = INf_df.drop(INf_df.loc[outlier_idxs].index)
         
-        if manual is not None:
-            manual = np.array(manual, dtype="int")
+    if manual is not None:
+        manual = np.array(manual, dtype="int")
 
-            IN_df = IN_df.drop(IN_df.loc[manual].index)
-            OUT_df = OUT_df.drop(OUT_df.loc[manual].index)
-            dIN_df = dIN_df.drop(dIN_df.loc[manual].index)
-            dOUT_df = dOUT_df.drop(dOUT_df.loc[manual].index)
-            props_df = props_df.drop(props_df.loc[manual].index)
-            if INf_df is not None:
-                INf_df = INf_df.drop(INf_df.loc[manual].index)
+        IN_df = IN_df.drop(manual, errors="ignore")
+        OUT_df = OUT_df.drop(manual, errors="ignore")
+        dIN_df = dIN_df.drop(manual, errors="ignore")
+        dOUT_df = dOUT_df.drop(manual, errors="ignore")
+        props_df = props_df.drop(manual, errors="ignore")
+        if INf_df is not None:
+            INf_df = INf_df.drop(manual, errors="ignore")
     
     return IN_df, OUT_df, dIN_df, dOUT_df, props_df, INf_df
 
@@ -138,6 +138,143 @@ def save_MULTIdata(IN_dfs, OUT_dfs, common_props_df, PATH, dis, INf_dfs=None):
     if INf_dfs is not None and INf_dfs[0] is not None and INf_dfs[1] is not None:
         INf_dfs[0].to_csv(PATH + f"MLdata/MULTI-UT-{dis}-allINf.csv")
         INf_dfs[1].to_csv(PATH + f"MLdata/MULTI-FT-{dis}-allINf.csv")
+
+def _field_save_npz_key(npz, candidates, required=True):
+    files = set(npz.files)
+    for key in candidates:
+        if key in files:
+            return key
+    if required:
+        raise KeyError(f"Field npz is missing one of the required keys: {candidates}.")
+    return None
+
+def _field_save_string_array(npz, candidates, default=None):
+    key = _field_save_npz_key(npz, candidates, required=False)
+    if key is None:
+        return default
+    return np.asarray(npz[key]).astype(str)
+
+def _field_save_sample_indices(npz, n_samples):
+    candidates = []
+    sample_ids = _field_save_string_array(npz, ["sample_ids", "ids", "indices", "index"], default=None)
+    if sample_ids is not None and len(sample_ids) == n_samples:
+        candidates.append(("sample_ids", pd.Index(sample_ids)))
+    sample_numbers = _field_save_string_array(npz, ["sample_numbers", "sample_number"], default=None)
+    if sample_numbers is not None and len(sample_numbers) == n_samples:
+        candidates.append(("sample_numbers", pd.Index(sample_numbers)))
+    if not candidates:
+        candidates.append(("position", pd.Index(range(n_samples))))
+    return candidates
+
+def _field_save_positions(field_index, target_index):
+    field_index = pd.Index(field_index)
+    target_index = pd.Index(target_index)
+    if not field_index.is_unique:
+        raise ValueError("field index is not unique")
+    positions = field_index.get_indexer(target_index)
+    if np.all(positions >= 0):
+        return positions
+
+    field_index_str = pd.Index(field_index.astype(str))
+    target_index_str = pd.Index(target_index.astype(str))
+    positions = field_index_str.get_indexer(target_index_str)
+    if np.any(positions < 0):
+        missing = target_index[positions < 0].tolist()
+        raise KeyError(f"Field npz is missing sample ids {missing[:10]}.")
+    return positions
+
+def _field_save_to_sfnc(values, valid_mask, npz):
+    frame_values = np.asarray(npz[_field_save_npz_key(npz, ["frame_values", "frames", "times"], required=False)]) if _field_save_npz_key(npz, ["frame_values", "frames", "times"], required=False) else None
+    node_labels = np.asarray(npz[_field_save_npz_key(npz, ["node_labels", "nodes", "labels"], required=False)]) if _field_save_npz_key(npz, ["node_labels", "nodes", "labels"], required=False) else None
+    if values.ndim == 3:
+        values = values[None, ...]
+        valid_mask = valid_mask[None, ...]
+    values = _data_field_layout_to_sfnc(values, "auto", frame_values=frame_values, node_labels=node_labels)
+    valid_mask = _data_field_layout_to_sfnc(valid_mask.astype(float), "auto", frame_values=frame_values, node_labels=node_labels).astype(bool)
+    return values, valid_mask
+
+def _save_field_subset(field_npz, sample_index, out_path):
+    field_npz = Path(field_npz)
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with np.load(field_npz, allow_pickle=True) as npz:
+        values_key = _field_save_npz_key(npz, ["Y", "U", "field", "values", "outputs", "field_values"])
+        values = np.asarray(npz[values_key], dtype=float)
+        mask_key = _field_save_npz_key(npz, ["valid_mask", "mask"], required=False)
+        valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
+        values, valid_mask = _field_save_to_sfnc(values, valid_mask, npz)
+
+        alignment_errors = []
+        for index_name, field_index in _field_save_sample_indices(npz, values.shape[0]):
+            try:
+                positions = _field_save_positions(field_index, sample_index)
+                break
+            except Exception as exc:
+                alignment_errors.append(f"{index_name}: {exc}")
+        else:
+            raise KeyError("Could not align field npz to requested samples. " + "; ".join(alignment_errors))
+        values = values[positions]
+        valid_mask = valid_mask[positions]
+
+        payload = {
+            "Y": values,
+            "valid_mask": valid_mask,
+            "sample_ids": np.asarray(pd.Index(sample_index).astype(str), dtype=str),
+            "source_field_npz": np.asarray([str(field_npz)], dtype=str),
+        }
+        for key in [
+            "frame_values",
+            "frames",
+            "times",
+            "node_labels",
+            "nodes",
+            "labels",
+            "node_coords",
+            "coords0",
+            "coords",
+            "nodes0",
+            "elements",
+            "elems",
+            "connectivity",
+            "components",
+            "component_names",
+            "variables",
+            "field_names",
+            "mode",
+        ]:
+            if key in npz.files and key not in payload:
+                payload[key] = npz[key]
+        for key in ["sample_stems", "sample_numbers", "sample_node_coords", "source_field_files", "source_odb_paths", "source_inp_paths"]:
+            if key in npz.files:
+                arr = np.asarray(npz[key])
+                payload[key] = arr[positions] if arr.shape[:1] == (len(field_index),) else arr
+
+    np.savez_compressed(out_path, **payload)
+    summary = {
+        "path": str(out_path),
+        "source_field_npz": str(field_npz),
+        "shape": list(values.shape),
+        "sample_ids": [str(i) for i in pd.Index(sample_index)],
+        "valid_fraction": float(valid_mask.mean()) if valid_mask.size else None,
+    }
+    with open(str(out_path).replace(".npz", ".summary.json"), "w") as handle:
+        json.dump(summary, handle, indent=2, sort_keys=True)
+    return out_path
+
+def save_field_MLdata(field_npz, IN_df, PATH, mode, dis, mechMode=None, sample_index=None):
+    """Save a final ML-ready field target aligned to an already-filtered input table."""
+    mechMode = mechMode or mode
+    sample_index = pd.Index(sample_index) if sample_index is not None else pd.Index(IN_df.index)
+    out_path = Path(PATH) / "MLdata" / f"{mechMode}-{mode}-{dis}-field.npz"
+    return _save_field_subset(field_npz, sample_index, out_path)
+
+def save_MULTIfieldData(UT_field_npz, FT_field_npz, common_props_df, PATH, dis):
+    """Save paired MULTI field targets using the common UT/FT sample index."""
+    sample_index = pd.Index(common_props_df.index)
+    UT_path = save_field_MLdata(UT_field_npz, common_props_df, PATH, "UT", dis, mechMode="MULTI", sample_index=sample_index)
+    FT_path = save_field_MLdata(FT_field_npz, common_props_df, PATH, "FT", dis, mechMode="MULTI", sample_index=sample_index)
+    return UT_path, FT_path
     
 
 def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
@@ -675,16 +812,17 @@ class DATA:
         if path_add.lower() == "frequency":
             self.freq = True
 
-        self.mechMode = mechMode.upper()
-        if mechMode.lower() == "ut":
+        mechMode_key = mechMode.lower()
+        self.mechMode = "MULTI" if mechMode_key == "both" else mechMode.upper()
+        if mechMode_key == "ut":
             self.mechTest = "Ductile"
             self.UTmechTest = True
             self.FTmechTest = False
-        elif mechMode.lower() == "ft":
+        elif mechMode_key == "ft":
             self.mechTest = "Fracture"
             self.UTmechTest = False
             self.FTmechTest = True
-        elif mechMode.lower() == "multi":
+        elif mechMode_key in ["multi", "both"]:
             self.UTmechTest = True
             self.FTmechTest = True
         
