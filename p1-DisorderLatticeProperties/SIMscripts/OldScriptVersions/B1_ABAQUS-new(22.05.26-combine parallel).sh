@@ -1,28 +1,15 @@
 #!/bin/bash
-
-# Default compute-partition Abaqus run.
 #SBATCH -n 8
 #SBATCH -p compute
 #SBATCH -t 240:0:0
 #SBATCH --mem-per-cpu=5G
+# --gres=gpu:2
+# --gres=cluster:andrena
+# --gres=highmem
 #SBATCH --job-name=JobNameOG
 #SBATCH -o %x.o%j
 #SBATCH -L abaqus:12
-
-# For parallel CPU partition runs.
-##SBATCH -N 4
-##SBATCH -n 192
-##SBATCH -p parallel
-##SBATCH -t 24:0:0
-##SBATCH --exclusive
-##SBATCH --mem=0
-
-# Optional resource constraints from older runs.
-##SBATCH --gres=gpu:2
-##SBATCH -p andrena
-##SBATCH -A pilot_andrena
-##SBATCH -p highmem
-##SBATCH --constraint=avx512
+# --gres=avx512
 
 set -euo pipefail
 
