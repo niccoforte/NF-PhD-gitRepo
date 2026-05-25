@@ -165,7 +165,10 @@ prepare_scratch() {
 }
 
 copy_inputs() {
-    copy_glob_to_dir "$SIM_CODE_DIR/A-HPC-*" "$SCRATCH_DIR"
+    copy_glob_to_dir "$SIM_CODE_DIR/A1_FractureToughness-Ductility.py" "$SCRATCH_DIR"
+    copy_glob_to_dir "$SIM_CODE_DIR/A2_OUTpostProcess.py" "$SCRATCH_DIR"
+    copy_glob_to_dir "$SIM_CODE_DIR/A2_INpostProcess.py" "$SCRATCH_DIR"
+    copy_glob_to_dir "$SIM_CODE_DIR/A2_FieldOUTpostProcess.py" "$SCRATCH_DIR"
     copy_glob_to_dir "$SLURM_SUBMIT_DIR/B*" "$SCRATCH_DIR"
     sync_dir_contents_if_exists "$RESOURCES_SRC" "$RESOURCES_DIR"
 }
@@ -262,14 +265,15 @@ write_run_config
 cd "$SCRATCH_DIR"
 /bin/echo "Working in directory: $(pwd)"
 
-abaqus cae noGUI=A-HPC-1_FractureToughness-Ductility.py -- "${ABAQUS_ARGS[@]}"
+abaqus cae noGUI=A1_FractureToughness-Ductility.py -- "${ABAQUS_ARGS[@]}"
 
 /bin/echo "Simulation completed at: $(date)"
 /bin/echo "Processing outputs..."
 
-abaqus cae noGUI=A-HPC-2_OUTpostProcess.py -- "${ABAQUS_ARGS[@]}"
-abaqus cae noGUI=A-HPC-2_INpostProcess.py -- "${ABAQUS_ARGS[@]}"
+abaqus cae noGUI=A2_OUTpostProcess.py -- "${ABAQUS_ARGS[@]}"
+abaqus cae noGUI=A2_INpostProcess.py -- "${ABAQUS_ARGS[@]}"
+abaqus cae noGUI=A2_FieldOUTpostProcess.py -- "${ABAQUS_ARGS[@]}"
 
-/bin/echo "Inputs and outputs collected."
+/bin/echo "Inputs, curve outputs, and field outputs collected."
 /bin/echo "Simulation files staged in: $ZIP_DIR"
 /bin/echo "Job completed at: $(date)"

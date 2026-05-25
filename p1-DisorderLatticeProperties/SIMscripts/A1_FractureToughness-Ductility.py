@@ -63,7 +63,12 @@ pDir = "C:\\temp"
 global frequencies
 frequencies = []
 
-cmdIN = sys.argv[8:]
+if "--" in sys.argv:
+    cmdIN = sys.argv[sys.argv.index("--") + 1:]
+elif len(sys.argv) >= 26:
+    cmdIN = sys.argv[10:]
+else:
+    cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     nnx = int(cmdIN[1])
@@ -133,6 +138,9 @@ if UTval:
     nodeVar = 'no'
     sizeVar = 'no'
     pDir = "C:\\Users\\exy053\\Documents\\al\\new\\18-1.1"
+
+if pDir in [None, "", "None", "none"]:
+    pDir = os.getcwd()
 
 os.chdir(pDir)
 

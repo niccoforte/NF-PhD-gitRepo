@@ -9,12 +9,17 @@ unitCellSize = 10.0
 
 pDir = "C:\\temp"
 
-cmdIN = sys.argv[8:]
+if "--" in sys.argv:
+    cmdIN = sys.argv[sys.argv.index("--") + 1:]
+elif len(sys.argv) >= 26:
+    cmdIN = sys.argv[10:]
+else:
+    cmdIN = sys.argv[8:]
 if len(cmdIN) > 0:
     latticeType = str(cmdIN[0])
     nnx = int(cmdIN[1])
     unitCellSize = float(cmdIN[2])
-    MechanicalModel = str(cmdIN[3])
+    mode = str(cmdIN[3])
     userMaterial = str(cmdIN[4])
     relDensity = float(cmdIN[5])
     dis = str(cmdIN[6])
@@ -59,6 +64,9 @@ if len(cmdIN) > 0:
 if stiffMatrix:
     pDir = "Z:\\p1\\sims\\Ti\\StiffMatrix"
 
+if pDir in [None, "", "None", "none"]:
+    pDir = os.getcwd()
+
 os.chdir(pDir)
 
 
@@ -66,25 +74,29 @@ freq = False
 if distribution.lower() == "frequency" or distribution.lower() == "opt-f":
     freq = True
 
-if not os.path.exists("transfer"):
-    os.makedirs("transfer")
+for curDirectory, folders, files in os.walk(pDir):
+    folders[:] = [folder for folder in folders if folder not in ["transfer", "__pycache__"]]
+    if not os.path.exists(curDirectory + "/transfer"):
+        os.makedirs(curDirectory + "/transfer")
 
-for file in os.scandir():
-    if 'per' in file.name or 'disNodes' in file.name:
-        if file.name.endswith('.inp'):
-            expFile_n = "transfer/IN-n" + file.name[:-4].replace('_','-') + ".csv"
-            expFile_f = "transfer/IN-f" + file.name[:-4].replace('_','-') + ".csv"
-            export_nodes(
-                file.name,
-                expFile_n,
-                latticeType=file.name.split('-')[1],
-                unitCellSize=unitCellSize,
-                stiffMatrix=stiffMatrix,
-            )
-            if freq:
-                export_frequencies(file.name, expFile_f)
+    for file in files:
+        if 'per' in file or 'disNodes' in file:
+            if file.endswith('.inp'):
+                inpFile = os.path.join(curDirectory, file)
+                expFile_n = curDirectory + "/transfer/IN-n" + file[:-4].replace('_','-') + ".csv"
+                expFile_f = curDirectory + "/transfer/IN-f" + file[:-4].replace('_','-') + ".csv"
+                export_nodes(
+                    inpFile,
+                    expFile_n,
+                    latticeType=file.split('-')[1],
+                    unitCellSize=unitCellSize,
+                    stiffMatrix=stiffMatrix,
+                )
+                if freq:
+                    export_frequencies(inpFile, expFile_f)
 
-    if 'per' in file.name or 'disStruts' in file.name:
-        if file.name.endswith('.inp'):
-            expFile = "transfer/IN-s" + file.name[:-4].replace('_','-') + ".csv"
-            export_struts(file.name, expFile)
+        if 'per' in file or 'disStruts' in file:
+            if file.endswith('.inp'):
+                inpFile = os.path.join(curDirectory, file)
+                expFile = curDirectory + "/transfer/IN-s" + file[:-4].replace('_','-') + ".csv"
+                export_struts(inpFile, expFile)
