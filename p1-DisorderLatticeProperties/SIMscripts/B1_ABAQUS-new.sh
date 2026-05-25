@@ -59,7 +59,7 @@ delete_scratch=${delete_scratch:-true}
 REPO_ROOT=${REPO_ROOT:-/data/home/$HPC_USER/00-PhD-gitRepo}
 SIM_CODE_DIR=${SIM_CODE_DIR:-$REPO_ROOT/p1-DisorderLatticeProperties/SIMscripts}
 RESOURCES_SRC=${RESOURCES_SRC:-$REPO_ROOT/resources}
-ARCHIVE_ROOT=${ARCHIVE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/Ti/data}
+ARCHIVE_ROOT=${ARCHIVE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data}
 
 # Allow basic syntax checks outside Slurm without crashing on unset variables.
 SLURM_JOB_ID=${SLURM_JOB_ID:-manual-$(date +%y%m%d-%H%M%S)}
