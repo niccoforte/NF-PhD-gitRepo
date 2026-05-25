@@ -18,19 +18,19 @@ set -euo pipefail
 HPC_USER=${HPC_USER:-${USER:-exy053}}
 
 # ^^^ EDIT / OVERRIDE FOR EACH POST-PROCESSING PASS ^^^
-LAT=${LAT:-FCC}
-nnx=${nnx:-20}
+LAT=${LAT:-lat}
+nnx=${nnx:-10}
 unitCellSize=${unitCellSize:-10}
 mode=${mode:-both}
 material=${material:-ti}
 rD=${rD:-0.2}
-DIS=${DIS:-disNodes}
-fac=${fac:-0.2}
+DIS=${DIS:-per}
+fac=${fac:-0.0}
 distribution=${distribution:-lhs_uniform}
 target=${target:-all}
 initial=${initial:-1}
 nJobs=${nJobs:-1}
-CPUs=${CPUs:-${SLURM_NTASKS:-1}}
+CPUs=${CPUs:-${SLURM_NTASKS:-8}}
 Fout=${Fout:-20}
 Hout=${Hout:-200}
 
