@@ -541,7 +541,24 @@ def _field_values_to_fnc(values):
         return values[0]
     raise ValueError(f"Raw field values must have shape [frame,node,component], got {values.shape}.")
 
-def create_fieldIndexCSV(directory, field_dir="", raw_dir="transfer", index_name=None, field_prefix="FIELDu-", dat=None, dis=None):
+def _field_body_node_mask(node_coords, dat=None):
+    if node_coords is None:
+        return None
+    node_coords = np.asarray(node_coords, dtype=float)
+    if node_coords.ndim != 2 or node_coords.shape[1] < 2:
+        return None
+    if dat is None or not hasattr(dat, "geom"):
+        return np.ones(node_coords.shape[0], dtype=bool)
+
+    tol = dat.geom.l * 1e-4
+    return (
+        (node_coords[:, 0] >= -tol) &
+        (node_coords[:, 0] <= dat.geom.L + tol) &
+        (node_coords[:, 1] >= -tol) &
+        (node_coords[:, 1] <= dat.geom.H + tol)
+    )
+
+def create_fieldIndexCSV(directory, field_dir="", raw_dir="transfer", index_name=None, field_prefix="FIELDu-", dat=None, dis=None, save=False):
     """Create a lightweight audit table for raw FIELDu-*.npz outputs."""
     dis = dis or (dat.dis if dat is not None else "disNodes")
     field_family = _field_family_name(field_prefix)
@@ -576,16 +593,17 @@ def create_fieldIndexCSV(directory, field_dir="", raw_dir="transfer", index_name
     df = pd.DataFrame(rows)
     if not df.empty:
         df = df.sort_values(["mech_mode", "sample_id", "stem"], kind="stable").reset_index(drop=True)
-    out_root = _field_root(directory, field_dir=field_dir)
-    out_root.mkdir(parents=True, exist_ok=True)
+    if save:
+        out_root = _field_root(directory, field_dir=field_dir)
+        out_root.mkdir(parents=True, exist_ok=True)
 
-    if index_name is not None:
-        df.to_csv(out_root / index_name, index=False)
-    elif not df.empty:
-        for mech_test, mode_df in df.groupby("mech_test", sort=False):
-            if pd.isna(mech_test) or str(mech_test) == "":
-                continue
-            mode_df.to_csv(out_root / f"{mech_test}-{dis}-{field_family}-index.csv", index=False)
+        if index_name is not None:
+            df.to_csv(out_root / index_name, index=False)
+        elif not df.empty:
+            for mech_test, mode_df in df.groupby("mech_test", sort=False):
+                if pd.isna(mech_test) or str(mech_test) == "":
+                    continue
+                mode_df.to_csv(out_root / f"{mech_test}-{dis}-{field_family}-index.csv", index=False)
     return df
 
 def _field_sort_key(item):
@@ -597,7 +615,7 @@ def _field_sort_key(item):
     except (TypeError, ValueError):
         return (1, str(sample_id))
 
-def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32"):
+def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32", dat=None):
     if not items:
         return None
 
@@ -680,6 +698,23 @@ def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32"):
         padded_frames[:len(frame_values)] = frame_values
         frame_values = padded_frames
 
+    raw_node_count = int(n_nodes)
+    body_node_mask = _field_body_node_mask(node_coords0, dat=dat)
+    if body_node_mask is None:
+        body_node_mask = np.ones(raw_node_count, dtype=bool)
+    body_node_mask = np.asarray(body_node_mask, dtype=bool)
+    if body_node_mask.shape[0] != raw_node_count:
+        raise ValueError(f"{mode}: body-node mask length {body_node_mask.shape[0]} does not match node count {raw_node_count}.")
+    if not np.any(body_node_mask):
+        raise ValueError(f"{mode}: body-node mask removed every field node.")
+
+    Y = Y[:, :, body_node_mask, :]
+    valid_mask = valid_mask[:, :, body_node_mask, :]
+    node_labels = np.asarray(node_labels, dtype=int)[body_node_mask]
+    node_coords0 = np.asarray(node_coords0, dtype=dtype)[body_node_mask]
+    sample_node_coords = sample_node_coords[:, body_node_mask, :]
+    body_node_count = int(body_node_mask.sum())
+
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(
@@ -699,6 +734,9 @@ def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32"):
         field_names=np.asarray(field_names or [], dtype=str),
         mode=np.asarray([mode], dtype=str),
         source_field_files=np.asarray(source_files, dtype=str),
+        body_node_mask=body_node_mask,
+        raw_node_count=np.asarray([raw_node_count], dtype=int),
+        body_node_count=np.asarray([body_node_count], dtype=int),
     )
 
     meta = {
@@ -711,6 +749,8 @@ def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32"):
         "sample_ids": [str(i) for i in sample_ids],
         "sample_numbers": [str(i) for i in sample_numbers],
         "valid_fraction": float(valid_mask.mean()) if valid_mask.size else np.nan,
+        "raw_node_count": raw_node_count,
+        "body_node_count": body_node_count,
         "source_field_files": source_files,
     }
     with open(str(out_path).replace(".npz", ".summary.json"), "w") as handle:
@@ -730,9 +770,6 @@ def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32"):
 def create_fieldNPZ(directory, dat=None, field_dir="", raw_dir="transfer", dis=None, dtype="float32", field_prefix="FIELDu-"):
     """Stack raw per-simulation field outputs into one processed NPZ per mechanical mode."""
     dis = dis or (dat.dis if dat is not None else "disNodes")
-    field_family = _field_family_name(field_prefix)
-    create_fieldIndexCSV(directory, field_dir=field_dir, raw_dir=raw_dir, field_prefix=field_prefix, dat=dat, dis=dis)
-
     groups = {"UT": [], "FT": []}
     for path in _field_raw_files(directory, field_dir=field_dir, raw_dir=raw_dir, field_prefix=field_prefix):
         with np.load(path, allow_pickle=True) as npz:
@@ -764,6 +801,7 @@ def create_fieldNPZ(directory, dat=None, field_dir="", raw_dir="transfer", dis=N
         "Ductile",
         dis,
         dtype=dtype,
+        dat=dat,
     )
     FTfield_df = _stack_field_group(
         groups["FT"],
@@ -772,10 +810,7 @@ def create_fieldNPZ(directory, dat=None, field_dir="", raw_dir="transfer", dis=N
         "Fracture",
         dis,
         dtype=dtype,
+        dat=dat,
     )
 
-    if UTfield_df is not None:
-        UTfield_df.to_csv(out_root / f"Ductile-{dis}-{field_family}-stack-index.csv", index=False)
-    if FTfield_df is not None:
-        FTfield_df.to_csv(out_root / f"Fracture-{dis}-{field_family}-stack-index.csv", index=False)
     return UTfield_df, FTfield_df
