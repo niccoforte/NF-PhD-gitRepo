@@ -18,20 +18,10 @@ set -euo pipefail
 HPC_USER=${HPC_USER:-${USER:-exy053}}
 
 # ^^^ EDIT / OVERRIDE FOR EACH POST-PROCESSING PASS ^^^
-LAT=${LAT:-lat}
-nnx=${nnx:-10}
+# These are the only Abaqus arguments that affect the recursive A2 post-processing pass.
 unitCellSize=${unitCellSize:-10}
 mode=${mode:-both}
-material=${material:-ti}
-rD=${rD:-0.2}
-DIS=${DIS:-per}
-fac=${fac:-0.0}
 distribution=${distribution:-lhs_uniform}
-target=${target:-all}
-initial=${initial:-1}
-nJobs=${nJobs:-1}
-CPUs=${CPUs:-${SLURM_NTASKS:-8}}
-Fout=${Fout:-20}
 Hout=${Hout:-200}
 
 # Run from the FCC directory by default. Override ROOT_DIR if needed.
@@ -68,20 +58,20 @@ run_postprocess() {
     job_name=$(basename "$(dirname "$pDir")")
 
     local abaqus_args=(
-        "$LAT"
-        "$nnx"
+        "post"
+        "0"
         "$unitCellSize"
         "$mode"
-        "$material"
-        "$rD"
-        "$DIS"
-        "$fac"
+        "post"
+        "0"
+        "per"
+        "0"
         "$distribution"
-        "$target"
-        "$initial"
-        "$nJobs"
-        "$CPUs"
-        "$Fout"
+        "all"
+        "1"
+        "1"
+        "${SLURM_NTASKS:-1}"
+        "20"
         "$Hout"
         "$pDir"
     )
