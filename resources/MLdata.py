@@ -1,5 +1,5 @@
 ﻿from resources.imports import *
-from resources.calculations import calcUT, calcFT
+from resources.calculations import calcUT, calcFT, stress_to_mpa
 from resources.lattices import Geometry, effProperties
 
 import json
@@ -78,7 +78,8 @@ def MULTIprops(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe)
     common_props_df = pd.concat([UT_props_df.loc[common_idxs], FT_props_df.loc[common_idxs]], axis=1)
     norm_df = (common_props_df/common_props_df.loc[0])
     common_props_df["Multi"] = norm_df["Ductility"]**2 + norm_df["K_JIC"]**2 + norm_df["WoF"] + norm_df["Displacement"] + norm_df["Strength"]
-    common_props_df["FCL"] = (common_props_df["K_JIC"]**2 / E_eff_pe) / (common_props_df["WoF"] * 1e6)
+    E_eff_pe_MPa = stress_to_mpa(E_eff_pe)
+    common_props_df["FCL"] = (common_props_df["K_JIC"]**2 / E_eff_pe_MPa) / common_props_df["WoF"]
     common_props_df = common_props_df.replace([np.inf, -np.inf], np.nan).dropna()
     common_idxs = common_props_df.index
 
@@ -92,20 +93,22 @@ def MULTIprops(IN_dfs, OUT_dfs, dIN_dfs, dOUT_dfs, props_dfs, INf_dfs, E_eff_pe)
     return common_props_df, [UT_IN_df, FT_IN_df], [UT_OUT_df, FT_OUT_df], [UT_dIN_df, FT_dIN_df], [UT_dOUT_df, FT_dOUT_df], [UT_INf_df, FT_INf_df] if INf_dfs[0] is not None and INf_dfs[1] is not None else INf_dfs
 
 def remove_outliers(IN_df, OUT_df, dIN_df, dOUT_df, props_df, INf_df=None, manual=None):
-    z_scores = (props_df - props_df.mean()) / props_df.std()
-    outlier_idxs = props_df.iloc[1:].index[(z_scores.iloc[1:].abs() > 3).any(axis=1)]
+    props_disordered_df = props_df.iloc[1:]
+    z_scores = (props_disordered_df - props_disordered_df.mean()) / props_disordered_df.std()
+    outlier_idxs = props_disordered_df.index[(z_scores.abs() > 3).any(axis=1)]
 
     if len(outlier_idxs) > 0:
-        IN_df = IN_df.drop(IN_df.loc[outlier_idxs].index)
-        OUT_df = OUT_df.drop(OUT_df.loc[outlier_idxs].index)
-        dIN_df = dIN_df.drop(dIN_df.loc[outlier_idxs].index)
-        dOUT_df = dOUT_df.drop(dOUT_df.loc[outlier_idxs].index)
-        props_df = props_df.drop(props_df.loc[outlier_idxs].index)
+        IN_df = IN_df.drop(outlier_idxs, errors="ignore")
+        OUT_df = OUT_df.drop(outlier_idxs, errors="ignore")
+        dIN_df = dIN_df.drop(outlier_idxs, errors="ignore")
+        dOUT_df = dOUT_df.drop(outlier_idxs, errors="ignore")
+        props_df = props_df.drop(outlier_idxs, errors="ignore")
         if INf_df is not None:
-            INf_df = INf_df.drop(INf_df.loc[outlier_idxs].index)
+            INf_df = INf_df.drop(outlier_idxs, errors="ignore")
         
     if manual is not None:
         manual = np.array(manual, dtype="int")
+        manual = manual[manual != props_df.index[0]]
 
         IN_df = IN_df.drop(manual, errors="ignore")
         OUT_df = OUT_df.drop(manual, errors="ignore")
@@ -290,12 +293,12 @@ def plot_sampling(df, LAT, l, indx=None, num=5, by="lattice"):
                 
 def get_stats(props_df):
     stats = pd.DataFrame((props_df.iloc[1:].mean(), props_df.iloc[1:].std()), index=['Mean', 'Std'])
-    stats_Pdiff = (stats - props_df.iloc[0]) / props_df.iloc[0]
+    stats_Pdiff = ((stats - props_df.iloc[0]) / props_df.iloc[0]) * 100
     stats_Pdiff.index = ['\\%d Mean', '\\%d Std']
     return pd.concat([stats, stats_Pdiff]), pd.DataFrame((props_df.iloc[1:].idxmax(), props_df.iloc[1:].idxmin()), index=['Max', 'Min'])
 
 def plot_frequency(raw_data, data, test, bins=50):
-    raw_data = np.array(data)
+    raw_data = np.array(raw_data)
     data = np.array(data)
     
     if test == "UT":

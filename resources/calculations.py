@@ -19,6 +19,11 @@ def smooth(y_old):
     return y_new
 
 
+def stress_to_mpa(stress):
+    stress = float(stress)
+    return stress / 1e6 if abs(stress) > 1e6 else stress
+
+
 def get_nodes(nodesCSV, lineStart=None, lineEnd=None):
     with open(nodesCSV, 'r') as f:
         lines = f.readlines()
@@ -110,7 +115,7 @@ def calcUT(df):
 
 def get_fractureData(outputCSV):
     output_df = pd.read_csv(outputCSV, names=['x', 'y'], usecols=['x', 'y'])
-    d = [0] + [dd/1000 for dd in output_df.x.tolist()[1:]]
+    d = [0] + output_df.x.tolist()[1:]
     F = [0] + output_df.y.tolist()[1:]
     F_sm = smooth(smooth(F))
     output_df["x"], output_df["y"], output_df["y_sm"] = d, F, F_sm
@@ -216,12 +221,13 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):
     d = df.x.tolist()
     F_sm = df.y_sm.tolist()
     
-    length_scale = 1e-3
-    W = geom.W * length_scale
-    B = geom.B * length_scale
-    ai = np.asarray(geom.ai, dtype=float) * length_scale
     if validation == True:
         E_eff_pe = E          # TODO: CHECK FT VAL
+    E_eff_pe = stress_to_mpa(E_eff_pe)
+
+    W = geom.W
+    B = geom.B
+    ai = np.asarray(geom.ai, dtype=float)
     
     P = F_sm[frac]
     dd = d[frac]
@@ -329,6 +335,16 @@ def plot_curve(df_list, typ, label=None):
 
     # ax1.grid()
     # ax2.grid()
+    if typ.lower() == "ut":
+        ax1.set_xlabel("Strain")
+        ax1.set_ylabel("Stress [MPa]")
+        ax2.set_xlabel("Strain")
+        ax2.set_ylabel("Smoothed Stress [MPa]")
+    elif typ.lower() == "ft":
+        ax1.set_xlabel("Displacement [mm]")
+        ax1.set_ylabel("Force [N]")
+        ax2.set_xlabel("Displacement [mm]")
+        ax2.set_ylabel("Smoothed Force [N]")
     ax1.legend()
     ax2.legend()
     plt.show()
