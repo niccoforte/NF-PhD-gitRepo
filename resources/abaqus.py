@@ -1010,8 +1010,9 @@ def export_nodes(inpFile, expFile=None, latticeType=None, unitCellSize=10.0, sti
     all_nodes_end = int([lines.index(line) for line in lines if "*Element" in line][0])
 
     if totalNodes is None:
-        LAT = inpFile.split('-')[1]
-        nnx = int(inpFile.split('-')[2])
+        inpName = os.path.basename(inpFile)
+        LAT = inpName.split('-')[1]
+        nnx = int(inpName.split('-')[2])
         if "Fracture" in inpFile:
             mode = 'fracture'
         elif "Ductile" in inpFile:
