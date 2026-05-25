@@ -242,6 +242,9 @@ def _save_field_subset(field_npz, sample_index, out_path):
             "variables",
             "field_names",
             "mode",
+            "body_node_mask",
+            "raw_node_count",
+            "body_node_count",
         ]:
             if key in npz.files and key not in payload:
                 payload[key] = npz[key]
@@ -251,22 +254,13 @@ def _save_field_subset(field_npz, sample_index, out_path):
                 payload[key] = arr[positions] if arr.shape[:1] == (len(field_index),) else arr
 
     np.savez_compressed(out_path, **payload)
-    summary = {
-        "path": str(out_path),
-        "source_field_npz": str(field_npz),
-        "shape": list(values.shape),
-        "sample_ids": [str(i) for i in pd.Index(sample_index)],
-        "valid_fraction": float(valid_mask.mean()) if valid_mask.size else None,
-    }
-    with open(str(out_path).replace(".npz", ".summary.json"), "w") as handle:
-        json.dump(summary, handle, indent=2, sort_keys=True)
     return out_path
 
 def save_field_MLdata(field_npz, IN_df, PATH, mode, dis, mechMode=None, sample_index=None):
     """Save a final ML-ready field target aligned to an already-filtered input table."""
     mechMode = mechMode or mode
     sample_index = pd.Index(sample_index) if sample_index is not None else pd.Index(IN_df.index)
-    out_path = Path(PATH) / "MLdata" / f"{mechMode}-{mode}-{dis}-field.npz"
+    out_path = Path(PATH) / "MLdata" / f"{mechMode}-{mode}-{dis}-allFIELD.npz"
     return _save_field_subset(field_npz, sample_index, out_path)
 
 def save_MULTIfieldData(UT_field_npz, FT_field_npz, common_props_df, PATH, dis):
@@ -1678,7 +1672,7 @@ def _data_field_path(data_obj, mode):
             if not path.is_absolute():
                 path = Path(data_obj.PATH) / path
             return path
-    filename = cfg.get("filename", f"{data_obj.mechMode}-{mode}-{data_obj.dis}-field.npz")
+    filename = cfg.get("filename", f"{data_obj.mechMode}-{mode}-{data_obj.dis}-allFIELD.npz")
     return Path(data_obj.PATH) / "MLdata" / filename
 
 def _data_field_npz_key(npz, candidates, required=True):
