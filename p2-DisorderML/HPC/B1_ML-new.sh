@@ -9,8 +9,10 @@
 #SBATCH --gres=gpu:1
 
 # For gpu partition runs
-##SBATCH -p gpu
+##SBATCH -p sae
+##SBATCH -A pilot_sae_gpu
 ##SBATCH -t 240:0:0
+
 # For andrena partitioin runs
 #SBATCH -p andrena
 #SBATCH -A pilot_andrena
