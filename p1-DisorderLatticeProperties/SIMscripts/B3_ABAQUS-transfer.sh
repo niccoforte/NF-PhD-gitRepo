@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REMOTE=${REMOTE:-exy053@login.hpc.qmul.ac.uk}
-REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/Ti/data}
+REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data}
 
 if [ -d "Z:/" ]; then
     LOCAL_ROOT=${LOCAL_ROOT:-Z:/p1/data/Ti}
@@ -20,9 +20,8 @@ fi
 #   bash B3_ABAQUS-transfer_v2.sh download-zip per FCC 9919196
 #   bash B3_ABAQUS-transfer_v2.sh upload-transfer FCC Frequency
 #
-# Interactive/default mode preserves the original B3_ABAQUS-transfer.sh behavior:
-# it downloads both per/0.0 and disNodes/<EXTRA>/0.2 transfer contents, then
-# copies files matching *per* into the local per transfer directory.
+# Interactive/default mode downloads per/0.0 and disNodes/<EXTRA>/0.2
+# transfer contents into their separate local transfer directories.
 
 prompt_default() {
     local var_name=$1
@@ -64,8 +63,10 @@ local_transfer_dir() {
 
     if [ "$dis" = "per" ]; then
         printf "%s/per/%s/transfer" "$LOCAL_ROOT" "$lat"
-    else
+    elif [ -n "$extra" ]; then
         printf "%s/%s/%s/%s/%s/transfer" "$LOCAL_ROOT" "$dis" "$extra" "$fac" "$lat"
+    else
+        printf "%s/%s/%s/%s/transfer" "$LOCAL_ROOT" "$dis" "$fac" "$lat"
     fi
 }
 
@@ -78,8 +79,10 @@ local_zip_parent_dir() {
 
     if [ "$dis" = "per" ]; then
         printf "%s/per/%s/%s" "$LOCAL_ROOT" "$lat" "$job_id"
-    else
+    elif [ -n "$extra" ]; then
         printf "%s/%s/%s/%s/%s/%s" "$LOCAL_ROOT" "$dis" "$extra" "$fac" "$lat" "$job_id"
+    else
+        printf "%s/%s/%s/%s/%s" "$LOCAL_ROOT" "$dis" "$fac" "$lat" "$job_id"
     fi
 }
 
@@ -87,7 +90,7 @@ remote_job_selector() {
     local job_id=$1
 
     if [ "$job_id" = "all" ]; then
-        printf "*"
+        printf "[0-9]*"
     else
         printf "%s" "$job_id"
     fi
@@ -104,8 +107,10 @@ remote_case_path() {
     selector=$(remote_job_selector "$job_id")
     if [ "$dis" = "per" ]; then
         printf "%s/per/%s/%s/%s" "$REMOTE_ROOT" "$fac" "$lat" "$selector"
-    else
+    elif [ -n "$extra" ]; then
         printf "%s/%s/%s/%s/%s/%s" "$REMOTE_ROOT" "$dis" "$extra" "$fac" "$lat" "$selector"
+    else
+        printf "%s/%s/%s/%s/%s" "$REMOTE_ROOT" "$dis" "$fac" "$lat" "$selector"
     fi
 }
 
@@ -118,12 +123,17 @@ rsync_remote_glob() {
     /bin/echo "Local:  $dest"
 
     set +e
-    rsync -av "$REMOTE:$remote_glob" "$dest/"
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -av "$REMOTE:$remote_glob" "$dest/"
+    else
+        /bin/echo "rsync not found locally; falling back to scp."
+        scp "$REMOTE:$remote_glob" "$dest/"
+    fi
     local rc=$?
     set -e
 
     if [ "$rc" -ne 0 ]; then
-        /bin/echo "WARNING: rsync returned status $rc for: $remote_glob"
+        /bin/echo "WARNING: transfer command returned status $rc for: $remote_glob"
         /bin/echo "This usually means the remote path did not match any files, or the transfer was interrupted."
     fi
 
@@ -163,7 +173,12 @@ download_zip_case() {
 
     /bin/echo "Remote: $REMOTE:$base/zip"
     /bin/echo "Local:  $parent/zip"
-    rsync -av "$REMOTE:$base/zip" "$parent/"
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -av "$REMOTE:$base/zip" "$parent/"
+    else
+        /bin/echo "rsync not found locally; falling back to scp."
+        scp -r "$REMOTE:$base/zip" "$parent/"
+    fi
 }
 
 download_both_default() {
@@ -177,19 +192,8 @@ download_both_default() {
     per_dest=$(local_transfer_dir "per" "" "0.0" "$lat")
 
     mkdir -p "$dis_dest" "$per_dest"
-    download_transfer_case "per" "" "0.0" "$lat" "$job_id" "$dis_dest"
+    download_transfer_case "per" "" "0.0" "$lat" "$job_id" "$per_dest"
     download_transfer_case "disNodes" "$extra" "0.2" "$lat" "$job_id" "$dis_dest"
-
-    shopt -s nullglob
-    local per_files=( "$dis_dest"/*per* )
-    shopt -u nullglob
-
-    if [ "${#per_files[@]}" -gt 0 ]; then
-        cp -n "${per_files[@]}" "$per_dest/"
-        /bin/echo "Copied per files into: $per_dest"
-    else
-        /bin/echo "No files matching *per* found in: $dis_dest"
-    fi
 
     /bin/echo "Default transfer complete."
     /bin/echo "disNodes files saved under: $dis_dest"
@@ -208,7 +212,12 @@ upload_transfer() {
     fi
 
     ssh "$REMOTE" "mkdir -p '$remote_dir'"
-    rsync -av "$local_dir"/ "$REMOTE:$remote_dir"/
+    if command -v rsync >/dev/null 2>&1; then
+        rsync -av "$local_dir"/ "$REMOTE:$remote_dir"/
+    else
+        /bin/echo "rsync not found locally; falling back to scp."
+        scp -r "$local_dir"/* "$REMOTE:$remote_dir"/
+    fi
     /bin/echo "Upload complete."
     /bin/echo "Remote: $REMOTE:$remote_dir"
 }
@@ -258,7 +267,7 @@ case "$MODE" in
         EXTRA=${2:-$EXTRA}
         JOB_ID=${3:-$JOB_ID}
         prompt_required LAT "LAT"
-        prompt_required EXTRA "Extra Path Spec, e.g. Frequency, Target-xs, validation"
+        prompt_default EXTRA "Extra Path Spec, e.g. Frequency, Target-xs, validation; leave empty for none" ""
         prompt_default JOB_ID "Job ID, or all" "$JOB_ID"
         prompt_default LOCAL_ROOT "Local root" "$LOCAL_ROOT"
         download_both_default "$LAT" "$EXTRA" "$JOB_ID"
@@ -278,7 +287,7 @@ case "$MODE" in
         JOB_ID=${3:-$JOB_ID}
         FAC=${FAC:-0.2}
         prompt_required LAT "LAT"
-        prompt_required EXTRA "Extra Path Spec, e.g. Frequency, Target-xs, validation"
+        prompt_default EXTRA "Extra Path Spec, e.g. Frequency, Target-xs, validation; leave empty for none" ""
         prompt_default FAC "fac" "$FAC"
         prompt_default JOB_ID "Job ID, or all" "$JOB_ID"
         prompt_default LOCAL_ROOT "Local root" "$LOCAL_ROOT"
@@ -297,7 +306,7 @@ case "$MODE" in
         else
             EXTRA=${3:-$EXTRA}
             JOB_ID=${4:-$JOB_ID}
-            prompt_required EXTRA "Extra Path Spec, e.g. Frequency, Target-xs, validation"
+            prompt_default EXTRA "Extra Path Spec, e.g. Frequency, Target-xs, validation; leave empty for none" ""
             FAC=${FAC:-0.2}
         fi
         prompt_default FAC "fac" "$FAC"
