@@ -44,7 +44,38 @@ def _append_frequency_row(rows, csv_path, num, dat):
     if len(freqs) > 0:
         rows.append(np.insert(freqs, 0, num))
 
-def create_inputCSV(directory, dat):
+def _data_root(dat):
+    return Path(dat.PATH)
+
+def _per_root(dat):
+    return Path(getattr(dat, "PATH_PER", dat.PATH))
+
+def _transfer_root(root):
+    return Path(root) / "transfer"
+
+def _same_root(path_a, path_b):
+    return os.path.normcase(os.path.normpath(str(path_a))) == os.path.normcase(os.path.normpath(str(path_b)))
+
+def _raw_csv_files(dat):
+    data_raw = _transfer_root(_data_root(dat))
+    per_raw = _transfer_root(_per_root(dat))
+
+    if _same_root(data_raw, per_raw):
+        if not data_raw.is_dir():
+            return []
+        return sorted(data_raw.glob("*.csv"))
+
+    files = []
+    if per_raw.is_dir():
+        files.extend(path for path in sorted(per_raw.glob("*.csv")) if "-per-" in path.name)
+    if data_raw.is_dir():
+        files.extend(path for path in sorted(data_raw.glob("*.csv")) if "-per-" not in path.name)
+    return files
+
+def _processed_path(dat, filename):
+    return str(_data_root(dat) / filename)
+
+def create_inputCSV(dat):
     duct_disNodes_n = []
     duct_disNodes_f = []
     duct_disStruts_s = []
@@ -54,47 +85,45 @@ def create_inputCSV(directory, dat):
     frac_disStruts_s = []
     frac_disStruts_f = []
 
-    path_raw = directory + "transfer/"
-    for ffile in os.listdir(path_raw):
-        if not ffile.endswith(".csv"):
-            continue
+    for path in _raw_csv_files(dat):
+        ffile = path.name
         try:
             num = _sim_num_from_filename(ffile)
         except ValueError:
             continue
 
         if "per" in ffile and "Ductile" in ffile and "IN-n" in ffile:
-            nodes, nodesCoords, nodes_df = get_nodes(path_raw + ffile)
+            nodes, nodesCoords, nodes_df = get_nodes(str(path))
             duct_disNodes_n.insert(0, np.insert(nodes_df.to_numpy().flatten(), 0, 0))
         elif "per" in ffile and "Ductile" in ffile and "IN-s" in ffile:
-            thicks = get_struts(path_raw + ffile)
+            thicks = get_struts(str(path))
             duct_disStruts_s.insert(0, np.insert(thicks, 0, 0))
         elif "per" in ffile and "Fracture" in ffile and "IN-n" in ffile:
-            nodes, nodesCoords, nodes_df = get_nodes(path_raw + ffile)
+            nodes, nodesCoords, nodes_df = get_nodes(str(path))
             frac_disNodes_n.insert(0, np.insert(nodes_df.to_numpy().flatten(), 0, 0))
         elif "per" in ffile and "Fracture" in ffile and "IN-s" in ffile:
-            thicks = get_struts(path_raw + ffile)
+            thicks = get_struts(str(path))
             frac_disStruts_s.insert(0, np.insert(thicks, 0, 0))
         elif "disNodes" in ffile and "Ductile" in ffile and "IN-n" in ffile:
-            nodes, nodesCoords, nodes_df = get_nodes(path_raw + ffile)
+            nodes, nodesCoords, nodes_df = get_nodes(str(path))
             duct_disNodes_n.append(np.insert(nodes_df.to_numpy().flatten(), 0, num))
         elif "disNodes" in ffile and "Ductile" in ffile and "IN-f" in ffile:
-            _append_frequency_row(duct_disNodes_f, path_raw + ffile, num, dat)
+            _append_frequency_row(duct_disNodes_f, str(path), num, dat)
         elif "disStruts" in ffile and "Ductile" in ffile and "IN-s" in ffile:
-            thicks = get_struts(path_raw + ffile)
+            thicks = get_struts(str(path))
             duct_disStruts_s.append(np.insert(thicks, 0, num))
         elif "disStruts" in ffile and "Ductile" in ffile and "IN-f" in ffile:
-            _append_frequency_row(duct_disStruts_f, path_raw + ffile, num, dat)
+            _append_frequency_row(duct_disStruts_f, str(path), num, dat)
         elif "disNodes" in ffile and "Fracture" in ffile and "IN-n" in ffile:
-            nodes, nodesCoords, nodes_df = get_nodes(path_raw + ffile)
+            nodes, nodesCoords, nodes_df = get_nodes(str(path))
             frac_disNodes_n.append(np.insert(nodes_df.to_numpy().flatten(), 0, num))
         elif "disNodes" in ffile and "Fracture" in ffile and "IN-f" in ffile:
-            _append_frequency_row(frac_disNodes_f, path_raw + ffile, num, dat)
+            _append_frequency_row(frac_disNodes_f, str(path), num, dat)
         elif "disStruts" in ffile and "Fracture" in ffile and "IN-s" in ffile:
-            thicks = get_struts(path_raw + ffile)
+            thicks = get_struts(str(path))
             frac_disStruts_s.append(np.insert(thicks, 0, num))
         elif "disStruts" in ffile and "Fracture" in ffile and "IN-f" in ffile:
-            _append_frequency_row(frac_disStruts_f, path_raw + ffile, num, dat)
+            _append_frequency_row(frac_disStruts_f, str(path), num, dat)
 
     UTdisNodesINn_df = None
     UTdisNodesINf_df = None
@@ -107,19 +136,19 @@ def create_inputCSV(directory, dat):
 
     if dat.UTmechTest:
         if _dis_enabled(dat, "disNodes"):
-            UTdisNodesINn_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disNodes_n), directory + "Ductile-disNodes-IN.csv")
-            UTdisNodesINf_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disNodes_f), directory + "Ductile-disNodes-INf.csv")
+            UTdisNodesINn_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disNodes_n), _processed_path(dat, "Ductile-disNodes-IN.csv"))
+            UTdisNodesINf_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disNodes_f), _processed_path(dat, "Ductile-disNodes-INf.csv"))
         if _dis_enabled(dat, "disStruts"):
-            UTdisStrutsINs_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disStruts_s), directory + "Ductile-disStruts-IN.csv")
-            UTdisStrutsINf_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disStruts_f), directory + "Ductile-disStruts-INf.csv")
+            UTdisStrutsINs_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disStruts_s), _processed_path(dat, "Ductile-disStruts-IN.csv"))
+            UTdisStrutsINf_df = _write_df_if_nonempty(_rows_to_indexed_df(duct_disStruts_f), _processed_path(dat, "Ductile-disStruts-INf.csv"))
 
     if dat.FTmechTest:
         if _dis_enabled(dat, "disNodes"):
-            FTdisNodesINn_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disNodes_n), directory + "Fracture-disNodes-IN.csv")
-            FTdisNodesINf_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disNodes_f), directory + "Fracture-disNodes-INf.csv")
+            FTdisNodesINn_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disNodes_n), _processed_path(dat, "Fracture-disNodes-IN.csv"))
+            FTdisNodesINf_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disNodes_f), _processed_path(dat, "Fracture-disNodes-INf.csv"))
         if _dis_enabled(dat, "disStruts"):
-            FTdisStrutsINs_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disStruts_s), directory + "Fracture-disStruts-IN.csv")
-            FTdisStrutsINf_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disStruts_f), directory + "Fracture-disStruts-INf.csv")
+            FTdisStrutsINs_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disStruts_s), _processed_path(dat, "Fracture-disStruts-IN.csv"))
+            FTdisStrutsINf_df = _write_df_if_nonempty(_rows_to_indexed_df(frac_disStruts_f), _processed_path(dat, "Fracture-disStruts-INf.csv"))
 
     return (
         UTdisNodesINn_df,
@@ -134,21 +163,16 @@ def create_inputCSV(directory, dat):
 
 
 ### Curve output processing
-def _raw_files_by_num(directory, mech_test, dis, token):
-    path_raw = directory + "transfer/"
+def _raw_files_by_num(dat, mech_test, dis, token):
     raw_files = {}
-    if not os.path.isdir(path_raw):
-        return raw_files
-
-    for ffile in os.listdir(path_raw):
-        if not ffile.endswith(".csv"):
-            continue
+    for path in _raw_csv_files(dat):
+        ffile = path.name
         if mech_test not in ffile or token not in ffile:
             continue
         if dis not in ffile and "-per-" not in ffile:
             continue
         try:
-            raw_files[_sim_num_from_filename(ffile)] = ffile
+            raw_files[_sim_num_from_filename(ffile)] = str(path)
         except ValueError:
             pass
     return raw_files
@@ -197,10 +221,10 @@ def _output_drop_ids(output_info):
             drop_ids.append(sim_id)
     return sorted(set(drop_ids))
 
-def _write_manifest(directory, dat, mech_test, mech_mode, dis, input_token, input_csv, output_csv, freq_csv, output_info):
-    raw_input_files = _raw_files_by_num(directory, mech_test, dis, input_token)
-    raw_output_files = _raw_files_by_num(directory, mech_test, dis, "OUT-")
-    raw_freq_files = _raw_files_by_num(directory, mech_test, dis, "IN-f")
+def _write_manifest(dat, mech_test, mech_mode, dis, input_token, input_csv, output_csv, freq_csv, output_info):
+    raw_input_files = _raw_files_by_num(dat, mech_test, dis, input_token)
+    raw_output_files = _raw_files_by_num(dat, mech_test, dis, "OUT-")
+    raw_freq_files = _raw_files_by_num(dat, mech_test, dis, "IN-f")
 
     final_input_ids = _read_final_ids(input_csv)
     final_output_ids = _read_final_ids(output_csv)
@@ -276,13 +300,13 @@ def _write_manifest(directory, dat, mech_test, mech_mode, dis, input_token, inpu
         )
 
     manifest_df = pd.DataFrame(rows)
-    manifest_df.to_csv(directory + f"{mech_test}-{dis}-manifest.csv", index=False)
+    manifest_df.to_csv(_processed_path(dat, f"{mech_test}-{dis}-manifest.csv"), index=False)
     return manifest_df
 
-def _process_output_dataset(directory, dat, mech_test, mech_mode, dis, input_token, input_csv, output_csv, freq_csv, output_rows):
+def _process_output_dataset(dat, mech_test, mech_mode, dis, input_token, input_csv, output_csv, freq_csv, output_rows):
     output_info = _output_row_info(output_rows)
     output_drop_ids = _output_drop_ids(output_info)
-    raw_output_ids = set(_raw_files_by_num(directory, mech_test, dis, "OUT-"))
+    raw_output_ids = set(_raw_files_by_num(dat, mech_test, dis, "OUT-"))
 
     output_df = None
     if output_rows:
@@ -315,47 +339,45 @@ def _process_output_dataset(directory, dat, mech_test, mech_mode, dis, input_tok
         else:
             freq_df = None
 
-    _write_manifest(directory, dat, mech_test, mech_mode, dis, input_token, input_csv, output_csv, freq_csv, output_info)
+    _write_manifest(dat, mech_test, mech_mode, dis, input_token, input_csv, output_csv, freq_csv, output_info)
     return output_df, input_df, freq_df
 
-def create_outputCSV(directory, dat):
+def create_outputCSV(dat):
     duct_disNodes = []
     duct_disStruts = []
     frac_disNodes = []
     frac_disStruts = []
 
-    path_raw = directory + "transfer/"
-    for ffile in os.listdir(path_raw):
-        if not ffile.endswith(".csv"):
-            continue
+    for path in _raw_csv_files(dat):
+        ffile = path.name
         try:
             num = _sim_num_from_filename(ffile)
         except ValueError:
             continue
 
         if "per" in ffile and "Ductile" in ffile and "OUT-" in ffile:
-            output_df = get_ductileData(path_raw + ffile, crit=0.25)
+            output_df = get_ductileData(str(path), crit=0.25)
             duct_disNodes.insert(0, np.insert(output_df.x.tolist(), 0, 0))
             duct_disStruts.insert(0, np.insert(output_df.x.tolist(), 0, 0))
             duct_disNodes.insert(1, np.insert(output_df.y_sm.tolist(), 0, 0))
             duct_disStruts.insert(1, np.insert(output_df.y_sm.tolist(), 0, 0))
         elif "per" in ffile and "Fracture" in ffile and "OUT-" in ffile:
-            output_df = get_fractureData(path_raw + ffile)
+            output_df = get_fractureData(str(path))
             frac_disNodes.insert(0, np.insert(output_df.x.tolist(), 0, 0))
             frac_disStruts.insert(0, np.insert(output_df.x.tolist(), 0, 0))
             frac_disNodes.insert(1, np.insert(output_df.y_sm.tolist(), 0, 0))
             frac_disStruts.insert(1, np.insert(output_df.y_sm.tolist(), 0, 0))
         elif "disNodes" in ffile and "Ductile" in ffile and "OUT-" in ffile:
-            output_df = get_ductileData(path_raw + ffile, crit=0.25)
+            output_df = get_ductileData(str(path), crit=0.25)
             duct_disNodes.append(np.insert(output_df.y_sm.tolist(), 0, num))
         elif "disStruts" in ffile and "Ductile" in ffile and "OUT-" in ffile:
-            output_df = get_ductileData(path_raw + ffile, crit=0.25)
+            output_df = get_ductileData(str(path), crit=0.25)
             duct_disStruts.append(np.insert(output_df.y_sm.tolist(), 0, num))
         elif "disNodes" in ffile and "Fracture" in ffile and "OUT-" in ffile:
-            output_df = get_fractureData(path_raw + ffile)
+            output_df = get_fractureData(str(path))
             frac_disNodes.append(np.insert(output_df.y_sm.tolist(), 0, num))
         elif "disStruts" in ffile and "Fracture" in ffile and "OUT-" in ffile:
-            output_df = get_fractureData(path_raw + ffile)
+            output_df = get_fractureData(str(path))
             frac_disStruts.append(np.insert(output_df.y_sm.tolist(), 0, num))
 
     UTdisNodesINn_df = None
@@ -374,56 +396,52 @@ def create_outputCSV(directory, dat):
     if dat.UTmechTest:
         if _dis_enabled(dat, "disNodes"):
             UTdisNodesOUT_df, UTdisNodesINn_df, UTdisNodesINf_df = _process_output_dataset(
-                directory,
                 dat,
                 "Ductile",
                 "UT",
                 "disNodes",
                 "IN-n",
-                directory + "Ductile-disNodes-IN.csv",
-                directory + "Ductile-disNodes-OUT.csv",
-                directory + "Ductile-disNodes-INf.csv",
+                _processed_path(dat, "Ductile-disNodes-IN.csv"),
+                _processed_path(dat, "Ductile-disNodes-OUT.csv"),
+                _processed_path(dat, "Ductile-disNodes-INf.csv"),
                 duct_disNodes,
             )
         if _dis_enabled(dat, "disStruts"):
             UTdisStrutsOUT_df, UTdisStrutsINs_df, UTdisStrutsINf_df = _process_output_dataset(
-                directory,
                 dat,
                 "Ductile",
                 "UT",
                 "disStruts",
                 "IN-s",
-                directory + "Ductile-disStruts-IN.csv",
-                directory + "Ductile-disStruts-OUT.csv",
-                directory + "Ductile-disStruts-INf.csv",
+                _processed_path(dat, "Ductile-disStruts-IN.csv"),
+                _processed_path(dat, "Ductile-disStruts-OUT.csv"),
+                _processed_path(dat, "Ductile-disStruts-INf.csv"),
                 duct_disStruts,
             )
 
     if dat.FTmechTest:
         if _dis_enabled(dat, "disNodes"):
             FTdisNodesOUT_df, FTdisNodesINn_df, FTdisNodesINf_df = _process_output_dataset(
-                directory,
                 dat,
                 "Fracture",
                 "FT",
                 "disNodes",
                 "IN-n",
-                directory + "Fracture-disNodes-IN.csv",
-                directory + "Fracture-disNodes-OUT.csv",
-                directory + "Fracture-disNodes-INf.csv",
+                _processed_path(dat, "Fracture-disNodes-IN.csv"),
+                _processed_path(dat, "Fracture-disNodes-OUT.csv"),
+                _processed_path(dat, "Fracture-disNodes-INf.csv"),
                 frac_disNodes,
             )
         if _dis_enabled(dat, "disStruts"):
             FTdisStrutsOUT_df, FTdisStrutsINs_df, FTdisStrutsINf_df = _process_output_dataset(
-                directory,
                 dat,
                 "Fracture",
                 "FT",
                 "disStruts",
                 "IN-s",
-                directory + "Fracture-disStruts-IN.csv",
-                directory + "Fracture-disStruts-OUT.csv",
-                directory + "Fracture-disStruts-INf.csv",
+                _processed_path(dat, "Fracture-disStruts-IN.csv"),
+                _processed_path(dat, "Fracture-disStruts-OUT.csv"),
+                _processed_path(dat, "Fracture-disStruts-INf.csv"),
                 frac_disStruts,
             )
 
@@ -444,21 +462,6 @@ def create_outputCSV(directory, dat):
 
 
 ### Field-output processing
-def _as_path(directory):
-    return Path(directory)
-
-def _field_root(directory, field_dir=""):
-    path = Path(field_dir)
-    if not path.is_absolute():
-        path = _as_path(directory) / path
-    return path
-
-def _field_raw_root(directory, field_dir="", raw_dir="transfer"):
-    path = Path(raw_dir)
-    if not path.is_absolute():
-        path = _field_root(directory, field_dir) / path
-    return path
-
 def _field_stem_from_path(path, field_prefix="FIELDu-"):
     stem = path.stem
     for prefix in [field_prefix, "FIELDu-", "FIELD-"]:
@@ -521,14 +524,25 @@ def _field_mode_from_npz(npz, stem):
         return mode, "Ductile" if mode == "UT" else "Fracture"
     return _field_mode_from_stem(stem)
 
-def _field_raw_files(directory, field_dir="", raw_dir="transfer", field_prefix="FIELDu-"):
-    root = _field_raw_root(directory, field_dir=field_dir, raw_dir=raw_dir)
+def _field_files_from_root(root, field_prefix="FIELDu-"):
     if not root.exists():
         return []
     files = sorted(root.glob(f"{field_prefix}*.npz"))
     if not files and field_prefix == "FIELDu-":
         files = sorted(root.glob("FIELD-*.npz"))
     return files
+
+def _field_raw_files(dat, field_prefix="FIELDu-"):
+    data_raw = _transfer_root(_data_root(dat))
+    per_raw = _transfer_root(_per_root(dat))
+
+    if _same_root(data_raw, per_raw):
+        return _field_files_from_root(data_raw, field_prefix=field_prefix)
+
+    files = []
+    files.extend(path for path in _field_files_from_root(per_raw, field_prefix=field_prefix) if "-per-" in path.name)
+    files.extend(path for path in _field_files_from_root(data_raw, field_prefix=field_prefix) if "-per-" not in path.name)
+    return sorted(files)
 
 def _field_family_name(field_prefix="FIELDu-"):
     return str(field_prefix).strip("-") or "FIELDu"
@@ -558,12 +572,12 @@ def _field_body_node_mask(node_coords, dat=None):
         (node_coords[:, 1] <= dat.geom.H + tol)
     )
 
-def create_fieldIndexCSV(directory, field_dir="", raw_dir="transfer", index_name=None, field_prefix="FIELDu-", dat=None, dis=None, save=False):
+def create_fieldIndexCSV(dat, index_name=None, field_prefix="FIELDu-", save=False):
     """Create a lightweight audit table for raw FIELDu-*.npz outputs."""
-    dis = dis or (dat.dis if dat is not None else "disNodes")
+    dis = dat.dis
     field_family = _field_family_name(field_prefix)
     rows = []
-    for path in _field_raw_files(directory, field_dir=field_dir, raw_dir=raw_dir, field_prefix=field_prefix):
+    for path in _field_raw_files(dat, field_prefix=field_prefix):
         with np.load(path, allow_pickle=True) as npz:
             values = _field_values_to_fnc(npz["Y"])
             valid = np.asarray(npz["valid_mask"], dtype=bool) if "valid_mask" in npz.files else np.isfinite(values)
@@ -594,7 +608,7 @@ def create_fieldIndexCSV(directory, field_dir="", raw_dir="transfer", index_name
     if not df.empty:
         df = df.sort_values(["mech_mode", "sample_id", "stem"], kind="stable").reset_index(drop=True)
     if save:
-        out_root = _field_root(directory, field_dir=field_dir)
+        out_root = _data_root(dat)
         out_root.mkdir(parents=True, exist_ok=True)
 
         if index_name is not None:
@@ -767,23 +781,22 @@ def _stack_field_group(items, out_path, mode, mech_test, dis, dtype="float32", d
         }
     )
 
-def create_fieldNPZ(directory, dat=None, field_dir="", raw_dir="transfer", dis=None, dtype="float32", field_prefix="FIELDu-"):
+def create_fieldNPZ(dat, dtype="float32", field_prefix="FIELDu-"):
     """Stack raw per-simulation field outputs into one processed NPZ per mechanical mode."""
-    dis = dis or (dat.dis if dat is not None else "disNodes")
+    dis = dat.dis
     groups = {"UT": [], "FT": []}
-    for path in _field_raw_files(directory, field_dir=field_dir, raw_dir=raw_dir, field_prefix=field_prefix):
+    for path in _field_raw_files(dat, field_prefix=field_prefix):
         with np.load(path, allow_pickle=True) as npz:
             stem = _npz_first_string(npz, ["sample_stem", "sample_stems"], default=_field_stem_from_path(path, field_prefix))
             mode, mech_test = _field_mode_from_npz(npz, stem)
             if mode not in groups:
                 continue
-            if dat is not None:
-                if mode == "UT" and not dat.UTmechTest:
-                    continue
-                if mode == "FT" and not dat.FTmechTest:
-                    continue
-                if not _dis_enabled(dat, dis):
-                    continue
+            if mode == "UT" and not dat.UTmechTest:
+                continue
+            if mode == "FT" and not dat.FTmechTest:
+                continue
+            if not _dis_enabled(dat, dis):
+                continue
             groups[mode].append(
                 {
                     "path": path,
@@ -793,7 +806,7 @@ def create_fieldNPZ(directory, dat=None, field_dir="", raw_dir="transfer", dis=N
                 }
             )
 
-    out_root = _field_root(directory, field_dir=field_dir)
+    out_root = _data_root(dat)
     UTfield_df = _stack_field_group(
         groups["UT"],
         out_root / f"Ductile-{dis}-FIELDu.npz",
