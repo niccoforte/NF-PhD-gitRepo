@@ -880,15 +880,20 @@ class DATA:
 
         pTi    = pData + 'Ti/'
         pTiLAT = pTi + f'{self.dis}/{self.path_add}/{self.dN}/{self.LAT}/'
+        pTiLATper = pTi + f'per/{self.LAT}/'
 
         if self.path == 0:
             self.PATH = pUTdisNodes
+            self.PATH_PER = self.PATH
         elif self.path == 1:
             self.PATH = pTiLAT
+            self.PATH_PER = pTiLATper
         elif self.path in ["hpc", "HPC"]:
             self.PATH = "/data/SEMS-TaoLab/Niccolo-Forte/p2/"
+            self.PATH_PER = self.PATH
         else:
             self.PATH = str(self.path)+"/"
+            self.PATH_PER = self.PATH
     
     def loadData(self):
         if self.output_kind == "field":
