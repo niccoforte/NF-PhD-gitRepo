@@ -101,7 +101,7 @@ if [ "$RUN_LABEL_PROVIDED" = false ]; then
 fi
 
 if [ -z "$RUN_LABEL" ]; then
-    RUN_LABEL=$(basename "$ML_SCRIPT")
+    RUN_LABEL=${SLURM_JOB_NAME:-$(basename "$ML_SCRIPT")}
     RUN_LABEL=${RUN_LABEL%.*}
 fi
 
