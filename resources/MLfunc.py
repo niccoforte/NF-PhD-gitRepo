@@ -1103,26 +1103,52 @@ def print_field_diagnostics(diagnostics, label="Field"):
         f"valid: {_fmt_metric(summary.get('valid_fraction'), 3)}"
     )
 
-def plot_field_diagnostics(diagnostics, figsize=(15, 4)):
+def plot_field_diagnostics(diagnostics, figsize=(15, 9)):
     frame_metrics = diagnostics["frame_metrics"]
     component_metrics = diagnostics["component_metrics"]
     sample_metrics = diagnostics["sample_metrics"]
     summary = diagnostics["summary"]
+    frame_axis = frame_metrics["frame"].to_numpy(dtype=float) + 1
 
-    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    fig, axes = plt.subplots(2, 3, figsize=figsize)
+    axes = axes.reshape(-1)
+
     ax = axes[0]
-    ax.plot(frame_metrics["frame"], frame_metrics["rmse"], marker="o", linewidth=1.5)
-    ax.set_title("Frame RMSE")
+    ax.plot(frame_axis, frame_metrics["rmse"], marker="o", label="RMSE")
+    if "mae" in frame_metrics.columns:
+        ax.plot(frame_axis, frame_metrics["mae"], marker="o", label="MAE")
+    ax.set_title("Frame Error")
     ax.set_xlabel("Frame")
-    ax.set_ylabel("RMSE")
+    ax.set_ylabel("Error")
+    ax.legend(fontsize=8)
 
     ax = axes[1]
-    ax.bar(component_metrics["component"].astype(str), component_metrics["rmse"])
-    ax.set_title("Component RMSE")
-    ax.set_xlabel("Component")
-    ax.set_ylabel("RMSE")
+    if "bias" in frame_metrics.columns:
+        ax.plot(frame_axis, frame_metrics["bias"], color="black", marker="o")
+    ax.axhline(0.0, color="gray", linestyle="--", linewidth=1)
+    ax.set_title("Frame Bias")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("Prediction - Truth")
 
     ax = axes[2]
+    if "valid_fraction" in frame_metrics.columns:
+        ax.plot(frame_axis, frame_metrics["valid_fraction"], color="tab:green", marker="o")
+    ax.set_ylim(0.0, 1.05)
+    ax.set_title("Valid Fraction")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("Fraction")
+
+    ax = axes[3]
+    component_labels = component_metrics["component"].astype(str)
+    ax.bar(component_labels, component_metrics["rmse"], label="RMSE", color="tab:blue", alpha=0.85)
+    if "mae" in component_metrics.columns:
+        ax.plot(component_labels, component_metrics["mae"], color="black", marker="o", label="MAE")
+    ax.set_title("Component Error")
+    ax.set_xlabel("Component")
+    ax.set_ylabel("Error")
+    ax.legend(fontsize=8)
+
+    ax = axes[4]
     values = sample_metrics["sample_rmse"].to_numpy(dtype=float)
     values = values[np.isfinite(values)]
     ax.hist(values, bins=min(30, max(5, int(np.sqrt(len(values))) if len(values) else 5)), color="tab:blue", alpha=0.8)
@@ -1131,6 +1157,206 @@ def plot_field_diagnostics(diagnostics, figsize=(15, 4)):
     ax.set_xlabel("RMSE")
     ax.set_ylabel("Count")
 
+    ax = axes[5]
+    ax.axis("off")
+    lines = [
+        f"RMSE: {_fmt_metric(summary.get('rmse'))}",
+        f"MAE: {_fmt_metric(summary.get('mae'))}",
+        f"Bias: {_fmt_metric(summary.get('bias'))}",
+        f"Collapse ratio: {_fmt_metric(summary.get('collapse_ratio'), 3)}",
+        f"Skill vs mean field: {_fmt_metric(summary.get('skill_vs_mean_field_rmse'), 3)}",
+        f"Valid fraction: {_fmt_metric(summary.get('valid_fraction'), 3)}",
+    ]
+    ax.text(0.0, 0.95, "\n".join(lines), transform=ax.transAxes, va="top", ha="left", fontsize=11)
+
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_frame_component_trends(diagnostics, figsize=(14, 8)):
+    frame_metrics = diagnostics["frame_metrics"]
+    component_metrics = diagnostics["component_metrics"]
+    frame_axis = frame_metrics["frame"].to_numpy(dtype=float) + 1
+
+    fig, axes = plt.subplots(2, 2, figsize=figsize)
+    axes = axes.reshape(-1)
+
+    ax = axes[0]
+    ax.plot(frame_axis, frame_metrics["rmse"], marker="o", label="RMSE")
+    if "mae" in frame_metrics.columns:
+        ax.plot(frame_axis, frame_metrics["mae"], marker="o", label="MAE")
+    ax.set_title("Frame Error")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("Error")
+    ax.legend(fontsize=8)
+
+    ax = axes[1]
+    if "bias" in frame_metrics.columns:
+        ax.plot(frame_axis, frame_metrics["bias"], color="black", marker="o")
+    ax.axhline(0.0, color="gray", linestyle="--", linewidth=1)
+    ax.set_title("Frame Bias")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("Prediction - Truth")
+
+    ax = axes[2]
+    if "valid_fraction" in frame_metrics.columns:
+        ax.plot(frame_axis, frame_metrics["valid_fraction"], color="tab:green", marker="o")
+    ax.set_ylim(0.0, 1.05)
+    ax.set_title("Valid Fraction")
+    ax.set_xlabel("Frame")
+    ax.set_ylabel("Fraction")
+
+    ax = axes[3]
+    component_labels = component_metrics["component"].astype(str)
+    ax.bar(component_labels, component_metrics["rmse"], label="RMSE", color="tab:blue", alpha=0.85)
+    if "mae" in component_metrics.columns:
+        ax.plot(component_labels, component_metrics["mae"], color="black", marker="o", label="MAE")
+    ax.set_title("Component Error")
+    ax.set_xlabel("Component")
+    ax.set_ylabel("Error")
+    ax.legend(fontsize=8)
+
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_diversity(diagnostics, figsize=(16, 4), ratio_reference=1.0, bins=40):
+    pred_std = diagnostics.get("pred_std")
+    true_std = diagnostics.get("true_std")
+    std_ratio = diagnostics.get("std_ratio")
+    if pred_std is None or true_std is None or std_ratio is None:
+        raise ValueError("Diversity arrays are unavailable for this diagnostics object.")
+
+    pred_std = np.asarray(pred_std, dtype=float)
+    true_std = np.asarray(true_std, dtype=float)
+    std_ratio = np.asarray(std_ratio, dtype=float)
+    frame_axis = np.arange(pred_std.shape[0]) + 1
+
+    pred_frame_std = np.nanmean(pred_std, axis=(1, 2))
+    true_frame_std = np.nanmean(true_std, axis=(1, 2))
+    ratio_frame = np.nanmean(std_ratio, axis=(1, 2))
+
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    axes[0].plot(frame_axis, true_frame_std, label="Truth std", color="darkgreen")
+    axes[0].plot(frame_axis, pred_frame_std, label="Prediction std", color="orangered")
+    axes[0].set_title("Across-Sample Field Diversity")
+    axes[0].set_xlabel("Frame")
+    axes[0].set_ylabel("Mean std")
+    axes[0].legend()
+
+    axes[1].plot(frame_axis, ratio_frame, color="tab:purple")
+    axes[1].axhline(ratio_reference, color="gray", linestyle="--", linewidth=1)
+    axes[1].set_title("Prediction Std / Truth Std")
+    axes[1].set_xlabel("Frame")
+    axes[1].set_ylabel("Ratio")
+
+    values = std_ratio[np.isfinite(std_ratio)]
+    axes[2].hist(values, bins=bins, color="tab:blue", alpha=0.8)
+    axes[2].axvline(ratio_reference, color="gray", linestyle="--", linewidth=1)
+    axes[2].set_title("Node-Frame-Component Ratio")
+    axes[2].set_xlabel("Std ratio")
+    axes[2].set_ylabel("Count")
+
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None):
+    cmaps = cmaps or {"RMSE": "viridis", "Bias": "coolwarm", "Valid Fraction": "magma"}
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    y_true = np.asarray(diagnostics["y_true"], dtype=float)
+    valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
+    err = y_pred - y_true
+
+    n_frames = y_pred.shape[1]
+    n_components = y_pred.shape[3]
+    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    frame_labels = [str(idx + 1) for idx in range(n_frames)]
+
+    rmse_map = np.full((n_frames, n_components), np.nan)
+    bias_map = np.full((n_frames, n_components), np.nan)
+    valid_map = np.full((n_frames, n_components), np.nan)
+    for frame_idx in range(n_frames):
+        for comp_idx in range(n_components):
+            mask = valid[:, frame_idx, :, comp_idx]
+            values = err[:, frame_idx, :, comp_idx]
+            if np.any(mask):
+                rmse_map[frame_idx, comp_idx] = np.sqrt(np.nanmean(values[mask] ** 2))
+                bias_map[frame_idx, comp_idx] = np.nanmean(values[mask])
+                valid_map[frame_idx, comp_idx] = np.mean(mask)
+
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    for ax, matrix, title in [
+        (axes[0], rmse_map, "RMSE"),
+        (axes[1], bias_map, "Bias"),
+        (axes[2], valid_map, "Valid Fraction"),
+    ]:
+        im = ax.imshow(matrix, aspect="auto", cmap=cmaps.get(title, "viridis"))
+        ax.set_title(title)
+        ax.set_xlabel("Component")
+        ax.set_ylabel("Frame")
+        ax.set_xticks(np.arange(n_components))
+        ax.set_xticklabels(components)
+        ax.set_yticks(np.arange(n_frames))
+        ax.set_yticklabels(frame_labels)
+        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_node_metrics(diagnostics, columns=None, figsize=None, point_size=22):
+    node_metrics = diagnostics.get("node_metrics")
+    if node_metrics is None or not hasattr(node_metrics, "copy"):
+        raise ValueError("Node metrics are unavailable.")
+
+    node = node_metrics.copy()
+    coords = diagnostics.get("node_coords")
+    if ("x" not in node.columns or "y" not in node.columns) and coords is not None and len(coords) == len(node):
+        coords = np.asarray(coords, dtype=float)
+        node["x"] = coords[:, 0]
+        node["y"] = coords[:, 1]
+    if "x" not in node.columns or "y" not in node.columns:
+        raise ValueError("Node coordinates are unavailable, so spatial node maps cannot be drawn.")
+
+    columns = columns or ["rmse", "mae", "bias", "valid_fraction"]
+    plot_cols = [col for col in columns if col in node.columns]
+    if not plot_cols:
+        raise ValueError("None of the requested node metric columns are available.")
+
+    figsize = figsize or (5 * len(plot_cols), 4)
+    fig, axes = plt.subplots(1, len(plot_cols), figsize=figsize)
+    axes = np.asarray(axes).reshape(-1)
+    for ax, col in zip(axes, plot_cols):
+        sc = ax.scatter(node["x"], node["y"], c=node[col], cmap="viridis", s=point_size)
+        ax.set_aspect("equal", adjustable="box")
+        ax.set_title(f"Node {col}")
+        fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_sample_metric_distributions(diagnostics, columns=None, bins=40, ncols=3, figsize=None):
+    sample_metrics = diagnostics.get("sample_metrics")
+    if sample_metrics is None or not hasattr(sample_metrics, "copy"):
+        raise ValueError("Sample metrics are unavailable.")
+
+    samples = sample_metrics.copy()
+    columns = columns or ["sample_mae", "sample_mse", "sample_rmse", "sample_bias", "valid_fraction"]
+    numeric_cols = [col for col in columns if col in samples.columns]
+    if not numeric_cols:
+        raise ValueError("None of the requested sample metric columns are available.")
+
+    ncols = int(ncols)
+    nrows = int(np.ceil(len(numeric_cols) / ncols))
+    figsize = figsize or (15, 4 * nrows)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize)
+    axes = np.asarray(axes).reshape(-1)
+    for ax, col in zip(axes, numeric_cols):
+        ax.hist(samples[col].dropna(), bins=bins, color="tab:blue", alpha=0.8)
+        ax.set_title(col)
+        ax.set_ylabel("Count")
+    for ax in axes[len(numeric_cols):]:
+        ax.axis("off")
     fig.tight_layout()
     plt.show()
     return fig, axes
@@ -1143,6 +1369,10 @@ def plot_field_sample(
     node_coords=None,
     cmap="coolwarm",
     figsize=(15, 4),
+    plot_style="points",
+    levels=30,
+    point_size=22,
+    show=True,
 ):
     pred = diagnostics["y_pred"]
     true = diagnostics["y_true"]
@@ -1168,26 +1398,45 @@ def plot_field_sample(
     err_vmax = np.nanpercentile(np.abs(err_values[valid_values]), 98) if np.any(valid_values) else 1.0
     err_vmax = max(float(err_vmax), 1e-12)
 
+    plot_style = str(plot_style).lower()
     fig, axes = plt.subplots(1, 3, figsize=figsize)
     for ax, values, title, limit in [
         (axes[0], truth_values, "Truth", vmax),
         (axes[1], pred_values, "Prediction", vmax),
         (axes[2], err_values, "Prediction - Truth", err_vmax),
     ]:
-        im = ax.scatter(
-            coords[:, 0],
-            coords[:, 1],
-            c=np.where(valid_values, values, np.nan),
-            cmap=cmap,
-            vmin=-limit if title != "Prediction - Truth" else -limit,
-            vmax=limit,
-            s=22,
-        )
+        plot_values = np.where(valid_values, values, np.nan)
+        finite = np.isfinite(plot_values)
+        im = None
+        if plot_style in ["continuous", "contour", "tricontour", "tricontourf"] and np.sum(finite) >= 3:
+            try:
+                level_values = np.linspace(-limit, limit, int(levels))
+                im = ax.tricontourf(
+                    coords[finite, 0],
+                    coords[finite, 1],
+                    plot_values[finite],
+                    levels=level_values,
+                    cmap=cmap,
+                    extend="both",
+                )
+            except Exception:
+                im = None
+        if im is None:
+            im = ax.scatter(
+                coords[:, 0],
+                coords[:, 1],
+                c=plot_values,
+                cmap=cmap,
+                vmin=-limit,
+                vmax=limit,
+                s=point_size,
+            )
         ax.set_title(title)
         ax.set_aspect("equal", adjustable="box")
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     fig.tight_layout()
-    plt.show()
+    if show:
+        plt.show()
     return fig, axes
 
 # Activation diagnostics
@@ -2052,6 +2301,7 @@ def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True)
         "results_dir": None,
         "metrics_json": None,
         "predictions_npz": None,
+        "loss_history_csv": None,
         "diagnostics_summary_json": None,
         "hpo_dir": None,
         "hpo_best_params_json": None,
@@ -2099,6 +2349,7 @@ def postprocess_resolve_artifacts(run_path, run_root=None, prefer_hpo_best=True)
     if results_dir is not None:
         artifacts["metrics_json"] = _postprocess_existing_file(results_dir / "metrics.json")
         artifacts["predictions_npz"] = _postprocess_existing_file(results_dir / "predictions.npz")
+        artifacts["loss_history_csv"] = _postprocess_existing_file(results_dir / "loss_history.csv")
         artifacts["diagnostics_summary_json"] = _postprocess_existing_file(results_dir / "diagnostics_summary.json")
 
     return artifacts
@@ -2249,6 +2500,7 @@ def postprocess_load_artifacts(artifacts):
         "metrics": {},
         "diagnostics_summary": {},
         "predictions": {},
+        "loss_history": None,
         "diagnostic_tables": {},
         "hpo": {},
     }
@@ -2275,6 +2527,10 @@ def postprocess_load_artifacts(artifacts):
         with np.load(predictions_npz, allow_pickle=False) as npz:
             loaded["predictions"] = {key: npz[key] for key in npz.files}
 
+    loss_history_csv = artifacts.get("loss_history_csv")
+    if loss_history_csv is not None and Path(loss_history_csv).exists():
+        loaded["loss_history"] = pd.read_csv(loss_history_csv)
+
     results_dir = artifacts.get("results_dir")
     if results_dir is not None and Path(results_dir).exists():
         for csv_file in Path(results_dir).glob("*_metrics.csv"):
@@ -2285,7 +2541,13 @@ def postprocess_load_artifacts(artifacts):
 
     return loaded
 
-def postprocess_load_data(data_json, data_path_override=None, auto_path_root=None, **overrides):
+def postprocess_load_data(
+    data_json,
+    data_path_override=None,
+    auto_path_root=None,
+    default_data_path=r"Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata",
+    **overrides,
+):
     """
     Load a DATA sidecar JSON while allowing the saved DATA constructor path to
     be replaced by a local path such as Z:/p2.
@@ -2299,23 +2561,18 @@ def postprocess_load_data(data_json, data_path_override=None, auto_path_root=Non
         raise ValueError(f"DATA JSON at '{data_json}' does not contain a valid data_config dictionary.")
 
     config = dict(config)
-    if isinstance(data_path_override, str) and data_path_override.lower() == "auto":
-        if _postprocess_should_auto_override_data_path(config.get("path")):
-            if auto_path_root is None:
-                raise ValueError("data_path_override='auto' requires auto_path_root.")
-            config["path"] = str(auto_path_root)
+    if data_path_override is None or str(data_path_override).strip().lower() in ["", "auto"]:
+        config["path"] = _postprocess_normalize_data_path(default_data_path)
     elif data_path_override is not None:
-        config["path"] = str(data_path_override)
+        config["path"] = _postprocess_normalize_data_path(data_path_override)
     config.update(overrides)
     return DATA(**config)
 
-def _postprocess_should_auto_override_data_path(saved_path):
-    if saved_path is None:
-        return False
-    text = str(saved_path).strip().replace("\\", "/").lower()
-    if text in ["hpc"]:
-        return True
-    return text.startswith("/data/")
+def _postprocess_normalize_data_path(path):
+    path = Path(path)
+    if path.name.lower() == "mldata":
+        path = path.parent
+    return str(path)
 
 def _postprocess_saved_output_kind(loaded):
     descriptor = loaded.get("data_descriptor", {}) if isinstance(loaded, dict) else {}
@@ -2521,6 +2778,11 @@ def postprocess_build_diagnostics(
             "valid_mask": np.isfinite(true) & np.isfinite(pred),
             **metadata,
         }
+        pred_masked = np.where(diagnostics["valid_mask"], pred, np.nan)
+        true_masked = np.where(diagnostics["valid_mask"], true, np.nan)
+        diagnostics["pred_std"] = _field_nanstd(pred_masked, axis=0)
+        diagnostics["true_std"] = _field_nanstd(true_masked, axis=0)
+        diagnostics["std_ratio"] = diagnostics["pred_std"] / np.maximum(diagnostics["true_std"], 1e-12)
     else:
         diagnostics = {
             "summary": {},
@@ -2547,6 +2809,22 @@ def postprocess_build_diagnostics(
             saved = tables.get(f"{mode}_{split}_{key}")
             if saved is not None:
                 diagnostics[key] = saved
+        if is_field:
+            node_metrics = diagnostics.get("node_metrics")
+            if (
+                diagnostics.get("node_coords") is None
+                and hasattr(node_metrics, "columns")
+                and {"x", "y"}.issubset(node_metrics.columns)
+            ):
+                ordered_nodes = node_metrics
+                if "node" in ordered_nodes.columns:
+                    ordered_nodes = ordered_nodes.sort_values("node")
+                coords = ordered_nodes[["x", "y"]].to_numpy(dtype=float)
+                field_shape = diagnostics.get("field_shape") or (None, None, None)
+                if coords.shape[0] == field_shape[1]:
+                    diagnostics["node_coords"] = coords
+                    if "node_label" in ordered_nodes.columns:
+                        diagnostics["node_labels"] = ordered_nodes["node_label"].to_numpy()
         if not is_field and diagnostics.get("point_metrics") is not None and "x" in diagnostics["point_metrics"].columns:
             diagnostics["x"] = diagnostics["point_metrics"]["x"].to_numpy(dtype=float)
 
@@ -3213,7 +3491,7 @@ def hOpt(
 
 def _hopt_save_best_model(model_instance, save_dir, trial, score, name="best_model"):
     os.makedirs(save_dir, exist_ok=True)
-    model_file = model_instance.save(path=save_dir, name=name)
+    model_file = model_instance.save(path=save_dir, name=name, save_results=False)
     meta_file = os.path.join(save_dir, f"{name}.json")
 
     if os.path.exists(meta_file):
@@ -3232,7 +3510,16 @@ def _hopt_save_best_model(model_instance, save_dir, trial, score, name="best_mod
         with open(meta_file, "w", encoding="utf-8") as f:
             json.dump(metadata, f, indent=2, sort_keys=True)
 
-    model_instance.evaluate_split("val", diagnostics=True, diag_plot=False)
+    saved_save_dir = getattr(model_instance, "save_dir", None)
+    saved_results_dir = getattr(model_instance, "results_dir", None)
+    try:
+        model_instance.save_dir = None
+        model_instance.results_dir = None
+        model_instance.evaluate_split("val", diagnostics=True, diag_plot=False)
+    finally:
+        model_instance.save_dir = saved_save_dir
+        model_instance.results_dir = saved_results_dir
+
     model_instance.save_results(
         path=os.path.join(save_dir, f"{name}_results"),
         eval_split="val",
