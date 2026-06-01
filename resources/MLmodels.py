@@ -529,8 +529,8 @@ class MODEL:
         )
         return self.match_scan
 
-    def save(self, path=None, name=None):
-        return _model_save_checkpoint(self, path=path, name=name)
+    def save(self, path=None, name=None, save_results=True):
+        return _model_save_checkpoint(self, path=path, name=name, save_results=save_results)
 
     def save_results(self, path=None, run_config=None, eval_split="test", metadata=None):
         return _model_save_results(
@@ -2588,7 +2588,7 @@ def _model_find_matching_checkpoint(model_obj, path=None, strict=True, recursive
     candidates = sorted(candidates, key=lambda p: Path(p).stat().st_mtime, reverse=True)
     return candidates[0]
 
-def _model_save_checkpoint(model_obj, path=None, name=None):
+def _model_save_checkpoint(model_obj, path=None, name=None, save_results=True):
     save_dir = Path(_mp_resolve_model_dir(model_obj, path=path, name=name if path is None else None))
     save_dir.mkdir(parents=True, exist_ok=True)
 
@@ -2621,8 +2621,9 @@ def _model_save_checkpoint(model_obj, path=None, name=None):
     model_obj.save_dir = str(save_dir)
     model_obj.model_file = str(model_file)
     model_obj.run_descriptor = save_dir.name
-    model_obj.results_dir = str(save_dir / "results")
-    _model_save_results(model_obj, eval_split="test")
+    model_obj.results_dir = str(save_dir / "results") if save_results else None
+    if save_results:
+        _model_save_results(model_obj, eval_split="test")
     return str(model_file)
 
 def _model_active_modes(model_obj):
@@ -2650,6 +2651,23 @@ def _model_prediction_attr(model_obj, mode, split, kind):
         fallback = f"{mode}_{'truth' if kind == 'truth' else 'test_outputs'}"
         value = getattr(model_obj, fallback, None)
     return value
+
+def _model_loss_history_df(model_obj):
+    rows = []
+    for mode in _model_active_modes(model_obj):
+        train_log = list(getattr(model_obj, f"{mode}_train_lossLog", []) or [])
+        val_log = list(getattr(model_obj, f"{mode}_val_lossLog", []) or [])
+        n_epochs = max(len(train_log), len(val_log))
+        for idx in range(n_epochs):
+            rows.append(
+                {
+                    "mode": mode,
+                    "epoch": idx + 1,
+                    "train_loss": train_log[idx] if idx < len(train_log) else np.nan,
+                    "val_loss": val_log[idx] if idx < len(val_log) else np.nan,
+                }
+            )
+    return pd.DataFrame(rows)
 
 def _model_save_results(model_obj, path=None, run_config=None, eval_split="test", metadata=None):
     if path is None:
@@ -2708,6 +2726,10 @@ def _model_save_results(model_obj, path=None, run_config=None, eval_split="test"
             predictions[f"{mode}_{eval_split}_truth"] = np.asarray(truth)
     if predictions:
         np.savez(results_dir / "predictions.npz", **predictions)
+
+    loss_history = _model_loss_history_df(model_obj)
+    if not loss_history.empty:
+        loss_history.to_csv(results_dir / "loss_history.csv", index=False)
 
     diag_summary = {}
     for mode in _model_active_modes(model_obj):
