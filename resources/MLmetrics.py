@@ -953,6 +953,19 @@ def plot_field_node_metrics(diagnostics, columns=None, figsize=None, point_size=
         raise ValueError("Node metrics are unavailable.")
 
     node = node_metrics.copy()
+    if "mean_abs_percent_error" not in node.columns and {"y_pred", "y_true"}.issubset(diagnostics):
+        y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+        y_true = np.asarray(diagnostics["y_true"], dtype=float)
+        valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
+        abs_err = np.where(valid, np.abs(y_pred - y_true), np.nan)
+        abs_true = np.where(valid, np.abs(y_true), np.nan)
+        err_sum = np.nansum(abs_err, axis=(0, 1, 3))
+        true_sum = np.nansum(abs_true, axis=(0, 1, 3))
+        node_percent_error = np.full_like(err_sum, np.nan, dtype=float)
+        denom_ok = true_sum > 1e-12
+        node_percent_error[denom_ok] = 100.0 * err_sum[denom_ok] / true_sum[denom_ok]
+        node["mean_abs_percent_error"] = node_percent_error
+
     coords = diagnostics.get("node_coords")
     if ("x" not in node.columns or "y" not in node.columns) and coords is not None and len(coords) == len(node):
         coords = np.asarray(coords, dtype=float)
@@ -961,7 +974,7 @@ def plot_field_node_metrics(diagnostics, columns=None, figsize=None, point_size=
     if "x" not in node.columns or "y" not in node.columns:
         raise ValueError("Node coordinates are unavailable, so spatial node maps cannot be drawn.")
 
-    columns = columns or ["rmse", "mae", "bias", "valid_fraction"]
+    columns = columns or ["rmse", "mae", "bias", "mean_abs_percent_error"]
     plot_cols = [col for col in columns if col in node.columns]
     if not plot_cols:
         raise ValueError("None of the requested node metric columns are available.")
@@ -969,10 +982,17 @@ def plot_field_node_metrics(diagnostics, columns=None, figsize=None, point_size=
     figsize = figsize or (5 * len(plot_cols), 4)
     fig, axes = plt.subplots(1, len(plot_cols), figsize=figsize)
     axes = np.asarray(axes).reshape(-1)
+    labels = {
+        "rmse": "RMSE",
+        "mae": "MAE",
+        "bias": "Bias",
+        "valid_fraction": "Valid Fraction",
+        "mean_abs_percent_error": "Mean Abs Percent Error",
+    }
     for ax, col in zip(axes, plot_cols):
         sc = ax.scatter(node["x"], node["y"], c=node[col], cmap="viridis", s=point_size)
         ax.set_aspect("equal", adjustable="box")
-        ax.set_title(f"Node {col}")
+        ax.set_title(f"Node {labels.get(col, col)}")
         fig.colorbar(sc, ax=ax, fraction=0.046, pad=0.04)
     fig.tight_layout()
     plt.show()
@@ -1632,6 +1652,645 @@ def postprocess_build_diagnostics(
             diagnostics["x"] = diagnostics["point_metrics"]["x"].to_numpy(dtype=float)
 
     return diagnostics
+
+def postprocess_artifact_table(artifacts, keys=None):
+    keys = keys or [
+        "input_path",
+        "run_dir",
+        "model_json",
+        "model_mdl",
+        "data_json",
+        "results_dir",
+        "metrics_json",
+        "predictions_npz",
+        "loss_history_csv",
+        "diagnostics_summary_json",
+        "is_hpo",
+    ]
+    rows = []
+    for key in keys:
+        value = artifacts.get(key)
+        rows.append((key, str(value) if value is not None else None))
+    return pd.DataFrame(rows, columns=["artifact", "path_or_value"])
+
+def postprocess_load_field_run(
+    run_path,
+    run_root=None,
+    load_data=True,
+    load_model=True,
+    data_path_override=None,
+    device="cpu",
+    verbose=True,
+):
+    artifacts = postprocess_resolve_artifacts(run_path, run_root=run_root)
+    loaded = postprocess_load_artifacts(artifacts)
+
+    data = None
+    if load_data and artifacts.get("data_json") is not None:
+        try:
+            data = postprocess_load_data(
+                artifacts["data_json"],
+                data_path_override=data_path_override,
+                auto_path_root=run_root,
+            )
+            if verbose:
+                print("Loaded DATA from:", artifacts["data_json"])
+                print("DATA output_kind:", getattr(data, "output_kind", "curve"))
+        except Exception as exc:
+            if verbose:
+                print("DATA load failed:", repr(exc))
+
+    model = None
+    if load_model and artifacts.get("model_json") is not None and data is not None:
+        try:
+            from resources.MLmodels import MODEL
+            model = MODEL.from_json(
+                artifacts["model_json"],
+                data=data,
+                load_weights=artifacts.get("model_mdl") is not None,
+                model_path=str(artifacts["model_mdl"]) if artifacts.get("model_mdl") is not None else None,
+                device=device,
+                scan_matches_on_init=False,
+            )
+            model = postprocess_attach_results(model, loaded)
+            if verbose:
+                print("Loaded MODEL from:", artifacts["model_json"])
+        except Exception as exc:
+            if verbose:
+                print("MODEL load failed:", repr(exc))
+    elif load_model and verbose:
+        print("MODEL was not loaded because a model JSON or DATA object is missing.")
+
+    return artifacts, loaded, data, model
+
+def postprocess_field_run_overview(
+    artifacts,
+    loaded,
+    data=None,
+    run_name=None,
+    run_type=None,
+    mech_mode=None,
+    view_mode="UT",
+    model_name=None,
+    device=None,
+    active_split=None,
+):
+    descriptor = loaded.get("descriptor") or {}
+    metrics = loaded.get("metrics") or {}
+    hpo = loaded.get("hpo") or {}
+
+    saved_output_kind = _postprocess_saved_output_kind(loaded)
+    loaded_output_kind = getattr(data, "output_kind", None) if data is not None else saved_output_kind
+
+    run_summary_fields = [
+        "run",
+        "run_type",
+        "mechMode",
+        "VIEW_MODE",
+        "model",
+        "output_kind",
+        "device",
+        "evaluation_split",
+        "is_hpo",
+        "model_json",
+        "results_dir",
+    ]
+    summary_values = {
+        "run": run_name,
+        "run_type": run_type,
+        "mechMode": mech_mode,
+        "VIEW_MODE": view_mode,
+        "model": model_name,
+        "output_kind": loaded_output_kind,
+        "device": device,
+        "evaluation_split": metrics.get("evaluation_split"),
+        "is_hpo": artifacts.get("is_hpo"),
+        "model_json": artifacts.get("model_json"),
+        "results_dir": artifacts.get("results_dir"),
+    }
+    summary_table = pd.DataFrame([(key, summary_values.get(key)) for key in run_summary_fields], columns=["item", "value"])
+
+    run_descriptor = descriptor.get("run_descriptor") if isinstance(descriptor, dict) else None
+    model_setup = pd.DataFrame(columns=["item", "value"])
+    if isinstance(run_descriptor, dict):
+        setup_fields = ["model_type", "name", "in_size", "out_size", "hidden_size", "n_layers", "n_heads", "dropout"]
+        compact_descriptor = {
+            "model_type": descriptor.get("model_type"),
+            "name": descriptor.get("name"),
+            "in_size": run_descriptor.get("in_size"),
+            "out_size": run_descriptor.get("out_size"),
+            "hidden_size": run_descriptor.get("hidden_size"),
+            "n_layers": run_descriptor.get("n_layers"),
+            "n_heads": run_descriptor.get("n_heads"),
+            "dropout": run_descriptor.get("dropout"),
+        }
+        compact_descriptor = {k: v for k, v in compact_descriptor.items() if k in setup_fields and v is not None}
+        if compact_descriptor:
+            model_setup = pd.DataFrame(compact_descriptor.items(), columns=["item", "value"])
+
+    active_metric_keys = ["best_epoch", "best_loss", "best_mse", "best_rmse", "mae", "mse", "rmse", "best", "worst"]
+    metric_rows = []
+    for key in [f"{str(view_mode).upper()}_{metric}" for metric in active_metric_keys]:
+        if key in metrics:
+            metric_rows.append((key, metrics[key]))
+    active_metrics = pd.DataFrame(metric_rows, columns=["metric", "value"])
+
+    available_evals = postprocess_available_evaluations(loaded)
+    field_eval_columns = ["mode", "split", "outputs", "truth", "sample_metrics", "frame_metrics", "component_metrics", "node_metrics"]
+    available_field_evals = available_evals[[col for col in field_eval_columns if col in available_evals.columns]] if not available_evals.empty else pd.DataFrame(columns=field_eval_columns)
+
+    resolved_split = active_split
+    if resolved_split is None:
+        resolved_split = metrics.get("evaluation_split", None)
+    if resolved_split is None and not available_evals.empty:
+        matching = available_evals[available_evals["mode"].astype(str).str.upper() == str(view_mode).upper()]
+        resolved_split = (matching.iloc[0] if not matching.empty else available_evals.iloc[0])["split"]
+
+    warnings = []
+    if loaded_output_kind is not None and str(loaded_output_kind).lower() != "field":
+        warnings.append("This notebook is intended for field-output runs, but the selected run does not look like output_kind='field'.")
+
+    return {
+        "summary": summary_table,
+        "model_setup": model_setup,
+        "active_metrics": active_metrics,
+        "available_evals": available_evals,
+        "available_field_evals": available_field_evals,
+        "active_split": resolved_split,
+        "hpo": hpo,
+        "warnings": warnings,
+    }
+
+def display_field_run_overview(overview):
+    from IPython.display import Markdown, display
+
+    for warning in overview.get("warnings", []):
+        print("WARNING:", warning)
+
+    display(overview["summary"])
+    if not overview["model_setup"].empty:
+        display(Markdown("### Model Setup"))
+        display(overview["model_setup"])
+    if not overview["active_metrics"].empty:
+        display(Markdown("### Saved Metrics For Active View"))
+        display(overview["active_metrics"])
+
+    display(Markdown("### Available Field Predictions / Diagnostic Tables"))
+    display(overview["available_field_evals"])
+
+    hpo = overview.get("hpo", {})
+    if hpo:
+        display(Markdown("### HPO Summary"))
+        for key, value in hpo.items():
+            if isinstance(value, dict):
+                display(Markdown(f"#### {key}"))
+                display(pd.DataFrame(value.items(), columns=["parameter", "value"]))
+    else:
+        print("No HPO files were found for this run.")
+
+def postprocess_build_active_field_diagnostics(
+    data,
+    loaded,
+    available_evals,
+    view_mode="UT",
+    active_split=None,
+    model=None,
+):
+    diagnostics = {}
+    for _, row in available_evals.iterrows():
+        mode = str(row["mode"]).upper()
+        split = str(row["split"]).lower()
+        diag = postprocess_build_diagnostics(
+            data,
+            loaded,
+            mode=mode,
+            split=split,
+            prefer_saved_tables=True,
+            recompute_from_predictions=False,
+        )
+        if diag is None:
+            print(f"No saved diagnostics are available for {mode} {split}.")
+            continue
+        if "field_shape" not in diag:
+            print(f"Skipping {mode} {split}: diagnostics are not field diagnostics.")
+            continue
+
+        diagnostics[(mode, split)] = diag
+        if model is not None:
+            setattr(model, f"{mode}_{split}_diagnostics", diag)
+            if split == "test":
+                setattr(model, f"{mode}_diagnostics", diag)
+                setattr(model, f"{mode}_prediction_summary", diag.get("summary"))
+
+    active_key = (str(view_mode).upper(), str(active_split).lower()) if view_mode and active_split else None
+    active_diag = diagnostics.get(active_key) if active_key is not None else None
+    return diagnostics, active_key, active_diag
+
+def field_summary_table(diagnostics, metrics=None):
+    if diagnostics is None:
+        return pd.DataFrame(columns=["metric", "value"])
+    metrics = metrics or [
+        "rmse",
+        "mae",
+        "mse",
+        "bias",
+        "collapse_ratio",
+        "mean_field_baseline_rmse",
+        "skill_vs_mean_field_rmse",
+        "valid_fraction",
+        "n_samples",
+        "n_frames",
+        "n_nodes",
+        "n_components",
+    ]
+    summary = diagnostics.get("summary", {})
+    return pd.DataFrame([(key, summary.get(key)) for key in metrics if key in summary], columns=["metric", "value"])
+
+def display_field_sample_error_summary(
+    diagnostics,
+    bins=40,
+    ncols=3,
+    top_n=5,
+    columns=None,
+):
+    from IPython.display import Markdown, display
+
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return
+    sample_metrics = diagnostics.get("sample_metrics")
+    if sample_metrics is None or not hasattr(sample_metrics, "copy"):
+        print("Sample metrics are unavailable.")
+        return
+
+    samples = sample_metrics.copy()
+    if "sample_rmse" in samples.columns:
+        display(Markdown("### Best And Worst Samples By RMSE"))
+        best_worst = pd.concat([
+            samples.sort_values("sample_rmse").head(int(top_n)),
+            samples.sort_values("sample_rmse").tail(int(top_n)),
+        ]).drop_duplicates()
+        display(best_worst)
+
+    columns = columns or ["sample_mae", "sample_mse", "sample_rmse", "sample_bias", "valid_fraction"]
+    try:
+        plot_field_sample_metric_distributions(diagnostics, columns=columns, bins=bins, ncols=ncols)
+    except ValueError as exc:
+        print(exc)
+
+    describe_cols = [col for col in columns if col in samples.columns]
+    if describe_cols:
+        display(Markdown("### Sample Metric Summary"))
+        display(samples[describe_cols].describe().T)
+
+def display_field_node_error_summary(
+    diagnostics,
+    metric="rmse",
+    top_n=20,
+    plot_columns=None,
+    point_size=22,
+):
+    from IPython.display import Markdown, display
+
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return
+    node_metrics = diagnostics.get("node_metrics")
+    if node_metrics is None or not hasattr(node_metrics, "copy"):
+        print("Node metrics are unavailable.")
+        return
+
+    node = node_metrics.copy()
+    metric = metric if metric in node.columns else "rmse"
+    display(Markdown(f"### Worst Nodes By {metric}"))
+    display(node.sort_values(metric, ascending=False).head(int(top_n)))
+
+    try:
+        plot_field_node_metrics(diagnostics, columns=plot_columns, point_size=point_size)
+    except ValueError as exc:
+        print(exc)
+
+def field_sample_viewer(
+    diagnostics,
+    sample_mode="selected",
+    selected_samples=0,
+    frame=10,
+    component="U2",
+    ranking_metric="rmse",
+    plot_style="continuous",
+    random_count=5,
+):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None
+
+    try:
+        import ipywidgets as widgets
+        widgets.Widget.close_all()
+    except Exception:
+        widgets = None
+
+    import ast
+    from io import BytesIO
+    from IPython.display import Image as IPyImage, display
+
+    state = {"last_key": None}
+    samples = diagnostics["sample_metrics"].copy()
+    coords = diagnostics.get("node_coords")
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    n_samples, n_frames, _, n_components = y_pred.shape
+    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    metric_options = [metric for metric in ["rmse", "mae", "mse", "bias"] if f"sample_{metric}" in samples.columns]
+    if not metric_options:
+        metric_options = ["rmse"]
+
+    def _as_sample_list(value):
+        if isinstance(value, (int, np.integer)):
+            return [int(value)]
+        if isinstance(value, (list, tuple, set, np.ndarray, pd.Series)):
+            return [int(v) for v in list(value)]
+
+        text = str(value).strip()
+        if not text:
+            return []
+        try:
+            parsed = ast.literal_eval(text)
+            if isinstance(parsed, (int, np.integer)):
+                return [int(parsed)]
+            if isinstance(parsed, (list, tuple, set, np.ndarray)):
+                return [int(v) for v in list(parsed)]
+        except Exception:
+            pass
+        return [int(part.strip()) for part in text.replace(";", ",").split(",") if part.strip()]
+
+    def _ranked_samples(metric, chosen_mode, count=1):
+        col = f"sample_{metric}"
+        if col not in samples.columns:
+            col = "sample_rmse"
+        ranked = samples[["sample", col]].dropna().copy()
+        ranked["_rank_value"] = ranked[col].abs() if metric == "bias" else ranked[col]
+        ranked = ranked.sort_values("_rank_value", ascending=(chosen_mode == "best"))
+        return ranked["sample"].astype(int).head(int(count)).tolist()
+
+    def _sample_metric_text(sample_idx):
+        row = samples.loc[samples["sample"].astype(int) == int(sample_idx)]
+        if row.empty:
+            return ""
+        parts = []
+        for metric in ["rmse", "mae", "mse", "bias"]:
+            col = f"sample_{metric}"
+            if col in row.columns:
+                parts.append(f"{metric}={row[col].iloc[0]:.4g}")
+        return ", " + ", ".join(parts) if parts else ""
+
+    def _choose_samples(chosen_mode, sample_text, metric, count):
+        if chosen_mode == "selected":
+            chosen = _as_sample_list(sample_text)
+        elif chosen_mode in ["best", "worst"]:
+            chosen = _ranked_samples(metric, chosen_mode, count=1)
+        elif chosen_mode == "random":
+            valid_samples = samples["sample"].astype(int).to_numpy()
+            n_random = min(max(5, int(count)), len(valid_samples))
+            chosen = np.random.default_rng().choice(valid_samples, size=n_random, replace=False).astype(int).tolist()
+        else:
+            chosen = []
+        return [idx for idx in dict.fromkeys(chosen) if 0 <= int(idx) < n_samples]
+
+    def _render_key(chosen_mode, sample_text, frame_value, component_value, metric, style, count):
+        return (chosen_mode, str(sample_text), int(frame_value), int(component_value), metric, style, int(count))
+
+    def _figure_png(fig):
+        buffer = BytesIO()
+        fig.savefig(buffer, format="png", dpi=120, bbox_inches="tight")
+        plt.close(fig)
+        return IPyImage(data=buffer.getvalue())
+
+    def _draw_field_samples(chosen_mode, sample_text, frame_value, component_value, metric, style, count, out=None, force=False):
+        render_key = _render_key(chosen_mode, sample_text, frame_value, component_value, metric, style, count)
+        if not force and render_key == state["last_key"]:
+            return
+        state["last_key"] = render_key
+
+        def _write(text):
+            if out is None:
+                print(text)
+            else:
+                out.append_stdout(text + "\n")
+
+        if coords is None:
+            _write("Node coordinates are unavailable, so field sample maps cannot be drawn.")
+            return
+        if metric == "bias":
+            _write("Bias = mean(prediction - truth); positive values over-predict and negative values under-predict.")
+
+        frame_label = int(np.clip(frame_value, 1, n_frames))
+        frame_idx = frame_label - 1
+        component_idx = int(component_value)
+        chosen = _choose_samples(chosen_mode, sample_text, metric, count)
+        if not chosen:
+            _write("No valid sample indices were selected.")
+            return
+
+        for sample_idx in chosen:
+            _write(
+                f"Sample {sample_idx}{_sample_metric_text(sample_idx)}, "
+                f"frame={frame_label}, component={components[component_idx]}, style={style}"
+            )
+            fig, _ = plot_field_sample(
+                diagnostics,
+                sample=sample_idx,
+                frame=frame_idx,
+                component=component_idx,
+                node_coords=coords,
+                plot_style=style,
+                show=False,
+            )
+            if out is None:
+                display(_figure_png(fig))
+            else:
+                out.append_display_data(_figure_png(fig))
+
+    try:
+        if widgets is None:
+            import ipywidgets as widgets
+
+        sample_mode_widget = widgets.ToggleButtons(
+            options=["selected", "best", "worst", "random"],
+            value=sample_mode,
+            description="Samples",
+        )
+        selected_samples_widget = widgets.Text(
+            value=str(selected_samples),
+            description="Selected",
+            placeholder="0 or 0, 4, 12",
+            layout=widgets.Layout(width="260px"),
+        )
+        frame_widget = widgets.IntSlider(
+            value=int(np.clip(frame, 1, n_frames)),
+            min=1,
+            max=n_frames,
+            step=1,
+            description="",
+            continuous_update=False,
+            layout=widgets.Layout(width="190px"),
+        )
+        component_default = components.index(component) if component in components else (1 if n_components > 1 else 0)
+        component_widget = widgets.Dropdown(
+            options=[(name, idx) for idx, name in enumerate(components)],
+            value=component_default,
+            description="Component",
+            layout=widgets.Layout(width="185px"),
+            style={"description_width": "80px"},
+        )
+        metric_widget = widgets.Dropdown(
+            options=metric_options,
+            value=ranking_metric if ranking_metric in metric_options else metric_options[0],
+            description="Rank by",
+            layout=widgets.Layout(width="165px"),
+            style={"description_width": "58px"},
+        )
+        plot_style_widget = widgets.ToggleButtons(
+            options=["continuous", "points"],
+            value=plot_style,
+            description="Style",
+            layout=widgets.Layout(width="320px", margin="0 0 0 28px"),
+            style={"description_width": "48px"},
+        )
+        random_count_widget = widgets.BoundedIntText(
+            value=min(max(5, int(random_count)), n_samples),
+            min=min(5, n_samples),
+            max=max(5, min(20, n_samples)),
+            step=1,
+            description="Random n",
+            layout=widgets.Layout(width="150px"),
+        )
+        refresh_widget = widgets.Button(
+            description="Refresh",
+            button_style="primary",
+            layout=widgets.Layout(width="80px", margin="0 0 0 16px"),
+        )
+        frame_label_widget = widgets.Label(value="Frame", layout=widgets.Layout(width="44px"))
+        frame_minus_widget = widgets.Button(description="-", layout=widgets.Layout(width="30px", margin="0 2px 0 0"))
+        frame_plus_widget = widgets.Button(description="+", layout=widgets.Layout(width="30px", margin="0 0 0 2px"))
+        frame_box = widgets.HBox(
+            [frame_label_widget, frame_minus_widget, frame_widget, frame_plus_widget],
+            layout=widgets.Layout(align_items="center", margin="0 14px 0 0"),
+        )
+
+        controls = widgets.VBox([
+            widgets.HBox([sample_mode_widget, selected_samples_widget, random_count_widget, refresh_widget]),
+            widgets.HBox(
+                [frame_box, component_widget, metric_widget, plot_style_widget],
+                layout=widgets.Layout(margin="12px 0 0 0"),
+            ),
+        ])
+        output = widgets.Output()
+
+        def _current_widget_values():
+            return {
+                "chosen_mode": sample_mode_widget.value,
+                "sample_text": selected_samples_widget.value,
+                "frame_value": frame_widget.value,
+                "component_value": component_widget.value,
+                "metric": metric_widget.value,
+                "style": plot_style_widget.value,
+                "count": random_count_widget.value,
+            }
+
+        def _update_view(_=None, force=False):
+            output.clear_output(wait=False)
+            _draw_field_samples(**_current_widget_values(), out=output, force=force)
+
+        def _step_frame(delta):
+            frame_widget.value = int(np.clip(frame_widget.value + delta, frame_widget.min, frame_widget.max))
+
+        frame_minus_widget.on_click(lambda _: _step_frame(-1))
+        frame_plus_widget.on_click(lambda _: _step_frame(1))
+        refresh_widget.on_click(lambda _: _update_view(force=True))
+
+        for widget in [
+            sample_mode_widget,
+            selected_samples_widget,
+            frame_widget,
+            component_widget,
+            metric_widget,
+            plot_style_widget,
+            random_count_widget,
+        ]:
+            widget.observe(lambda change: _update_view(force=True), names="value")
+
+        display(controls, output)
+        _update_view()
+        return controls, output
+    except Exception as exc:
+        print("ipywidgets are unavailable; using editable variables in this cell instead.")
+        print(repr(exc))
+        field_component = components.index(component) if component in components else (1 if n_components > 1 else 0)
+        _draw_field_samples(
+            sample_mode,
+            selected_samples,
+            frame,
+            field_component,
+            ranking_metric,
+            plot_style,
+            random_count,
+        )
+        return None
+
+def plot_field_sample_frame_evolution(diagnostics, sample=0, figsize=None):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None, None
+
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    y_true = np.asarray(diagnostics["y_true"], dtype=float)
+    valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
+    n_samples, n_frames, _, n_components = y_pred.shape
+    sample_idx = int(np.clip(sample, 0, n_samples - 1))
+    x = np.arange(n_frames) + 1
+    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+
+    pred_s = np.where(valid[sample_idx], y_pred[sample_idx], np.nan)
+    true_s = np.where(valid[sample_idx], y_true[sample_idx], np.nan)
+    err_s = pred_s - true_s
+
+    pred_mean = np.nanmean(pred_s, axis=1)
+    true_mean = np.nanmean(true_s, axis=1)
+    mae_frame = np.nanmean(np.abs(err_s), axis=1)
+
+    figsize = figsize or (6 * n_components, 4)
+    fig, axes = plt.subplots(1, n_components, figsize=figsize, squeeze=False)
+    for comp_idx in range(n_components):
+        ax = axes[0, comp_idx]
+        ax.plot(x, true_mean[:, comp_idx], label="Truth", color="darkgreen")
+        ax.plot(x, pred_mean[:, comp_idx], label="Prediction", color="orangered")
+        ax.plot(x, mae_frame[:, comp_idx], label="Mean abs error", color="gray", linestyle="--")
+        ax.set_title(f"Sample {sample_idx} - {components[comp_idx]}")
+        ax.set_xlabel("Frame")
+        ax.set_ylabel("Mean node value")
+        ax.legend(fontsize=8)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_loss_history(loss_history, metrics=None, figsize=(9, 4)):
+    metrics = metrics or ["train_loss", "val_loss"]
+    if loss_history is None or not hasattr(loss_history, "empty") or loss_history.empty:
+        print("No loss_history.csv was found for this run.")
+        return None, None
+
+    fig, ax = plt.subplots(figsize=figsize)
+    for mode, mode_history in loss_history.groupby("mode"):
+        for metric in metrics:
+            if metric in mode_history.columns:
+                ax.plot(mode_history["epoch"], mode_history[metric], marker="o", label=f"{mode} {metric}")
+    ax.set_title("Training History")
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Loss")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    plt.show()
+    return fig, ax
 
 def postprocess_save_open_figures(out_dir, prefix="", formats=("png",), dpi=250, close=False):
     """Save all currently open matplotlib figures into a post-processing folder."""
