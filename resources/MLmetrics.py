@@ -525,6 +525,528 @@ def plot_curve_diagnostics(
     plt.show()
     return fig, axes
 
+def postprocess_load_curve_run(
+    run_path,
+    run_root=None,
+    prefer_hpo_best=True,
+    load_data=True,
+    load_model=True,
+    data_path_override=None,
+    device="cpu",
+    verbose=True,
+):
+    artifacts = postprocess_resolve_artifacts(run_path, run_root=run_root, prefer_hpo_best=prefer_hpo_best)
+    loaded = postprocess_load_artifacts(artifacts)
+
+    data = None
+    if load_data and artifacts.get("data_json") is not None:
+        try:
+            data = postprocess_load_data(
+                artifacts["data_json"],
+                data_path_override=data_path_override,
+                auto_path_root=run_root,
+            )
+            if verbose:
+                print("Loaded DATA from:", artifacts["data_json"])
+                print("DATA output_kind:", getattr(data, "output_kind", "curve"))
+        except Exception as exc:
+            if verbose:
+                print("DATA load failed:", repr(exc))
+
+    model = None
+    if load_model and artifacts.get("model_json") is not None and data is not None:
+        try:
+            from resources.MLmodels import MODEL
+            model = MODEL.from_json(
+                artifacts["model_json"],
+                data=data,
+                load_weights=artifacts.get("model_mdl") is not None,
+                model_path=str(artifacts["model_mdl"]) if artifacts.get("model_mdl") is not None else None,
+                device=device,
+                scan_matches_on_init=False,
+            )
+            model = postprocess_attach_results(model, loaded)
+            if verbose:
+                print("Loaded MODEL from:", artifacts["model_json"])
+        except Exception as exc:
+            if verbose:
+                print("MODEL load failed:", repr(exc))
+    elif load_model and verbose:
+        print("MODEL was not loaded because a model JSON or DATA object is missing.")
+
+    return artifacts, loaded, data, model
+
+def postprocess_curve_run_overview(
+    artifacts,
+    loaded,
+    data=None,
+    run_name=None,
+    run_type=None,
+    mech_mode=None,
+    view_mode="UT",
+    model_name=None,
+    device=None,
+    active_split=None,
+):
+    descriptor = loaded.get("descriptor") or {}
+    metrics = loaded.get("metrics") or {}
+    hpo = loaded.get("hpo") or {}
+
+    saved_output_kind = _postprocess_saved_output_kind(loaded)
+    loaded_output_kind = getattr(data, "output_kind", None) if data is not None else saved_output_kind
+
+    summary_values = {
+        "run": run_name,
+        "run_type": run_type,
+        "mechMode": mech_mode,
+        "VIEW_MODE": view_mode,
+        "model": model_name,
+        "output_kind": loaded_output_kind,
+        "device": device,
+        "evaluation_split": metrics.get("evaluation_split"),
+        "is_hpo": artifacts.get("is_hpo"),
+        "model_json": artifacts.get("model_json"),
+        "results_dir": artifacts.get("results_dir"),
+    }
+    summary_fields = [
+        "run",
+        "run_type",
+        "mechMode",
+        "VIEW_MODE",
+        "model",
+        "output_kind",
+        "device",
+        "evaluation_split",
+        "is_hpo",
+        "model_json",
+        "results_dir",
+    ]
+    summary_table = pd.DataFrame([(key, summary_values.get(key)) for key in summary_fields], columns=["item", "value"])
+
+    run_descriptor = descriptor.get("run_descriptor") if isinstance(descriptor, dict) else None
+    model_setup = pd.DataFrame(columns=["item", "value"])
+    if isinstance(run_descriptor, dict):
+        compact_descriptor = {
+            "model_type": descriptor.get("model_type"),
+            "name": descriptor.get("name"),
+            "in_size": run_descriptor.get("in_size"),
+            "out_size": run_descriptor.get("out_size"),
+            "hidden_size": run_descriptor.get("hidden_size"),
+            "n_layers": run_descriptor.get("n_layers"),
+            "n_heads": run_descriptor.get("n_heads"),
+            "dropout": run_descriptor.get("dropout"),
+        }
+        compact_descriptor = {key: value for key, value in compact_descriptor.items() if value is not None}
+        if compact_descriptor:
+            model_setup = pd.DataFrame(compact_descriptor.items(), columns=["item", "value"])
+
+    active_metric_keys = ["best_epoch", "best_loss", "best_mse", "best_rmse", "mae", "mse", "rmse", "best", "worst"]
+    metric_rows = []
+    for key in [f"{str(view_mode).upper()}_{metric}" for metric in active_metric_keys]:
+        if key in metrics:
+            metric_rows.append((key, metrics[key]))
+    active_metrics = pd.DataFrame(metric_rows, columns=["metric", "value"])
+
+    available_evals = postprocess_available_evaluations(loaded)
+    curve_eval_columns = ["mode", "split", "outputs", "truth", "sample_metrics", "point_metrics", "zone_metrics"]
+    available_curve_evals = available_evals[[col for col in curve_eval_columns if col in available_evals.columns]] if not available_evals.empty else pd.DataFrame(columns=curve_eval_columns)
+
+    resolved_split = active_split
+    if resolved_split is None:
+        resolved_split = metrics.get("evaluation_split", None)
+    if resolved_split is None and not available_evals.empty:
+        matching = available_evals[available_evals["mode"].astype(str).str.upper() == str(view_mode).upper()]
+        resolved_split = (matching.iloc[0] if not matching.empty else available_evals.iloc[0])["split"]
+
+    warnings = []
+    if loaded_output_kind is not None and str(loaded_output_kind).lower() == "field":
+        warnings.append("This notebook is intended for curve-output runs, but the selected run looks like output_kind='field'.")
+
+    return {
+        "summary": summary_table,
+        "model_setup": model_setup,
+        "active_metrics": active_metrics,
+        "available_evals": available_evals,
+        "available_curve_evals": available_curve_evals,
+        "active_split": resolved_split,
+        "hpo": hpo,
+        "warnings": warnings,
+    }
+
+def display_curve_run_overview(overview):
+    from IPython.display import Markdown, display
+
+    for warning in overview.get("warnings", []):
+        print("WARNING:", warning)
+
+    display(overview["summary"])
+    if not overview["model_setup"].empty:
+        display(Markdown("### Model Setup"))
+        display(overview["model_setup"])
+    if not overview["active_metrics"].empty:
+        display(Markdown("### Saved Metrics For Active View"))
+        display(overview["active_metrics"])
+
+    display(Markdown("### Available Curve Predictions / Diagnostic Tables"))
+    display(overview["available_curve_evals"])
+
+    hpo = overview.get("hpo", {})
+    if hpo:
+        display(Markdown("### HPO Summary"))
+        for key, value in hpo.items():
+            if isinstance(value, dict):
+                display(Markdown(f"#### {key}"))
+                display(pd.DataFrame(value.items(), columns=["parameter", "value"]))
+    else:
+        print("No HPO files were found for this run.")
+
+def postprocess_build_active_curve_diagnostics(
+    data,
+    loaded,
+    available_evals,
+    view_mode="UT",
+    active_split=None,
+    model=None,
+    zone_boundaries=None,
+):
+    diagnostics = {}
+    for _, row in available_evals.iterrows():
+        mode = str(row["mode"]).upper()
+        split = str(row["split"]).lower()
+        saved_summary = (loaded.get("diagnostics_summary") or {}).get(mode, {})
+        zone_cfg = zone_boundaries
+        if zone_cfg is None and isinstance(saved_summary, dict):
+            zone_cfg = saved_summary.get("zone_boundaries", None)
+
+        diag = postprocess_build_diagnostics(
+            data,
+            loaded,
+            mode=mode,
+            split=split,
+            zone_boundaries=zone_cfg,
+            prefer_saved_tables=True,
+            recompute_from_predictions=False,
+        )
+        if diag is None:
+            print(f"No saved diagnostics are available for {mode} {split}.")
+            continue
+        if "field_shape" in diag:
+            print(f"Skipping {mode} {split}: diagnostics are field diagnostics.")
+            continue
+
+        diagnostics[(mode, split)] = diag
+        if model is not None:
+            setattr(model, f"{mode}_{split}_diagnostics", diag)
+            if split == "test":
+                setattr(model, f"{mode}_diagnostics", diag)
+                setattr(model, f"{mode}_prediction_summary", diag.get("summary"))
+
+    active_key = (str(view_mode).upper(), str(active_split).lower()) if view_mode and active_split else None
+    active_diag = diagnostics.get(active_key) if active_key is not None else None
+    return diagnostics, active_key, active_diag
+
+def curve_summary_table(diagnostics, metrics=None):
+    if diagnostics is None:
+        return pd.DataFrame(columns=["metric", "value"])
+    metrics = metrics or [
+        "rmse",
+        "mae",
+        "mse",
+        "bias",
+        "r2_global",
+        "collapse_ratio",
+        "mean_curve_baseline_rmse",
+        "skill_vs_mean_curve_rmse",
+        "mean_sample_curve_corr",
+        "peak_corr",
+        "peak_x_corr",
+        "energy_corr",
+        "n_samples",
+        "n_points",
+    ]
+    summary = diagnostics.get("summary", {})
+    return pd.DataFrame([(key, summary.get(key)) for key in metrics if key in summary], columns=["metric", "value"])
+
+def _curve_out_df(data, mode):
+    return getattr(data, f"{str(mode).upper()}_OUT_df", None) if data is not None else None
+
+def display_curve_main_dashboard(
+    diagnostics,
+    data=None,
+    mode="UT",
+    max_samples=64,
+    sort_by="rmse",
+):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None
+    return plot_curve_diagnostics(
+        _curve_out_df(data, mode),
+        diagnostics["y_pred"],
+        diagnostics["y_true"],
+        diagnostics=diagnostics,
+        mode=str(mode).lower(),
+        max_samples=max_samples,
+        sort_by=sort_by,
+    )
+
+def display_curve_pointwise_summary(
+    diagnostics,
+    data=None,
+    mode="UT",
+    max_error_curves=100,
+    sort_by="rmse",
+    show_correlation=True,
+):
+    from IPython.display import Markdown, display
+
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None
+
+    plot_prediction_error_curves(
+        _curve_out_df(data, mode),
+        diagnostics["y_pred"],
+        diagnostics["y_true"],
+        diagnostics=diagnostics,
+        mode=str(mode).lower(),
+        max_samples=max_error_curves,
+        sort_by=sort_by,
+    )
+
+    if show_correlation:
+        corr, _, _ = plot_curve_correlation_matrix(diagnostics, method="pearson")
+        display(Markdown("### Diagnostic Correlations"))
+        display(corr)
+
+def display_curve_sample_error_summary(
+    diagnostics,
+    bins=40,
+    ncols=3,
+    top_n=5,
+    columns=None,
+):
+    from IPython.display import Markdown, display
+
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return
+    samples = diagnostics.get("sample_metrics")
+    if samples is None or not hasattr(samples, "copy"):
+        print("Sample metrics are unavailable.")
+        return
+
+    samples = samples.copy()
+    if "sample_rmse" in samples.columns:
+        display(Markdown("### Best And Worst Samples By RMSE"))
+        best_worst = pd.concat([
+            samples.sort_values("sample_rmse").head(int(top_n)),
+            samples.sort_values("sample_rmse").tail(int(top_n)),
+        ]).drop_duplicates()
+        display(best_worst)
+
+    columns = columns or [
+        "sample_mae",
+        "sample_mse",
+        "sample_rmse",
+        "sample_bias",
+        "sample_max_abs_error",
+        "sample_curve_corr",
+        "peak_error",
+        "peak_x_error",
+        "energy_error",
+    ]
+    plot_cols = [col for col in columns if col in samples.columns]
+    if plot_cols:
+        nrows = int(np.ceil(len(plot_cols) / ncols))
+        fig, axes = plt.subplots(nrows, ncols, figsize=(15, 4 * nrows))
+        axes = np.asarray(axes).reshape(-1)
+        for ax, col in zip(axes, plot_cols):
+            ax.hist(samples[col].dropna(), bins=bins, color="tab:blue", alpha=0.8)
+            ax.set_title(col)
+            ax.set_ylabel("Count")
+        for ax in axes[len(plot_cols):]:
+            ax.axis("off")
+        fig.tight_layout()
+        plt.show()
+
+        display(Markdown("### Sample Metric Summary"))
+        display(samples[plot_cols].describe().T)
+
+def display_curve_peak_energy_summary(diagnostics):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None
+    samples = diagnostics.get("sample_metrics")
+    if samples is None or not hasattr(samples, "copy"):
+        print("Sample metrics are unavailable.")
+        return None
+
+    samples = samples.copy()
+    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+    specs = [
+        ("true_peak", "pred_peak", "Peak value", "True peak", "Predicted peak"),
+        ("true_peak_x", "pred_peak_x", "Peak location", "True peak x", "Predicted peak x"),
+        ("true_energy", "pred_energy", "Integrated curve energy", "True energy", "Predicted energy"),
+    ]
+    for ax, (true_col, pred_col, title, xlabel, ylabel) in zip(axes, specs):
+        if true_col not in samples.columns or pred_col not in samples.columns:
+            ax.axis("off")
+            continue
+        ax.scatter(samples[true_col], samples[pred_col], c=samples.get("sample_rmse"), cmap="viridis", alpha=0.8)
+        lo = np.nanmin([samples[true_col].min(), samples[pred_col].min()])
+        hi = np.nanmax([samples[true_col].max(), samples[pred_col].max()])
+        ax.plot([lo, hi], [lo, hi], color="gray", linestyle="--")
+        ax.set_title(title)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def display_curve_zone_summary(diagnostics):
+    from IPython.display import Markdown, display
+
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None
+    zone = diagnostics.get("zone_metrics")
+    if zone is None or not hasattr(zone, "copy"):
+        print("Zone metrics are unavailable.")
+        return None
+
+    zone = zone.copy()
+    display(Markdown("### Zone Metrics"))
+    display(zone)
+
+    zone_cols = ["mae", "mse", "rmse", "bias", "true_std_mean", "pred_std_mean", "collapse_ratio"]
+    zone_cols = [col for col in zone_cols if col in zone.columns]
+    if not zone_cols:
+        return None
+    fig, axes = plt.subplots(1, len(zone_cols), figsize=(4 * len(zone_cols), 4), sharex=False)
+    axes = np.asarray(axes).reshape(-1)
+    for ax, col in zip(axes, zone_cols):
+        ax.bar(zone["zone"], zone[col], color="tab:blue", alpha=0.85)
+        ax.set_title(col)
+        ax.tick_params(axis="x", rotation=35)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def display_curve_sample_examples(
+    diagnostics,
+    selected_sample=0,
+    random_count=8,
+    random_seed=42,
+    rank_by="sample_rmse",
+    ncols=2,
+):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None
+    samples = diagnostics.get("sample_metrics")
+    if samples is None or not hasattr(samples, "copy"):
+        print("Sample metrics are unavailable.")
+        return None
+
+    samples = samples.copy()
+    y_pred = diagnostics["y_pred"]
+    y_true = diagnostics["y_true"]
+    x = diagnostics["x"]
+
+    rank_col = rank_by if rank_by in samples.columns else "sample_rmse"
+    candidate_indices = []
+    if rank_col in samples.columns:
+        candidate_indices.extend(samples.sort_values(rank_col).head(1)["sample"].astype(int).tolist())
+        candidate_indices.extend(samples.sort_values(rank_col).tail(1)["sample"].astype(int).tolist())
+    candidate_indices.append(int(selected_sample))
+
+    rng = np.random.default_rng(random_seed)
+    if len(samples) > 0:
+        candidate_indices.extend(
+            rng.choice(samples["sample"].astype(int), size=min(int(random_count), len(samples)), replace=False).tolist()
+        )
+    candidate_indices = [idx for idx in dict.fromkeys(candidate_indices) if 0 <= idx < len(y_pred)]
+
+    nrows = int(np.ceil(len(candidate_indices) / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(14, 4 * nrows))
+    axes = np.asarray(axes).reshape(-1)
+    for ax, idx in zip(axes, candidate_indices):
+        ax.plot(x, y_true[idx], color="darkgreen", label="Truth")
+        ax.plot(x, y_pred[idx], color="orangered", label="Prediction")
+        row = samples.loc[samples["sample"].astype(int) == int(idx)]
+        rmse_text = f", RMSE={row['sample_rmse'].iloc[0]:.4g}" if not row.empty and "sample_rmse" in row else ""
+        ax.set_title(f"Sample {idx}{rmse_text}")
+        ax.legend(fontsize=8)
+    for ax in axes[len(candidate_indices):]:
+        ax.axis("off")
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def display_curve_loss_component_breakdown(model, diagnostics, active_key=None):
+    from IPython.display import display
+    import torch
+
+    if model is None:
+        print("MODEL is not loaded, so loss components cannot be evaluated.")
+        return pd.DataFrame()
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return pd.DataFrame()
+
+    mode = active_key[0] if active_key is not None else "UT"
+    loss_rows = []
+    y_pred_t = torch.as_tensor(diagnostics["y_pred"], dtype=torch.float32, device=model.device)
+    y_true_t = torch.as_tensor(diagnostics["y_true"], dtype=torch.float32, device=model.device)
+    for loss_idx, loss_obj in enumerate(getattr(model, f"{mode}_losses", [])):
+        if not hasattr(loss_obj, "component_losses"):
+            loss_rows.append({
+                "loss_index": loss_idx,
+                "loss_class": loss_obj.__class__.__name__,
+                "component": "total",
+                "value": np.nan,
+                "note": "component_losses unavailable",
+            })
+            continue
+        try:
+            with torch.no_grad():
+                components = loss_obj.component_losses(y_pred_t, y_true_t, weighted=False)
+                weighted_components = loss_obj.component_losses(y_pred_t, y_true_t, weighted=True)
+            for comp_name, comp_value in components.items():
+                value = comp_value.detach().cpu().item() if torch.is_tensor(comp_value) else float(comp_value)
+                weighted_value = weighted_components.get(comp_name, np.nan)
+                weighted_value = weighted_value.detach().cpu().item() if torch.is_tensor(weighted_value) else float(weighted_value)
+                loss_rows.append({
+                    "loss_index": loss_idx,
+                    "loss_class": loss_obj.__class__.__name__,
+                    "component": comp_name,
+                    "value": value,
+                    "weighted_value": weighted_value,
+                })
+        except Exception as exc:
+            loss_rows.append({
+                "loss_index": loss_idx,
+                "loss_class": loss_obj.__class__.__name__,
+                "component": "error",
+                "value": np.nan,
+                "note": repr(exc),
+            })
+
+    loss_components_df = pd.DataFrame(loss_rows)
+    display(loss_components_df)
+
+    if not loss_components_df.empty and "weighted_value" in loss_components_df.columns:
+        plot_df = loss_components_df.dropna(subset=["weighted_value"])
+        if not plot_df.empty:
+            fig, ax = plt.subplots(figsize=(10, 4))
+            ax.bar(plot_df["component"], plot_df["weighted_value"], color="tab:blue")
+            ax.set_title("Weighted Loss Components")
+            ax.tick_params(axis="x", rotation=35)
+            fig.tight_layout()
+            plt.show()
+    return loss_components_df
+
 # =============================================================================
 # Field Metrics
 # =============================================================================
