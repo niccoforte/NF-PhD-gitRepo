@@ -202,8 +202,8 @@ def curve_loss_space():
         "derivative_order": [1, 2],
         "SoftPeak_beta": [5.0, 10.0, 20.0, 40.0, 80.0],
         "normalization_eps": {"type": "fixed", "value": 1e-8},
-        "UT": {"zone_boundaries": (67, 134), "zone_weights": (1.0, 5.0, 2.0)},
-        "FT": {"zone_boundaries": (67, 134), "zone_weights": (1.0, 5.0, 2.0)},
+        "UT": {"zone_boundaries": (65, 130), "zone_weights": (1.0, 5.0, 0.2)},
+        "FT": {"zone_boundaries": (85, 160), "zone_weights": (1.0, 5.0, 0.2)},
     }
 
 

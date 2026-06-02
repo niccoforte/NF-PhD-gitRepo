@@ -608,6 +608,15 @@ def _activation(act="relu", return_name=False, return_types=False):
 
 
 ### Custom Loss Functions
+def curve_default_zone_boundaries(mode=None):
+    mode_key = str(mode or "UT").strip().upper()
+    if mode_key == "FT":
+        return (85, 160)
+    return (65, 130)
+
+def curve_default_zone_weights():
+    return (1.0, 5.0, 0.2)
+
 class CombinedCurveLoss(nn.Module):
     """
     Convenience wrapper for normalized curve-level losses. Weights with value 0 disable a term.
@@ -620,8 +629,8 @@ class CombinedCurveLoss(nn.Module):
         peak_weight=0.2,
         energy_weight=0.2,
         peak_location_weight=0.05,
-        zone_boundaries=(67, 134),
-        zone_weights=(1.0, 5.0, 2.0),
+        zone_boundaries=None,
+        zone_weights=None,
         x_values=None,
         reduction="mean",
         derivative_order=1,
@@ -645,8 +654,8 @@ class CombinedCurveLoss(nn.Module):
         self.SoftPeak_beta = float(SoftPeak_beta)
 
         self.weighted_mse = WeightedCurveMSELoss(
-            zone_boundaries=zone_boundaries,
-            zone_weights=zone_weights,
+            zone_boundaries=curve_default_zone_boundaries() if zone_boundaries is None else zone_boundaries,
+            zone_weights=curve_default_zone_weights() if zone_weights is None else zone_weights,
             reduction=reduction,
             normalize_by_target_range=True,
             eps=normalization_eps,
@@ -916,7 +925,7 @@ class WeightedCurveMSELoss(nn.Module):
                 b1, b2 = int(self.zone_boundaries[0]), int(self.zone_boundaries[1])
             if not (0 < b1 < b2 < n_points):
                 raise ValueError(f"Invalid zone boundaries ({b1}, {b2}) for n_points={n_points}.")
-            zone_weights = [1.0, 5.0, 2.0] if self.zone_weights is None else list(self.zone_weights)
+            zone_weights = list(curve_default_zone_weights()) if self.zone_weights is None else list(self.zone_weights)
             if len(zone_weights) != 3:
                 raise ValueError("zone_weights must contain exactly 3 values.")
             w = y_true.new_ones(n_points)
@@ -1681,8 +1690,8 @@ def hOpt_build_loss(loss_params, data, loss_cfg=None):
             continue
         task_cfg = _hopt_loss_task_cfg(loss_cfg, mode)
         params = {k: v for k, v in loss_params.items() if k != "family"}
-        params["zone_boundaries"] = _hopt_get(task_cfg, "zone_boundaries", (67, 134))
-        params["zone_weights"] = _hopt_get(task_cfg, "zone_weights", (1.0, 5.0, 2.0))
+        params["zone_boundaries"] = _hopt_get(task_cfg, "zone_boundaries", curve_default_zone_boundaries(mode))
+        params["zone_weights"] = _hopt_get(task_cfg, "zone_weights", curve_default_zone_weights())
         params["x_values"] = _hopt_get(task_cfg, "x_values", _hopt_curve_x_values(data, mode))
         task_losses[mode] = CombinedCurveLoss(**params)
 
