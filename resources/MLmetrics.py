@@ -819,6 +819,179 @@ def display_curve_pointwise_summary(
         display(Markdown("### Diagnostic Correlations"))
         display(corr)
 
+def plot_curve_all_point_parity(
+    diagnostics,
+    gridsize=75,
+    cmap="viridis",
+    mincnt=1,
+    figsize=(6, 5),
+):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None, None
+
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    y_true = np.asarray(diagnostics["y_true"], dtype=float)
+    mask = np.isfinite(y_pred) & np.isfinite(y_true)
+    true_values = y_true[mask]
+    pred_values = y_pred[mask]
+    if true_values.size == 0:
+        print("No valid curve points are available for parity plotting.")
+        return None, None
+
+    lo = np.nanpercentile(np.concatenate([true_values, pred_values]), 1)
+    hi = np.nanpercentile(np.concatenate([true_values, pred_values]), 99)
+    if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
+        lo = np.nanmin(np.concatenate([true_values, pred_values]))
+        hi = np.nanmax(np.concatenate([true_values, pred_values]))
+    if lo == hi:
+        lo -= 1.0
+        hi += 1.0
+
+    fig, ax = plt.subplots(figsize=figsize)
+    hb = ax.hexbin(true_values, pred_values, gridsize=gridsize, mincnt=mincnt, cmap=cmap)
+    ax.plot([lo, hi], [lo, hi], color="white", linewidth=2.0)
+    ax.plot([lo, hi], [lo, hi], color="black", linestyle="--", linewidth=1.0)
+    ax.set_xlim(lo, hi)
+    ax.set_ylim(lo, hi)
+    ax.set_aspect("equal", adjustable="box")
+    bias = float(np.nanmean(pred_values - true_values))
+    rmse = float(np.sqrt(np.nanmean((pred_values - true_values) ** 2)))
+    ax.set_title(f"All-Point Curve Parity\nRMSE={rmse:.4g}, bias={bias:.4g}, n={true_values.size:,}")
+    ax.set_xlabel("Truth")
+    ax.set_ylabel("Prediction")
+    fig.colorbar(hb, ax=ax, fraction=0.046, pad=0.04, label="Count")
+    fig.tight_layout()
+    plt.show()
+    return fig, ax
+
+def curve_initial_slope_diagnostics(
+    diagnostics,
+    window_fraction=0.08,
+    x_threshold=None,
+    min_points=3,
+    eps=1e-12,
+):
+    if diagnostics is None:
+        return pd.DataFrame(), {}
+
+    x = np.asarray(diagnostics["x"], dtype=float).reshape(-1)
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    y_true = np.asarray(diagnostics["y_true"], dtype=float)
+    n_points = x.size
+
+    if x_threshold is not None:
+        window_mask = x <= float(x_threshold)
+        if int(np.sum(window_mask)) < int(min_points):
+            order = np.argsort(x)
+            window_indices = order[: int(min_points)]
+        else:
+            window_indices = np.where(window_mask)[0]
+    else:
+        window_size = max(int(min_points), int(np.ceil(float(window_fraction) * n_points)))
+        window_size = min(window_size, n_points)
+        window_indices = np.arange(window_size)
+
+    window_indices = np.asarray(window_indices, dtype=int)
+    x_window = x[window_indices]
+
+    def _slope(y_values):
+        values = np.asarray(y_values, dtype=float)[window_indices]
+        mask = np.isfinite(x_window) & np.isfinite(values)
+        if int(np.sum(mask)) < int(min_points):
+            return np.nan
+        try:
+            return float(np.polyfit(x_window[mask], values[mask], deg=1)[0])
+        except Exception:
+            return np.nan
+
+    true_slope = np.array([_slope(row) for row in y_true], dtype=float)
+    pred_slope = np.array([_slope(row) for row in y_pred], dtype=float)
+    slope_error = pred_slope - true_slope
+    slope_percent_error = np.full_like(slope_error, np.nan, dtype=float)
+    denom_ok = np.abs(true_slope) > eps
+    slope_percent_error[denom_ok] = 100.0 * slope_error[denom_ok] / true_slope[denom_ok]
+
+    slopes = pd.DataFrame({
+        "sample": np.arange(y_true.shape[0]),
+        "true_slope": true_slope,
+        "pred_slope": pred_slope,
+        "slope_error": slope_error,
+        "slope_percent_error": slope_percent_error,
+    })
+    finite = np.isfinite(true_slope) & np.isfinite(pred_slope)
+    slope_corr = _safe_corr(true_slope[finite], pred_slope[finite], eps=eps) if np.any(finite) else np.nan
+    summary = {
+        "window_start_idx": int(window_indices.min()) if window_indices.size else None,
+        "window_end_idx": int(window_indices.max()) if window_indices.size else None,
+        "window_start_x": float(np.nanmin(x_window)) if x_window.size else np.nan,
+        "window_end_x": float(np.nanmax(x_window)) if x_window.size else np.nan,
+        "window_points": int(window_indices.size),
+        "slope_correlation": slope_corr,
+        "slope_mae": _safe_nanmean(np.abs(slope_error)),
+        "slope_rmse": float(np.sqrt(_safe_nanmean(slope_error ** 2))),
+        "slope_bias": _safe_nanmean(slope_error),
+        "slope_median_abs_percent_error": float(np.nanmedian(np.abs(slope_percent_error)))
+        if np.any(np.isfinite(slope_percent_error)) else np.nan,
+    }
+    return slopes, summary
+
+def display_curve_initial_slope_summary(
+    diagnostics,
+    window_fraction=0.08,
+    x_threshold=None,
+    min_points=3,
+    top_n=5,
+    figsize=(12, 4.5),
+):
+    from IPython.display import Markdown, display
+
+    slopes, summary = curve_initial_slope_diagnostics(
+        diagnostics,
+        window_fraction=window_fraction,
+        x_threshold=x_threshold,
+        min_points=min_points,
+    )
+    if slopes.empty:
+        print("Initial slope diagnostics are unavailable.")
+        return slopes, summary
+
+    display(Markdown("### Initial Slope Summary"))
+    display(pd.DataFrame(summary.items(), columns=["metric", "value"]))
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    finite = np.isfinite(slopes["true_slope"]) & np.isfinite(slopes["pred_slope"])
+    if np.any(finite):
+        axes[0].scatter(
+            slopes.loc[finite, "true_slope"],
+            slopes.loc[finite, "pred_slope"],
+            c=np.abs(slopes.loc[finite, "slope_percent_error"]),
+            cmap="viridis",
+            alpha=0.8,
+        )
+        lo = np.nanmin([slopes["true_slope"].min(), slopes["pred_slope"].min()])
+        hi = np.nanmax([slopes["true_slope"].max(), slopes["pred_slope"].max()])
+        axes[0].plot([lo, hi], [lo, hi], color="gray", linestyle="--")
+    axes[0].set_title(f"Initial slope parity\ncorr={_fmt_metric(summary.get('slope_correlation'), 3)}")
+    axes[0].set_xlabel("True slope")
+    axes[0].set_ylabel("Predicted slope")
+
+    percent_error = slopes["slope_percent_error"].replace([np.inf, -np.inf], np.nan).dropna()
+    if not percent_error.empty:
+        axes[1].hist(percent_error, bins=40, color="tab:blue", alpha=0.8)
+        axes[1].axvline(0.0, color="gray", linestyle="--", linewidth=1)
+    axes[1].set_title("Initial slope percent error")
+    axes[1].set_xlabel("Percent error")
+    axes[1].set_ylabel("Count")
+    fig.tight_layout()
+    plt.show()
+
+    if top_n is not None and int(top_n) > 0:
+        display(Markdown("### Worst Initial Slope Samples"))
+        worst = slopes.assign(abs_percent_error=np.abs(slopes["slope_percent_error"]))
+        display(worst.sort_values("abs_percent_error", ascending=False).head(int(top_n)))
+    return slopes, summary
+
 def display_curve_sample_error_summary(
     diagnostics,
     bins=40,
@@ -1426,8 +1599,7 @@ def plot_field_diversity(diagnostics, figsize=(16, 4), ratio_reference=1.0, bins
     plt.show()
     return fig, axes
 
-def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None):
-    cmaps = cmaps or {"RMSE": "viridis", "Bias": "coolwarm", "Valid Fraction": "magma"}
+def _field_frame_component_metric_maps(diagnostics):
     y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
     y_true = np.asarray(diagnostics["y_true"], dtype=float)
     valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
@@ -1441,6 +1613,7 @@ def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None
     rmse_map = np.full((n_frames, n_components), np.nan)
     bias_map = np.full((n_frames, n_components), np.nan)
     valid_map = np.full((n_frames, n_components), np.nan)
+    collapse_map = np.full((n_frames, n_components), np.nan)
     for frame_idx in range(n_frames):
         for comp_idx in range(n_components):
             mask = valid[:, frame_idx, :, comp_idx]
@@ -1449,6 +1622,35 @@ def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None
                 rmse_map[frame_idx, comp_idx] = np.sqrt(np.nanmean(values[mask] ** 2))
                 bias_map[frame_idx, comp_idx] = np.nanmean(values[mask])
                 valid_map[frame_idx, comp_idx] = np.mean(mask)
+                pred_values = np.where(mask, y_pred[:, frame_idx, :, comp_idx], np.nan)
+                true_values = np.where(mask, y_true[:, frame_idx, :, comp_idx], np.nan)
+                pred_std = np.nanstd(pred_values, axis=0)
+                true_std = np.nanstd(true_values, axis=0)
+                with np.errstate(divide="ignore", invalid="ignore"):
+                    collapse_map[frame_idx, comp_idx] = np.nanmean(pred_std / np.maximum(true_std, 1e-12))
+
+    return {
+        "RMSE": rmse_map,
+        "Bias": bias_map,
+        "Valid Fraction": valid_map,
+        "Collapse Ratio": collapse_map,
+        "components": components,
+        "frame_labels": frame_labels,
+    }
+
+def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None, mark_worst=True):
+    cmaps = cmaps or {"RMSE": "viridis", "Bias": "coolwarm", "Valid Fraction": "magma"}
+    maps = _field_frame_component_metric_maps(diagnostics)
+    components = maps["components"]
+    frame_labels = maps["frame_labels"]
+    rmse_map = maps["RMSE"]
+    bias_map = maps["Bias"]
+    valid_map = maps["Valid Fraction"]
+    n_frames, n_components = rmse_map.shape
+
+    worst = None
+    if mark_worst and np.any(np.isfinite(rmse_map)):
+        worst = np.unravel_index(np.nanargmax(rmse_map), rmse_map.shape)
 
     fig, axes = plt.subplots(1, 3, figsize=figsize)
     for ax, matrix, title in [
@@ -1457,6 +1659,11 @@ def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None
         (axes[2], valid_map, "Valid Fraction"),
     ]:
         im = ax.imshow(matrix, aspect="auto", cmap=cmaps.get(title, "viridis"))
+        if title == "RMSE" and worst is not None:
+            frame_idx, comp_idx = worst
+            ax.scatter(comp_idx, frame_idx, marker="x", s=110, color="white", linewidths=2.0)
+            ax.scatter(comp_idx, frame_idx, marker="x", s=55, color="black", linewidths=1.4)
+            title = f"RMSE (worst: frame {frame_idx + 1}, {components[comp_idx]})"
         ax.set_title(title)
         ax.set_xlabel("Component")
         ax.set_ylabel("Frame")
@@ -1465,6 +1672,118 @@ def plot_field_frame_component_heatmaps(diagnostics, figsize=(17, 5), cmaps=None
         ax.set_yticks(np.arange(n_frames))
         ax.set_yticklabels(frame_labels)
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
+def plot_field_frame_component_collapse(diagnostics, figsize=(8, 5), cmap="viridis", annotate_worst=True):
+    maps = _field_frame_component_metric_maps(diagnostics)
+    collapse_map = maps["Collapse Ratio"]
+    components = maps["components"]
+    frame_labels = maps["frame_labels"]
+    n_frames, n_components = collapse_map.shape
+
+    worst = None
+    if annotate_worst and np.any(np.isfinite(collapse_map)):
+        # Values farthest from 1.0 are the most suspicious: near-zero collapse or inflated diversity.
+        worst = np.unravel_index(np.nanargmax(np.abs(collapse_map - 1.0)), collapse_map.shape)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.imshow(collapse_map, aspect="auto", cmap=cmap, vmin=0.0)
+    title = "Frame-Component Collapse Ratio"
+    if worst is not None:
+        frame_idx, comp_idx = worst
+        ax.scatter(comp_idx, frame_idx, marker="x", s=120, color="white", linewidths=2.0)
+        ax.scatter(comp_idx, frame_idx, marker="x", s=60, color="black", linewidths=1.4)
+        title += f" (largest deviation: frame {frame_idx + 1}, {components[comp_idx]})"
+    ax.set_title(title)
+    ax.set_xlabel("Component")
+    ax.set_ylabel("Frame")
+    ax.set_xticks(np.arange(n_components))
+    ax.set_xticklabels(components)
+    ax.set_yticks(np.arange(n_frames))
+    ax.set_yticklabels(frame_labels)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="Pred std / true std")
+    fig.tight_layout()
+    plt.show()
+    return fig, ax
+
+def plot_field_component_parity(
+    diagnostics,
+    components=None,
+    max_points_per_component=300000,
+    gridsize=70,
+    cmap="viridis",
+    mincnt=1,
+    random_seed=0,
+    figsize=None,
+):
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    y_true = np.asarray(diagnostics["y_true"], dtype=float)
+    valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
+    n_components = y_pred.shape[3]
+    component_names = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+
+    if components is None:
+        component_indices = list(range(n_components))
+    else:
+        requested = [components] if isinstance(components, (str, int, np.integer)) else list(components)
+        component_indices = []
+        for item in requested:
+            if isinstance(item, (int, np.integer)):
+                component_indices.append(int(item) % n_components)
+            elif str(item) in component_names:
+                component_indices.append(component_names.index(str(item)))
+        component_indices = list(dict.fromkeys(component_indices))
+    if not component_indices:
+        raise ValueError("No requested field components are available for parity plotting.")
+
+    figsize = figsize or (5 * len(component_indices), 4.5)
+    fig, axes = plt.subplots(1, len(component_indices), figsize=figsize, squeeze=False)
+    axes = axes.reshape(-1)
+    rng = np.random.default_rng(random_seed)
+
+    for ax, comp_idx in zip(axes, component_indices):
+        mask = valid[:, :, :, comp_idx]
+        true_values = y_true[:, :, :, comp_idx][mask]
+        pred_values = y_pred[:, :, :, comp_idx][mask]
+        total_points = true_values.size
+        if max_points_per_component is not None and total_points > int(max_points_per_component):
+            chosen = rng.choice(total_points, size=int(max_points_per_component), replace=False)
+            true_plot = true_values[chosen]
+            pred_plot = pred_values[chosen]
+        else:
+            true_plot = true_values
+            pred_plot = pred_values
+
+        if true_plot.size == 0:
+            ax.set_title(f"{component_names[comp_idx]}: no valid values")
+            ax.axis("off")
+            continue
+
+        lo = np.nanpercentile(np.concatenate([true_plot, pred_plot]), 1)
+        hi = np.nanpercentile(np.concatenate([true_plot, pred_plot]), 99)
+        if not np.isfinite(lo) or not np.isfinite(hi) or lo == hi:
+            lo = np.nanmin(np.concatenate([true_plot, pred_plot]))
+            hi = np.nanmax(np.concatenate([true_plot, pred_plot]))
+        if lo == hi:
+            lo -= 1.0
+            hi += 1.0
+
+        hb = ax.hexbin(true_plot, pred_plot, gridsize=gridsize, mincnt=mincnt, cmap=cmap)
+        ax.plot([lo, hi], [lo, hi], color="white", linewidth=2.0)
+        ax.plot([lo, hi], [lo, hi], color="black", linestyle="--", linewidth=1.0)
+        ax.set_xlim(lo, hi)
+        ax.set_ylim(lo, hi)
+        ax.set_aspect("equal", adjustable="box")
+        bias = float(np.nanmean(pred_values - true_values))
+        rmse = float(np.sqrt(np.nanmean((pred_values - true_values) ** 2)))
+        sample_note = f"{true_plot.size:,}/{total_points:,}" if true_plot.size != total_points else f"{total_points:,}"
+        ax.set_title(f"{component_names[comp_idx]} parity\nRMSE={rmse:.4g}, bias={bias:.4g}, n={sample_note}")
+        ax.set_xlabel("Truth")
+        ax.set_ylabel("Prediction")
+        fig.colorbar(hb, ax=ax, fraction=0.046, pad=0.04, label="Count")
+
     fig.tight_layout()
     plt.show()
     return fig, axes
@@ -1622,6 +1941,156 @@ def plot_field_sample(
     fig.tight_layout()
     if show:
         plt.show()
+    return fig, axes
+
+def _field_component_index(components, component):
+    if isinstance(component, (int, np.integer)):
+        return int(component) % len(components)
+    component = str(component)
+    if component in components:
+        return components.index(component)
+    return 1 if len(components) > 1 else 0
+
+def _first_sample_index(sample, n_samples):
+    if isinstance(sample, (int, np.integer)):
+        return int(np.clip(sample, 0, n_samples - 1))
+    if isinstance(sample, (list, tuple, set, np.ndarray, pd.Series)) and len(sample) > 0:
+        return int(np.clip(list(sample)[0], 0, n_samples - 1))
+    text = str(sample).strip()
+    if not text:
+        return 0
+    try:
+        import ast
+        parsed = ast.literal_eval(text)
+        if isinstance(parsed, (list, tuple, set)) and len(parsed) > 0:
+            return int(np.clip(list(parsed)[0], 0, n_samples - 1))
+        if isinstance(parsed, (int, np.integer)):
+            return int(np.clip(parsed, 0, n_samples - 1))
+    except Exception:
+        pass
+    first = text.replace(";", ",").split(",")[0]
+    return int(np.clip(int(first), 0, n_samples - 1))
+
+def plot_field_keyframe_strip(
+    diagnostics,
+    sample=0,
+    component="U2",
+    frames=None,
+    n_keyframes=5,
+    rows=("truth", "prediction", "error"),
+    plot_style="continuous",
+    cmap="coolwarm",
+    levels=24,
+    point_size=14,
+    figsize=None,
+    frame_label_offset=1,
+):
+    if diagnostics is None:
+        print("No active diagnostics are available.")
+        return None, None
+
+    coords = diagnostics.get("node_coords")
+    if coords is None:
+        print("Node coordinates are unavailable, so the keyframe strip cannot be drawn.")
+        return None, None
+    coords = np.asarray(coords, dtype=float)
+
+    y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
+    y_true = np.asarray(diagnostics["y_true"], dtype=float)
+    valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
+    n_samples, n_frames, _, n_components = y_pred.shape
+    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+
+    sample_idx = _first_sample_index(sample, n_samples)
+    component_idx = _field_component_index(components, component)
+    if frames is None:
+        frame_indices = np.linspace(0, n_frames - 1, num=min(int(n_keyframes), n_frames), dtype=int)
+    else:
+        frame_indices = np.asarray(frames, dtype=int)
+        frame_indices = frame_indices[(frame_indices >= 0) & (frame_indices < n_frames)]
+        if frame_indices.size == 0:
+            frame_indices = np.linspace(0, n_frames - 1, num=min(int(n_keyframes), n_frames), dtype=int)
+    frame_indices = np.unique(frame_indices)
+
+    row_specs = []
+    for row in rows:
+        row_key = str(row).lower()
+        if row_key in ["truth", "true", "target"]:
+            row_specs.append(("Truth", y_true[sample_idx, frame_indices, :, component_idx]))
+        elif row_key in ["prediction", "pred", "output"]:
+            row_specs.append(("Prediction", y_pred[sample_idx, frame_indices, :, component_idx]))
+        elif row_key in ["error", "residual", "prediction - truth"]:
+            row_specs.append(("Prediction - Truth", y_pred[sample_idx, frame_indices, :, component_idx] - y_true[sample_idx, frame_indices, :, component_idx]))
+    if not row_specs:
+        row_specs = [("Truth", y_true[sample_idx, frame_indices, :, component_idx])]
+
+    sample_valid = valid[sample_idx, frame_indices, :, component_idx]
+    field_values = np.concatenate([
+        np.ravel(y_true[sample_idx, frame_indices, :, component_idx][sample_valid]),
+        np.ravel(y_pred[sample_idx, frame_indices, :, component_idx][sample_valid]),
+    ])
+    error_values = np.ravel((y_pred[sample_idx, frame_indices, :, component_idx] - y_true[sample_idx, frame_indices, :, component_idx])[sample_valid])
+    value_limit = np.nanpercentile(np.abs(field_values), 98) if field_values.size else 1.0
+    error_limit = np.nanpercentile(np.abs(error_values), 98) if error_values.size else 1.0
+    value_limit = max(float(value_limit), 1e-12)
+    error_limit = max(float(error_limit), 1e-12)
+
+    figsize = figsize or (3.0 * len(frame_indices), 2.5 * len(row_specs))
+    fig, axes = plt.subplots(
+        len(row_specs),
+        len(frame_indices),
+        figsize=figsize,
+        squeeze=False,
+        constrained_layout=True,
+    )
+    plot_style = str(plot_style).lower()
+
+    for row_idx, (row_title, row_values) in enumerate(row_specs):
+        limit = error_limit if "Truth" in row_title and "Prediction" in row_title else value_limit
+        if row_title == "Prediction - Truth":
+            limit = error_limit
+        last_im = None
+        for col_idx, frame_idx in enumerate(frame_indices):
+            ax = axes[row_idx, col_idx]
+            frame_valid = sample_valid[col_idx]
+            values = np.where(frame_valid, row_values[col_idx], np.nan)
+            finite = np.isfinite(values)
+            im = None
+            if plot_style in ["continuous", "contour", "tricontour", "tricontourf"] and np.sum(finite) >= 3:
+                try:
+                    im = ax.tricontourf(
+                        coords[finite, 0],
+                        coords[finite, 1],
+                        values[finite],
+                        levels=np.linspace(-limit, limit, int(levels)),
+                        cmap=cmap,
+                        extend="both",
+                    )
+                except Exception:
+                    im = None
+            if im is None:
+                im = ax.scatter(
+                    coords[:, 0],
+                    coords[:, 1],
+                    c=values,
+                    cmap=cmap,
+                    vmin=-limit,
+                    vmax=limit,
+                    s=point_size,
+                )
+            last_im = im
+            if row_idx == 0:
+                ax.set_title(f"Frame {int(frame_idx) + int(frame_label_offset)}")
+            if col_idx == 0:
+                ax.set_ylabel(row_title)
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_aspect("equal", adjustable="box")
+        if last_im is not None:
+            fig.colorbar(last_im, ax=axes[row_idx, :], fraction=0.020, pad=0.02)
+
+    fig.suptitle(f"Sample {sample_idx} Keyframes - {components[component_idx]}")
+    plt.show()
     return fig, axes
 
 # =============================================================================
@@ -1836,6 +2305,571 @@ def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
     if max_runs is not None:
         df = df.head(int(max_runs))
     return df
+
+def postprocess_resolve_hpo_run_path(
+    run_root="Z:/p2",
+    task="UT",
+    model="Transformer",
+    run_name=None,
+    run_type="model_hpo",
+    run_path_override=None,
+):
+    """Resolve the two supported HPO run layouts into one concrete directory."""
+    if run_path_override is not None and str(run_path_override).strip():
+        return Path(run_path_override).expanduser()
+
+    if run_name is None or not str(run_name).strip():
+        raise ValueError("run_name is required when RUN_PATH_OVERRIDE is not set.")
+
+    root = Path(run_root).expanduser()
+    task = str(task).upper()
+    model = str(model)
+    run_name = str(run_name)
+    run_type = str(run_type).lower()
+
+    if run_type == "model_hpo":
+        return root / task / model / "HPO" / run_name
+    if run_type == "cross_model_hpo":
+        return root / task / "HPO" / run_name / model
+    raise ValueError("run_type must be 'model_hpo' or 'cross_model_hpo' for HPO post-processing.")
+
+def _postprocess_hpo_layout_from_path(path, run_root=None):
+    path = Path(path)
+    if run_root is None:
+        parts = path.parts
+    else:
+        try:
+            parts = path.relative_to(Path(run_root)).parts
+        except ValueError:
+            parts = path.parts
+
+    layout = {
+        "run_type": None,
+        "task": None,
+        "model": None,
+        "run_name": None,
+    }
+    upper_parts = [str(part).upper() for part in parts]
+    if len(parts) >= 4 and upper_parts[2] == "HPO":
+        layout.update(
+            {
+                "run_type": "model_hpo",
+                "task": parts[0],
+                "model": parts[1],
+                "run_name": parts[3],
+            }
+        )
+    elif len(parts) >= 4 and upper_parts[1] == "HPO":
+        layout.update(
+            {
+                "run_type": "cross_model_hpo",
+                "task": parts[0],
+                "model": parts[3],
+                "run_name": parts[2],
+            }
+        )
+    return layout
+
+def postprocess_hpo_path_summary(
+    run_path,
+    run_root=None,
+    task=None,
+    output_kind=None,
+    model=None,
+    run_name=None,
+    run_type=None,
+):
+    """Return a compact table for the resolved HPO path and user-facing config."""
+    run_path = Path(run_path)
+    layout = _postprocess_hpo_layout_from_path(run_path, run_root=run_root)
+    values = {
+        "RUN_ROOT": run_root,
+        "OUTPUT_KIND": output_kind,
+        "TASK": task if task is not None else layout.get("task"),
+        "MODEL": model if model is not None else layout.get("model"),
+        "RUN_NAME": run_name if run_name is not None else layout.get("run_name"),
+        "RUN_TYPE": run_type if run_type is not None else layout.get("run_type"),
+        "RUN_PATH": run_path,
+        "RUN_PATH_EXISTS": run_path.exists(),
+        "STUDY_DB": run_path / "full_study.db",
+        "STUDY_DB_EXISTS": (run_path / "full_study.db").exists(),
+    }
+    return pd.DataFrame(values.items(), columns=["item", "value"])
+
+def postprocess_cross_hpo_base_path(run_path, run_type="cross_model_hpo"):
+    """Return the comparison root for a cross-model HPO run."""
+    if str(run_type).lower() != "cross_model_hpo":
+        return None
+    return Path(run_path).parent
+
+def postprocess_list_hpo_runs(run_root="Z:/p2", max_runs=25):
+    """List recent HPO study directories that contain full_study.db."""
+    root = Path(run_root).expanduser()
+    columns = [
+        "task",
+        "model",
+        "run_name",
+        "run_type",
+        "hpo_dir",
+        "study_db",
+        "best_model_json",
+        "best_model_results",
+        "modified",
+    ]
+    if not root.exists():
+        return pd.DataFrame(columns=columns)
+
+    rows = []
+    for study_db in root.rglob("full_study.db"):
+        hpo_dir = study_db.parent
+        layout = _postprocess_hpo_layout_from_path(hpo_dir, run_root=root)
+        artifacts = postprocess_resolve_artifacts(hpo_dir, run_root=root, prefer_hpo_best=True)
+        rows.append(
+            {
+                "task": layout.get("task"),
+                "model": layout.get("model"),
+                "run_name": layout.get("run_name"),
+                "run_type": layout.get("run_type"),
+                "hpo_dir": str(hpo_dir),
+                "study_db": str(study_db),
+                "best_model_json": str(artifacts.get("model_json")) if artifacts.get("model_json") is not None else None,
+                "best_model_results": str(artifacts.get("results_dir")) if artifacts.get("results_dir") is not None else None,
+                "modified": datetime.datetime.fromtimestamp(study_db.stat().st_mtime),
+            }
+        )
+
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    df = pd.DataFrame(rows).sort_values("modified", ascending=False).reset_index(drop=True)
+    if max_runs is not None:
+        df = df.head(int(max_runs))
+    return df[columns]
+
+def _postprocess_hpo_storage_url(study_db):
+    return f"sqlite:///{Path(study_db).as_posix()}"
+
+def postprocess_load_hpo_study(hpo_dir, study_name=None):
+    """
+    Load an Optuna study from full_study.db. Missing databases are reported
+    clearly and are not replaced by best_params.json fallbacks.
+    """
+    hpo_dir = Path(hpo_dir).expanduser()
+    study_db = hpo_dir / "full_study.db"
+    info = {
+        "hpo_dir": hpo_dir,
+        "study_db": study_db,
+        "study_name": study_name,
+        "study": None,
+        "summaries": pd.DataFrame(columns=["study_name", "direction", "n_trials", "datetime_start"]),
+        "message": None,
+    }
+
+    if not study_db.exists():
+        info["message"] = f"No full_study.db was found at {study_db}."
+        return info
+
+    try:
+        import optuna
+    except Exception as exc:
+        info["message"] = f"Optuna is required to load {study_db}: {exc!r}"
+        return info
+
+    storage = _postprocess_hpo_storage_url(study_db)
+    try:
+        summaries = optuna.study.get_all_study_summaries(storage=storage)
+        summary_rows = []
+        for summary in summaries:
+            direction = getattr(summary, "direction", None)
+            summary_rows.append(
+                {
+                    "study_name": summary.study_name,
+                    "direction": getattr(direction, "name", str(direction)),
+                    "n_trials": int(summary.n_trials),
+                    "datetime_start": summary.datetime_start,
+                }
+            )
+        info["summaries"] = pd.DataFrame(summary_rows)
+        if study_name is None:
+            if len(summaries) == 1:
+                study_name = summaries[0].study_name
+            elif len(summaries) == 0:
+                info["message"] = f"No Optuna studies were found in {study_db}."
+                return info
+            else:
+                info["message"] = (
+                    f"{study_db} contains multiple studies. Set STUDY_NAME to one of "
+                    f"{[summary.study_name for summary in summaries]}."
+                )
+                return info
+
+        study = optuna.load_study(study_name=study_name, storage=storage)
+        info["study_name"] = study_name
+        info["study"] = study
+        info["message"] = f"Loaded study '{study_name}' from {study_db}."
+    except Exception as exc:
+        info["message"] = f"Study load failed for {study_db}: {exc!r}"
+    return info
+
+def _postprocess_trial_state_name(trial):
+    state = getattr(trial, "state", None)
+    return getattr(state, "name", str(state))
+
+def _postprocess_completed_trials(study):
+    if study is None:
+        return []
+    trials = getattr(study, "trials", [])
+    return [
+        trial for trial in trials
+        if _postprocess_trial_state_name(trial) == "COMPLETE" and trial.value is not None and np.isfinite(trial.value)
+    ]
+
+def _postprocess_hpo_compact_value(value, max_chars=160):
+    if isinstance(value, (dict, list, tuple)):
+        try:
+            text = json.dumps(_postprocess_json_safe(value), sort_keys=True)
+        except Exception:
+            text = str(value)
+    else:
+        text = str(value)
+    if len(text) > int(max_chars):
+        return text[: int(max_chars) - 3] + "..."
+    return text
+
+def _postprocess_json_safe(value):
+    if isinstance(value, dict):
+        return {str(k): _postprocess_json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_postprocess_json_safe(v) for v in value]
+    if isinstance(value, np.ndarray):
+        return value.tolist()
+    if isinstance(value, (np.integer, np.floating)):
+        return value.item()
+    if isinstance(value, Path):
+        return str(value)
+    return value
+
+def postprocess_hpo_study_stats(study):
+    if study is None:
+        return pd.DataFrame(columns=["item", "value"])
+    trials = list(getattr(study, "trials", []))
+    state_counts = {}
+    for trial in trials:
+        state = _postprocess_trial_state_name(trial)
+        state_counts[state] = state_counts.get(state, 0) + 1
+    completed = _postprocess_completed_trials(study)
+    best_trial = None
+    try:
+        best_trial = study.best_trial
+    except Exception:
+        best_trial = None
+    rows = [
+        ("study_name", getattr(study, "study_name", None)),
+        ("direction", getattr(getattr(study, "direction", None), "name", getattr(study, "direction", None))),
+        ("n_trials", len(trials)),
+        ("n_complete", len(completed)),
+        ("n_pruned", state_counts.get("PRUNED", 0)),
+        ("n_failed", state_counts.get("FAIL", 0)),
+        ("best_trial", getattr(best_trial, "number", None)),
+        ("best_value", getattr(best_trial, "value", None)),
+        ("objective_metric", (best_trial.params or {}).get("objective_metric") if best_trial is not None else None),
+    ]
+    return pd.DataFrame(rows, columns=["item", "value"])
+
+def postprocess_hpo_best_overview(study_info, artifacts=None, loaded=None):
+    """Build compact best-trial tables and best-model artifact paths."""
+    study = study_info.get("study") if isinstance(study_info, dict) else study_info
+    artifacts = artifacts or {}
+    loaded = loaded or {}
+    best_trial = None
+    try:
+        best_trial = study.best_trial if study is not None else None
+    except Exception:
+        best_trial = None
+
+    summary = postprocess_hpo_study_stats(study)
+    params = pd.DataFrame(columns=["parameter", "value"])
+    attrs = pd.DataFrame(columns=["attribute", "value"])
+    if best_trial is not None:
+        params = pd.DataFrame(
+            [(key, value) for key, value in sorted((best_trial.params or {}).items())],
+            columns=["parameter", "value"],
+        )
+        attrs = pd.DataFrame(
+            [
+                (key, _postprocess_hpo_compact_value(value))
+                for key, value in sorted((best_trial.user_attrs or {}).items())
+                if key != "model_instance"
+            ],
+            columns=["attribute", "value"],
+        )
+
+    artifact_keys = [
+        "model_json",
+        "model_mdl",
+        "data_json",
+        "results_dir",
+        "metrics_json",
+        "predictions_npz",
+        "loss_history_csv",
+        "diagnostics_summary_json",
+        "hpo_best_params_json",
+        "hpo_best_trial_user_attrs_json",
+    ]
+    artifact_rows = [(key, artifacts.get(key)) for key in artifact_keys]
+    if isinstance(loaded.get("metrics"), dict):
+        metadata = loaded["metrics"].get("metadata", {})
+        if isinstance(metadata, dict):
+            artifact_rows.extend(
+                [
+                    ("saved_trial_number", metadata.get("trial_number")),
+                    ("saved_objective_value", metadata.get("objective_value")),
+                ]
+            )
+    artifact_paths = pd.DataFrame(
+        [(key, str(value) if value is not None else None) for key, value in artifact_rows],
+        columns=["artifact", "path_or_value"],
+    )
+
+    return {
+        "summary": summary,
+        "best_params": params,
+        "best_user_attrs": attrs,
+        "artifact_paths": artifact_paths,
+        "best_trial": best_trial,
+    }
+
+def display_hpo_best_overview(overview, max_attrs=20):
+    from IPython.display import Markdown, display
+
+    display(Markdown("### Best Trial Summary"))
+    display(overview["summary"])
+    if not overview["best_params"].empty:
+        display(Markdown("### Best Parameters"))
+        display(overview["best_params"])
+    if not overview["best_user_attrs"].empty:
+        display(Markdown("### Best User Attributes"))
+        display(overview["best_user_attrs"].head(int(max_attrs)))
+    display(Markdown("### Best Model Artifacts"))
+    display(overview["artifact_paths"])
+
+def _postprocess_hpo_key_params(study, max_params=8):
+    trials = list(getattr(study, "trials", [])) if study is not None else []
+    values_by_key = {}
+    for trial in trials:
+        for key, value in (trial.params or {}).items():
+            if key == "objective_metric":
+                continue
+            values_by_key.setdefault(key, set()).add(str(value))
+    ranked = sorted(values_by_key.items(), key=lambda item: (-len(item[1]), item[0]))
+    return [key for key, values in ranked[: int(max_params)]]
+
+def postprocess_hpo_trial_leaderboard(study, top_n=20, key_params=None):
+    """Return a compact objective leaderboard for Optuna trials."""
+    columns = ["trial", "value", "state", "model_family", "duration_s"]
+    if study is None:
+        return pd.DataFrame(columns=columns)
+    key_params = list(key_params) if key_params is not None else _postprocess_hpo_key_params(study)
+    rows = []
+    for trial in getattr(study, "trials", []):
+        duration = None
+        if trial.datetime_start is not None and trial.datetime_complete is not None:
+            duration = (trial.datetime_complete - trial.datetime_start).total_seconds()
+        row = {
+            "trial": int(trial.number),
+            "value": trial.value,
+            "state": _postprocess_trial_state_name(trial),
+            "model_family": (trial.user_attrs or {}).get("typ"),
+            "duration_s": duration,
+        }
+        for key in key_params:
+            row[key] = (trial.params or {}).get(key)
+        rows.append(row)
+    if not rows:
+        return pd.DataFrame(columns=columns + key_params)
+    df = pd.DataFrame(rows)
+    df["_sort_value"] = pd.to_numeric(df["value"], errors="coerce")
+    df = df.sort_values(["_sort_value", "trial"], ascending=[True, True], na_position="last")
+    df = df.drop(columns=["_sort_value"]).reset_index(drop=True)
+    if top_n is not None:
+        df = df.head(int(top_n))
+    return df
+
+def plot_hpo_optimization_history(study, figsize=(9, 4), show=True):
+    """Plot objective value by trial number and mark the best completed trial."""
+    completed = _postprocess_completed_trials(study)
+    if not completed:
+        print("No completed Optuna trials are available for optimization history.")
+        return None, None
+
+    trial_numbers = np.asarray([trial.number for trial in completed], dtype=int)
+    values = np.asarray([trial.value for trial in completed], dtype=float)
+    best_idx = int(np.nanargmin(values))
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(trial_numbers, values, color="tab:blue", linewidth=1.0, alpha=0.65)
+    ax.scatter(trial_numbers, values, color="tab:blue", s=34, alpha=0.8, label="Completed trial")
+    ax.scatter(
+        [trial_numbers[best_idx]],
+        [values[best_idx]],
+        color="crimson",
+        s=80,
+        marker="*",
+        label=f"Best trial {trial_numbers[best_idx]}",
+        zorder=5,
+    )
+    ax.set_title("HPO Optimization History")
+    ax.set_xlabel("Trial")
+    ax.set_ylabel("Objective value")
+    ax.legend(fontsize=8)
+    fig.tight_layout()
+    if show:
+        plt.show()
+    return fig, ax
+
+def postprocess_hpo_param_importance(study):
+    """Compute Optuna parameter importance when the completed trials support it."""
+    columns = ["parameter", "importance"]
+    if study is None:
+        return pd.DataFrame(columns=columns), "No study is loaded."
+    try:
+        import optuna
+        importance = optuna.importance.get_param_importances(study)
+    except Exception as exc:
+        return pd.DataFrame(columns=columns), f"Parameter importance could not be computed: {exc!r}"
+    if not importance:
+        return pd.DataFrame(columns=columns), "Parameter importance is empty for this study."
+    df = pd.DataFrame(importance.items(), columns=columns).sort_values("importance", ascending=False).reset_index(drop=True)
+    return df, None
+
+def plot_hpo_param_importance(importance, top_n=15, figsize=None, show=True):
+    if importance is None or not hasattr(importance, "empty") or importance.empty:
+        print("No parameter importance values are available to plot.")
+        return None, None
+    plot_df = importance.head(int(top_n)).iloc[::-1]
+    figsize = figsize or (9, max(3, 0.35 * len(plot_df)))
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.barh(plot_df["parameter"], plot_df["importance"], color="tab:green")
+    ax.set_title("HPO Parameter Importance")
+    ax.set_xlabel("Importance")
+    fig.tight_layout()
+    if show:
+        plt.show()
+    return fig, ax
+
+def _postprocess_metric_scalar(value):
+    if isinstance(value, (list, tuple)):
+        numeric = [item for item in value if isinstance(item, (int, float, np.integer, np.floating))]
+        if numeric:
+            return float(numeric[-1])
+        return str(value)
+    if isinstance(value, (np.integer, np.floating)):
+        return value.item()
+    return value
+
+def _postprocess_hpo_metric_extract(metrics, task=None):
+    if not isinstance(metrics, dict):
+        return {}
+    modes = [str(task).upper()] if task is not None and str(task).upper() in ["UT", "FT"] else ["UT", "FT"]
+    extracted = {"evaluation_split": metrics.get("evaluation_split")}
+    for mode in modes:
+        for key in ["best_loss", "best_mse", "best_rmse", "val_mae", "val_mse", "val_rmse", "mae", "mse", "rmse"]:
+            metric_key = f"{mode}_{key}"
+            if metric_key in metrics:
+                extracted[metric_key] = _postprocess_metric_scalar(metrics[metric_key])
+        summary = metrics.get(f"{mode}_prediction_summary")
+        if isinstance(summary, dict):
+            for key in ["rmse", "mae", "mse", "collapse_ratio", "skill_vs_mean_curve_rmse", "skill_vs_mean_field_rmse"]:
+                if key in summary:
+                    extracted[f"{mode}_summary_{key}"] = _postprocess_metric_scalar(summary[key])
+    return extracted
+
+def postprocess_cross_model_hpo_comparison(cross_hpo_dir, model_names=None, task=None):
+    """
+    Compare model-family HPO folders under Z:/p2/{task}/HPO/{run_descriptor}.
+    """
+    base_dir = Path(cross_hpo_dir).expanduser()
+    columns = [
+        "model",
+        "best_value",
+        "best_trial",
+        "n_trials",
+        "n_complete",
+        "n_pruned",
+        "n_failed",
+        "study_db",
+        "best_model_json",
+        "results_dir",
+    ]
+    if not base_dir.exists():
+        return pd.DataFrame(columns=columns)
+
+    if model_names is None:
+        candidates = sorted([path for path in base_dir.iterdir() if path.is_dir()], key=lambda p: p.name.lower())
+    else:
+        candidates = [base_dir / str(name) for name in model_names]
+
+    rows = []
+    for hpo_dir in candidates:
+        if not hpo_dir.exists():
+            continue
+        study_info = postprocess_load_hpo_study(hpo_dir)
+        study = study_info.get("study")
+        stats = postprocess_hpo_study_stats(study)
+        stats_map = dict(stats.values.tolist()) if not stats.empty else {}
+        artifacts = postprocess_resolve_artifacts(hpo_dir, prefer_hpo_best=True)
+        loaded = postprocess_load_artifacts(artifacts)
+        row = {
+            "model": hpo_dir.name,
+            "best_value": stats_map.get("best_value"),
+            "best_trial": stats_map.get("best_trial"),
+            "n_trials": stats_map.get("n_trials"),
+            "n_complete": stats_map.get("n_complete"),
+            "n_pruned": stats_map.get("n_pruned"),
+            "n_failed": stats_map.get("n_failed"),
+            "study_db": str(study_info.get("study_db")) if study_info.get("study_db") is not None else None,
+            "best_model_json": str(artifacts.get("model_json")) if artifacts.get("model_json") is not None else None,
+            "results_dir": str(artifacts.get("results_dir")) if artifacts.get("results_dir") is not None else None,
+        }
+        row.update(_postprocess_hpo_metric_extract(loaded.get("metrics"), task=task))
+        if study_info.get("message") and study is None:
+            row["study_message"] = study_info.get("message")
+        rows.append(row)
+
+    if not rows:
+        return pd.DataFrame(columns=columns)
+    df = pd.DataFrame(rows)
+    df["_sort_value"] = pd.to_numeric(df["best_value"], errors="coerce")
+    df = df.sort_values(["_sort_value", "model"], ascending=[True, True], na_position="last")
+    return df.drop(columns=["_sort_value"]).reset_index(drop=True)
+
+def plot_cross_model_hpo_comparison(comparison, figsize=(9, 4), show=True):
+    if comparison is None or not hasattr(comparison, "empty") or comparison.empty:
+        print("No cross-model HPO comparison rows are available.")
+        return None, None
+    plot_df = comparison.dropna(subset=["best_value"]).copy()
+    if plot_df.empty:
+        print("No best objective values are available for cross-model plotting.")
+        return None, None
+    fig, ax = plt.subplots(figsize=figsize)
+    bars = ax.bar(plot_df["model"], plot_df["best_value"], color="tab:blue", alpha=0.85)
+    ax.set_title("Cross-Model HPO Best Objective")
+    ax.set_xlabel("Model family")
+    ax.set_ylabel("Best objective value")
+    for bar, (_, row) in zip(bars, plot_df.iterrows()):
+        n_complete = row.get("n_complete")
+        if pd.notna(n_complete):
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_height(),
+                f"n={int(n_complete)}",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+    fig.tight_layout()
+    if show:
+        plt.show()
+    return fig, ax
 
 def postprocess_load_artifacts(artifacts):
     """Load saved metadata, scalar metrics, predictions, HPO files, and diagnostic CSVs."""
@@ -2198,13 +3232,14 @@ def postprocess_artifact_table(artifacts, keys=None):
 def postprocess_load_field_run(
     run_path,
     run_root=None,
+    prefer_hpo_best=True,
     load_data=True,
     load_model=True,
     data_path_override=None,
     device="cpu",
     verbose=True,
 ):
-    artifacts = postprocess_resolve_artifacts(run_path, run_root=run_root)
+    artifacts = postprocess_resolve_artifacts(run_path, run_root=run_root, prefer_hpo_best=prefer_hpo_best)
     loaded = postprocess_load_artifacts(artifacts)
 
     data = None
