@@ -6,10 +6,10 @@ REMOTE=${REMOTE:-exy053@login.hpc.qmul.ac.uk}
 REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 
 # Usage examples:
-#   bash B3_ML-transfer.sh "UT/MLP/HPC-ut-mlp-260514-142233"
-#   bash B3_ML-transfer.sh UT MLP HPC-ut-mlp-260514-142233
-#   bash B3_ML-transfer.sh UT MLP HPO HPC-MLP_full_hOpt
-#   bash B3_ML-transfer.sh UT HPO HPC-GNN_full_hOpt GAT
+#   bash B3_ML-transfer.sh "UT/Curve/MLP/HPC-ut-mlp-260514-142233"
+#   bash B3_ML-transfer.sh UT Curve MLP HPC-ut-mlp-260514-142233
+#   bash B3_ML-transfer.sh UT Curve MLP HPO HPC-MLP_full_hOpt
+#   bash B3_ML-transfer.sh UT Field HPO HPC-GNN_full_hOpt GAT
 
 if [ -d "Z:/" ]; then
     LOCAL_ROOT=${LOCAL_ROOT:-Z:/p2}
@@ -51,42 +51,46 @@ prompt_required() {
 
 RUN_PATH=${RUN_PATH:-}
 
-if [ -z "$RUN_PATH" ] && [ "$#" -eq 4 ]; then
+if [ -z "$RUN_PATH" ] && [ "$#" -eq 5 ]; then
     TASK=$1
-    MODEL_NAME=$2
-    HPO_MARKER=$3
-    RUN_DESCRIPTOR=$4
+    OUTPUT_KIND=$2
+    MODEL_NAME=$3
+    HPO_MARKER=$4
+    RUN_DESCRIPTOR=$5
     if [ "${MODEL_NAME^^}" = "HPO" ]; then
-        RUN_PATH=$TASK/HPO/$HPO_MARKER/$RUN_DESCRIPTOR
+        RUN_PATH=$TASK/$OUTPUT_KIND/HPO/$HPO_MARKER/$RUN_DESCRIPTOR
     elif [ "${HPO_MARKER^^}" = "HPO" ]; then
-        RUN_PATH=$TASK/$MODEL_NAME/HPO/$RUN_DESCRIPTOR
+        RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/HPO/$RUN_DESCRIPTOR
     else
-        /bin/echo "ERROR: Four-argument form must be either:"
-        /bin/echo "  TASK MODEL HPO RUN_DESCRIPTOR"
-        /bin/echo "  TASK HPO RUN_DESCRIPTOR MODEL"
+        /bin/echo "ERROR: Five-argument HPO form must be either:"
+        /bin/echo "  TASK OUTPUT_KIND MODEL HPO RUN_DESCRIPTOR"
+        /bin/echo "  TASK OUTPUT_KIND HPO RUN_DESCRIPTOR MODEL"
         exit 2
     fi
-elif [ -z "$RUN_PATH" ] && [ "$#" -eq 3 ]; then
+elif [ -z "$RUN_PATH" ] && [ "$#" -eq 4 ]; then
     TASK=$1
-    MODEL_NAME=$2
-    RUN_DESCRIPTOR=$3
-    RUN_PATH=$TASK/$MODEL_NAME/$RUN_DESCRIPTOR
+    OUTPUT_KIND=$2
+    MODEL_NAME=$3
+    RUN_DESCRIPTOR=$4
+    RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/$RUN_DESCRIPTOR
 elif [ -z "$RUN_PATH" ] && [ "$#" -eq 1 ]; then
     RUN_PATH=$1
 elif [ -z "$RUN_PATH" ] && [ "$#" -gt 0 ]; then
-    /bin/echo "ERROR: Use one raw RUN_PATH, regular form TASK MODEL RUN_DESCRIPTOR, or HPO forms:"
-    /bin/echo "  TASK MODEL HPO RUN_DESCRIPTOR"
-    /bin/echo "  TASK HPO RUN_DESCRIPTOR MODEL"
+    /bin/echo "ERROR: Use one raw RUN_PATH, regular form TASK OUTPUT_KIND MODEL RUN_DESCRIPTOR, or HPO forms:"
+    /bin/echo "  TASK OUTPUT_KIND MODEL HPO RUN_DESCRIPTOR"
+    /bin/echo "  TASK OUTPUT_KIND HPO RUN_DESCRIPTOR MODEL"
     exit 2
 fi
 
 if [ -z "$RUN_PATH" ]; then
     TASK=${TASK:-}
+    OUTPUT_KIND=${OUTPUT_KIND:-}
     MODEL_NAME=${MODEL_NAME:-}
     RUN_DESCRIPTOR=${RUN_DESCRIPTOR:-}
     RUN_KIND=${RUN_KIND:-}
 
     prompt_required TASK "Task, e.g. UT, FT, MULTI"
+    prompt_required OUTPUT_KIND "Output kind, e.g. Curve or Field"
     prompt_default RUN_KIND "Run kind: regular, model-hpo, compare-hpo" "regular"
     prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
     prompt_required RUN_DESCRIPTOR "Run descriptor, e.g. HPC-ut-gat-260513-143012, HPC-MLP_full_hOpt, or all"
@@ -94,23 +98,23 @@ if [ -z "$RUN_PATH" ]; then
     case "${RUN_KIND,,}" in
         regular)
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
-                RUN_PATH=$TASK/$MODEL_NAME
+                RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME
             else
-                RUN_PATH=$TASK/$MODEL_NAME/$RUN_DESCRIPTOR
+                RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/$RUN_DESCRIPTOR
             fi
             ;;
         model-hpo)
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
-                RUN_PATH=$TASK/$MODEL_NAME/HPO
+                RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/HPO
             else
-                RUN_PATH=$TASK/$MODEL_NAME/HPO/$RUN_DESCRIPTOR
+                RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/HPO/$RUN_DESCRIPTOR
             fi
             ;;
         compare-hpo)
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
-                RUN_PATH=$TASK/HPO
+                RUN_PATH=$TASK/$OUTPUT_KIND/HPO
             else
-                RUN_PATH=$TASK/HPO/$RUN_DESCRIPTOR/$MODEL_NAME
+                RUN_PATH=$TASK/$OUTPUT_KIND/HPO/$RUN_DESCRIPTOR/$MODEL_NAME
             fi
             ;;
         *)

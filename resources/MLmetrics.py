@@ -2267,11 +2267,63 @@ def postprocess_output_dir(artifacts, label=None, create=True):
         out_dir.mkdir(parents=True, exist_ok=True)
     return out_dir
 
+def _postprocess_output_kind_token(output_kind):
+    key = str(output_kind or "Curve").strip()
+    if key.lower() == "field":
+        return "Field"
+    if key.lower() == "curve":
+        return "Curve"
+    return key
+
+def _postprocess_path_parts(path, run_root=None):
+    path = Path(path)
+    if run_root is None:
+        return path.parts
+    try:
+        return path.relative_to(Path(run_root)).parts
+    except ValueError:
+        return path.parts
+
+def _postprocess_run_layout_from_path(path, run_root=None):
+    parts = _postprocess_path_parts(path, run_root=run_root)
+    upper_parts = [str(part).upper() for part in parts]
+
+    layout = {
+        "task": None,
+        "output_kind": None,
+        "model": None,
+        "run_name": None,
+    }
+
+    if "HPO" in upper_parts:
+        hpo_layout = _postprocess_hpo_layout_from_path(path, run_root=run_root)
+        layout.update({key: hpo_layout.get(key) for key in layout})
+        return layout
+
+    if len(parts) >= 4 and upper_parts[1] in {"CURVE", "FIELD"}:
+        layout.update(
+            {
+                "task": parts[0],
+                "output_kind": parts[1],
+                "model": parts[2],
+                "run_name": parts[3],
+            }
+        )
+    elif len(parts) >= 3:
+        layout.update(
+            {
+                "task": parts[0],
+                "model": parts[1],
+                "run_name": parts[2],
+            }
+        )
+    return layout
+
 def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
     """List recent saved model runs under a local run root."""
     root = Path(run_root).expanduser()
     rows = []
-    columns = ["run_dir", "model_json", "model_mdl", "results_dir", "is_hpo", "modified"]
+    columns = ["task", "output_kind", "model", "run_name", "run_dir", "model_json", "model_mdl", "results_dir", "is_hpo", "modified"]
     if not root.exists():
         return pd.DataFrame(columns=columns)
     skip_names = {
@@ -2288,8 +2340,13 @@ def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
         artifacts = postprocess_resolve_artifacts(model_json, prefer_hpo_best=include_hpo)
         if artifacts["is_hpo"] and not include_hpo:
             continue
+        layout = _postprocess_run_layout_from_path(artifacts.get("run_dir"), run_root=root)
         rows.append(
             {
+                "task": layout.get("task"),
+                "output_kind": layout.get("output_kind"),
+                "model": layout.get("model"),
+                "run_name": layout.get("run_name"),
                 "run_dir": str(artifacts.get("run_dir")),
                 "model_json": str(model_json),
                 "model_mdl": str(model_json.with_suffix(".mdl")),
@@ -2309,6 +2366,7 @@ def postprocess_list_runs(run_root="Z:/p2", max_runs=25, include_hpo=True):
 def postprocess_resolve_hpo_run_path(
     run_root="Z:/p2",
     task="UT",
+    output_kind="Curve",
     model="Transformer",
     run_name=None,
     run_type="model_hpo",
@@ -2323,34 +2381,49 @@ def postprocess_resolve_hpo_run_path(
 
     root = Path(run_root).expanduser()
     task = str(task).upper()
+    output_kind = _postprocess_output_kind_token(output_kind)
     model = str(model)
     run_name = str(run_name)
     run_type = str(run_type).lower()
 
     if run_type == "model_hpo":
-        return root / task / model / "HPO" / run_name
+        return root / task / output_kind / model / "HPO" / run_name
     if run_type == "cross_model_hpo":
-        return root / task / "HPO" / run_name / model
+        return root / task / output_kind / "HPO" / run_name / model
     raise ValueError("run_type must be 'model_hpo' or 'cross_model_hpo' for HPO post-processing.")
 
 def _postprocess_hpo_layout_from_path(path, run_root=None):
-    path = Path(path)
-    if run_root is None:
-        parts = path.parts
-    else:
-        try:
-            parts = path.relative_to(Path(run_root)).parts
-        except ValueError:
-            parts = path.parts
+    parts = _postprocess_path_parts(path, run_root=run_root)
 
     layout = {
         "run_type": None,
         "task": None,
+        "output_kind": None,
         "model": None,
         "run_name": None,
     }
     upper_parts = [str(part).upper() for part in parts]
-    if len(parts) >= 4 and upper_parts[2] == "HPO":
+    if len(parts) >= 5 and upper_parts[3] == "HPO":
+        layout.update(
+            {
+                "run_type": "model_hpo",
+                "task": parts[0],
+                "output_kind": parts[1],
+                "model": parts[2],
+                "run_name": parts[4],
+            }
+        )
+    elif len(parts) >= 5 and upper_parts[2] == "HPO":
+        layout.update(
+            {
+                "run_type": "cross_model_hpo",
+                "task": parts[0],
+                "output_kind": parts[1],
+                "model": parts[4],
+                "run_name": parts[3],
+            }
+        )
+    elif len(parts) >= 4 and upper_parts[2] == "HPO":
         layout.update(
             {
                 "run_type": "model_hpo",
@@ -2384,7 +2457,7 @@ def postprocess_hpo_path_summary(
     layout = _postprocess_hpo_layout_from_path(run_path, run_root=run_root)
     values = {
         "RUN_ROOT": run_root,
-        "OUTPUT_KIND": output_kind,
+        "OUTPUT_KIND": output_kind if output_kind is not None else layout.get("output_kind"),
         "TASK": task if task is not None else layout.get("task"),
         "MODEL": model if model is not None else layout.get("model"),
         "RUN_NAME": run_name if run_name is not None else layout.get("run_name"),
@@ -2407,6 +2480,7 @@ def postprocess_list_hpo_runs(run_root="Z:/p2", max_runs=25):
     root = Path(run_root).expanduser()
     columns = [
         "task",
+        "output_kind",
         "model",
         "run_name",
         "run_type",
@@ -2427,6 +2501,7 @@ def postprocess_list_hpo_runs(run_root="Z:/p2", max_runs=25):
         rows.append(
             {
                 "task": layout.get("task"),
+                "output_kind": layout.get("output_kind"),
                 "model": layout.get("model"),
                 "run_name": layout.get("run_name"),
                 "run_type": layout.get("run_type"),
@@ -2785,7 +2860,7 @@ def _postprocess_hpo_metric_extract(metrics, task=None):
 
 def postprocess_cross_model_hpo_comparison(cross_hpo_dir, model_names=None, task=None):
     """
-    Compare model-family HPO folders under Z:/p2/{task}/HPO/{run_descriptor}.
+    Compare model-family HPO folders under Z:/p2/{task}/{output_kind}/HPO/{run_descriptor}.
     """
     base_dir = Path(cross_hpo_dir).expanduser()
     columns = [

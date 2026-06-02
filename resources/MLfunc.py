@@ -1386,18 +1386,23 @@ def _hopt_output_kind(data):
 def _hopt_is_field_output(data):
     return _hopt_output_kind(data) == "field"
 
+def _hopt_output_kind_token(data):
+    from resources.MLmodels import _mp_output_kind_token
+
+    return _mp_output_kind_token(data)
+
 def _hopt_model_type_token(typ):
     from resources.MLmodels import _mp_model_type_token
 
     return _mp_model_type_token(typ=_hopt_normalize_typ(typ))
 
-def _hopt_task_base_dir(data):
+def _hopt_output_base_dir(data):
     from resources.MLmodels import _mp_run_root
 
-    return str(_mp_run_root() / _hopt_task_token(data))
+    return str(_mp_run_root() / _hopt_task_token(data) / _hopt_output_kind_token(data))
 
 def _hopt_model_base_dir(typ, data):
-    return os.path.join(_hopt_task_base_dir(data), _hopt_model_type_token(typ))
+    return os.path.join(_hopt_output_base_dir(data), _hopt_model_type_token(typ))
 
 def _hopt_model_study_dir(typ, data, name):
     return os.path.join(_hopt_model_base_dir(typ, data), "HPO", _hopt_context_name(name))
@@ -1410,12 +1415,12 @@ def _hopt_compare_study_base_dir(typs, data, name):
         raise ValueError(f"No DATA object supplied for typ(s): {missing}.")
 
     if len({id(d) for d in typ_data}) == 1:
-        base_dir = _hopt_task_base_dir(typ_data[0])
+        base_dir = _hopt_output_base_dir(typ_data[0])
     else:
-        task_dirs = {_hopt_task_base_dir(d) for d in typ_data}
-        if len(task_dirs) != 1:
-            raise ValueError("HPO comparison studies with multiple task roots need an explicit path or study_dir.")
-        base_dir = next(iter(task_dirs))
+        output_dirs = {_hopt_output_base_dir(d) for d in typ_data}
+        if len(output_dirs) != 1:
+            raise ValueError("HPO comparison studies with multiple task/output roots need an explicit path or study_dir.")
+        base_dir = next(iter(output_dirs))
     return os.path.join(base_dir, "HPO", _hopt_context_name(name))
 
 def _hopt_sample(trial, name, spec, default=None):

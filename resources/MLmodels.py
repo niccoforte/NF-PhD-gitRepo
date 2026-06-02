@@ -1818,6 +1818,12 @@ def _mp_task_token(data):
     mech_mode = str(getattr(data, "mechMode", "OTHER")).strip().upper()
     return mech_mode if mech_mode else "OTHER"
 
+def _mp_output_kind_token(data):
+    key = str(getattr(data, "output_kind", "curve") or "curve").strip().lower()
+    if key == "field":
+        return "Field"
+    return "Curve"
+
 def _mp_model_type_label(token):
     key = str(token or "").strip().lower()
     labels = {
@@ -1866,7 +1872,7 @@ def _mp_model_base_dir(model_obj):
     data = getattr(model_obj, "data", None)
     if data is None:
         raise ValueError("MODEL save/load requires model_obj.data to build the ML run path.")
-    return _mp_run_root() / _mp_task_token(data) / _mp_model_type_token(model_obj)
+    return _mp_run_root() / _mp_task_token(data) / _mp_output_kind_token(data) / _mp_model_type_token(model_obj)
 
 def _mp_latest_run_dir(model_obj):
     base = _mp_model_base_dir(model_obj)
@@ -2494,6 +2500,7 @@ def _model_refresh_descriptor(model_obj, path=None, name=None):
             "root": str(_mp_run_root()),
             "archive_root": str(_mp_archive_root()) if _mp_archive_root() is not None else None,
             "task": _mp_task_token(data),
+            "output_kind": _mp_output_kind_token(data),
             "model": _mp_model_type_token(model_obj),
             "run_descriptor": Path(path).name if path is not None else None,
             "results_dir": str(Path(path) / "results") if path is not None else None,

@@ -31,7 +31,7 @@ HPC_USER=${HPC_USER:-${USER:-exy053}}
 # ^^^ RENAME / EDIT FOR EACH ML RUN ^^^
 #
 # Intended submit workflow:
-#   cd /data/home/exy053/p2/UT/MLP
+#   cd /data/home/exy053/p2/UT/Curve/MLP
 #   sbatch B1_ML-new.sh
 #
 # Keep a copy or symlink of this B1 script in the submit directory above.
