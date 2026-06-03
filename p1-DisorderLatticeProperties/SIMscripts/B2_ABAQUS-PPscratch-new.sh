@@ -1,9 +1,9 @@
 #!/bin/bash
 
 # SLURM post-processing pass for archived Abaqus runs.
-# Submit this from the lattice archive directory, e.g.
-#   cd /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC
-#   sbatch /data/home/$USER/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B2_ABAQUS-PPscratch.sh
+# Submit this from a lattice archive directory or from the parent disorder level, e.g.
+#   cd /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2
+#   sbatch /data/home/$USER/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B2_ABAQUS-PPscratch-new.sh
 
 #SBATCH -n 1
 #SBATCH -p compute
@@ -24,9 +24,9 @@ mode=${mode:-both}
 distribution=${distribution:-lhs_uniform}
 Hout=${Hout:-200}
 
-# Run from the FCC directory by default. Override ROOT_DIR if needed.
+# Run from the current directory by default. Override ROOT_DIR if needed.
 ROOT_DIR=${ROOT_DIR:-$(pwd)}
-SKIP_DIRS=${SKIP_DIRS:-16-ps}
+ROOT_DIR=${ROOT_DIR%/}
 DRY_RUN=${DRY_RUN:-false}
 
 REPO_ROOT=${REPO_ROOT:-/data/home/$HPC_USER/00-PhD-gitRepo}
@@ -36,16 +36,6 @@ OUT_SCRIPT=${OUT_SCRIPT:-$SIM_CODE_DIR/A2_OUTpostProcess.py}
 IN_SCRIPT=${IN_SCRIPT:-$SIM_CODE_DIR/A2_INpostProcess.py}
 
 export PYTHONPATH=$REPO_ROOT:${PYTHONPATH:-}
-
-should_skip_dir() {
-    local dirname=$1
-    for skip in $SKIP_DIRS; do
-        if [ "$dirname" = "$skip" ]; then
-            return 0
-        fi
-    done
-    return 1
-}
 
 has_odb_files() {
     local directory=$1
@@ -58,6 +48,7 @@ run_postprocess() {
     job_name=$(basename "$(dirname "$pDir")")
 
     local abaqus_args=(
+        # LAT and nnx placeholders. A2 scripts infer both from each file name.
         "post"
         "0"
         "$unitCellSize"
@@ -126,35 +117,23 @@ fi
 
 processed=0
 skipped=0
+found=0
 
-for job_dir in "$ROOT_DIR"/*; do
-    [ -d "$job_dir" ] || continue
-    job_name=$(basename "$job_dir")
-
-    if should_skip_dir "$job_name"; then
-        /bin/echo "Skipping requested directory: $job_name"
-        skipped=$((skipped + 1))
-        continue
-    fi
-
-    zip_dir="$job_dir/zip"
-    if [ ! -d "$zip_dir" ]; then
-        /bin/echo "Skipping $job_name: no zip directory."
-        skipped=$((skipped + 1))
-        continue
-    fi
+while IFS= read -r -d '' zip_dir; do
+    found=$((found + 1))
 
     if ! has_odb_files "$zip_dir"; then
-        /bin/echo "Skipping $job_name: no .odb files in zip directory."
+        /bin/echo "Skipping $zip_dir: no .odb files."
         skipped=$((skipped + 1))
         continue
     fi
 
     run_postprocess "$zip_dir"
     processed=$((processed + 1))
-done
+done < <(find "$ROOT_DIR" -type d \( -name transfer -o -name __pycache__ \) -prune -o -type d -name zip -print0 | sort -z)
 
 /bin/echo
 /bin/echo "Completed at: $(date)"
+/bin/echo "Discovered zip directories: $found"
 /bin/echo "Processed zip directories: $processed"
 /bin/echo "Skipped directories: $skipped"
