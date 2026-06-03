@@ -1265,7 +1265,7 @@ def _field_sample_number(stem):
 def _field_mode_label(mode):
     return "FT" if str(mode).lower().startswith("frac") or str(mode).lower() == "ft" else "UT"
 
-def _read_inp_nodes_for_field(inpFile, totalNodes, mode="ductile"):
+def _read_inp_nodes_for_field(inpFile, totalNodes):
     with open(inpFile, 'r') as f:
         lines = f.readlines()
 
@@ -1274,9 +1274,6 @@ def _read_inp_nodes_for_field(inpFile, totalNodes, mode="ductile"):
     node_lines = lines[nodes_start:nodes_end]
     nodes = [[float(i.strip().strip('\n')) for i in line.split(",")[:3]] for line in node_lines]
     nodes = np.array(nodes)
-
-    if mode.lower().startswith("frac") and len(nodes) > 2:
-        nodes = np.delete(nodes, [0, 2], axis=0)
 
     return nodes
 
@@ -1328,7 +1325,7 @@ def get_UfieldData(Job, nodeLabels, field_names=("UT", "U"), dtype="float32"):
 
 def export_UfieldNPZ(Job, inpFile, expFile, totalNodes, mode="ductile", sample_id=None, dtype="float32"):
     stem = os.path.splitext(os.path.basename(Job))[0]
-    nodes = _read_inp_nodes_for_field(inpFile, totalNodes=totalNodes, mode=mode)
+    nodes = _read_inp_nodes_for_field(inpFile, totalNodes=totalNodes)
     node_labels = nodes[:, 0].astype(int)
     node_coords = nodes[:, 1:3].astype(np.dtype(dtype))
 
