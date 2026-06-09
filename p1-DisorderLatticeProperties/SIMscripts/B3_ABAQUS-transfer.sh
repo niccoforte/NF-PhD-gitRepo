@@ -12,13 +12,13 @@ else
 fi
 
 # Usage examples:
-#   bash B3_ABAQUS-transfer_v2.sh
-#   bash B3_ABAQUS-transfer_v2.sh both FCC Frequency
-#   bash B3_ABAQUS-transfer_v2.sh disNodes FCC Frequency 9919196
-#   bash B3_ABAQUS-transfer_v2.sh per FCC all
-#   bash B3_ABAQUS-transfer_v2.sh download-zip disNodes FCC Frequency 9919196
-#   bash B3_ABAQUS-transfer_v2.sh download-zip per FCC 9919196
-#   bash B3_ABAQUS-transfer_v2.sh upload-transfer FCC Frequency
+#   bash B3_ABAQUS-transfer.sh
+#   bash B3_ABAQUS-transfer.sh both FCC Frequency
+#   bash B3_ABAQUS-transfer.sh disNodes FCC Frequency 9919196
+#   bash B3_ABAQUS-transfer.sh per FCC all
+#   bash B3_ABAQUS-transfer.sh download-zip disNodes FCC Frequency 9919196
+#   bash B3_ABAQUS-transfer.sh download-zip per FCC 9919196
+#   bash B3_ABAQUS-transfer.sh upload-transfer FCC Frequency
 #
 # Interactive/default mode downloads per/0.0 and disNodes/<EXTRA>/0.2
 # transfer contents into their separate local transfer directories.
