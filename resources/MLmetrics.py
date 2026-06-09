@@ -2277,6 +2277,9 @@ def _postprocess_output_kind_token(output_kind):
         return "Curve"
     return key
 
+def _postprocess_layout_output_kinds():
+    return {"CURVE", "FIELD", "FIELDTOCURVE"}
+
 def _postprocess_path_parts(path, run_root=None):
     path = Path(path)
     if run_root is None:
@@ -2302,7 +2305,7 @@ def _postprocess_run_layout_from_path(path, run_root=None):
         layout.update({key: hpo_layout.get(key) for key in layout})
         return layout
 
-    if len(parts) >= 4 and upper_parts[1] in {"CURVE", "FIELD"}:
+    if len(parts) >= 4 and upper_parts[1] in _postprocess_layout_output_kinds():
         layout.update(
             {
                 "task": parts[0],
@@ -3031,13 +3034,24 @@ def _postprocess_normalize_data_path(path):
     return str(path)
 
 def _postprocess_saved_output_kind(loaded):
+    descriptor = loaded.get("descriptor", {}) if isinstance(loaded, dict) else {}
+    if isinstance(descriptor, dict):
+        run_layout = descriptor.get("run_layout", {})
+        if isinstance(run_layout, dict):
+            output_kind = run_layout.get("output_kind")
+            if output_kind is not None:
+                return str(output_kind).lower()
+
     descriptor = loaded.get("data_descriptor", {}) if isinstance(loaded, dict) else {}
     if not isinstance(descriptor, dict):
         return None
     config = descriptor.get("data_config", descriptor.get("config", descriptor))
     if isinstance(config, dict):
+        input_kind = str(config.get("input_kind", "geometry") or "geometry").lower()
         output_kind = config.get("output_kind")
         if output_kind is not None:
+            if str(output_kind).lower() == "curve" and input_kind == "field":
+                return "fieldtocurve"
             return str(output_kind).lower()
     return None
 

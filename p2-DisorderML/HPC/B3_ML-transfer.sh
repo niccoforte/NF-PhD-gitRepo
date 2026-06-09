@@ -8,6 +8,7 @@ REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 # Usage examples:
 #   bash B3_ML-transfer.sh "UT/Curve/MLP/HPC-ut-mlp-260514-142233"
 #   bash B3_ML-transfer.sh UT Curve MLP HPC-ut-mlp-260514-142233
+#   bash B3_ML-transfer.sh UT FieldToCurve Transformer HPC-field-to-curve-smoke
 #   bash B3_ML-transfer.sh UT Curve MLP HPO HPC-MLP_full_hOpt
 #   bash B3_ML-transfer.sh UT Field HPO HPC-GNN_full_hOpt GAT
 
@@ -90,7 +91,7 @@ if [ -z "$RUN_PATH" ]; then
     RUN_KIND=${RUN_KIND:-}
 
     prompt_required TASK "Task, e.g. UT, FT, MULTI"
-    prompt_required OUTPUT_KIND "Output kind, e.g. Curve or Field"
+    prompt_required OUTPUT_KIND "Output kind, e.g. Curve, Field, or FieldToCurve"
     prompt_default RUN_KIND "Run kind: regular, model-hpo, compare-hpo" "regular"
     prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
     prompt_required RUN_DESCRIPTOR "Run descriptor, e.g. HPC-ut-gat-260513-143012, HPC-MLP_full_hOpt, or all"
