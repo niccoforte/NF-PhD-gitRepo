@@ -753,7 +753,9 @@ class DATA:
         geom_feats=None,
         tr_params=None,
         output_kind="curve",
-        field_config=None
+        field_config=None,
+        input_kind="geometry",
+        field_input_config=None
     ):
         self.path = path
         self.path_add = path_add
@@ -773,10 +775,14 @@ class DATA:
         self.d_data = d_data
         self.nsims = nsims
         self.model = model
+        self.input_kind = str(input_kind or "geometry").strip().lower()
+        if self.input_kind not in ["geometry", "field"]:
+            raise ValueError("input_kind must be 'geometry' or 'field'.")
         self.output_kind = str(output_kind).strip().lower()
         if self.output_kind not in ["curve", "field"]:
             raise ValueError("output_kind must be 'curve' or 'field'.")
         self.field_config = {} if field_config is None else field_config
+        self.field_input_config = {} if field_input_config is None else field_input_config
         self.freq = freq
         self.round_decimals = None if round_decimals is None or round_decimals is False else int(round_decimals)
         self.geom_feats = _data_resolve_geom_feats(geom_feats=geom_feats, tr_params=tr_params)
@@ -793,6 +799,13 @@ class DATA:
             _data_init_scaler(self, scale)
 
         self.reduce_dim = reduce_dim
+        if self.input_kind == "field":
+            if self.output_kind != "curve":
+                raise ValueError("DATA(input_kind='field') currently supports output_kind='curve' only.")
+            if not _data_is_node_model(self.model):
+                raise ValueError("DATA(input_kind='field') requires model='GNN', 'GCN', 'GAT', or 'TR'.")
+            if self.load_split:
+                raise ValueError("Saved split loading for input_kind='field' is not implemented. Use split_seed.")
         if self.output_kind == "field":
             if not _data_is_node_model(self.model):
                 raise ValueError("DATA(output_kind='field') currently requires model='GNN', 'GCN', 'GAT', or 'TR'.")
@@ -921,6 +934,8 @@ class DATA:
 
             if self.nsims is not None:
                 _data_limit_mode_samples(self, "UT")
+            if self.input_kind == "field":
+                _data_load_curve_field_input_mode(self, "UT")
 
         if self.FTmechTest:
             self.FT_IN_df, \
@@ -942,6 +957,8 @@ class DATA:
 
             if self.nsims is not None:
                 _data_limit_mode_samples(self, "FT")
+            if self.input_kind == "field":
+                _data_load_curve_field_input_mode(self, "FT")
 
         if self.UTmechTest and self.FTmechTest:
             self.common_props_df = self.UT_props_df
@@ -998,6 +1015,8 @@ class DATA:
             setattr(self, f"{mode}_dINr_df", dINr_df.loc[:, keep_columns].copy())
             if self.output_kind == "field":
                 _data_filter_field_nodes(self, mode, input_body_mask=body_mask)
+            if self.input_kind == "field":
+                _data_filter_field_input_nodes(self, mode, input_body_mask=body_mask)
 
         if self.UTmechTest:
             _filter_mode("UT")
@@ -1125,6 +1144,12 @@ class DATA:
             self.FT_test_out = _data_to_numpy(self.FT_test_out_df)
             self.FT_testProps = _data_to_numpy(self.FT_testProps_df)
 
+        if self.input_kind == "field":
+            if self.UTmechTest:
+                _data_assign_curve_field_inputs(self, "UT")
+            if self.FTmechTest:
+                _data_assign_curve_field_inputs(self, "FT")
+
         _data_update_reconstructors(self)
 
     def splitFieldData(self, split_name=None):
@@ -1213,6 +1238,8 @@ class DATA:
         _data_update_reconstructors(self)
     
     def saveSplitData(self, split_name=None):
+        if self.input_kind == "field":
+            raise ValueError("Saved split writing for input_kind='field' is not implemented. Use split_seed.")
         if self.output_kind == "field":
             raise ValueError("Saved split writing for output_kind='field' is not implemented yet. Use split_seed for reproducible field splits.")
         if split_name is None:
@@ -1345,6 +1372,9 @@ class DATA:
     def reshapeData(self):
         model_name = self.model.lower()
         if not _data_is_node_model(model_name):
+            return
+        if self.input_kind == "field":
+            _data_clean_field_input_arrays(self)
             return
 
         feature_label = "TR" if model_name == "tr" else "GNN"
@@ -1491,8 +1521,10 @@ def _data_constructor_config(data_obj):
         "mechMode": _data_json_safe(getattr(data_obj, "mechMode", "MULTI")),
         "nsims": _data_json_safe(getattr(data_obj, "nsims", None)),
         "model": _data_json_safe(getattr(data_obj, "model", "MLP")),
+        "input_kind": _data_json_safe(getattr(data_obj, "input_kind", "geometry")),
         "output_kind": _data_json_safe(getattr(data_obj, "output_kind", "curve")),
         "field_config": _data_json_safe(getattr(data_obj, "field_config", {})),
+        "field_input_config": _data_json_safe(getattr(data_obj, "field_input_config", {})),
         "freq": bool(getattr(data_obj, "freq", False)),
         "scale": _data_json_safe(getattr(data_obj, "scale", False)),
         "reduce_dim": _data_json_safe(getattr(data_obj, "reduce_dim", False)),
@@ -1522,6 +1554,7 @@ def _data_to_json_payload(data_obj):
             "input_range_split": bool(getattr(data_obj, "input_range_split", False)),
             "output_range_split": bool(getattr(data_obj, "output_range_split", False)),
             "geom_feats": _data_json_safe(getattr(data_obj, "geom_feats", None)),
+            "input_kind": _data_json_safe(getattr(data_obj, "input_kind", "geometry")),
             "output_kind": _data_json_safe(getattr(data_obj, "output_kind", "curve")),
             "UTmechTest": bool(getattr(data_obj, "UTmechTest", False)),
             "FTmechTest": bool(getattr(data_obj, "FTmechTest", False)),
@@ -1659,21 +1692,21 @@ def _data_resolve_geom_feats(geom_feats=None, tr_params=None):
         resolved["coord_norm"] = False
     return resolved
 
-def _data_field_mode_config(data_obj, mode):
-    cfg = getattr(data_obj, "field_config", None) or {}
+def _data_field_mode_config(data_obj, mode, config_attr="field_config"):
+    cfg = getattr(data_obj, config_attr, None) or {}
     if not isinstance(cfg, dict):
-        raise TypeError("field_config must be a dictionary when output_kind='field'.")
+        raise TypeError(f"{config_attr} must be a dictionary.")
     merged = {key: value for key, value in cfg.items() if str(key).upper() not in ["UT", "FT"]}
     mode_cfg = cfg.get(mode, cfg.get(mode.lower(), {}))
     if mode_cfg is None:
         mode_cfg = {}
     if not isinstance(mode_cfg, dict):
-        raise TypeError(f"field_config['{mode}'] must be a dictionary.")
+        raise TypeError(f"{config_attr}['{mode}'] must be a dictionary.")
     merged.update(mode_cfg)
     return merged
 
-def _data_field_path(data_obj, mode):
-    cfg = _data_field_mode_config(data_obj, mode)
+def _data_field_path(data_obj, mode, config_attr="field_config"):
+    cfg = _data_field_mode_config(data_obj, mode, config_attr=config_attr)
     for key in ["path", "file", "npz", "field_path"]:
         if key in cfg and cfg[key]:
             path = Path(str(cfg[key]))
@@ -1682,6 +1715,84 @@ def _data_field_path(data_obj, mode):
             return path
     filename = cfg.get("filename", f"{data_obj.mechMode}-{mode}-{data_obj.dis}-allFIELD.npz")
     return Path(data_obj.PATH) / "MLdata" / filename
+
+def _data_read_field_npz(data_obj, mode, config_attr="field_config"):
+    cfg = _data_field_mode_config(data_obj, mode, config_attr=config_attr)
+    field_path = _data_field_path(data_obj, mode, config_attr=config_attr)
+    if not field_path.exists():
+        raise FileNotFoundError(f"{mode}: field npz not found: {field_path}")
+
+    with np.load(field_path, allow_pickle=True) as npz:
+        values_key = _data_field_npz_key(npz, ["Y", "U", "field", "values", "outputs", "field_values"])
+        values = np.asarray(npz[values_key], dtype=float)
+        frame_key = _data_field_npz_key(npz, ["frame_values", "frames", "times"], required=False)
+        node_label_key = _data_field_npz_key(npz, ["node_labels", "nodes", "labels"], required=False)
+        node_coord_key = _data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False)
+        elem_key = _data_field_npz_key(npz, ["elems", "elements", "connectivity"], required=False)
+        sample_id_key = _data_field_npz_key(npz, ["sample_ids", "ids", "indices", "index"], required=False)
+        sample_coord_key = _data_field_npz_key(npz, ["sample_node_coords", "sample_coords", "coords_by_sample"], required=False)
+        frame_values = np.asarray(npz[frame_key]) if frame_key is not None else None
+        node_labels = np.asarray(npz[node_label_key]) if node_label_key is not None else None
+        node_coords = np.asarray(npz[node_coord_key], dtype=float) if node_coord_key is not None else None
+        elems = np.asarray(npz[elem_key]) if elem_key is not None else None
+        sample_ids = np.asarray(npz[sample_id_key]) if sample_id_key is not None else None
+        sample_node_coords = np.asarray(npz[sample_coord_key], dtype=float) if sample_coord_key is not None else None
+        available_components = _data_npz_string_array(npz, ["components", "component_names", "variables"], default=None)
+        mask_key = _data_field_npz_key(npz, ["valid_mask", "mask"], required=False)
+        valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
+
+    if available_components is None:
+        available_components = [f"c{i}" for i in range(values.shape[-1])]
+        if values.shape[-1] == 2:
+            available_components = ["U1", "U2"]
+
+    values = _data_field_layout_to_sfnc(
+        values,
+        cfg.get("layout", "auto"),
+        frame_values=frame_values,
+        node_labels=node_labels,
+        components=available_components,
+    )
+    valid_mask = _data_field_layout_to_sfnc(
+        valid_mask.astype(float),
+        cfg.get("layout", "auto"),
+        frame_values=frame_values,
+        node_labels=node_labels,
+        components=available_components,
+    ).astype(bool)
+
+    requested_components = cfg.get("components", ("U1", "U2"))
+    values, valid_mask, components = _data_field_select_components(
+        values,
+        valid_mask,
+        available_components,
+        requested_components,
+    )
+
+    drop_frame0 = bool(cfg.get("drop_frame0", True))
+    if drop_frame0 and values.shape[1] > 1:
+        values = values[:, 1:, :, :]
+        valid_mask = valid_mask[:, 1:, :, :]
+        if frame_values is not None and len(frame_values) == values.shape[1] + 1:
+            frame_values = frame_values[1:]
+
+    if frame_values is None:
+        frame_values = np.arange(values.shape[1])
+    if node_labels is None:
+        node_labels = np.arange(values.shape[2]) + 1
+
+    return {
+        "path": str(field_path),
+        "values": values,
+        "valid_mask": valid_mask,
+        "frame_values": np.asarray(frame_values),
+        "node_labels": np.asarray(node_labels),
+        "node_coords": node_coords,
+        "elems": elems,
+        "sample_ids": sample_ids,
+        "sample_node_coords": sample_node_coords,
+        "components": components,
+    }
 
 def _data_field_npz_key(npz, candidates, required=True):
     files = set(npz.files)
@@ -1904,6 +2015,170 @@ def _data_load_field_mode(data_obj, mode):
     setattr(data_obj, f"{mode}_field_components", components)
     setattr(data_obj, f"{mode}_field_shape", (int(values.shape[1]), int(values.shape[2]), int(values.shape[3])))
 
+def _data_align_field_samples(mode, reference_index, field_index, values, valid_mask, sample_node_coords=None):
+    reference_index = pd.Index(reference_index)
+    field_index = pd.Index(field_index)
+    common_idx = reference_index.intersection(field_index)
+    if len(common_idx) == 0:
+        field_index_str = pd.Index(field_index.astype(str))
+        reference_index_str = pd.Index(reference_index.astype(str))
+        common_str = reference_index_str.intersection(field_index_str)
+        if len(common_str) == 0:
+            raise ValueError(f"{mode}: no common sample ids between reference data and field npz.")
+        reference_lookup = dict(zip(reference_index_str, reference_index))
+        field_index = pd.Index([reference_lookup.get(str(i), i) for i in field_index])
+        common_idx = pd.Index([reference_lookup[i] for i in common_str])
+
+    positions = field_index.get_indexer(common_idx)
+    if np.any(positions < 0):
+        missing = common_idx[positions < 0].tolist()
+        raise KeyError(f"{mode}: field inputs are missing sample indices {missing[:10]}.")
+
+    aligned_coords = None
+    if sample_node_coords is not None:
+        aligned_coords = np.asarray(sample_node_coords, dtype=float)[positions]
+    return pd.Index(common_idx), values[positions], valid_mask[positions], aligned_coords
+
+def _data_field_input_static_features(data_obj, mode, node_coords, sample_node_coords, n_samples, n_nodes):
+    coords = sample_node_coords if sample_node_coords is not None else node_coords
+    if coords is None:
+        return None
+
+    coords = np.asarray(coords, dtype=float)
+    if coords.ndim == 2:
+        if coords.shape != (n_nodes, 2):
+            return None
+        coords = np.broadcast_to(coords[None, :, :], (n_samples, n_nodes, 2)).copy()
+    elif coords.ndim == 3:
+        if coords.shape[:2] != (n_samples, n_nodes) or coords.shape[2] < 2:
+            return None
+        coords = coords[:, :, :2]
+    else:
+        return None
+
+    x_raw = coords[:, :, 0]
+    y_raw = coords[:, :, 1]
+    x_min = np.nanmin(x_raw, axis=1, keepdims=True)
+    x_max = np.nanmax(x_raw, axis=1, keepdims=True)
+    y_min = np.nanmin(y_raw, axis=1, keepdims=True)
+    y_max = np.nanmax(y_raw, axis=1, keepdims=True)
+
+    if data_obj.geom_feats["coord_norm"]:
+        x_span = x_max - x_min
+        y_span = y_max - y_min
+        x_ref = np.divide(x_raw - x_min, x_span, out=np.zeros_like(x_raw), where=~np.isclose(x_span, 0.0))
+        y_ref = np.divide(y_raw - y_min, y_span, out=np.zeros_like(y_raw), where=~np.isclose(y_span, 0.0))
+    else:
+        x_ref, y_ref = x_raw, y_raw
+
+    tol = data_obj.geom.l * 1e-4
+    flags = np.stack(
+        [
+            np.isclose(x_raw, x_min, atol=tol).astype(float),
+            np.isclose(x_raw, x_max, atol=tol).astype(float),
+            np.isclose(y_raw, y_min, atol=tol).astype(float),
+            np.isclose(y_raw, y_max, atol=tol).astype(float),
+        ],
+        axis=-1,
+    )
+    static = np.concatenate([np.stack([x_ref, y_ref], axis=-1), flags], axis=-1)
+    static = np.nan_to_num(static, nan=0.0, posinf=0.0, neginf=0.0)
+    return static
+
+def _data_field_input_feature_names(frame_values, components, include_static):
+    dynamic = []
+    for frame in frame_values:
+        frame_label = f"{float(frame):.6g}" if np.issubdtype(np.asarray(frame_values).dtype, np.number) else str(frame)
+        for component in components:
+            dynamic.append(f"{component}@{frame_label}")
+    if include_static:
+        dynamic.extend(["x0", "y0", "on_left", "on_right", "on_bottom", "on_top"])
+    return dynamic
+
+def _data_build_field_input_tokens(data_obj, mode, values, valid_mask, node_coords=None, sample_node_coords=None):
+    flat, flat_mask = _data_field_flatten(values, valid_mask)
+    n_samples, n_nodes, _ = flat.shape
+    tokens = flat
+    include_static = bool(data_obj.geom_feats["enabled"])
+    if include_static:
+        static = _data_field_input_static_features(data_obj, mode, node_coords, sample_node_coords, n_samples, n_nodes)
+        if static is not None:
+            tokens = np.concatenate([tokens, static.astype(tokens.dtype, copy=False)], axis=-1)
+        else:
+            include_static = False
+
+    feature_names = _data_field_input_feature_names(
+        getattr(data_obj, f"{mode}_field_input_frame_values"),
+        getattr(data_obj, f"{mode}_field_input_components"),
+        include_static,
+    )
+    setattr(data_obj, f"{mode}_field_input_feature_names", feature_names)
+    setattr(data_obj, f"{mode}_node_feature_names", feature_names)
+    return tokens
+
+def _data_load_curve_field_input_mode(data_obj, mode):
+    loaded = _data_read_field_npz(data_obj, mode, config_attr="field_input_config")
+    IN_df = getattr(data_obj, f"{mode}_IN_df")
+    OUT_df = getattr(data_obj, f"{mode}_OUT_df")
+    dOUT_df = getattr(data_obj, f"{mode}_dOUT_df")
+    props_df = getattr(data_obj, f"{mode}_props_df")
+
+    reference_index = IN_df.index.intersection(dOUT_df.index).intersection(props_df.index)
+    if loaded["sample_ids"] is None:
+        if loaded["values"].shape[0] != len(IN_df) and getattr(data_obj, "nsims", None) is not None and loaded["values"].shape[0] >= len(IN_df):
+            sample_count = len(IN_df)
+            loaded["values"] = loaded["values"][:sample_count]
+            loaded["valid_mask"] = loaded["valid_mask"][:sample_count]
+            if loaded["sample_node_coords"] is not None:
+                loaded["sample_node_coords"] = loaded["sample_node_coords"][:sample_count]
+        if loaded["values"].shape[0] != len(IN_df):
+            raise ValueError(
+                f"{mode}: field input sample count ({loaded['values'].shape[0]}) does not match input rows "
+                f"({len(IN_df)}), and the npz has no sample_ids key."
+            )
+        field_index = pd.Index(IN_df.index)
+    else:
+        field_index = pd.Index(loaded["sample_ids"])
+
+    common_idx, values, valid_mask, sample_node_coords = _data_align_field_samples(
+        mode,
+        reference_index,
+        field_index,
+        loaded["values"],
+        loaded["valid_mask"],
+        sample_node_coords=loaded["sample_node_coords"],
+    )
+
+    setattr(data_obj, f"{mode}_IN_df", IN_df.loc[common_idx].copy())
+    out_axis = OUT_df.iloc[[0]]
+    out_samples = OUT_df.iloc[1:]
+    setattr(data_obj, f"{mode}_OUT_df", pd.concat([out_axis, out_samples.loc[common_idx]], axis=0))
+    for attr in ["INf_df", "dIN_df", "dINr_df", "dOUT_df", "props_df"]:
+        name = f"{mode}_{attr}"
+        value = getattr(data_obj, name)
+        if value is not None:
+            setattr(data_obj, name, value.loc[common_idx].copy())
+    dOUTr_df = getattr(data_obj, f"{mode}_dOUTr_df")
+    dOUTr_axis = dOUTr_df.iloc[[0]]
+    dOUTr_samples = dOUTr_df.iloc[1:]
+    setattr(data_obj, f"{mode}_dOUTr_df", pd.concat([dOUTr_axis, dOUTr_samples.loc[common_idx]], axis=0))
+
+    node_coords = loaded["node_coords"]
+    if node_coords is None and IN_df.shape[1] % 2 == 0 and IN_df.shape[1] // 2 == values.shape[2]:
+        node_coords = IN_df.iloc[0].to_numpy(dtype=float).reshape(-1, 2)
+
+    setattr(data_obj, f"{mode}_field_input_path", loaded["path"])
+    setattr(data_obj, f"{mode}_field_input_index", pd.Index(common_idx))
+    setattr(data_obj, f"{mode}_field_input_values", values)
+    setattr(data_obj, f"{mode}_field_input_valid_mask", valid_mask)
+    setattr(data_obj, f"{mode}_field_input_frame_values", loaded["frame_values"])
+    setattr(data_obj, f"{mode}_field_input_node_labels", loaded["node_labels"])
+    setattr(data_obj, f"{mode}_field_input_node_coords", None if node_coords is None else np.asarray(node_coords, dtype=float))
+    setattr(data_obj, f"{mode}_field_input_sample_node_coords", sample_node_coords)
+    setattr(data_obj, f"{mode}_field_input_elems", loaded["elems"])
+    setattr(data_obj, f"{mode}_field_input_components", loaded["components"])
+    setattr(data_obj, f"{mode}_field_input_shape", (int(values.shape[1]), int(values.shape[2]), int(values.shape[3])))
+
 def _data_filter_field_nodes(data_obj, mode, input_body_mask=None):
     values = getattr(data_obj, f"{mode}_field_values", None)
     if values is None:
@@ -1945,6 +2220,55 @@ def _data_filter_field_nodes(data_obj, mode, input_body_mask=None):
         int(getattr(data_obj, f"{mode}_field_values").shape[3]),
     ))
 
+def _data_filter_field_input_nodes(data_obj, mode, input_body_mask=None):
+    values = getattr(data_obj, f"{mode}_field_input_values", None)
+    if values is None:
+        return
+    n_nodes = values.shape[2]
+    mask = None
+    if input_body_mask is not None and len(input_body_mask) == n_nodes:
+        mask = np.asarray(input_body_mask, dtype=bool)
+    else:
+        coords = getattr(data_obj, f"{mode}_field_input_node_coords", None)
+        if coords is not None and len(coords) == n_nodes:
+            tol = data_obj.geom.l * 1e-4
+            coords = np.asarray(coords, dtype=float)
+            mask = (
+                (coords[:, 0] >= -tol) &
+                (coords[:, 0] <= data_obj.geom.L + tol) &
+                (coords[:, 1] >= -tol) &
+                (coords[:, 1] <= data_obj.geom.H + tol)
+            )
+
+    if mask is None:
+        if getattr(data_obj, f"{mode}_IN_df").shape[1] // 2 == n_nodes:
+            return
+        raise ValueError(
+            f"{mode}: cannot determine body-node mask for field inputs. "
+            "Provide field coords0/node_coords in the npz or make field nodes match input nodes."
+        )
+    if int(mask.sum()) == n_nodes:
+        return
+    if int(mask.sum()) == 0:
+        raise ValueError(f"{mode}: body-node mask removed every field input node.")
+
+    setattr(data_obj, f"{mode}_field_input_values", values[:, :, mask, :])
+    setattr(data_obj, f"{mode}_field_input_valid_mask", getattr(data_obj, f"{mode}_field_input_valid_mask")[:, :, mask, :])
+    for attr in ["field_input_node_labels", "field_input_node_coords"]:
+        name = f"{mode}_{attr}"
+        value = getattr(data_obj, name, None)
+        if value is not None and len(value) == n_nodes:
+            setattr(data_obj, name, np.asarray(value)[mask])
+    sample_coords_name = f"{mode}_field_input_sample_node_coords"
+    sample_coords = getattr(data_obj, sample_coords_name, None)
+    if sample_coords is not None and sample_coords.shape[1] == n_nodes:
+        setattr(data_obj, sample_coords_name, np.asarray(sample_coords)[:, mask, :])
+    setattr(data_obj, f"{mode}_field_input_shape", (
+        int(getattr(data_obj, f"{mode}_field_input_values").shape[1]),
+        int(getattr(data_obj, f"{mode}_field_input_values").shape[2]),
+        int(getattr(data_obj, f"{mode}_field_input_values").shape[3]),
+    ))
+
 def _data_split_indices(IN, props, split=0.8, random_state=None, force_train_idx=None):
     dummy_out = pd.DataFrame({"dummy": np.zeros(len(IN), dtype=float)}, index=IN.index)
     dummy_props = props if props is not None and len(props.index) else pd.DataFrame(index=IN.index)
@@ -1980,6 +2304,43 @@ def _data_assign_field_split(data_obj, mode, input_df, train_idx, val_idx, test_
     setattr(data_obj, f"{mode}_trainProps", _data_to_numpy(getattr(data_obj, f"{mode}_trainProps_df")))
     setattr(data_obj, f"{mode}_valProps", _data_to_numpy(getattr(data_obj, f"{mode}_valProps_df")))
     setattr(data_obj, f"{mode}_testProps", _data_to_numpy(getattr(data_obj, f"{mode}_testProps_df")))
+
+def _data_field_input_take(data_obj, mode, idx):
+    idx = pd.Index(idx)
+    field_index = pd.Index(getattr(data_obj, f"{mode}_field_input_index"))
+    positions = field_index.get_indexer(idx)
+    if np.any(positions < 0):
+        missing = idx[positions < 0].tolist()
+        raise KeyError(f"{mode}: field inputs are missing sample indices {missing[:10]}.")
+    values = getattr(data_obj, f"{mode}_field_input_values")[positions]
+    mask = getattr(data_obj, f"{mode}_field_input_valid_mask")[positions]
+    sample_coords = getattr(data_obj, f"{mode}_field_input_sample_node_coords", None)
+    sample_coords = None if sample_coords is None else sample_coords[positions]
+    return _data_build_field_input_tokens(
+        data_obj,
+        mode,
+        values,
+        mask,
+        node_coords=getattr(data_obj, f"{mode}_field_input_node_coords", None),
+        sample_node_coords=sample_coords,
+    )
+
+def _data_assign_curve_field_inputs(data_obj, mode):
+    setattr(data_obj, f"{mode}_train_in", _data_field_input_take(data_obj, mode, getattr(data_obj, f"{mode}_train_in_df").index))
+    setattr(data_obj, f"{mode}_val_in", _data_field_input_take(data_obj, mode, getattr(data_obj, f"{mode}_val_in_df").index))
+    setattr(data_obj, f"{mode}_test_in", _data_field_input_take(data_obj, mode, getattr(data_obj, f"{mode}_test_in_df").index))
+
+def _data_clean_field_input_arrays(data_obj):
+    if getattr(data_obj, "input_kind", "geometry") != "field":
+        return
+    for mode in ["UT", "FT"]:
+        if not getattr(data_obj, f"{mode}mechTest", False):
+            continue
+        for split in ["train", "val", "test"]:
+            attr = f"{mode}_{split}_in"
+            if hasattr(data_obj, attr):
+                arr = np.asarray(getattr(data_obj, attr), dtype=float)
+                setattr(data_obj, attr, np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0))
 
 def _data_limit_mode_samples(data_obj, mode):
     nsims = int(data_obj.nsims)

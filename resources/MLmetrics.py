@@ -2269,6 +2269,8 @@ def postprocess_output_dir(artifacts, label=None, create=True):
 
 def _postprocess_output_kind_token(output_kind):
     key = str(output_kind or "Curve").strip()
+    if key.lower() in ["fieldtocurve", "field_to_curve", "field-to-curve"]:
+        return "FieldToCurve"
     if key.lower() == "field":
         return "Field"
     if key.lower() == "curve":

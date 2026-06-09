@@ -1820,6 +1820,9 @@ def _mp_task_token(data):
 
 def _mp_output_kind_token(data):
     key = str(getattr(data, "output_kind", "curve") or "curve").strip().lower()
+    input_key = str(getattr(data, "input_kind", "geometry") or "geometry").strip().lower()
+    if key == "curve" and input_key == "field":
+        return "FieldToCurve"
     if key == "field":
         return "Field"
     return "Curve"
@@ -1966,7 +1969,7 @@ def _mp_collect_data_signature(model_obj):
     for key in (
         "mechMode", "LAT", "dis", "dN", "d_data", "nsims", "split_frac",
         "split_seed", "range_split", "input_range_split", "output_range_split",
-        "round_decimals", "geom_feats", "model", "output_kind", "field_config",
+        "round_decimals", "geom_feats", "model", "input_kind", "output_kind", "field_config", "field_input_config",
         "scale", "scale_reduced", "reduce_dim", "path", "path_add", "load_split",
         "UTmechTest", "FTmechTest",
     ):
