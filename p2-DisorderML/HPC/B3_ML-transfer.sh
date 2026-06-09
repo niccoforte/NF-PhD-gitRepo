@@ -10,7 +10,8 @@ REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 #   bash B3_ML-transfer.sh UT Curve MLP HPC-ut-mlp-260514-142233
 #   bash B3_ML-transfer.sh UT FieldToCurve Transformer HPC-field-to-curve-smoke
 #   bash B3_ML-transfer.sh UT Curve MLP HPO HPC-MLP_full_hOpt
-#   bash B3_ML-transfer.sh UT Field HPO HPC-GNN_full_hOpt GAT
+#   bash B3_ML-transfer.sh UT Field HPO HPC-cross_model_hOpt
+#   bash B3_ML-transfer.sh UT Field HPO HPC-cross_model_hOpt GAT  # optional single model subfolder
 
 if [ -d "Z:/" ]; then
     LOCAL_ROOT=${LOCAL_ROOT:-Z:/p2}
@@ -73,12 +74,17 @@ elif [ -z "$RUN_PATH" ] && [ "$#" -eq 4 ]; then
     OUTPUT_KIND=$2
     MODEL_NAME=$3
     RUN_DESCRIPTOR=$4
-    RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/$RUN_DESCRIPTOR
+    if [ "${MODEL_NAME^^}" = "HPO" ]; then
+        RUN_PATH=$TASK/$OUTPUT_KIND/HPO/$RUN_DESCRIPTOR
+    else
+        RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/$RUN_DESCRIPTOR
+    fi
 elif [ -z "$RUN_PATH" ] && [ "$#" -eq 1 ]; then
     RUN_PATH=$1
 elif [ -z "$RUN_PATH" ] && [ "$#" -gt 0 ]; then
     /bin/echo "ERROR: Use one raw RUN_PATH, regular form TASK OUTPUT_KIND MODEL RUN_DESCRIPTOR, or HPO forms:"
     /bin/echo "  TASK OUTPUT_KIND MODEL HPO RUN_DESCRIPTOR"
+    /bin/echo "  TASK OUTPUT_KIND HPO RUN_DESCRIPTOR"
     /bin/echo "  TASK OUTPUT_KIND HPO RUN_DESCRIPTOR MODEL"
     exit 2
 fi
@@ -93,11 +99,11 @@ if [ -z "$RUN_PATH" ]; then
     prompt_required TASK "Task, e.g. UT, FT, MULTI"
     prompt_required OUTPUT_KIND "Output kind, e.g. Curve, Field, or FieldToCurve"
     prompt_default RUN_KIND "Run kind: regular, model-hpo, compare-hpo" "regular"
-    prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
-    prompt_required RUN_DESCRIPTOR "Run descriptor, e.g. HPC-ut-gat-260513-143012, HPC-MLP_full_hOpt, or all"
 
     case "${RUN_KIND,,}" in
         regular)
+            prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
+            prompt_required RUN_DESCRIPTOR "Run descriptor, e.g. HPC-ut-gat-260513-143012 or all"
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
                 RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME
             else
@@ -105,6 +111,8 @@ if [ -z "$RUN_PATH" ]; then
             fi
             ;;
         model-hpo)
+            prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
+            prompt_required RUN_DESCRIPTOR "Model-specific HPO descriptor, e.g. HPC-MLP_full_hOpt or all"
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
                 RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/HPO
             else
@@ -112,10 +120,11 @@ if [ -z "$RUN_PATH" ]; then
             fi
             ;;
         compare-hpo)
+            prompt_required RUN_DESCRIPTOR "Cross-model HPO descriptor, e.g. HPC-cross_model_hOpt or all"
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
                 RUN_PATH=$TASK/$OUTPUT_KIND/HPO
             else
-                RUN_PATH=$TASK/$OUTPUT_KIND/HPO/$RUN_DESCRIPTOR/$MODEL_NAME
+                RUN_PATH=$TASK/$OUTPUT_KIND/HPO/$RUN_DESCRIPTOR
             fi
             ;;
         *)
