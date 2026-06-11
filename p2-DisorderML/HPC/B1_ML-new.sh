@@ -126,6 +126,10 @@ else
 fi
 SCRIPT_LOCAL=$SCRATCH_DIR/$(basename "$ML_SCRIPT")
 
+if [ "$RUN_LABEL_PROVIDED" = false ] && [ -e "$SCRIPT_SRC" ] && grep -q -- "--run-label" "$SCRIPT_SRC"; then
+    ML_ARGS=(--run-label "$RUN_LABEL" "${ML_ARGS[@]}")
+fi
+
 init_conda_shell() {
     if command -v conda >/dev/null 2>&1; then
         local conda_base

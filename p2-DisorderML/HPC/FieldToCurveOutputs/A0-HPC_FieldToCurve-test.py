@@ -70,11 +70,7 @@ def add_optional_bool_pair(parser, name, default=None, help_on=None, help_off=No
 
 def context_label(label):
     label = str(label or "").strip()
-    if not label:
-        return None
-    if os.environ.get("ML_RUN_CONTEXT", "").strip().lower() == "hpc" and not label.lower().startswith("hpc-"):
-        return f"HPC-{label}"
-    return label
+    return label if label else None
 
 
 def parse_args():
