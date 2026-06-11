@@ -81,7 +81,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Single-GPU field-to-curve Transformer smoke test."
     )
-    parser.add_argument("--task", type=str.upper, default="UT", choices=["UT"])
+    parser.add_argument("--task", type=str.upper, default="UT", choices=["UT", "FT"])
     parser.add_argument("--model-type", default="TR", choices=["TR", "Transformer", "tr", "transformer"])
     parser.add_argument("--run-label", default="", help="Optional run descriptor. Empty uses the framework timestamp.")
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
@@ -163,6 +163,7 @@ def split_size_summary(data):
 
 def main():
     args = parse_args()
+    active_mode = args.task.upper()
     nsims = parse_nsims(args.nsims)
     components = parse_components(args.components)
     if args.pca_components < 1:
@@ -203,7 +204,7 @@ def main():
 
     run_config = vars(args).copy()
     run_config.update({
-        "task": args.task,
+        "task": active_mode,
         "model_type": "TR",
         "input_kind": "field",
         "output_kind": "curve",
@@ -234,7 +235,7 @@ def main():
         dis=args.dis,
         dN=args.dN,
         d_data=args.d_data,
-        mechMode=args.task,
+        mechMode=active_mode,
         nsims=nsims,
         model="TR",
         input_kind="field",
@@ -249,15 +250,17 @@ def main():
 
     split_sizes = split_size_summary(data)
     print(f"Split sizes: {split_sizes}")
-    print(f"UT field input shape: {getattr(data, 'UT_field_input_shape', None)}")
-    print(f"UT field token shape per sample: {data.UT_train_in.shape[1:]}")
-    print(f"UT latent output size: {data.UT_train_out.shape[-1]}")
-    pca = getattr(data, "UT_OUTreducer", None)
+    train_in = getattr(data, f"{active_mode}_train_in")
+    train_out = getattr(data, f"{active_mode}_train_out")
+    print(f"{active_mode} field input shape: {getattr(data, f'{active_mode}_field_input_shape', None)}")
+    print(f"{active_mode} field token shape per sample: {train_in.shape[1:]}")
+    print(f"{active_mode} latent output size: {train_out.shape[-1]}")
+    pca = getattr(data, f"{active_mode}_OUTreducer", None)
     if pca is not None and hasattr(pca, "explained_variance_ratio_"):
-        print(f"UT PCA explained variance ({args.pca_components} components): {float(np.sum(pca.explained_variance_ratio_)):.6f}")
+        print(f"{active_mode} PCA explained variance ({args.pca_components} components): {float(np.sum(pca.explained_variance_ratio_)):.6f}")
 
-    in_shape = data.UT_train_in.shape[1:]
-    out_size = int(data.UT_train_out.shape[-1])
+    in_shape = train_in.shape[1:]
+    out_size = int(train_out.shape[-1])
     transformer = Transformer(
         in_size=int(in_shape[-1]),
         seq_len=int(in_shape[-2]),
