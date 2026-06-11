@@ -2922,6 +2922,40 @@ def postprocess_cross_model_hpo_comparison(cross_hpo_dir, model_names=None, task
     df = df.sort_values(["_sort_value", "model"], ascending=[True, True], na_position="last")
     return df.drop(columns=["_sort_value"]).reset_index(drop=True)
 
+def postprocess_select_cross_model_hpo_model(comparison, preferred_metric="best_value", task=None):
+    """Select one model family from a cross-model HPO table using lower-is-better metrics."""
+    if comparison is None or not hasattr(comparison, "empty") or comparison.empty:
+        return None, None, None
+
+    mode = str(task).upper() if task is not None and str(task).upper() in ["UT", "FT"] else None
+    metric_candidates = []
+
+    def _add_metric(metric):
+        if metric and metric in comparison.columns and metric not in metric_candidates:
+            metric_candidates.append(metric)
+
+    _add_metric(preferred_metric)
+    _add_metric("best_value")
+    if mode is not None:
+        _add_metric(f"{mode}_best_rmse")
+        _add_metric(f"{mode}_summary_rmse")
+        _add_metric(f"{mode}_val_rmse")
+    for column in comparison.columns:
+        if str(column).endswith(("_best_rmse", "_summary_rmse", "_val_rmse")):
+            _add_metric(column)
+
+    for metric in metric_candidates:
+        ranked = comparison.copy()
+        ranked["_selection_value"] = pd.to_numeric(ranked[metric], errors="coerce")
+        ranked = ranked.dropna(subset=["_selection_value"])
+        if ranked.empty:
+            continue
+        ranked = ranked.sort_values(["_selection_value", "model"], ascending=[True, True])
+        row = ranked.iloc[0].drop(labels=["_selection_value"])
+        return row.get("model"), metric, row
+
+    return None, None, None
+
 def plot_cross_model_hpo_comparison(comparison, figsize=(9, 4), show=True):
     if comparison is None or not hasattr(comparison, "empty") or comparison.empty:
         print("No cross-model HPO comparison rows are available.")
