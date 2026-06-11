@@ -44,7 +44,8 @@ HPC_USER=${HPC_USER:-${USER:-exy053}}
 #   sbatch -J HPC-CurvePCAUT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task UT --output-reduction pca --pca-components 16
 #   sbatch -J HPC-CurvePCAFT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task FT --output-reduction pca --pca-components 16
 #   ML_SCRIPT=FieldOutputs/A0-HPC_Field-test.py sbatch -J trial-field-tr B1_ML-new.sh -- --epochs 3
-#   ML_SCRIPT=FieldToCurveOutputs/A0-HPC_FieldToCurve-test.py sbatch -J trial-field-to-curve B1_ML-new.sh -- --epochs 3 --nsims 64
+#   ML_SCRIPT=FieldToCurve/A0-HPC_FieldToCurve-test.py sbatch -J trial-field-to-curve B1_ML-new.sh -- --epochs 3 --nsims 64
+#   ML_SCRIPT=FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py sbatch -J Field2Curve-FT-HPO B1_ML-new.sh -- --task FT
 #
 # ML_SCRIPT may be either:
 #   - a filename inside p2-DisorderML/HPC, e.g. B0-example.py
