@@ -39,6 +39,17 @@ def write_json(path, payload):
     path.write_text(json.dumps(json_safe(payload), indent=2), encoding="utf-8")
 
 
+def default_study_name(value):
+    value = str(value or "").strip()
+    if value:
+        return value
+    for env_name in ["ML_JOB_NAME", "SLURM_JOB_NAME"]:
+        env_value = str(os.environ.get(env_name, "")).strip()
+        if env_value:
+            return env_value
+    return "Curve-CrossModelHPO"
+
+
 def normalize_typ(value):
     value = str(value).strip().lower()
     aliases = {
@@ -82,7 +93,7 @@ def split_size_summary(data):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Full cross-model GPU HPO for curve stress-strain outputs."
+        description="Cross-model GPU HPO for curve stress-strain outputs."
     )
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
     parser.add_argument("--split", default="", help="Saved curve split name without the 'split-' prefix.")
@@ -99,13 +110,48 @@ def parse_args():
     parser.add_argument("--task", type=str.upper, default="UT", choices=["UT", "FT", "MULTI"])
     parser.add_argument("--round-decimals", type=int, default=5)
     parser.add_argument("--models", default="MLP,GCN,GAT,TR")
-    parser.add_argument("--study-name", default="Curve-CrossModelHPO")
+    parser.add_argument("--output-reduction", default="none", choices=["none", "pca"])
+    parser.add_argument("--pca-components", type=int, default=None, help="Fixed PCA latent dimension. Defaults to 16 when PCA is enabled without --pca-accuracy.")
+    parser.add_argument("--pca-accuracy", type=float, default=None, help="Variance threshold for PCA component selection. Ignored when --pca-components is set.")
+    parser.add_argument("--no-scale-reduced", action="store_true", help="Do not scale PCA latent curve outputs.")
+    parser.add_argument("--study-name", default="", help="HPO study/folder name. Empty uses the Slurm job name from -J.")
     parser.add_argument("--allow-cpu", action="store_true", help="Allow running without CUDA for local/debug runs.")
     parser.add_argument("--no-progress", action="store_true", help="Disable Optuna progress bars.")
     return parser.parse_args()
 
 
-def build_curve_data(DATA, args, typ, nsims):
+def output_reduce_dim(args):
+    reduction = str(args.output_reduction).strip().lower()
+    if reduction == "none":
+        return False
+    if reduction != "pca":
+        raise ValueError("--output-reduction must be 'none' or 'pca'.")
+    if args.pca_components is not None and args.pca_components < 1:
+        raise ValueError("--pca-components must be >= 1 when set.")
+    if args.pca_accuracy is not None and not 0 < args.pca_accuracy <= 1:
+        raise ValueError("--pca-accuracy must be in the range (0, 1].")
+    n_components = 16 if args.pca_components is None and args.pca_accuracy is None else args.pca_components
+    accuracy = args.pca_accuracy if n_components is None else None
+    return ("PCA", "out", accuracy, n_components, not args.no_scale_reduced)
+
+
+def pca_summary(data):
+    rows = {}
+    for mode in ("UT", "FT"):
+        if not getattr(data, f"{mode}mechTest", False):
+            continue
+        reducer = getattr(data, f"{mode}_OUTreducer", None)
+        if reducer is None:
+            continue
+        explained = getattr(reducer, "explained_variance_ratio_", None)
+        rows[mode] = {
+            "latent_dim": int(getattr(data, f"{mode}_train_out").shape[-1]),
+            "explained_variance": float(np.sum(explained)) if explained is not None else None,
+        }
+    return rows
+
+
+def build_curve_data(DATA, args, typ, nsims, reduce_dim):
     model_token = "TR" if typ == "tr" else typ.upper()
     node_model = typ in ["gcn", "gat", "tr"]
     return DATA(
@@ -127,7 +173,7 @@ def build_curve_data(DATA, args, typ, nsims):
         output_kind="curve",
         freq=False,
         scale=("symm", "inout"),
-        reduce_dim=False,
+        reduce_dim=reduce_dim,
         round_decimals=args.round_decimals,
         geom_feats=(True, True) if node_model else (False, False),
     )
@@ -189,7 +235,11 @@ def curve_model_space():
     }
 
 
-def curve_loss_space():
+def curve_loss_space(reduced_output=False):
+    if reduced_output:
+        return {
+            "family": ["mse"],
+        }
     return {
         "family": ["mse", "combined"],
         "mse_weight": {"type": "float", "low": 0.05, "high": 2.0, "log": True},
@@ -251,9 +301,11 @@ def curve_train_space():
 
 def main():
     args = parse_args()
+    args.study_name = default_study_name(args.study_name)
     models = parse_models(args.models)
     nsims = parse_nsims(args.nsims)
     timeout = None if args.timeout_hours <= 0 else int(args.timeout_hours * 3600)
+    reduce_dim = output_reduce_dim(args)
 
     print("Importing torch...")
     import torch
@@ -282,20 +334,24 @@ def main():
         "nsims_resolved": nsims,
         "timeout_seconds_per_model": timeout,
         "output_kind": "curve",
+        "reduce_dim": reduce_dim,
+        "scale": ["symm", "inout"],
     })
     write_json(os.environ.get("ML_RUN_METADATA"), {"script": Path(__file__).name, "run_config": run_config})
 
     data_by_typ = {}
     for typ in models:
-        data_by_typ[typ] = build_curve_data(DATA, args, typ, nsims)
+        data_by_typ[typ] = build_curve_data(DATA, args, typ, nsims, reduce_dim)
         print(f"{typ.upper()} split sizes: {split_size_summary(data_by_typ[typ])}")
+        if reduce_dim:
+            print(f"{typ.upper()} PCA summary: {pca_summary(data_by_typ[typ])}")
 
     studies = hOpt_compare(
         typs=models,
         data=data_by_typ,
         n_trials_per_typ=args.n_trials_per_typ,
         model_space=curve_model_space(),
-        loss_space=curve_loss_space(),
+        loss_space=curve_loss_space(reduced_output=bool(reduce_dim)),
         train_space=curve_train_space(),
         seed=args.seed,
         device=device,
