@@ -60,6 +60,95 @@ def parse_optional_norm(value):
     return value
 
 
+def output_reduce_dim(args):
+    output_reduction = str(args.output_reduction or "pca").strip().lower()
+    if output_reduction in ["none", "false", "off", "full", "curve"]:
+        return False
+    if output_reduction != "pca":
+        raise ValueError("--output-reduction must be 'pca' or 'none'.")
+    if args.pca_components is not None and args.pca_components < 1:
+        raise ValueError("--pca-components must be >= 1 when set.")
+    if args.pca_accuracy is not None and not 0 < args.pca_accuracy <= 1:
+        raise ValueError("--pca-accuracy must be in the range (0, 1].")
+    n_components = 16 if args.pca_components is None and args.pca_accuracy is None else args.pca_components
+    accuracy = args.pca_accuracy if n_components is None else None
+    return ("PCA", "out", accuracy, n_components, not args.no_scale_reduced)
+
+
+def resolve_loss_family(args, reduce_dim):
+    requested = str(args.loss or "auto").strip().lower()
+    if reduce_dim:
+        if requested == "combined":
+            raise ValueError("--loss combined requires --output-reduction none; curve terms are not meaningful on PCA latents.")
+        return "mse"
+    return "combined" if requested == "auto" else requested
+
+
+def curve_x_values(data, mode):
+    out_df = getattr(data, f"{mode}_OUT_df", None)
+    if out_df is None or not hasattr(out_df, "iloc"):
+        return None
+    x_values = out_df.iloc[0]
+    if hasattr(x_values, "drop") and "0" in list(x_values.index):
+        x_values = x_values.drop(labels=["0"])
+    return np.asarray(x_values, dtype=float)
+
+
+def combined_curve_loss_params(data, mode, args, curve_default_zone_boundaries, curve_default_zone_weights):
+    return {
+        "mse_weight": args.mse_weight,
+        "weighted_mse_weight": args.weighted_mse_weight,
+        "derivative_weight": args.derivative_weight,
+        "peak_weight": args.peak_weight,
+        "energy_weight": args.energy_weight,
+        "peak_location_weight": args.peak_location_weight,
+        "zone_boundaries": curve_default_zone_boundaries(mode),
+        "zone_weights": curve_default_zone_weights(),
+        "x_values": curve_x_values(data, mode),
+        "reduction": "mean",
+        "derivative_order": args.derivative_order,
+        "SoftPeak_beta": args.soft_peak_beta,
+        "normalization_eps": args.loss_eps,
+    }
+
+
+def build_loss(data, mode, args, reduce_dim, nn, CombinedCurveLoss, curve_default_zone_boundaries, curve_default_zone_weights):
+    family = resolve_loss_family(args, reduce_dim)
+    if family == "mse":
+        return nn.MSELoss(reduction="mean")
+    if family != "combined":
+        raise ValueError(f"Unsupported loss family: {family}")
+    return CombinedCurveLoss(
+        **combined_curve_loss_params(
+            data,
+            mode,
+            args,
+            curve_default_zone_boundaries,
+            curve_default_zone_weights,
+        )
+    )
+
+
+def loss_summary(args, mode, reduce_dim, curve_default_zone_boundaries, curve_default_zone_weights):
+    family = resolve_loss_family(args, reduce_dim)
+    summary = {"requested": args.loss, "family": family}
+    if family == "combined":
+        summary.update({
+            "mse_weight": args.mse_weight,
+            "weighted_mse_weight": args.weighted_mse_weight,
+            "derivative_weight": args.derivative_weight,
+            "peak_weight": args.peak_weight,
+            "energy_weight": args.energy_weight,
+            "peak_location_weight": args.peak_location_weight,
+            "zone_boundaries": curve_default_zone_boundaries(mode),
+            "zone_weights": curve_default_zone_weights(),
+            "derivative_order": args.derivative_order,
+            "SoftPeak_beta": args.soft_peak_beta,
+            "normalization_eps": args.loss_eps,
+        })
+    return summary
+
+
 def add_optional_bool_pair(parser, name, default=None, help_on=None, help_off=None):
     group = parser.add_mutually_exclusive_group()
     dest = name.replace("-", "_")
@@ -94,8 +183,11 @@ def parse_args():
     parser.add_argument("--d-data", default="in")
     parser.add_argument("--round-decimals", type=int, default=5)
     parser.add_argument("--components", default="U1,U2", help="Field input components, e.g. 'U1,U2' or 'Umag'.")
-    parser.add_argument("--pca-components", type=int, default=16)
     parser.add_argument("--keep-frame0", action="store_true", help="Keep the unloaded field frame 0 in the input.")
+    parser.add_argument("--output-reduction", default="pca", choices=["pca", "none"], help="Use PCA curve latents or full ordered curve outputs.")
+    parser.add_argument("--pca-components", type=int, default=None, help="Fixed PCA latent dimension. Defaults to 16 when --pca-accuracy is not set.")
+    parser.add_argument("--pca-accuracy", type=float, default=None, help="Variance threshold for PCA component selection. Ignored when --pca-components is set.")
+    parser.add_argument("--no-scale-reduced", action="store_true", help="Do not scale PCA latent curve outputs.")
 
     add_optional_bool_pair(
         parser,
@@ -135,6 +227,17 @@ def parse_args():
     parser.add_argument("--pos-encoding", default="learned", choices=["learned", "sinusoidal"])
     parser.add_argument("--use-cls-token", action="store_true")
 
+    parser.add_argument("--loss", default="auto", choices=["auto", "mse", "combined"], help="'auto' uses MSE for PCA latents and combined loss for full curves.")
+    parser.add_argument("--mse-weight", type=float, default=1.0)
+    parser.add_argument("--weighted-mse-weight", type=float, default=0.5)
+    parser.add_argument("--derivative-weight", type=float, default=0.05)
+    parser.add_argument("--peak-weight", type=float, default=0.25)
+    parser.add_argument("--energy-weight", type=float, default=0.10)
+    parser.add_argument("--peak-location-weight", type=float, default=0.02)
+    parser.add_argument("--soft-peak-beta", type=float, default=20.0)
+    parser.add_argument("--derivative-order", type=int, default=1)
+    parser.add_argument("--loss-eps", type=float, default=1e-8)
+
     parser.add_argument("--scheduler-patience", type=int, default=10)
     parser.add_argument("--scheduler-factor", type=float, default=0.5)
     parser.add_argument("--scheduler-threshold", type=float, default=1e-4)
@@ -162,10 +265,14 @@ def main():
     active_mode = args.task.upper()
     nsims = parse_nsims(args.nsims)
     components = parse_components(args.components)
-    if args.pca_components < 1:
-        raise ValueError("--pca-components must be >= 1.")
+    reduce_dim = output_reduce_dim(args)
     if args.d_model % args.n_heads != 0:
         raise ValueError(f"--d-model ({args.d_model}) must be divisible by --n-heads ({args.n_heads}).")
+    if args.derivative_order < 1:
+        raise ValueError("--derivative-order must be >= 1.")
+    if args.loss_eps <= 0:
+        raise ValueError("--loss-eps must be positive.")
+    resolve_loss_family(args, reduce_dim)
 
     print("Importing torch...")
     import torch
@@ -173,9 +280,21 @@ def main():
 
     print("Importing project ML framework...")
     from resources.MLdata import DATA
-    from resources.MLfunc import EarlyStopping
+    from resources.MLfunc import (
+        CombinedCurveLoss,
+        EarlyStopping,
+        curve_default_zone_boundaries,
+        curve_default_zone_weights,
+    )
     from resources.MLmodels import MODEL, Transformer
     print("Imports completed.")
+    loss_config = loss_summary(
+        args,
+        active_mode,
+        reduce_dim,
+        curve_default_zone_boundaries,
+        curve_default_zone_weights,
+    )
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -196,7 +315,6 @@ def main():
         "drop_frame0": not args.keep_frame0,
         "layout": "auto",
     }
-    reduce_dim = ("PCA", "out", None, int(args.pca_components), True)
 
     run_config = vars(args).copy()
     run_config.update({
@@ -211,6 +329,7 @@ def main():
         "field_input_config": field_input_config,
         "reduce_dim": reduce_dim,
         "scale": ["symm", "inout"],
+        "loss_config": loss_config,
     })
     metadata = {
         "script": Path(__file__).name,
@@ -250,10 +369,14 @@ def main():
     train_out = getattr(data, f"{active_mode}_train_out")
     print(f"{active_mode} field input shape: {getattr(data, f'{active_mode}_field_input_shape', None)}")
     print(f"{active_mode} field token shape per sample: {train_in.shape[1:]}")
-    print(f"{active_mode} latent output size: {train_out.shape[-1]}")
-    pca = getattr(data, f"{active_mode}_OUTreducer", None)
-    if pca is not None and hasattr(pca, "explained_variance_ratio_"):
-        print(f"{active_mode} PCA explained variance ({args.pca_components} components): {float(np.sum(pca.explained_variance_ratio_)):.6f}")
+    if reduce_dim:
+        print(f"{active_mode} latent output size: {train_out.shape[-1]}")
+        pca = getattr(data, f"{active_mode}_OUTreducer", None)
+        if pca is not None and hasattr(pca, "explained_variance_ratio_"):
+            print(f"{active_mode} PCA explained variance ({train_out.shape[-1]} components): {float(np.sum(pca.explained_variance_ratio_)):.6f}")
+    else:
+        print(f"{active_mode} output curve size: {train_out.shape[-1]}")
+    print(f"Loss: {loss_config}")
 
     in_shape = train_in.shape[1:]
     out_size = int(train_out.shape[-1])
@@ -283,7 +406,16 @@ def main():
     model = MODEL(
         typ=data.model,
         model=transformer,
-        lossf=nn.MSELoss(reduction="mean"),
+        lossf=build_loss(
+            data,
+            active_mode,
+            args,
+            reduce_dim,
+            nn,
+            CombinedCurveLoss,
+            curve_default_zone_boundaries,
+            curve_default_zone_weights,
+        ),
         opt=("adamw", args.weight_decay),
         batch=batch,
         lr=args.lr,
