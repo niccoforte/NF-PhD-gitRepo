@@ -38,8 +38,8 @@ HPC_USER=${HPC_USER:-${USER:-exy053}}
 # The Python run script and resources folder are still copied from REPO_ROOT,
 # not from the submit directory.
 #
-# Other submit examples. For ordinary model runs, MODEL.save() creates the run descriptor.
-# For HPO runs, -J also becomes the default archive folder and HPO study/folder name.
+# Other submit examples. For ordinary model runs, -J becomes the default run descriptor.
+# For HPO runs, -J also becomes the default HPO study/folder name.
 #   sbatch -J curve-test B1_ML-new.sh CurveOutputs/A0-HPC_Curve-test.py --epochs 3 --nsims 64
 #   sbatch -J HPC-CurvePCAUT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task UT --output-reduction pca --pca-components 16
 #   sbatch -J HPC-CurvePCAFT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task FT --output-reduction pca --pca-components 16
@@ -68,9 +68,11 @@ CONDA_ENV=${CONDA_ENV:-nf-ml-gpu}
 
 # Data and archive locations. MLdata.py appends "MLdata/..." to DATA(path=...),
 # so DATA_ROOT must be the parent directory containing MLdata, not MLdata itself.
-# With this default, Python should use DATA(path=os.environ["ML_DATA_ROOT"], ...).
+# ARCHIVE_ROOT receives the framework run layout directly:
+#   {UT|FT|MULTI}/{Curve|Field|FieldToCurve}/{Model}/{Run}
+# With these defaults, Python should use DATA(path=os.environ["ML_DATA_ROOT"], ...).
 DATA_ROOT=${DATA_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
-ARCHIVE_PARENT=${ARCHIVE_PARENT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
+ARCHIVE_ROOT=${ARCHIVE_ROOT:-${ARCHIVE_PARENT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}}
 
 zip=false
 delete_scratch=true
@@ -111,7 +113,7 @@ if [ -z "$RUN_LABEL" ]; then
 fi
 
 ARCHIVE_JOB_NAME=${SLURM_JOB_NAME:-$RUN_LABEL}
-ARCHIVE_ROOT=${ARCHIVE_ROOT:-${ARCHIVE_PARENT%/}/$ARCHIVE_JOB_NAME}
+ARCHIVE_ROOT=${ARCHIVE_ROOT%/}
 ML_JOB_NAME=${ML_JOB_NAME:-$ARCHIVE_JOB_NAME}
 
 if [[ "$ML_SCRIPT" = /* ]]; then
