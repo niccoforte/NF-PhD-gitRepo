@@ -1859,8 +1859,7 @@ def _mp_model_type_token(model_obj=None, typ=None, model=None):
     return _mp_model_type_label(token)
 
 def _mp_run_context_prefix():
-    raw = str(os.environ.get("ML_RUN_CONTEXT", "")).strip().lower()
-    return "HPC-" if raw == "hpc" else ""
+    return ""
 
 def _mp_run_descriptor(model_obj, name=None):
     if name is not None and str(name).strip():

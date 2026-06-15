@@ -41,8 +41,8 @@ HPC_USER=${HPC_USER:-${USER:-exy053}}
 # Other submit examples. For ordinary model runs, -J becomes the default run descriptor.
 # For HPO runs, -J also becomes the default HPO study/folder name.
 #   sbatch -J curve-UT-GAT-full B1_ML-new.sh CurveOutputs/A0-HPC_Curve-test.py --task UT --model-type GAT
-#   sbatch -J HPC-CurvePCAUT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task UT --output-reduction pca --pca-components 16
-#   sbatch -J HPC-CurvePCAFT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task FT --output-reduction pca --pca-components 16
+#   sbatch -J CurvePCAUT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task UT --output-reduction pca --pca-components 16
+#   sbatch -J CurvePCAFT_fullHPO B1_ML-new.sh CurveOutputs/A0-HPC_Curve-CrossModelHPO.py --task FT --output-reduction pca --pca-components 16
 #   ML_SCRIPT=FieldOutputs/A0-HPC_Field-test.py sbatch -J field-UT-TR-full B1_ML-new.sh -- --task UT --model-type TR
 #   ML_SCRIPT=FieldToCurve/A0-HPC_FieldToCurve-test.py sbatch -J field-to-curve-FT-full B1_ML-new.sh -- --task FT --output-reduction none
 #   ML_SCRIPT=FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py sbatch -J Field2Curve-FT-HPO B1_ML-new.sh -- --task FT

@@ -6,12 +6,12 @@ REMOTE=${REMOTE:-exy053@login.hpc.qmul.ac.uk}
 REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 
 # Usage examples:
-#   bash B3_ML-transfer.sh "UT/Curve/MLP/HPC-ut-mlp-260514-142233"
-#   bash B3_ML-transfer.sh UT Curve MLP HPC-ut-mlp-260514-142233
+#   bash B3_ML-transfer.sh "UT/Curve/MLP/ut-mlp-260514-142233"
+#   bash B3_ML-transfer.sh UT Curve MLP ut-mlp-260514-142233
 #   bash B3_ML-transfer.sh UT FieldToCurve Transformer field-to-curve-UT-full
-#   bash B3_ML-transfer.sh UT Curve MLP HPO HPC-MLP_full_hOpt
-#   bash B3_ML-transfer.sh UT Field HPO HPC-cross_model_hOpt
-#   bash B3_ML-transfer.sh UT Field HPO HPC-cross_model_hOpt GAT  # optional single model subfolder
+#   bash B3_ML-transfer.sh UT Curve MLP HPO MLP_full_hOpt
+#   bash B3_ML-transfer.sh UT Field HPO cross_model_hOpt
+#   bash B3_ML-transfer.sh UT Field HPO cross_model_hOpt GAT  # optional single model subfolder
 
 if [ -d "Z:/" ]; then
     LOCAL_ROOT=${LOCAL_ROOT:-Z:/p2}
@@ -103,7 +103,7 @@ if [ -z "$RUN_PATH" ]; then
     case "${RUN_KIND,,}" in
         regular)
             prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
-            prompt_required RUN_DESCRIPTOR "Run descriptor, e.g. HPC-ut-gat-260513-143012 or all"
+            prompt_required RUN_DESCRIPTOR "Run descriptor, e.g. ut-gat-260513-143012 or all"
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
                 RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME
             else
@@ -112,7 +112,7 @@ if [ -z "$RUN_PATH" ]; then
             ;;
         model-hpo)
             prompt_required MODEL_NAME "Model, e.g. MLP, GAT, GCN, Transformer"
-            prompt_required RUN_DESCRIPTOR "Model-specific HPO descriptor, e.g. HPC-MLP_full_hOpt or all"
+            prompt_required RUN_DESCRIPTOR "Model-specific HPO descriptor, e.g. MLP_full_hOpt or all"
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
                 RUN_PATH=$TASK/$OUTPUT_KIND/$MODEL_NAME/HPO
             else
@@ -120,7 +120,7 @@ if [ -z "$RUN_PATH" ]; then
             fi
             ;;
         compare-hpo)
-            prompt_required RUN_DESCRIPTOR "Cross-model HPO descriptor, e.g. HPC-cross_model_hOpt or all"
+            prompt_required RUN_DESCRIPTOR "Cross-model HPO descriptor, e.g. cross_model_hOpt or all"
             if [ "$RUN_DESCRIPTOR" = "all" ]; then
                 RUN_PATH=$TASK/$OUTPUT_KIND/HPO
             else
