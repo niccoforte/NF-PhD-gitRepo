@@ -100,7 +100,7 @@ def split_size_summary(data):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Cross-model GPU HPO for field-input to PCA curve-output models."
+        description="Cross-model GPU HPO for field-input to curve-output models."
     )
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
     parser.add_argument("--split-frac", type=float, default=0.9)
@@ -118,6 +118,7 @@ def parse_args():
     parser.add_argument("--components", default="U1,U2", help="Field input components, e.g. 'U1,U2', 'U2', or 'Umag'.")
     parser.add_argument("--keep-frame0", action="store_true", help="Keep the unloaded field frame 0 in the input.")
     parser.add_argument("--models", default="GCN,GAT,TR")
+    parser.add_argument("--output-reduction", default="pca", choices=["pca", "none"], help="Use PCA curve latents or full ordered curve outputs.")
     parser.add_argument("--pca-components", type=int, default=None, help="Fixed PCA latent dimension. Defaults to 16 when --pca-accuracy is not set.")
     parser.add_argument("--pca-accuracy", type=float, default=None, help="Variance threshold for PCA component selection. Ignored when --pca-components is set.")
     parser.add_argument("--no-scale-reduced", action="store_true", help="Do not scale PCA latent curve outputs.")
@@ -128,6 +129,11 @@ def parse_args():
 
 
 def output_reduce_dim(args):
+    output_reduction = str(args.output_reduction or "pca").strip().lower()
+    if output_reduction in ["none", "false", "off", "full", "curve"]:
+        return False
+    if output_reduction != "pca":
+        raise ValueError("--output-reduction must be 'pca' or 'none'.")
     if args.pca_components is not None and args.pca_components < 1:
         raise ValueError("--pca-components must be >= 1 when set.")
     if args.pca_accuracy is not None and not 0 < args.pca_accuracy <= 1:
@@ -344,8 +350,12 @@ def main():
                 train_out = getattr(data_by_typ[typ], f"{mode}_train_out")
                 print(f"{typ.upper()} {mode} field input shape: {getattr(data_by_typ[typ], f'{mode}_field_input_shape', None)}")
                 print(f"{typ.upper()} {mode} token shape per sample: {train_in.shape[1:]}")
-                print(f"{typ.upper()} {mode} latent output size: {train_out.shape[-1]}")
-        print(f"{typ.upper()} PCA summary: {pca_summary(data_by_typ[typ])}")
+                if reduce_dim:
+                    print(f"{typ.upper()} {mode} latent output size: {train_out.shape[-1]}")
+                else:
+                    print(f"{typ.upper()} {mode} output curve size: {train_out.shape[-1]}")
+        if reduce_dim:
+            print(f"{typ.upper()} PCA summary: {pca_summary(data_by_typ[typ])}")
 
     studies = run_exact_named_hpo(
         hOpt_compare,
