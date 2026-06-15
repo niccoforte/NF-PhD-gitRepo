@@ -155,15 +155,61 @@ conda_env_exists() {
 sync_run_outputs() {
     mkdir -p "$ARCHIVE_ROOT"
 
-    if [ -f "$SLURM_SUBMIT_DIR/$SLURM_JOB_NAME.o$SLURM_JOB_ID" ]; then
-        while IFS= read -r model_file; do
-            rsync -av "$SLURM_SUBMIT_DIR/$SLURM_JOB_NAME.o$SLURM_JOB_ID" "$(dirname "$model_file")/"
-        done < <(find "$SCRATCH_RUN_ROOT" -type f -name "*.mdl" 2>/dev/null)
-    fi
-
     if [ -d "$SCRATCH_RUN_ROOT" ]; then
         rsync -av "$SCRATCH_RUN_ROOT"/ "$ARCHIVE_ROOT"/
     fi
+}
+
+job_log_roots() {
+    local roots=()
+    local db rel p0 p1 p2 p3 p4 target model_file
+
+    if [ ! -d "$SCRATCH_RUN_ROOT" ]; then
+        return 0
+    fi
+
+    while IFS= read -r db; do
+        rel=${db#"$SCRATCH_RUN_ROOT"/}
+        IFS='/' read -r p0 p1 p2 p3 p4 _ <<< "$rel"
+        if [ "$p2" = "HPO" ] && [ -n "${p3:-}" ] && [ -n "${p4:-}" ]; then
+            target="$SCRATCH_RUN_ROOT/$p0/$p1/HPO/$p3"
+        elif [ "$p3" = "HPO" ] && [ -n "${p4:-}" ]; then
+            target=$(dirname "$db")
+        else
+            target=$(dirname "$db")
+        fi
+        roots+=("$target")
+    done < <(find "$SCRATCH_RUN_ROOT" -type f -name "full_study.db" 2>/dev/null)
+
+    if [ "${#roots[@]}" -eq 0 ]; then
+        while IFS= read -r model_file; do
+            roots+=("$(dirname "$model_file")")
+        done < <(find "$SCRATCH_RUN_ROOT" -type f -name "*.mdl" 2>/dev/null)
+    fi
+
+    if [ "${#roots[@]}" -gt 0 ]; then
+        printf '%s\n' "${roots[@]}" | sort -u
+    fi
+}
+
+sync_job_log_to_archive_roots() {
+    local log_file archive_target scratch_root rel
+
+    log_file="$SLURM_SUBMIT_DIR/$SLURM_JOB_NAME.o$SLURM_JOB_ID"
+    if [ ! -f "$log_file" ]; then
+        /bin/echo "Job log not found yet: $log_file"
+        return 0
+    fi
+
+    while IFS= read -r scratch_root; do
+        if [[ "$scratch_root" != "$SCRATCH_RUN_ROOT"* ]]; then
+            continue
+        fi
+        rel=${scratch_root#"$SCRATCH_RUN_ROOT"/}
+        archive_target="$ARCHIVE_ROOT/$rel"
+        mkdir -p "$archive_target"
+        rsync -av "$log_file" "$archive_target/"
+    done < <(job_log_roots)
 }
 
 finish() {
@@ -178,6 +224,10 @@ finish() {
         rsync -av "$SCRATCH_DIR/C2_mlruns-$RUN_LABEL-$SLURM_JOB_ID.tgz" "$ARCHIVE_ROOT/"
     fi
 
+    /bin/echo "Job finished with status $status at: $(date)"
+    /bin/echo "Data saved under: $ARCHIVE_ROOT"
+    sync_job_log_to_archive_roots
+
     if [ "$status" -eq 0 ] && [ "$delete_scratch" = true ]; then
         if [[ "$SCRATCH_DIR" == /gpfs/scratch/"$HPC_USER"/"$SLURM_JOB_ID" ]]; then
             rm -rf "$SCRATCH_DIR"
@@ -188,8 +238,6 @@ finish() {
         /bin/echo "Scratch kept for debugging: $SCRATCH_DIR"
     fi
 
-    /bin/echo "Job finished with status $status at: $(date)"
-    /bin/echo "Data saved under: $ARCHIVE_ROOT"
     exit "$status"
 }
 trap finish EXIT
@@ -202,6 +250,7 @@ trap finish EXIT
 /bin/echo "Run label: $RUN_LABEL"
 /bin/echo "Archive root: $ARCHIVE_ROOT"
 /bin/echo "ML job/study name: $ML_JOB_NAME"
+/bin/echo "Python args: ${ML_ARGS[*]:-}"
 
 mkdir -p "$SCRATCH_DIR"
 mkdir -p "$SCRATCH_RUN_ROOT"
