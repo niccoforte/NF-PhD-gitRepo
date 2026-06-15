@@ -93,18 +93,18 @@ def context_label(label):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Generic single-GPU field-output smoke test for GCN, GAT, and Transformer models."
+        description="Generic single-GPU field-output training run for GCN, GAT, and Transformer models."
     )
     parser.add_argument("--task", type=str.upper, default="UT", choices=["UT", "FT", "MULTI"])
     parser.add_argument("--model-type", default="TR", help="GCN, GAT, GNN, TR, or Transformer.")
     parser.add_argument("--run-label", default="", help="Optional run descriptor. Empty uses the framework timestamp.")
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
     parser.add_argument("--split-frac", type=float, default=0.9)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=450)
     parser.add_argument("--batch", type=int, default=0, help="0 chooses a model-appropriate default.")
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-5)
-    parser.add_argument("--nsims", default="64", help="Number of simulations, or 'all'.")
+    parser.add_argument("--nsims", default="all", help="Number of simulations, or 'all'.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--lat", default="FCC")
     parser.add_argument("--dis", default="disNodes")
@@ -164,10 +164,10 @@ def parse_args():
     parser.add_argument("--use-cls-token", action="store_true", help="Add a Transformer CLS token. Node pooling ignores it.")
 
     parser.add_argument("--loss", default="masked", choices=["auto", "masked", "mse"])
-    parser.add_argument("--scheduler-patience", type=int, default=3)
+    parser.add_argument("--scheduler-patience", type=int, default=20)
     parser.add_argument("--scheduler-factor", type=float, default=0.5)
     parser.add_argument("--scheduler-threshold", type=float, default=1e-4)
-    parser.add_argument("--early-stop-patience", type=int, default=8)
+    parser.add_argument("--early-stop-patience", type=int, default=75)
     parser.add_argument("--early-stop-delta", type=float, default=1e-5)
     parser.add_argument("--verbose", type=int, default=1)
     parser.add_argument("--diag-samples", type=int, default=16)

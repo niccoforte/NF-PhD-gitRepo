@@ -164,18 +164,18 @@ def context_label(label):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Single-GPU field-to-curve Transformer smoke test."
+        description="Single-GPU field-to-curve Transformer training run."
     )
     parser.add_argument("--task", type=str.upper, default="UT", choices=["UT", "FT"])
     parser.add_argument("--model-type", default="TR", choices=["TR", "Transformer", "tr", "transformer"])
     parser.add_argument("--run-label", default="", help="Optional run descriptor. Empty uses the framework timestamp.")
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
     parser.add_argument("--split-frac", type=float, default=0.9)
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--epochs", type=int, default=350)
     parser.add_argument("--batch", type=int, default=0, help="0 chooses a Transformer-friendly default.")
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-5)
-    parser.add_argument("--nsims", default="64", help="Number of simulations, or 'all'.")
+    parser.add_argument("--nsims", default="all", help="Number of simulations, or 'all'.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--lat", default="FCC")
     parser.add_argument("--dis", default="disNodes")
@@ -238,10 +238,10 @@ def parse_args():
     parser.add_argument("--derivative-order", type=int, default=1)
     parser.add_argument("--loss-eps", type=float, default=1e-8)
 
-    parser.add_argument("--scheduler-patience", type=int, default=10)
+    parser.add_argument("--scheduler-patience", type=int, default=20)
     parser.add_argument("--scheduler-factor", type=float, default=0.5)
     parser.add_argument("--scheduler-threshold", type=float, default=1e-4)
-    parser.add_argument("--early-stop-patience", type=int, default=30)
+    parser.add_argument("--early-stop-patience", type=int, default=50)
     parser.add_argument("--early-stop-delta", type=float, default=1e-5)
     parser.add_argument("--verbose", type=int, default=1)
     parser.add_argument("--allow-cpu", action="store_true", help="Allow running without CUDA.")

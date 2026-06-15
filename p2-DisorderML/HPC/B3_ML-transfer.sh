@@ -8,7 +8,7 @@ REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 # Usage examples:
 #   bash B3_ML-transfer.sh "UT/Curve/MLP/HPC-ut-mlp-260514-142233"
 #   bash B3_ML-transfer.sh UT Curve MLP HPC-ut-mlp-260514-142233
-#   bash B3_ML-transfer.sh UT FieldToCurve Transformer HPC-field-to-curve-smoke
+#   bash B3_ML-transfer.sh UT FieldToCurve Transformer field-to-curve-UT-full
 #   bash B3_ML-transfer.sh UT Curve MLP HPO HPC-MLP_full_hOpt
 #   bash B3_ML-transfer.sh UT Field HPO HPC-cross_model_hOpt
 #   bash B3_ML-transfer.sh UT Field HPO HPC-cross_model_hOpt GAT  # optional single model subfolder
