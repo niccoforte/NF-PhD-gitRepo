@@ -45,7 +45,8 @@ Options:
   --data-root PATH        DATA root passed through ML_DATA_ROOT. Default: archive root
   --repo-root PATH        Git repository root. Default: /data/home/$USER/00-PhD-gitRepo
   --script PATH           Override the HPO Python script if it cannot be inferred.
-  --study-name NAME       Override the study folder/name. Default: basename of STUDY.
+  --study-name NAME       Override the Optuna study base name. Default: archive folder,
+                          with auto-detection from the DB for older mismatched archives.
   --target-trials N       Target finished trials per model. Default: infer from log or sibling studies.
   --models LIST           Restrict models to resume, e.g. GCN,GAT,TR.
   --no-progress           Pass --no-progress to the HPO entry point.
@@ -147,10 +148,63 @@ resolve_script_source() {
 }
 
 sync_resume_outputs() {
-    if [ -d "${SCRATCH_RUN_ROOT:-}" ]; then
-        mkdir -p "$ARCHIVE_ROOT"
-        rsync -av "$SCRATCH_RUN_ROOT"/ "$ARCHIVE_ROOT"/
+    if [ -n "${SCRATCH_HPO_DIR:-}" ] && [ -d "$SCRATCH_HPO_DIR" ]; then
+        mkdir -p "$HPO_ARCHIVE_DIR"
+        rsync -av "$SCRATCH_HPO_DIR"/ "$HPO_ARCHIVE_DIR"/
+    else
+        /bin/echo "No scratch HPO output directory to sync."
     fi
+}
+
+rewrite_resume_archive_metadata() {
+    if [ -z "${SCRATCH_HPO_DIR:-}" ] || [ -z "${RUN_HPO_REL:-}" ] || [ -z "${HPO_REL:-}" ]; then
+        return 0
+    fi
+    if [ "$RUN_HPO_REL" = "$HPO_REL" ] || [ ! -d "$SCRATCH_HPO_DIR" ]; then
+        return 0
+    fi
+    if ! command -v python >/dev/null 2>&1; then
+        /bin/echo "Python not available; skipping archive metadata path rewrite."
+        return 0
+    fi
+
+    export SCRATCH_HPO_DIR
+    export ARCHIVE_ROOT
+    export RUN_HPO_REL
+    export HPO_ARCHIVE_DIR
+
+    python - <<'PY'
+import json
+import os
+from pathlib import Path
+
+root = Path(os.environ["SCRATCH_HPO_DIR"])
+old_archive = f"{os.environ['ARCHIVE_ROOT'].rstrip('/')}/{os.environ['RUN_HPO_REL']}"
+new_archive = os.environ["HPO_ARCHIVE_DIR"].rstrip("/")
+
+def replace_value(value):
+    if isinstance(value, str):
+        return value.replace(old_archive, new_archive)
+    if isinstance(value, list):
+        return [replace_value(item) for item in value]
+    if isinstance(value, dict):
+        return {key: replace_value(item) for key, item in value.items()}
+    return value
+
+rewritten = 0
+for json_file in root.rglob("*.json"):
+    try:
+        data = json.loads(json_file.read_text(encoding="utf-8"))
+    except Exception:
+        continue
+    updated = replace_value(data)
+    if updated != data:
+        json_file.write_text(json.dumps(updated, indent=2, sort_keys=True), encoding="utf-8")
+        rewritten += 1
+
+if rewritten:
+    print(f"Rewrote archive metadata paths in {rewritten} JSON file(s).")
+PY
 }
 
 sync_resume_log() {
@@ -170,6 +224,7 @@ finish() {
     set +e
 
     /bin/echo "Archiving resumed HPO outputs at: $(date)"
+    rewrite_resume_archive_metadata
     sync_resume_outputs
     /bin/echo "Resume job finished with status $status at: $(date)"
     /bin/echo "Data saved under: ${ARCHIVE_ROOT:-unknown}"
@@ -200,6 +255,7 @@ DATA_ROOT=${DATA_ROOT:-}
 ARCHIVE_ARG=
 ML_SCRIPT=
 STUDY_NAME=
+STUDY_NAME_PROVIDED=false
 TARGET_TRIALS=
 MODEL_FILTER=
 dry_run=false
@@ -255,10 +311,12 @@ while [ "$#" -gt 0 ]; do
         --study-name)
             [ "$#" -ge 2 ] || die "--study-name requires a value."
             STUDY_NAME=$2
+            STUDY_NAME_PROVIDED=true
             shift 2
             ;;
         --study-name=*)
             STUDY_NAME=${1#--study-name=}
+            STUDY_NAME_PROVIDED=true
             shift
             ;;
         --target-trials)
@@ -382,8 +440,8 @@ SCRIPT_SRC=$(resolve_script_source "$ML_SCRIPT")
 
 SCRATCH_DIR=/gpfs/scratch/$HPC_USER/$JOB_ID
 SCRATCH_RUN_ROOT=$SCRATCH_DIR/mlruns
-SCRATCH_HPO_DIR=$SCRATCH_RUN_ROOT/$HPO_REL
 PLAN_FILE=$SCRATCH_DIR/resume_plan.tsv
+RESOLVED_STUDY_NAME_FILE=$SCRATCH_DIR/resolved_study_name.txt
 SCRIPT_LOCAL=$SCRATCH_DIR/$(basename "$ML_SCRIPT")
 
 trap finish EXIT
@@ -395,7 +453,8 @@ trap finish EXIT
 /bin/echo "Resume archive root: $ARCHIVE_ROOT"
 /bin/echo "Relative HPO path: $HPO_REL"
 /bin/echo "Task/output: $TASK / $OUTPUT_KIND"
-/bin/echo "Study folder/name: $STUDY_NAME"
+/bin/echo "Archive study folder: $STUDY_FOLDER"
+/bin/echo "Requested Optuna study base: $STUDY_NAME"
 /bin/echo "Resume script: $ML_SCRIPT"
 if [ -n "$SOURCE_LOG" ]; then
     /bin/echo "Detected source log: $SOURCE_LOG"
@@ -426,8 +485,10 @@ export TARGET_TRIALS
 export MODEL_FILTER
 export HPO_ARCHIVE_DIR
 export STUDY_NAME
+export STUDY_NAME_PROVIDED
 export SOURCE_LOG
 export PLAN_FILE
+export RESOLVED_STUDY_NAME_FILE
 
 python - <<'PY'
 import os
@@ -475,7 +536,9 @@ def infer_target_from_log(log_file):
 
 archive_dir = Path(os.environ["HPO_ARCHIVE_DIR"])
 plan_file = Path(os.environ["PLAN_FILE"])
-study_base = os.environ["STUDY_NAME"]
+resolved_study_name_file = Path(os.environ["RESOLVED_STUDY_NAME_FILE"])
+requested_study_base = os.environ["STUDY_NAME"]
+study_name_provided = os.environ.get("STUDY_NAME_PROVIDED", "false").lower() == "true"
 target_text = os.environ.get("TARGET_TRIALS", "").strip()
 target = int(target_text) if target_text else infer_target_from_log(os.environ.get("SOURCE_LOG", ""))
 
@@ -502,23 +565,33 @@ for study_dir in study_dirs:
         raise SystemExit(f"No Optuna studies found in {db_path}.")
 
     expected_suffix = f"_{study_dir.name}"
+    expected_name = f"{requested_study_base}{expected_suffix}"
     summary = None
+    detected_study_base = None
     for candidate in summaries:
-        if candidate.study_name == f"{study_base}{expected_suffix}":
+        if candidate.study_name == expected_name:
             summary = candidate
+            detected_study_base = requested_study_base
             break
-    if summary is None and len(summaries) == 1:
-        summary = summaries[0]
-    if summary is None:
-        names = ", ".join(candidate.study_name for candidate in summaries)
-        raise SystemExit(f"Could not choose one study in {db_path}. Found: {names}")
 
-    expected_name = f"{study_base}{expected_suffix}"
-    if summary.study_name != expected_name:
-        raise SystemExit(
-            f"Study name '{summary.study_name}' does not match folder-derived name "
-            f"'{expected_name}'. Use --study-name or check the archive path."
-        )
+    if summary is None:
+        suffix_matches = [
+            candidate for candidate in summaries
+            if candidate.study_name.endswith(expected_suffix)
+        ]
+        if not study_name_provided and len(suffix_matches) == 1:
+            summary = suffix_matches[0]
+            detected_study_base = summary.study_name[:-len(expected_suffix)]
+        else:
+            names = ", ".join(candidate.study_name for candidate in summaries)
+            if study_name_provided:
+                raise SystemExit(
+                    f"Could not find study '{expected_name}' in {db_path}. Found: {names}"
+                )
+            raise SystemExit(
+                f"Could not choose one study in {db_path}. Expected '{expected_name}' "
+                f"or one unambiguous '*{expected_suffix}' study. Found: {names}"
+            )
 
     study = optuna.load_study(study_name=summary.study_name, storage=storage)
     trials = study.get_trials(deepcopy=False)
@@ -529,6 +602,7 @@ for study_dir in study_dirs:
         "model_dir": study_dir.name,
         "model_arg": model_arg(study_dir.name),
         "study_name": summary.study_name,
+        "study_base": detected_study_base,
         "finished": finished,
         "running": running,
         "failed": failed,
@@ -538,6 +612,14 @@ for study_dir in study_dirs:
 if not rows:
     raise SystemExit("No HPO model studies matched the requested model filter.")
 
+study_bases = sorted({row["study_base"] for row in rows})
+if len(study_bases) != 1:
+    raise SystemExit(f"Selected model studies have inconsistent Optuna study bases: {study_bases}")
+resolved_study_base = study_bases[0]
+if not resolved_study_base:
+    raise SystemExit("Resolved Optuna study base is empty.")
+resolved_study_name_file.write_text(resolved_study_base + "\n", encoding="utf-8")
+
 if target is None:
     finished_counts = [row["finished"] for row in rows if row["finished"] > 0]
     if not finished_counts:
@@ -545,20 +627,36 @@ if target is None:
     target = max(finished_counts)
 
 with plan_file.open("w", encoding="utf-8") as handle:
-    handle.write("model_dir\tmodel_arg\tstudy_name\tfinished\trunning\tfailed\ttotal\ttarget\tremaining\n")
+    handle.write("model_dir\tmodel_arg\tstudy_name\tstudy_base\tfinished\trunning\tfailed\ttotal\ttarget\tremaining\n")
     for row in rows:
         remaining = max(0, target - row["finished"])
         handle.write(
-            f"{row['model_dir']}\t{row['model_arg']}\t{row['study_name']}\t"
+            f"{row['model_dir']}\t{row['model_arg']}\t{row['study_name']}\t{row['study_base']}\t"
             f"{row['finished']}\t{row['running']}\t{row['failed']}\t{row['total']}\t"
             f"{target}\t{remaining}\n"
         )
 PY
 
+RESOLVED_STUDY_NAME=$(cat "$RESOLVED_STUDY_NAME_FILE")
+[ -n "$RESOLVED_STUDY_NAME" ] || die "Resolved Optuna study name is empty."
+case "$RESOLVED_STUDY_NAME" in
+    */*)
+        die "Resolved Optuna study name must not contain '/': $RESOLVED_STUDY_NAME"
+        ;;
+esac
+
+/bin/echo "Resolved Optuna study base: $RESOLVED_STUDY_NAME"
+if [ "$RESOLVED_STUDY_NAME" != "$STUDY_NAME" ]; then
+    /bin/echo "Archive folder '$STUDY_FOLDER' contains DB study base '$RESOLVED_STUDY_NAME'; resuming by DB name and syncing back to the archive folder."
+fi
+
+RUN_HPO_REL=$TASK/$OUTPUT_KIND/HPO/$RESOLVED_STUDY_NAME
+SCRATCH_HPO_DIR=$SCRATCH_RUN_ROOT/$RUN_HPO_REL
+
 /bin/echo "Detected HPO resume plan:"
 column -t -s $'\t' "$PLAN_FILE" || cat "$PLAN_FILE"
 
-if ! awk -F '\t' 'NR > 1 && $9 > 0 { found = 1 } END { exit found ? 0 : 1 }' "$PLAN_FILE"; then
+if ! awk -F '\t' 'NR > 1 && $10 > 0 { found = 1 } END { exit found ? 0 : 1 }' "$PLAN_FILE"; then
     /bin/echo "All selected HPO studies have reached the target trial count. Nothing to resume."
     exit 0
 fi
@@ -588,23 +686,23 @@ export PYTHONPATH=$SCRATCH_DIR:${PYTHONPATH:-}
 export ML_DATA_ROOT=$DATA_ROOT
 export ML_RUN_ROOT=$SCRATCH_RUN_ROOT
 export ML_ARCHIVE_ROOT=$ARCHIVE_ROOT
-export ML_JOB_NAME=$STUDY_NAME
+export ML_JOB_NAME=$RESOLVED_STUDY_NAME
 export ML_RUN_CONTEXT=
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_GPU:-${SLURM_NTASKS:-12}}
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
 
 cd "$SCRATCH_DIR"
-while IFS=$'\t' read -r model_dir model_arg study_name finished running failed total target remaining; do
+while IFS=$'\t' read -r model_dir model_arg study_name study_base finished running failed total target remaining; do
     if [ "$model_dir" = "model_dir" ] || [ "$remaining" -le 0 ]; then
         continue
     fi
 
-    /bin/echo "Resuming $model_dir: finished=$finished running=$running failed=$failed total=$total target=$target remaining=$remaining"
+    /bin/echo "Resuming $model_dir: study=$study_name finished=$finished running=$running failed=$failed total=$total target=$target remaining=$remaining"
     run_args=(
         --task "$TASK"
         --models "$model_arg"
-        --study-name "$STUDY_NAME"
+        --study-name "$RESOLVED_STUDY_NAME"
         --n-trials-per-typ "$remaining"
     )
     if [ "$no_progress" = true ]; then
