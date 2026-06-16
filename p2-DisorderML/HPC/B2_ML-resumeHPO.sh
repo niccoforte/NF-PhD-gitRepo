@@ -58,6 +58,9 @@ Notes:
   active cross-model HPO layout:
       ARCHIVE_ROOT/{UT|FT|MULTI}/{Curve|Field|FieldToCurve}/HPO/{Study}/{Model}/full_study.db
 
+  The original Slurm log is searched in the submit directory first, then in the
+  archive folder as a fallback.
+
   Path-only resume works for default HPO runs. If the original job used extra
   flags such as PCA settings, custom components, or reduced nsims, pass the same
   script flags after "--".
@@ -90,20 +93,34 @@ conda_env_exists() {
 
 find_source_log() {
     local search_dir=$1
+    local preferred_job_name=${2:-}
     local log
+    local base
     local logs=()
+    local preferred_logs=()
+
+    [ -d "$search_dir" ] || return 1
 
     while IFS= read -r log; do
         logs+=("$log")
-    done < <(find "$search_dir" -maxdepth 1 -type f -name "*.o[0-9]*" 2>/dev/null | sort)
+    done < <(find "$search_dir" -maxdepth 1 -type f -name "*.o[0-9]*" 2>/dev/null | sort -r)
 
     if [ "${#logs[@]}" -eq 0 ]; then
         while IFS= read -r log; do
             logs+=("$log")
-        done < <(find "$search_dir" -mindepth 2 -maxdepth 2 -type f -name "*.o[0-9]*" 2>/dev/null | sort)
+        done < <(find "$search_dir" -mindepth 2 -maxdepth 2 -type f -name "*.o[0-9]*" 2>/dev/null | sort -r)
     fi
 
-    for log in "${logs[@]}"; do
+    if [ -n "$preferred_job_name" ]; then
+        for log in "${logs[@]}"; do
+            base=$(basename "$log")
+            if [[ "$base" == "$preferred_job_name".o[0-9]* ]]; then
+                preferred_logs+=("$log")
+            fi
+        done
+    fi
+
+    for log in "${preferred_logs[@]}" "${logs[@]}"; do
         if grep -q "^Script:" "$log" && grep -q "^Archive root:" "$log"; then
             printf '%s\n' "$log"
             return 0
@@ -411,7 +428,21 @@ if [ -z "$STUDY_NAME" ]; then
     STUDY_NAME=$STUDY_FOLDER
 fi
 
-SOURCE_LOG=$(find_source_log "$HPO_ARCHIVE_DIR" || true)
+SUBMIT_LOG_DIR=${SLURM_SUBMIT_DIR:-$(pwd)}
+SOURCE_LOG=
+SOURCE_LOG_ORIGIN=
+if [ -d "$SUBMIT_LOG_DIR" ]; then
+    SOURCE_LOG=$(find_source_log "$SUBMIT_LOG_DIR" "$STUDY_FOLDER" || true)
+    if [ -n "$SOURCE_LOG" ]; then
+        SOURCE_LOG_ORIGIN="submit directory"
+    fi
+fi
+if [ -z "$SOURCE_LOG" ]; then
+    SOURCE_LOG=$(find_source_log "$HPO_ARCHIVE_DIR" "$STUDY_FOLDER" || true)
+    if [ -n "$SOURCE_LOG" ]; then
+        SOURCE_LOG_ORIGIN="archive directory"
+    fi
+fi
 if [ -n "$SOURCE_LOG" ]; then
     LOG_SCRIPT=$(sed -n 's/^Script:[[:space:]]*//p' "$SOURCE_LOG" | head -n 1)
     LOG_ARGS=$(sed -n 's/^Python args:[[:space:]]*//p' "$SOURCE_LOG" | tail -n 1)
@@ -456,8 +487,9 @@ trap finish EXIT
 /bin/echo "Archive study folder: $STUDY_FOLDER"
 /bin/echo "Requested Optuna study base: $STUDY_NAME"
 /bin/echo "Resume script: $ML_SCRIPT"
+/bin/echo "Submit log search directory: $SUBMIT_LOG_DIR"
 if [ -n "$SOURCE_LOG" ]; then
-    /bin/echo "Detected source log: $SOURCE_LOG"
+    /bin/echo "Detected source log ($SOURCE_LOG_ORIGIN): $SOURCE_LOG"
     /bin/echo "Original job: ${ORIGINAL_JOB_NAME:-unknown} ${ORIGINAL_JOB_ID:-unknown}"
     if [ -n "$LOG_ARGS" ]; then
         /bin/echo "Original Python args line: $LOG_ARGS"
@@ -466,7 +498,7 @@ if [ -n "$SOURCE_LOG" ]; then
         /bin/echo "Warning: source log archive root differs: $LOG_ARCHIVE_ROOT"
     fi
 else
-    /bin/echo "No source Slurm log found under the HPO archive path."
+    /bin/echo "No source Slurm log found in the submit directory or under the HPO archive path."
 fi
 
 mkdir -p "$SCRATCH_DIR"
