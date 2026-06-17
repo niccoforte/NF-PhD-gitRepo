@@ -525,7 +525,15 @@ def plot_curve_diagnostics(
     plt.show()
     return fig, axes
 
-def postprocess_load_curve_run(
+def _postprocess_data_kind_label(data):
+    input_kind = str(getattr(data, "input_kind", "geometry") or "geometry").lower()
+    output_kind = str(getattr(data, "output_kind", "curve") or "curve").lower()
+    if input_kind == "field" and output_kind == "curve":
+        return "FieldToCurve"
+    return output_kind
+
+
+def _postprocess_load_run(
     run_path,
     run_root=None,
     prefer_hpo_best=True,
@@ -548,7 +556,9 @@ def postprocess_load_curve_run(
             )
             if verbose:
                 print("Loaded DATA from:", artifacts["data_json"])
+                print("DATA input_kind:", getattr(data, "input_kind", "geometry"))
                 print("DATA output_kind:", getattr(data, "output_kind", "curve"))
+                print("DATA kind:", _postprocess_data_kind_label(data))
         except Exception as exc:
             if verbose:
                 print("DATA load failed:", repr(exc))
@@ -575,6 +585,29 @@ def postprocess_load_curve_run(
         print("MODEL was not loaded because a model JSON or DATA object is missing.")
 
     return artifacts, loaded, data, model
+
+
+def postprocess_load_curve_run(
+    run_path,
+    run_root=None,
+    prefer_hpo_best=True,
+    load_data=True,
+    load_model=True,
+    data_path_override=None,
+    device="cpu",
+    verbose=True,
+):
+    return _postprocess_load_run(
+        run_path,
+        run_root=run_root,
+        prefer_hpo_best=prefer_hpo_best,
+        load_data=load_data,
+        load_model=load_model,
+        data_path_override=data_path_override,
+        device=device,
+        verbose=verbose,
+    )
+
 
 def postprocess_curve_run_overview(
     artifacts,
@@ -798,8 +831,6 @@ def display_curve_pointwise_summary(
     sort_by="rmse",
     show_correlation=True,
 ):
-    from IPython.display import Markdown, display
-
     if diagnostics is None:
         print("No active diagnostics are available.")
         return None
@@ -815,9 +846,7 @@ def display_curve_pointwise_summary(
     )
 
     if show_correlation:
-        corr, _, _ = plot_curve_correlation_matrix(diagnostics, method="pearson")
-        display(Markdown("### Diagnostic Correlations"))
-        display(corr)
+        plot_curve_correlation_matrix(diagnostics, method="pearson")
 
 def plot_curve_all_point_parity(
     diagnostics,
@@ -1096,12 +1125,16 @@ def display_curve_zone_summary(diagnostics):
     zone_cols = [col for col in zone_cols if col in zone.columns]
     if not zone_cols:
         return None
-    fig, axes = plt.subplots(1, len(zone_cols), figsize=(4 * len(zone_cols), 4), sharex=False)
+    nrows = 2
+    ncols = int(np.ceil(len(zone_cols) / nrows))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 3.7 * nrows), sharex=False)
     axes = np.asarray(axes).reshape(-1)
     for ax, col in zip(axes, zone_cols):
         ax.bar(zone["zone"], zone[col], color="tab:blue", alpha=0.85)
         ax.set_title(col)
         ax.tick_params(axis="x", rotation=35)
+    for ax in axes[len(zone_cols):]:
+        ax.axis("off")
     fig.tight_layout()
     plt.show()
     return fig, axes
@@ -1215,6 +1248,7 @@ def display_curve_loss_component_breakdown(model, diagnostics, active_key=None):
             fig, ax = plt.subplots(figsize=(10, 4))
             ax.bar(plot_df["component"], plot_df["weighted_value"], color="tab:blue")
             ax.set_title("Weighted Loss Components")
+            ax.set_yscale("log")
             ax.tick_params(axis="x", rotation=35)
             fig.tight_layout()
             plt.show()
@@ -3364,46 +3398,16 @@ def postprocess_load_field_run(
     device="cpu",
     verbose=True,
 ):
-    artifacts = postprocess_resolve_artifacts(run_path, run_root=run_root, prefer_hpo_best=prefer_hpo_best)
-    loaded = postprocess_load_artifacts(artifacts)
-
-    data = None
-    if load_data and artifacts.get("data_json") is not None:
-        try:
-            data = postprocess_load_data(
-                artifacts["data_json"],
-                data_path_override=data_path_override,
-                auto_path_root=run_root,
-            )
-            if verbose:
-                print("Loaded DATA from:", artifacts["data_json"])
-                print("DATA output_kind:", getattr(data, "output_kind", "curve"))
-        except Exception as exc:
-            if verbose:
-                print("DATA load failed:", repr(exc))
-
-    model = None
-    if load_model and artifacts.get("model_json") is not None and data is not None:
-        try:
-            from resources.MLmodels import MODEL
-            model = MODEL.from_json(
-                artifacts["model_json"],
-                data=data,
-                load_weights=artifacts.get("model_mdl") is not None,
-                model_path=str(artifacts["model_mdl"]) if artifacts.get("model_mdl") is not None else None,
-                device=device,
-                scan_matches_on_init=False,
-            )
-            model = postprocess_attach_results(model, loaded)
-            if verbose:
-                print("Loaded MODEL from:", artifacts["model_json"])
-        except Exception as exc:
-            if verbose:
-                print("MODEL load failed:", repr(exc))
-    elif load_model and verbose:
-        print("MODEL was not loaded because a model JSON or DATA object is missing.")
-
-    return artifacts, loaded, data, model
+    return _postprocess_load_run(
+        run_path,
+        run_root=run_root,
+        prefer_hpo_best=prefer_hpo_best,
+        load_data=load_data,
+        load_model=load_model,
+        data_path_override=data_path_override,
+        device=device,
+        verbose=verbose,
+    )
 
 def postprocess_field_run_overview(
     artifacts,
@@ -3965,10 +3969,11 @@ def plot_loss_history(loss_history, metrics=None, figsize=(9, 4)):
     for mode, mode_history in loss_history.groupby("mode"):
         for metric in metrics:
             if metric in mode_history.columns:
-                ax.plot(mode_history["epoch"], mode_history[metric], marker="o", label=f"{mode} {metric}")
+                ax.plot(mode_history["epoch"], mode_history[metric], label=f"{mode} {metric}")
     ax.set_title("Training History")
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Loss")
+    ax.set_yscale("log")
     ax.legend(fontsize=8)
     fig.tight_layout()
     plt.show()

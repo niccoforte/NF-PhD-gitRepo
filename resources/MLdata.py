@@ -14,6 +14,9 @@ from sklearn.decomposition import PCA
 from sklearn.base import clone, BaseEstimator, TransformerMixin
 
 
+FIELD_ARRAY_DTYPE = np.float32
+
+
 def load_data(inputs, outputs, f_inputs=None, props=None):
     IN_df   = pd.read_csv(inputs, index_col=0, header=0)
     OUTr_df = pd.read_csv(outputs, index_col=0, header=0)
@@ -193,7 +196,7 @@ def _field_save_to_sfnc(values, valid_mask, npz):
         values = values[None, ...]
         valid_mask = valid_mask[None, ...]
     values = _data_field_layout_to_sfnc(values, "auto", frame_values=frame_values, node_labels=node_labels)
-    valid_mask = _data_field_layout_to_sfnc(valid_mask.astype(float), "auto", frame_values=frame_values, node_labels=node_labels).astype(bool)
+    valid_mask = _data_field_layout_to_sfnc(valid_mask, "auto", frame_values=frame_values, node_labels=node_labels, dtype=bool)
     return values, valid_mask
 
 def _save_field_subset(field_npz, sample_index, out_path):
@@ -203,7 +206,7 @@ def _save_field_subset(field_npz, sample_index, out_path):
 
     with np.load(field_npz, allow_pickle=True) as npz:
         values_key = _field_save_npz_key(npz, ["Y", "U", "field", "values", "outputs", "field_values"])
-        values = np.asarray(npz[values_key], dtype=float)
+        values = np.asarray(npz[values_key], dtype=FIELD_ARRAY_DTYPE)
         mask_key = _field_save_npz_key(npz, ["valid_mask", "mask"], required=False)
         valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
         values, valid_mask = _field_save_to_sfnc(values, valid_mask, npz)
@@ -1574,12 +1577,15 @@ def _data_to_numpy(x):
     return np.asarray(x).copy()
 
 def _data_apply_transform_array(transform_fn, x):
-    arr = np.asarray(x, dtype=float)
+    arr = np.asarray(x)
     if arr.ndim <= 2:
+        arr = np.asarray(x, dtype=float)
         return transform_fn(arr)
+
+    arr = np.asarray(arr, dtype=FIELD_ARRAY_DTYPE)
     shape = arr.shape
     out = transform_fn(arr.reshape(-1, shape[-1]))
-    return np.asarray(out).reshape(shape)
+    return np.asarray(out, dtype=FIELD_ARRAY_DTYPE).reshape(shape)
 
 def _data_fit_transform_array(transformer, x):
     return _data_apply_transform_array(transformer.fit_transform, x)
@@ -1724,7 +1730,7 @@ def _data_read_field_npz(data_obj, mode, config_attr="field_config"):
 
     with np.load(field_path, allow_pickle=True) as npz:
         values_key = _data_field_npz_key(npz, ["Y", "U", "field", "values", "outputs", "field_values"])
-        values = np.asarray(npz[values_key], dtype=float)
+        values = np.asarray(npz[values_key], dtype=FIELD_ARRAY_DTYPE)
         frame_key = _data_field_npz_key(npz, ["frame_values", "frames", "times"], required=False)
         node_label_key = _data_field_npz_key(npz, ["node_labels", "nodes", "labels"], required=False)
         node_coord_key = _data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False)
@@ -1733,10 +1739,10 @@ def _data_read_field_npz(data_obj, mode, config_attr="field_config"):
         sample_coord_key = _data_field_npz_key(npz, ["sample_node_coords", "sample_coords", "coords_by_sample"], required=False)
         frame_values = np.asarray(npz[frame_key]) if frame_key is not None else None
         node_labels = np.asarray(npz[node_label_key]) if node_label_key is not None else None
-        node_coords = np.asarray(npz[node_coord_key], dtype=float) if node_coord_key is not None else None
+        node_coords = np.asarray(npz[node_coord_key], dtype=FIELD_ARRAY_DTYPE) if node_coord_key is not None else None
         elems = np.asarray(npz[elem_key]) if elem_key is not None else None
         sample_ids = np.asarray(npz[sample_id_key]) if sample_id_key is not None else None
-        sample_node_coords = np.asarray(npz[sample_coord_key], dtype=float) if sample_coord_key is not None else None
+        sample_node_coords = np.asarray(npz[sample_coord_key], dtype=FIELD_ARRAY_DTYPE) if sample_coord_key is not None else None
         available_components = _data_npz_string_array(npz, ["components", "component_names", "variables"], default=None)
         mask_key = _data_field_npz_key(npz, ["valid_mask", "mask"], required=False)
         valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
@@ -1754,12 +1760,13 @@ def _data_read_field_npz(data_obj, mode, config_attr="field_config"):
         components=available_components,
     )
     valid_mask = _data_field_layout_to_sfnc(
-        valid_mask.astype(float),
+        valid_mask,
         cfg.get("layout", "auto"),
         frame_values=frame_values,
         node_labels=node_labels,
         components=available_components,
-    ).astype(bool)
+        dtype=bool,
+    )
 
     requested_components = cfg.get("components", ("U1", "U2"))
     values, valid_mask, components = _data_field_select_components(
@@ -1810,8 +1817,8 @@ def _data_npz_string_array(npz, candidates, default=None):
     values = npz[key]
     return np.asarray(values).astype(str)
 
-def _data_field_layout_to_sfnc(values, layout, frame_values=None, node_labels=None, components=None):
-    arr = np.asarray(values, dtype=float)
+def _data_field_layout_to_sfnc(values, layout, frame_values=None, node_labels=None, components=None, dtype=FIELD_ARRAY_DTYPE):
+    arr = np.asarray(values, dtype=dtype)
     if arr.ndim != 4:
         raise ValueError(f"Field values must be 4D, got shape {arr.shape}.")
     layout = str(layout or "sfnc").strip().lower()
@@ -1871,7 +1878,7 @@ def _data_field_select_components(values, valid_mask, available_components, requ
     return np.concatenate(selected_values, axis=-1), np.concatenate(selected_masks, axis=-1), selected_names
 
 def _data_field_flatten(values, valid_mask):
-    values = np.asarray(values, dtype=float)
+    values = np.asarray(values, dtype=FIELD_ARRAY_DTYPE)
     valid_mask = np.asarray(valid_mask, dtype=bool)
     if values.ndim != 4:
         raise ValueError(f"Field values must have shape [samples, frames, nodes, components], got {values.shape}.")
@@ -1910,10 +1917,10 @@ def _data_load_field_mode(data_obj, mode):
 
     with np.load(field_path, allow_pickle=True) as npz:
         values_key = _data_field_npz_key(npz, ["Y", "U", "field", "values", "outputs", "field_values"])
-        values = np.asarray(npz[values_key], dtype=float)
+        values = np.asarray(npz[values_key], dtype=FIELD_ARRAY_DTYPE)
         frame_values = np.asarray(npz[_data_field_npz_key(npz, ["frame_values", "frames", "times"], required=False)]) if _data_field_npz_key(npz, ["frame_values", "frames", "times"], required=False) else None
         node_labels = np.asarray(npz[_data_field_npz_key(npz, ["node_labels", "nodes", "labels"], required=False)]) if _data_field_npz_key(npz, ["node_labels", "nodes", "labels"], required=False) else None
-        node_coords = np.asarray(npz[_data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False)], dtype=float) if _data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False) else None
+        node_coords = np.asarray(npz[_data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False)], dtype=FIELD_ARRAY_DTYPE) if _data_field_npz_key(npz, ["coords0", "node_coords", "coords", "nodes0"], required=False) else None
         elems = np.asarray(npz[_data_field_npz_key(npz, ["elems", "elements", "connectivity"], required=False)]) if _data_field_npz_key(npz, ["elems", "elements", "connectivity"], required=False) else None
         sample_ids = np.asarray(npz[_data_field_npz_key(npz, ["sample_ids", "ids", "indices", "index"], required=False)]) if _data_field_npz_key(npz, ["sample_ids", "ids", "indices", "index"], required=False) else None
         available_components = _data_npz_string_array(npz, ["components", "component_names", "variables"], default=None)
@@ -1933,12 +1940,13 @@ def _data_load_field_mode(data_obj, mode):
         components=available_components,
     )
     valid_mask = _data_field_layout_to_sfnc(
-        valid_mask.astype(float),
+        valid_mask,
         cfg.get("layout", "auto"),
         frame_values=frame_values,
         node_labels=node_labels,
         components=available_components,
-    ).astype(bool)
+        dtype=bool,
+    )
 
     requested_components = cfg.get("components", ("U1", "U2"))
     values, valid_mask, components = _data_field_select_components(
@@ -1992,7 +2000,7 @@ def _data_load_field_mode(data_obj, mode):
         node_labels = np.arange(values.shape[2]) + 1
     if node_coords is None:
         if IN_df.shape[1] % 2 == 0 and IN_df.shape[1] // 2 == values.shape[2]:
-            node_coords = IN_df.iloc[0].to_numpy(dtype=float).reshape(-1, 2)
+            node_coords = IN_df.iloc[0].to_numpy(dtype=FIELD_ARRAY_DTYPE).reshape(-1, 2)
         else:
             node_coords = None
 
@@ -2010,7 +2018,7 @@ def _data_load_field_mode(data_obj, mode):
     setattr(data_obj, f"{mode}_field_valid_mask", valid_mask)
     setattr(data_obj, f"{mode}_field_frame_values", np.asarray(frame_values))
     setattr(data_obj, f"{mode}_field_node_labels", np.asarray(node_labels))
-    setattr(data_obj, f"{mode}_field_node_coords", None if node_coords is None else np.asarray(node_coords, dtype=float))
+    setattr(data_obj, f"{mode}_field_node_coords", None if node_coords is None else np.asarray(node_coords, dtype=FIELD_ARRAY_DTYPE))
     setattr(data_obj, f"{mode}_field_elems", elems)
     setattr(data_obj, f"{mode}_field_components", components)
     setattr(data_obj, f"{mode}_field_shape", (int(values.shape[1]), int(values.shape[2]), int(values.shape[3])))
@@ -2036,7 +2044,7 @@ def _data_align_field_samples(mode, reference_index, field_index, values, valid_
 
     aligned_coords = None
     if sample_node_coords is not None:
-        aligned_coords = np.asarray(sample_node_coords, dtype=float)[positions]
+        aligned_coords = np.asarray(sample_node_coords, dtype=FIELD_ARRAY_DTYPE)[positions]
     return pd.Index(common_idx), values[positions], valid_mask[positions], aligned_coords
 
 def _data_field_input_static_features(data_obj, mode, node_coords, sample_node_coords, n_samples, n_nodes):
@@ -2044,7 +2052,7 @@ def _data_field_input_static_features(data_obj, mode, node_coords, sample_node_c
     if coords is None:
         return None
 
-    coords = np.asarray(coords, dtype=float)
+    coords = np.asarray(coords, dtype=FIELD_ARRAY_DTYPE)
     if coords.ndim == 2:
         if coords.shape != (n_nodes, 2):
             return None
@@ -2074,10 +2082,10 @@ def _data_field_input_static_features(data_obj, mode, node_coords, sample_node_c
     tol = data_obj.geom.l * 1e-4
     flags = np.stack(
         [
-            np.isclose(x_raw, x_min, atol=tol).astype(float),
-            np.isclose(x_raw, x_max, atol=tol).astype(float),
-            np.isclose(y_raw, y_min, atol=tol).astype(float),
-            np.isclose(y_raw, y_max, atol=tol).astype(float),
+            np.isclose(x_raw, x_min, atol=tol).astype(FIELD_ARRAY_DTYPE),
+            np.isclose(x_raw, x_max, atol=tol).astype(FIELD_ARRAY_DTYPE),
+            np.isclose(y_raw, y_min, atol=tol).astype(FIELD_ARRAY_DTYPE),
+            np.isclose(y_raw, y_max, atol=tol).astype(FIELD_ARRAY_DTYPE),
         ],
         axis=-1,
     )
@@ -2165,7 +2173,7 @@ def _data_load_curve_field_input_mode(data_obj, mode):
 
     node_coords = loaded["node_coords"]
     if node_coords is None and IN_df.shape[1] % 2 == 0 and IN_df.shape[1] // 2 == values.shape[2]:
-        node_coords = IN_df.iloc[0].to_numpy(dtype=float).reshape(-1, 2)
+        node_coords = IN_df.iloc[0].to_numpy(dtype=FIELD_ARRAY_DTYPE).reshape(-1, 2)
 
     setattr(data_obj, f"{mode}_field_input_path", loaded["path"])
     setattr(data_obj, f"{mode}_field_input_index", pd.Index(common_idx))
@@ -2173,7 +2181,7 @@ def _data_load_curve_field_input_mode(data_obj, mode):
     setattr(data_obj, f"{mode}_field_input_valid_mask", valid_mask)
     setattr(data_obj, f"{mode}_field_input_frame_values", loaded["frame_values"])
     setattr(data_obj, f"{mode}_field_input_node_labels", loaded["node_labels"])
-    setattr(data_obj, f"{mode}_field_input_node_coords", None if node_coords is None else np.asarray(node_coords, dtype=float))
+    setattr(data_obj, f"{mode}_field_input_node_coords", None if node_coords is None else np.asarray(node_coords, dtype=FIELD_ARRAY_DTYPE))
     setattr(data_obj, f"{mode}_field_input_sample_node_coords", sample_node_coords)
     setattr(data_obj, f"{mode}_field_input_elems", loaded["elems"])
     setattr(data_obj, f"{mode}_field_input_components", loaded["components"])
@@ -2191,7 +2199,7 @@ def _data_filter_field_nodes(data_obj, mode, input_body_mask=None):
         coords = getattr(data_obj, f"{mode}_field_node_coords", None)
         if coords is not None and len(coords) == n_nodes:
             tol = data_obj.geom.l * 1e-4
-            coords = np.asarray(coords, dtype=float)
+            coords = np.asarray(coords, dtype=FIELD_ARRAY_DTYPE)
             mask = (
                 (coords[:, 0] >= -tol) &
                 (coords[:, 0] <= data_obj.geom.L + tol) &
@@ -2232,7 +2240,7 @@ def _data_filter_field_input_nodes(data_obj, mode, input_body_mask=None):
         coords = getattr(data_obj, f"{mode}_field_input_node_coords", None)
         if coords is not None and len(coords) == n_nodes:
             tol = data_obj.geom.l * 1e-4
-            coords = np.asarray(coords, dtype=float)
+            coords = np.asarray(coords, dtype=FIELD_ARRAY_DTYPE)
             mask = (
                 (coords[:, 0] >= -tol) &
                 (coords[:, 0] <= data_obj.geom.L + tol) &
@@ -2339,7 +2347,7 @@ def _data_clean_field_input_arrays(data_obj):
         for split in ["train", "val", "test"]:
             attr = f"{mode}_{split}_in"
             if hasattr(data_obj, attr):
-                arr = np.asarray(getattr(data_obj, attr), dtype=float)
+                arr = np.asarray(getattr(data_obj, attr), dtype=FIELD_ARRAY_DTYPE)
                 setattr(data_obj, attr, np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0))
 
 def _data_limit_mode_samples(data_obj, mode):
