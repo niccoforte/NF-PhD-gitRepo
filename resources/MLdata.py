@@ -1748,9 +1748,7 @@ def _data_read_field_npz(data_obj, mode, config_attr="field_config"):
         valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
 
     if available_components is None:
-        available_components = [f"c{i}" for i in range(values.shape[-1])]
-        if values.shape[-1] == 2:
-            available_components = ["U1", "U2"]
+        available_components = [f"U{i + 1}" for i in range(values.shape[-1])]
 
     values = _data_field_layout_to_sfnc(
         values,
@@ -1928,9 +1926,7 @@ def _data_load_field_mode(data_obj, mode):
         valid_mask = np.asarray(npz[mask_key], dtype=bool) if mask_key is not None else np.isfinite(values)
 
     if available_components is None:
-        available_components = [f"c{i}" for i in range(values.shape[-1])]
-        if values.shape[-1] == 2:
-            available_components = ["U1", "U2"]
+        available_components = [f"U{i + 1}" for i in range(values.shape[-1])]
 
     values = _data_field_layout_to_sfnc(
         values,

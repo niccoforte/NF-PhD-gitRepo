@@ -1300,6 +1300,9 @@ def _field_nanstd(arr, axis=None):
     with np.errstate(invalid="ignore", divide="ignore"):
         return np.nanstd(arr, axis=axis)
 
+def _field_default_components(n_components):
+    return [f"U{i + 1}" for i in range(int(n_components))]
+
 def field_performance_diagnostics(
     y_pred,
     y_true,
@@ -1330,10 +1333,10 @@ def field_performance_diagnostics(
         frame_values = np.arange(n_frames)
 
     if components is None:
-        components = [f"c{i}" for i in range(n_components)]
+        components = _field_default_components(n_components)
     components = [str(c) for c in components]
     if len(components) != n_components:
-        components = [f"c{i}" for i in range(n_components)]
+        components = _field_default_components(n_components)
 
     if node_labels is None:
         node_labels = np.arange(n_nodes)
@@ -1641,7 +1644,7 @@ def _field_frame_component_metric_maps(diagnostics):
 
     n_frames = y_pred.shape[1]
     n_components = y_pred.shape[3]
-    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    components = [str(c) for c in (diagnostics.get("components") or _field_default_components(n_components))]
     frame_labels = [str(idx + 1) for idx in range(n_frames)]
 
     rmse_map = np.full((n_frames, n_components), np.nan)
@@ -1756,7 +1759,7 @@ def plot_field_component_parity(
     y_true = np.asarray(diagnostics["y_true"], dtype=float)
     valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
     n_components = y_pred.shape[3]
-    component_names = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    component_names = [str(c) for c in (diagnostics.get("components") or _field_default_components(n_components))]
 
     if components is None:
         component_indices = list(range(n_components))
@@ -2033,7 +2036,7 @@ def plot_field_keyframe_strip(
     y_true = np.asarray(diagnostics["y_true"], dtype=float)
     valid = np.asarray(diagnostics.get("valid_mask", np.isfinite(y_true) & np.isfinite(y_pred)), dtype=bool)
     n_samples, n_frames, _, n_components = y_pred.shape
-    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    components = [str(c) for c in (diagnostics.get("components") or _field_default_components(n_components))]
 
     sample_idx = _first_sample_index(sample, n_samples)
     component_idx = _field_component_index(components, component)
@@ -3163,7 +3166,7 @@ def _postprocess_field_metadata(data, loaded, mode, outputs=None):
         if frame_values is None:
             frame_values = np.arange(n_frames)
         if components is None:
-            components = [f"c{i}" for i in range(n_components)]
+            components = _field_default_components(n_components)
         if node_labels is None:
             node_labels = np.arange(n_nodes)
 
@@ -3685,7 +3688,7 @@ def field_sample_viewer(
     coords = diagnostics.get("node_coords")
     y_pred = np.asarray(diagnostics["y_pred"], dtype=float)
     n_samples, n_frames, _, n_components = y_pred.shape
-    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    components = [str(c) for c in (diagnostics.get("components") or _field_default_components(n_components))]
     metric_options = [metric for metric in ["rmse", "mae", "mse", "bias"] if f"sample_{metric}" in samples.columns]
     if not metric_options:
         metric_options = ["rmse"]
@@ -3934,7 +3937,7 @@ def plot_field_sample_frame_evolution(diagnostics, sample=0, figsize=None):
     n_samples, n_frames, _, n_components = y_pred.shape
     sample_idx = int(np.clip(sample, 0, n_samples - 1))
     x = np.arange(n_frames) + 1
-    components = [str(c) for c in diagnostics.get("components", [f"c{i}" for i in range(n_components)])]
+    components = [str(c) for c in (diagnostics.get("components") or _field_default_components(n_components))]
 
     pred_s = np.where(valid[sample_idx], y_pred[sample_idx], np.nan)
     true_s = np.where(valid[sample_idx], y_true[sample_idx], np.nan)
