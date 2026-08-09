@@ -15,6 +15,8 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 
 - `pyproject.toml` exposes `resources` as the editable package `phd-shared-resources`.
 - `setup-Windows.ps1` installs the shared package for standard Python and Abaqus Python; `-remove` reverses that setup. `setup-macOS.sh` creates or refreshes the `nf-phd` Conda environment; its `-remove` mode deletes that environment.
+- Dependency changes must consider all three environments: Windows standard Python (`requirements.txt` plus Windows-specific compatibility pins), Abaqus Python (`requirements-abaqus.txt`), and the package list/platform pins embedded in `setup-macOS.sh`.
+- Setup and removal mutate external Python, Abaqus, or Conda environments. Do not run either script merely for validation; use parse/syntax checks unless the user explicitly authorizes the install or removal.
 - Use imports like `from resources.MLdata import DATA` or `from resources.lattices import Geometry`; avoid local `sys.path` hacks unless an Abaqus/HPC launch path truly requires them.
 - Standard Python and Abaqus Python are separate environments. Code that touches Abaqus model/session/ODB APIs must be validated in the Abaqus interpreter or by syntax review only when Abaqus is unavailable.
 

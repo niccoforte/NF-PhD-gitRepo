@@ -7,6 +7,7 @@ import argparse
 import csv
 import importlib.util
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -94,6 +95,8 @@ def repository_paths(root: Path) -> set[str]:
 def in_scope(path: str, scope: str) -> bool:
     if any(part in IGNORED_PARTS for part in PurePosixPath(path).parts):
         return False
+    if scope == "root" and len(PurePosixPath(path).parts) == 1:
+        return True
     return any(path == prefix or path.startswith(prefix) for prefix in SCOPES[scope])
 
 
@@ -200,6 +203,12 @@ def check_shell(root: Path, paths: list[str]) -> list[Result]:
     if not paths:
         return []
     bash = shutil.which("bash")
+    if not bash and sys.platform == "win32":
+        program_files = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+        for candidate in (program_files / "Git/bin/bash.exe", program_files / "Git/usr/bin/bash.exe"):
+            if candidate.is_file():
+                bash = str(candidate)
+                break
     if not bash:
         return [Result("SKIP", "Shell syntax", "Bash is unavailable; no shell scripts were executed.")]
     results: list[Result] = []
@@ -307,6 +316,14 @@ def check_contract_fixture(root: Path) -> list[Result]:
 
 def external_limitations(paths: list[str]) -> list[Result]:
     results: list[Result] = []
+    if any(path in {"setup-Windows.ps1", "setup-macOS.sh"} for path in paths):
+        results.append(
+            Result(
+                "SKIP",
+                "Environment setup/removal",
+                "No Python, Abaqus, pip, or Conda environment was installed, changed, or removed.",
+            )
+        )
     if any(path.endswith(".py") and is_abaqus_path(path) for path in paths):
         results.append(Result("SKIP", "Abaqus behavior", "No CAE/ODB job or Abaqus API execution was attempted."))
     if any(path.endswith(".sh") and ("HPC/" in path or "/SIMscripts/" in path) for path in paths):

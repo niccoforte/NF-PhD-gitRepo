@@ -13,6 +13,8 @@ MAX_INSTRUCTION_BYTES = 32 * 1024
 REQUIRED_FILES = (
     "AGENTS.md",
     "README.md",
+    "setup-Windows.ps1",
+    "setup-macOS.sh",
     "p1-DisorderLatticeProperties/AGENTS.md",
     "p1-DisorderLatticeProperties/PROJECT_STATUS.md",
     "p1-DisorderLatticeProperties/SIMscripts/AGENTS.md",
@@ -35,6 +37,8 @@ REQUIRED_FILES = (
 STALE_TEXT = (
     "repository currently ignores `*AGENTS.md`",
     "local guidance unless force-added",
+    "`setup.ps1`",
+    "`remove-setup.ps1`",
 )
 
 
@@ -185,6 +189,10 @@ def main() -> int:
         ("p3-DisorderIcingMitigation/AGENTS.md", "README.md"),
         ("PROJECT_STATUS.md", "README.md"),
         ("tools/validate_repo.py", "README.md"),
+        ("setup-Windows.ps1", "AGENTS.md"),
+        ("setup-macOS.sh", "AGENTS.md"),
+        ("setup-Windows.ps1", "README.md"),
+        ("setup-macOS.sh", "README.md"),
     ):
         content = root_agents if relative == "AGENTS.md" else readme
         if token not in content:

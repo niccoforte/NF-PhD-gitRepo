@@ -9,13 +9,14 @@ Use the repository entry point first:
 
 ```powershell
 python tools/validate_repo.py --changed
+python tools/validate_repo.py --scope root
 python tools/validate_repo.py --scope resources
 python tools/validate_repo.py --scope p1
 python tools/validate_repo.py --scope p2
 python tools/validate_repo.py --scope contract
 ```
 
-The script is non-destructive. It checks diff whitespace and guidance coverage; compiles selected Python without running modules; imports relevant shared modules in fresh processes; validates notebook JSON; runs `bash -n` and PowerShell parse checks when available; and validates the explicitly synthetic contract fixture. It reports Abaqus, HPC, external-data, and scientific execution as skipped rather than implying coverage.
+The script is non-destructive. It checks diff whitespace and guidance coverage; compiles selected Python without running modules; imports relevant shared modules in fresh processes; validates notebook JSON; runs `bash -n` and PowerShell parse checks when available; and validates the explicitly synthetic contract fixture. It reports environment setup/removal, Abaqus, HPC, external-data, and scientific execution as skipped rather than implying coverage.
 
 ## Add focused validation
 
@@ -23,6 +24,6 @@ The script is non-destructive. It checks diff whitespace and guidance coverage; 
 2. Add the narrowest test or import that exercises the changed behavior without requiring unapproved external operations.
 3. For data-contract changes, invoke `review-p1-p2-data-contract` and run the contract scope.
 4. Use Abaqus Python for real model/ODB behavior only when the environment and task authorize it.
-5. Do not submit Abaqus or Slurm jobs, transfer archives, upgrade ODBs, rename research files, or delete artifacts merely to claim validation.
+5. Do not install/remove Python, Abaqus, or Conda environments; submit Abaqus or Slurm jobs; transfer archives; upgrade ODBs; rename research files; or delete artifacts merely to claim validation.
 
 Report passed, failed, syntax-only, and skipped checks separately. Local or synthetic validation is not scientific validation on real data.

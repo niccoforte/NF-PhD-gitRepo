@@ -387,11 +387,14 @@ On Windows, this installs for both interpreters:
 
 On macOS, the script creates or refreshes the `nf-phd` Conda environment, installs the standard-Python dependencies with macOS-compatible PyTorch and TensorFlow versions, and installs the local `resources` package. It does not attempt to install Abaqus.
 
+The macOS script expects Miniforge at `~/miniforge3` by default. Set `CONDA_ROOT` to another installation, `CONDA_ENV` to choose another environment name, or `PYTHON_VERSION` to override Python 3.12 before running it. Its dependency list intentionally mirrors the standard requirements while replacing Windows/Linux-specific PyTorch and TensorFlow pins; dependency changes must review both `requirements.txt` and `setup-macOS.sh`.
+
 Important implementation details:
 
 - setup writes a `.pth` hook (`phd_shared_resources_repo.pth`) in Abaqus user site-packages for reliability and to cover local-package pip failures
 - setup verifies imports from a temp directory, not from the repo root, so import checks are real
 - if `PIP_NO_INDEX` is set in the shell, setup temporarily unsets it during install and restores it afterwards
+- setup and removal change external environments; repository validation parses these scripts but does not execute installation or removal automatically
 
 Optional flags:
 
