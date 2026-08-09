@@ -14,10 +14,16 @@ At a high level:
 From the repository root, run:
 
 ```powershell
-.\setup.ps1
+.\setup-Windows.ps1
 ```
 
-That sets up the shared `resources` package for both standard Python and Abaqus Python, then verifies imports from outside the repo root. After setup, code can use imports such as:
+On macOS, run:
+
+```bash
+./setup-macOS.sh
+```
+
+The Windows script sets up the shared `resources` package for both standard Python and Abaqus Python. The macOS script creates or refreshes the isolated `nf-phd` Conda environment for standard Python; Abaqus is not available on macOS. Both scripts verify imports from outside the repo root. After setup, code can use imports such as:
 
 ```python
 from resources.MLdata import DATA
@@ -25,7 +31,7 @@ from resources.lattices import Geometry
 from resources.data_processing import create_inputCSV, create_outputCSV
 ```
 
-If you are only working with notebooks or standard Python tools, `.\setup.ps1 -OnlyPython` is usually enough. If you are only preparing Abaqus-side helpers, use `.\setup.ps1 -OnlyAbaqus`.
+On Windows, `-OnlyPython` and `-OnlyAbaqus` select one interpreter. Pass `-remove` to either platform script to reverse its setup.
 
 The root `requirements.txt` is set up for a standard local Python environment, including CPU PyTorch wheels. The GPU/HPC machine-learning environment is managed separately by `p2-DisorderML/HPC/B0_ML-env-setup.sh`.
 
@@ -108,8 +114,8 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 +-- pyproject.toml
 +-- requirements.txt
 +-- requirements-abaqus.txt
-+-- setup.ps1
-+-- remove-setup.ps1
++-- setup-Windows.ps1
++-- setup-macOS.sh
 +-- update-repo.ps1
 +-- p1-DisorderLatticeProperties/
 |   +-- AGENTS.md
@@ -362,18 +368,24 @@ Generated data, Abaqus artifacts, model checkpoints, HPO databases, Slurm logs, 
 
 ## Setup (Python + Abaqus)
 
-Recommended one-command setup from repo root:
+Recommended setup from the repository root:
 
 ```powershell
-.\setup.ps1
+.\setup-Windows.ps1
 ```
 
-This installs for both interpreters:
+```bash
+./setup-macOS.sh
+```
+
+On Windows, this installs for both interpreters:
 
 - all dependencies from `requirements.txt` into standard Python
 - all dependencies from `requirements-abaqus.txt` into Abaqus Python
 - the local repo package (`resources`) for standard Python
 - the local repo package (`resources`) for Abaqus Python
+
+On macOS, the script creates or refreshes the `nf-phd` Conda environment, installs the standard-Python dependencies with macOS-compatible PyTorch and TensorFlow versions, and installs the local `resources` package. It does not attempt to install Abaqus.
 
 Important implementation details:
 
@@ -383,22 +395,28 @@ Important implementation details:
 
 Optional flags:
 
-- `.\setup.ps1 -OnlyPython` runs only standard Python setup
-- `.\setup.ps1 -OnlyAbaqus` runs only Abaqus Python setup
+- `.\setup-Windows.ps1 -OnlyPython` runs only standard Python setup
+- `.\setup-Windows.ps1 -OnlyAbaqus` runs only Abaqus Python setup
 
 ## Remove Setup
 
 To uninstall everything installed by setup for both interpreters, run:
 
 ```powershell
-.\remove-setup.ps1
+.\setup-Windows.ps1 -remove
 ```
 
-Default behavior:
+```bash
+./setup-macOS.sh -remove
+```
+
+Windows removal behavior:
 
 - standard Python: uninstall local `resources` package and uninstall all packages listed in `requirements.txt`
 - Abaqus Python: uninstall local `resources` package and uninstall all packages listed in `requirements-abaqus.txt`
 - remove fallback `.pth` hooks (`phd_shared_resources_repo.pth`) for both Python and Abaqus if present
+
+On macOS, removal deletes the isolated `nf-phd` Conda environment. It does not delete the repository, Miniforge, or packages in other Python environments.
 
 Important:
 
@@ -407,9 +425,10 @@ Important:
 
 Optional flags:
 
-- `.\remove-setup.ps1 -OnlyPython` runs only standard Python removal
-- `.\remove-setup.ps1 -OnlyAbaqus` runs only Abaqus removal
-- `.\remove-setup.ps1 -SkipPythonRequirementsUninstall` removes the local `resources` package/hook but keeps packages from `requirements.txt` and `requirements-abaqus.txt` installed
+- `.\setup-Windows.ps1 -remove -OnlyPython` runs only standard Python removal
+- `.\setup-Windows.ps1 -remove -OnlyAbaqus` runs only Abaqus removal
+- `.\setup-Windows.ps1 -remove -SkipPythonRequirementsUninstall` removes the local `resources` package/hook but keeps packages from `requirements.txt` and `requirements-abaqus.txt` installed
+- `./setup-macOS.sh -remove` removes the isolated `nf-phd` Conda environment and leaves the repository untouched
 
 ## Working Notes
 

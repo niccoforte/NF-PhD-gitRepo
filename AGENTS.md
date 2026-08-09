@@ -14,7 +14,7 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 ## Environment And Imports
 
 - `pyproject.toml` exposes `resources` as the editable package `phd-shared-resources`.
-- `setup.ps1` installs the shared package for standard Python and Abaqus Python; `remove-setup.ps1` reverses that setup.
+- `setup-Windows.ps1` installs the shared package for standard Python and Abaqus Python; `-remove` reverses that setup. `setup-macOS.sh` creates or refreshes the `nf-phd` Conda environment; its `-remove` mode deletes that environment.
 - Use imports like `from resources.MLdata import DATA` or `from resources.lattices import Geometry`; avoid local `sys.path` hacks unless an Abaqus/HPC launch path truly requires them.
 - Standard Python and Abaqus Python are separate environments. Code that touches Abaqus model/session/ODB APIs must be validated in the Abaqus interpreter or by syntax review only when Abaqus is unavailable.
 
