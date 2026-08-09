@@ -1,0 +1,4 @@
+interface:
+  display_name: "Operate P2 HPC"
+  short_description: "Protect p2 Slurm and archive workflows"
+  default_prompt: "Use $operate-p2-hpc to review or change this p2 HPC workflow safely, preserving production defaults and reporting external checks not run."

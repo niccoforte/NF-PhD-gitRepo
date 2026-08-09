@@ -1,0 +1,26 @@
+{
+  "fixture_kind": "synthetic_non_scientific_contract",
+  "description": "Minimal metadata-only fixture for testing alignment and serialization. It is not research data and carries no experimental or simulation values.",
+  "periodic_sample_id": 0,
+  "sample_ids": [0, 1, 2],
+  "inputs": {
+    "sample_ids": [0, 1, 2],
+    "feature_shape": [3, 4, 2]
+  },
+  "curve_outputs": {
+    "sample_ids": [0, 1, 2],
+    "value_shape": [3, 5]
+  },
+  "field_outputs": {
+    "sample_ids": [0, 1, 2],
+    "value_shape": [3, 2, 4, 2],
+    "frame_values": [0.0, 1.0],
+    "node_labels": [1, 2, 3, 4],
+    "node_coordinates_shape": [4, 2],
+    "components": ["U1", "U2"],
+    "valid_mask_shape": [3, 2, 4]
+  },
+  "manifest": {
+    "sample_ids": [0, 1, 2]
+  }
+}

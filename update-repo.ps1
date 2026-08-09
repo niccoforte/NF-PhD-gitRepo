@@ -1,3 +1,9 @@
+# LEGACY SIDE-EFFECTFUL WORKFLOW
+# This script pulls, broadly stages, commits, pushes, changes among hard-coded
+# checkouts, and opens an HPC SSH session. It is not the standard repository
+# update path. Review every target and obtain explicit user confirmation before
+# running it. Whether this script should be retired or redesigned is Decision required.
+
 cd "C:\Users\exy053\Documents\00-PhD-gitRepo"
 git pull
 git add .

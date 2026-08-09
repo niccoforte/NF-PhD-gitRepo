@@ -74,9 +74,9 @@ Important meanings:
 ## How To Work Here
 
 - Use Abaqus Python for real execution of scripts that touch `mdb`, `session`, or `openOdb`.
-- Standard `python -m py_compile` can catch syntax issues, but it does not prove Abaqus API behavior.
-- If changing A1 file naming, also inspect A2 post-processing, p1 notebook data processing, and p2 data loading.
+- Run `python tools/validate_repo.py --changed` from the repository root. Its Python result is syntax-only for Abaqus-dependent files and does not prove Abaqus API behavior.
+- If changing A1/A2 names or output contracts, use `review-p1-p2-data-contract` to inspect every affected producer and consumer.
 - If changing ODB parsing, verify expected step counts (`Hout + 1` in current launchers) and whether missing history data should be zero-filled or extrapolated.
-- If changing field output, preserve `Y`, `valid_mask`, `frame_values`, `node_labels`, `node_coords`, `components`, mode labels, sample ids, and source path metadata.
+- If changing field output, use the field schema and impact map in the data-contract skill reference.
 - Keep active scripts direct and intentional. Avoid adding broad fallback layers or compatibility scaffolding unless a current launcher or archived data path concretely needs it.
 - Treat `odbUpgrade.py`, backup deletion, renaming utilities, and recursive archive scripts as destructive unless run in dry-run mode or on a confirmed target.

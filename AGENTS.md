@@ -2,11 +2,13 @@
 
 This repository is organized by PhD paper folder with one shared Python package. Start with this file, then read the nearest nested `AGENTS.md` before editing inside a paper folder.
 
+For planning, continuation, or handoff work, also read that paper's `PROJECT_STATUS.md`. It contains changing work state; durable rules belong in `AGENTS.md` and reusable procedures belong in `.agents/skills/`.
+
 ## Repository Map
 
 - `p1-DisorderLatticeProperties/` is the Abaqus FEA, post-processing, and data-generation workflow for quasi-disordered 2D lattices under uniaxial/ductile and compact-tension/fracture loading.
 - `p2-DisorderML/` is the machine-learning and surrogate-modeling workflow built on p1 outputs. It trains and diagnoses curve and field surrogates and contains cluster training/HPO scripts.
-- `p3-DisorderIcingMitigation/` is intentionally not covered by an AGENTS file yet. Treat it as uncertain and do not add guidance or borrow conventions from it unless the user explicitly asks.
+- `p3-DisorderIcingMitigation/` contains early, provisional Abaqus work. Read its `AGENTS.md`; its icing-specific scientific scope is still `To be confirmed`, so do not borrow p1 assumptions or present the current script as a validated icing model.
 - `resources/` is the shared package used by p1 and p2. Changes there can affect Abaqus scripts, notebooks, ML training, post-processing, and saved artifact loading.
 
 ## Environment And Imports
@@ -22,7 +24,7 @@ This repository is organized by PhD paper folder with one shared Python package.
 - Local p2 saved runs are commonly rooted at `Z:/p2`.
 - QMUL HPC archive paths commonly use `/data/SEMS-TaoLab/Niccolo-Forte/...`; scratch paths may use `/gpfs/scratch/...`.
 - Generated Abaqus files, transfer CSVs/NPZs, MLdata products, model checkpoints, HPO databases, Slurm logs, and notebook output bulk are research artifacts. Do not delete, rename, or commit them unless the task explicitly asks for that.
-- The repository currently ignores `*AGENTS.md`, so these guidance files are local unless the ignore rule is changed or they are force-added.
+- `AGENTS.md` files and repo skills under `.agents/skills/` are tracked project infrastructure. Keep them synchronized with the implementation.
 
 ## Cross-Folder Workflow
 
@@ -38,6 +40,26 @@ This repository is organized by PhD paper folder with one shared Python package.
 - Keep path overrides explicit in notebooks and scripts. Do not hide new global path constants inside shared modules.
 - Ask for clarification before changing a scientific assumption, simulation setup, lattice definition, material law, loss definition, or data-filtering rule that cannot be verified from local context.
 - For notebooks, prefer targeted cell/helper edits. Running full notebooks may require large data, Abaqus artifacts, or HPC resources.
+- `update-repo.ps1` is a legacy, side-effectful multi-checkout script that runs pull, broad staging, commit, push, and SSH commands against hard-coded locations. Do not run it or treat it as the normal Git workflow unless the user explicitly requests that exact operation and the targets have been re-verified.
+
+## Living Documentation Requirement
+
+Keeping human and agent guidance current is a completion requirement for every repository-changing task.
+
+- Before editing, read the root `README.md`, this file, the closest nested `AGENTS.md`, and any matching repo skill under `.agents/skills/`.
+- Read `PROJECT_STATUS.md` for planning, continuation, or handoff tasks; update it only when the current objective, evidence, blocker, decision, or next task changes.
+- During the same change, update the closest relevant `AGENTS.md` whenever behavior, structure, paths, commands, dependencies, scientific conventions, data contracts, outputs, risks, or validation expectations change.
+- Update `README.md` whenever the changed fact affects human setup, navigation, execution, interpretation, or maintenance.
+- Update the relevant `SKILL.md`, scripts, references, and `agents/openai.yaml` whenever a reusable workflow or its discovery metadata changes.
+- Add an `AGENTS.md` when a new subtree develops a distinct workflow, risk boundary, or validation contract.
+- Edit current guidance in place. Do not leave stale statements or append routine dated change logs; Git history is the change log.
+- If guidance already remains exact after a non-durable implementation change, explicitly verify that conclusion rather than silently skipping the documentation review.
+
+Use the `maintain-repo-guidance` skill for every repository change and run its checker before completion.
+
+Use `validate-repo-change` to select proportionate checks, `review-p1-p2-data-contract` whenever a change can affect the p1-to-p2 producer-consumer boundary, and `operate-p2-hpc` for cluster-facing p2 work.
+
+`.github/workflows/guidance-integrity.yml` runs the changed-surface validator on pushes and pull requests. Keep local validation authoritative when remote Actions are unavailable.
 
 ## Cleanup Constraint
 
@@ -54,6 +76,6 @@ Treat the user's cleanup preference as a high-priority engineering constraint, n
 
 ## Validation
 
-- For standard Python changes, use targeted import checks, `python -m py_compile`, or focused tests when data is available.
-- For shell scripts, use `bash -n` where possible.
-- For Abaqus scripts, distinguish syntax checks from real Abaqus execution. Real behavior often depends on Abaqus CAE, license access, and local/HPC file layout.
+- Run `python tools/validate_repo.py --changed` before claiming completion. Use a named `--scope` for broader review.
+- Treat `SYNTAX-ONLY` and `SKIP` as explicit limits, especially for Abaqus, HPC, external data, and scientific behavior.
+- Add focused checks for the changed behavior when the general validator cannot exercise it.
