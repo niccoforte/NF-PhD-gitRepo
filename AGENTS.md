@@ -41,6 +41,8 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 - Ask for clarification before changing a scientific assumption, simulation setup, lattice definition, material law, loss definition, or data-filtering rule that cannot be verified from local context.
 - For notebooks, prefer targeted cell/helper edits. Running full notebooks may require large data, Abaqus artifacts, or HPC resources.
 - `update-repo.ps1` is a legacy, side-effectful multi-checkout script that runs pull, broad staging, commit, push, and SSH commands against hard-coded locations. Do not run it or treat it as the normal Git workflow unless the user explicitly requests that exact operation and the targets have been re-verified.
+- The intended `origin` setup fetches from QMUL and has both QMUL and GitHub.com push URLs, so one `git push` updates both repositories. This is clone-local configuration: follow the README setup for a fresh checkout and inspect `git remote get-url --all --push origin` before relying on it.
+- Multi-destination pushes are not atomic. If either destination fails, inspect both remote branch tips and reconcile the lagging destination without rewriting shared history.
 
 ## Living Documentation Requirement
 

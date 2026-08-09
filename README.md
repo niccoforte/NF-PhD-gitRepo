@@ -61,6 +61,29 @@ The `review-p1-p2-data-contract` skill treats the boundary like an internal API:
 
 `update-repo.ps1` is a legacy manual multi-checkout workflow, not a setup or validation command. It runs pulls, broad staging, commits, pushes, and an SSH login against hard-coded local, OneDrive, `Z:`, and QMUL HPC locations. Do not run it without explicitly reviewing and confirming every target; whether it should be retired or redesigned is `Decision required`.
 
+## Git Remotes And Dual Push
+
+The intended setup fetches from QMUL GitHub while a single `git push` publishes the current branch to both QMUL GitHub and the public GitHub.com mirror. Configure each fresh clone once because push URLs live in that clone's local `.git/config` and are not versioned:
+
+```powershell
+git remote set-url origin https://github.qmul.ac.uk/exy053/NF-PhD-gitRepo.git
+git config --unset-all remote.origin.pushurl
+git config --add remote.origin.pushurl https://github.qmul.ac.uk/exy053/NF-PhD-gitRepo.git
+git config --add remote.origin.pushurl https://github.com/niccoforte/NF-PhD-gitRepo.git
+git remote -v
+```
+
+After that, ordinary `git pull`/`git fetch` use the single QMUL fetch URL, while `git push` or `git push origin main` pushes to both configured destinations. Authentication must work for both servers.
+
+A multi-destination push is not atomic: one server can accept a commit before the other rejects it or becomes unavailable. If `git push` reports any failure, compare both remote branch tips before retrying:
+
+```powershell
+git ls-remote https://github.qmul.ac.uk/exy053/NF-PhD-gitRepo.git refs/heads/main
+git ls-remote https://github.com/niccoforte/NF-PhD-gitRepo.git refs/heads/main
+```
+
+Do not set these `origin` push URLs globally, because that would affect unrelated repositories that also call their remote `origin`.
+
 ## Repository Map
 
 ```text
