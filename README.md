@@ -40,21 +40,22 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 Repository guidance is tracked with the code so a fresh checkout carries the same working agreements:
 
 - Start with the root `AGENTS.md`, then read the closest nested `AGENTS.md` before working in a paper folder, notebook folder, HPC folder, or `resources/`.
+- The root and nested `AGENTS.md` files provide the minimum repository and local context. Agents should additionally consult the relevant README sections for unfamiliar or cross-project work and for setup, navigation, commands, workflows, interpretation, or maintenance; repository-wide or unclear-scope work requires the full README.
 - Project-specific guidance includes `p1-DisorderLatticeProperties/AGENTS.md`, `p2-DisorderML/AGENTS.md`, `p3-DisorderIcingMitigation/AGENTS.md`, and `resources/AGENTS.md`.
 - Each paper has a concise `PROJECT_STATUS.md` for continuation, planning, and handoff. It holds only changing objectives, current evidence, decisions, external requirements, and the next task; durable rules stay in `AGENTS.md`.
 - Repo-scoped skills live under `.agents/skills/`. `maintain-repo-guidance` keeps instructions synchronized, `validate-repo-change` selects proportionate checks, `review-p1-p2-data-contract` protects the FEA-to-ML producer-consumer boundary, and `operate-p2-hpc` loads cluster procedures only for relevant work.
-- Human-facing setup, structure, commands, workflows, and limitations belong in this README. Agent-specific routing, safety, and validation rules belong in the closest relevant `AGENTS.md`. Reusable procedures belong in a skill.
+- Human-facing setup, structure, commands, workflows, and limitations belong in this README and must stay current whenever those facts change. Agent-specific routing, safety, and validation rules belong in the closest relevant `AGENTS.md`. Reusable procedures belong in a skill.
 - Current guidance should be edited in place; Git history records the chronology.
 
 Before completing a change, run:
 
 ```powershell
-python tools/validate_repo.py --changed
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed
 ```
 
 Useful broader scopes are `--scope resources`, `--scope p1`, `--scope p2`, `--scope p3`, `--scope contract`, and `--scope all`. The validator:
 
-- runs `git diff --check` and the guidance-integrity checker;
+- runs `git diff --check` and the guidance-integrity checker, which reports every effective `AGENTS.md` chain, warns above 24 KiB, and fails above 32 KiB;
 - compiles selected Python without executing it and labels Abaqus-dependent code `SYNTAX-ONLY`;
 - imports applicable `resources` modules in fresh Python processes;
 - checks notebook JSON/required structure, `bash -n`, and PowerShell parsing when those interpreters are available;
@@ -102,15 +103,14 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 |       +-- operate-p2-hpc/
 |       +-- review-p1-p2-data-contract/
 |       +-- validate-repo-change/
+|           +-- scripts/
+|           |   +-- validate_repo.py
+|           +-- fixtures/
+|               +-- synthetic_contract/
+|                   +-- contract.json
 +-- .github/
 |   +-- workflows/
 |       +-- guidance-integrity.yml
-+-- tools/
-|   +-- validate_repo.py
-+-- tests/
-|   +-- fixtures/
-|       +-- synthetic_contract/
-|           +-- contract.json
 +-- pyproject.toml
 +-- requirements.txt
 +-- requirements-abaqus.txt
@@ -436,7 +436,7 @@ Optional flags:
 ## Working Notes
 
 - Standard Python and Abaqus Python are separate environments. Code that touches `mdb`, `session`, `openOdb`, or Abaqus constants needs Abaqus Python for real execution.
-- `python tools/validate_repo.py --changed` labels compiled Abaqus-dependent Python as `SYNTAX-ONLY`; it does not validate Abaqus API behavior.
+- `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` labels compiled Abaqus-dependent Python as `SYNTAX-ONLY`; it does not validate Abaqus API behavior.
 - `AGENTS.md` files and `.agents/skills/` are tracked repository infrastructure and must stay current with the code and this README.
 - `.gitignore` excludes standard Abaqus replay/session files by their specific names without hiding the tracked `resources/abaqus.py` source module from normal file discovery.
 - `phd_shared_resources.egg-info/` can be created by editable installs and is expected.

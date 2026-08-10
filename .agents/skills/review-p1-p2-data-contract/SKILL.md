@@ -13,7 +13,7 @@ Treat the p1-to-p2 boundary like an internal API. p1 produces named CSV/NPZ file
 2. Read [references/data-contract.md](references/data-contract.md) for the affected contract only.
 3. Inspect the actual producer and every listed consumer; documentation is a routing aid, not proof of behavior.
 4. Update all affected ends together, or define an explicit migration for existing research artifacts.
-5. Run `python tools/validate_repo.py --scope contract`, then add the narrowest code-specific or real-data check available.
+5. Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope contract`, then add the narrowest code-specific or real-data check available.
 6. Report separately what was verified synthetically, with local research data, in Abaqus, and on HPC.
 
 Do not reinterpret smoothing, fracture indices, property definitions, filtering, loss definitions, or node selection as mere schema work. Those are scientific changes and need established authority.

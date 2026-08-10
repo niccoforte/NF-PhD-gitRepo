@@ -54,4 +54,4 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 
 ## Synthetic boundary check
 
-`tests/fixtures/synthetic_contract/contract.json` is explicitly non-scientific. `python tools/validate_repo.py --scope contract` checks aligned ids, reference id `0`, field dimensions/metadata, CSV round-trip identity, and NPZ round-trip shapes when NumPy is available. It does not validate real values, Abaqus behavior, scientific assumptions, or HPC execution.
+The explicitly non-scientific fixture lives at `.agents/skills/validate-repo-change/fixtures/synthetic_contract/contract.json`. Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope contract` to check aligned ids, reference id `0`, field dimensions/metadata, CSV round-trip identity, and NPZ round-trip shapes when NumPy is available. It does not validate real values, Abaqus behavior, scientific assumptions, or HPC execution.

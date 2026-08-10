@@ -38,5 +38,5 @@ This directory is the local notebook layer for p2 training, diagnostics, tokeniz
 ## Validation
 
 - Validate targeted notebook JSON and inspect changed cells; do not execute whole notebooks blindly when they require `Z:` data, saved runs, GPUs, or HPC.
-- Run `python tools/validate_repo.py --changed` from the repository root, plus focused loader or diagnostic checks when the required artifacts are available.
+- Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` from the repository root, plus focused loader or diagnostic checks when the required artifacts are available.
 - Record changing run observations or next steps in `../PROJECT_STATUS.md`, not here.

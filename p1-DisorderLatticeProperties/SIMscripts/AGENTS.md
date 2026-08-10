@@ -74,7 +74,7 @@ Important meanings:
 ## How To Work Here
 
 - Use Abaqus Python for real execution of scripts that touch `mdb`, `session`, or `openOdb`.
-- Run `python tools/validate_repo.py --changed` from the repository root. Its Python result is syntax-only for Abaqus-dependent files and does not prove Abaqus API behavior.
+- Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` from the repository root. Its Python result is syntax-only for Abaqus-dependent files and does not prove Abaqus API behavior.
 - If changing A1/A2 names or output contracts, use `review-p1-p2-data-contract` to inspect every affected producer and consumer.
 - If changing ODB parsing, verify expected step counts (`Hout + 1` in current launchers) and whether missing history data should be zero-filled or extrapolated.
 - If changing field output, use the field schema and impact map in the data-contract skill reference.

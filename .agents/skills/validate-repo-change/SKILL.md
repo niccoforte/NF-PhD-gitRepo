@@ -8,15 +8,15 @@ description: Select and run proportionate validation for changes in this PhD rep
 Use the repository entry point first:
 
 ```powershell
-python tools/validate_repo.py --changed
-python tools/validate_repo.py --scope root
-python tools/validate_repo.py --scope resources
-python tools/validate_repo.py --scope p1
-python tools/validate_repo.py --scope p2
-python tools/validate_repo.py --scope contract
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope root
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope resources
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope p1
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope p2
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope contract
 ```
 
-The script is non-destructive. It checks diff whitespace and guidance coverage; compiles selected Python without running modules; imports relevant shared modules in fresh processes; validates notebook JSON; runs `bash -n` and PowerShell parse checks when available; and validates the explicitly synthetic contract fixture. It reports environment setup/removal, Abaqus, HPC, external-data, and scientific execution as skipped rather than implying coverage.
+Run these commands from the repository root. The colocated script is non-destructive. It checks diff whitespace and guidance coverage; compiles selected Python without running modules; imports relevant shared modules in fresh processes; validates notebook JSON; runs `bash -n` and PowerShell parse checks when available; and validates the explicitly synthetic fixture under this skill's `fixtures/` directory. It reports environment setup/removal, Abaqus, HPC, external-data, and scientific execution as skipped rather than implying coverage.
 
 ## Add focused validation
 

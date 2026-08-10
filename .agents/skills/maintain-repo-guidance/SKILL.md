@@ -9,8 +9,8 @@ Treat current human and agent instructions as part of the implementation, not as
 
 ## Before editing
 
-1. Read the root `AGENTS.md` and `README.md`.
-2. Read every `AGENTS.md` from the repository root down to the affected directory.
+1. Read the root `AGENTS.md` and every `AGENTS.md` down to the affected directory; these supply the minimum repository and local context.
+2. Consult the relevant root `README.md` sections when work is unfamiliar, crosses projects or shared resources, or affects human setup, navigation, commands, workflows, interpretation, or maintenance. Read the full README for repository-wide onboarding or restructuring, or when the relevant scope is unclear.
 3. Inspect `.agents/skills/` for a workflow relevant to the task.
 4. For planning, continuation, or handoff work, read the affected paper's `PROJECT_STATUS.md`.
 5. Identify which current facts may change: structure, entry points, commands, paths, schemas, scientific assumptions, dependencies, outputs, safety constraints, validation expectations, or active handoff state.
@@ -19,7 +19,7 @@ Treat current human and agent instructions as part of the implementation, not as
 
 - Update the closest `AGENTS.md` when future agents need the changed fact or rule.
 - Update the paper-level or root `AGENTS.md` when the change crosses folders or affects repository-wide behavior.
-- Update `README.md` when a human needs the changed setup, structure, command, workflow, file role, or limitation.
+- Update `README.md` whenever a human needs the changed setup, structure, command, workflow, file role, or limitation. Selective reading never relaxes this update requirement.
 - Update the relevant skill when its trigger, procedure, script, reference, validation, or dependency changes.
 - Update `PROJECT_STATUS.md` only when the current objective, authoritative working surface, verified state, blocker, decision, external requirement, or next task changes. Do not copy durable rules into it.
 - Add an `AGENTS.md` when a new subtree has a distinct workflow, risk boundary, or validation contract.

@@ -25,7 +25,7 @@ jobs:
             base="$PUSH_BASE"
           fi
           if [ -n "$base" ] && [ "$base" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$base^{commit}"; then
-            python tools/validate_repo.py --base-ref "$base"
+            python .agents/skills/validate-repo-change/scripts/validate_repo.py --base-ref "$base"
           else
-            python tools/validate_repo.py --scope root
+            python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope root
           fi

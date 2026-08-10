@@ -12,5 +12,5 @@ Use this procedure for cluster-facing p2 work. Do not submit, resume, transfer, 
 3. Preserve production defaults. Express smoke/debug behavior only through explicit CLI overrides.
 4. For path or naming changes, trace scratch, archive, metadata, resume, diagnostics, and transfer consumers. Invoke `review-p1-p2-data-contract` when data or saved-run contracts are affected.
 5. Use dry-run modes where available before any authorized external operation.
-6. Run `python tools/validate_repo.py --changed`; add focused argument/path checks and report Bash, Slurm, GPU, data, and job execution separately.
+6. Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed`; add focused argument/path checks and report Bash, Slurm, GPU, data, and job execution separately.
 7. Invoke `maintain-repo-guidance` if the workflow, reference, commands, or current handoff state changes.

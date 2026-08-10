@@ -50,7 +50,8 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 
 Keeping human and agent guidance current is a completion requirement for every repository-changing task.
 
-- Before editing, read the root `README.md`, this file, the closest nested `AGENTS.md`, and any matching repo skill under `.agents/skills/`.
+- Before editing, read this file, every applicable `AGENTS.md` down to the affected directory, and any matching repo skill under `.agents/skills/`.
+- Use this file's repository map and cross-folder workflow as the minimum project context. Also consult the relevant `README.md` sections when the task is unfamiliar, crosses papers or shared resources, or affects human setup, navigation, commands, workflows, interpretation, or maintenance. Read the full README for repository-wide onboarding or restructuring, or whenever the relevant scope is unclear.
 - Read `PROJECT_STATUS.md` for planning, continuation, or handoff tasks; update it only when the current objective, evidence, blocker, decision, or next task changes.
 - During the same change, update the closest relevant `AGENTS.md` whenever behavior, structure, paths, commands, dependencies, scientific conventions, data contracts, outputs, risks, or validation expectations change.
 - Update `README.md` whenever the changed fact affects human setup, navigation, execution, interpretation, or maintenance.
@@ -69,17 +70,12 @@ Use `validate-repo-change` to select proportionate checks, `review-p1-p2-data-co
 
 Treat the user's cleanup preference as a high-priority engineering constraint, not a cosmetic preference.
 
-- Active scripts, notebooks, and helper modules should stay clean, compact, current, and intentional.
-- Do not leave behind dated, stale, legacy, failed, partial, duplicated, or superseded code in active work areas.
-- If an attempted approach is abandoned, remove it. If a helper exists only because of an old workaround and is no longer needed, remove it.
-- If notebook cells are replaced by helper functions, remove the stale code paths and clear stale outputs instead of preserving them "just in case".
-- Avoid verbose safety-net layers, fallback branches, legacy compatibility scaffolding, and overly defensive helper functions unless there is a concrete current need.
-- Prefer direct, readable code and compact helpers. If a helper is used once and does not clarify the main flow, consider inlining it. If logic is reused or makes notebooks cleaner, move it into the appropriate `resources/` module.
+- Keep active scripts, notebooks, and helpers compact, current, and intentional. Remove abandoned approaches, stale notebook cells and outputs, duplicated or superseded code, obsolete workaround helpers, and unnecessary compatibility or fallback scaffolding as part of the change.
+- Prefer direct code and compact helpers: inline one-off helpers that do not clarify the flow, and move genuinely reused logic into the appropriate `resources/` module.
 - Important exception: archived or explicitly historical folders, such as `p1-DisorderLatticeProperties/SIMscripts/OldScriptVersions/`, can preserve old versions. Active/current scripts and notebooks should not accumulate old experiments.
-- In short: clean up as you go.
 
 ## Validation
 
-- Run `python tools/validate_repo.py --changed` before claiming completion. Use a named `--scope` for broader review.
+- Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` before claiming completion. Use a named `--scope` for broader review.
 - Treat `SYNTAX-ONLY` and `SKIP` as explicit limits, especially for Abaqus, HPC, external data, and scientific behavior.
 - Add focused checks for the changed behavior when the general validator cannot exercise it.

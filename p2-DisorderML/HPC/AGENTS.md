@@ -22,5 +22,5 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 
 ## Validation
 
-- Run `python tools/validate_repo.py --changed` from the repository root. It performs Python and shell syntax checks where available but does not execute Slurm, GPUs, transfers, or research workloads.
+- Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` from the repository root. It performs Python and shell syntax checks where available but does not execute Slurm, GPUs, transfers, or research workloads.
 - For path changes, add focused dry-run checks for representative script forms and report any unavailable Bash/HPC checks.

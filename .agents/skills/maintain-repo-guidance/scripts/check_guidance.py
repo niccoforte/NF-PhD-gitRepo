@@ -10,6 +10,7 @@ from pathlib import Path, PurePosixPath
 
 
 MAX_INSTRUCTION_BYTES = 32 * 1024
+SOFT_INSTRUCTION_BYTES = 24 * 1024
 REQUIRED_FILES = (
     "AGENTS.md",
     "README.md",
@@ -30,8 +31,8 @@ REQUIRED_FILES = (
     ".agents/skills/maintain-repo-guidance/agents/openai.yaml",
     ".agents/skills/maintain-repo-guidance/scripts/check_guidance.py",
     ".agents/skills/review-p1-p2-data-contract/references/data-contract.md",
-    "tools/validate_repo.py",
-    "tests/fixtures/synthetic_contract/contract.json",
+    ".agents/skills/validate-repo-change/scripts/validate_repo.py",
+    ".agents/skills/validate-repo-change/fixtures/synthetic_contract/contract.json",
     ".github/workflows/guidance-integrity.yml",
 )
 STALE_TEXT = (
@@ -159,6 +160,7 @@ def main() -> int:
     root = find_repo_root()
     errors: list[str] = []
     notes: list[str] = []
+    warnings: list[str] = []
 
     for relative in REQUIRED_FILES:
         if not (root / relative).is_file():
@@ -188,7 +190,7 @@ def main() -> int:
         (".github/workflows/guidance-integrity.yml", "README.md"),
         ("p3-DisorderIcingMitigation/AGENTS.md", "README.md"),
         ("PROJECT_STATUS.md", "README.md"),
-        ("tools/validate_repo.py", "README.md"),
+        (".agents/skills/validate-repo-change/scripts/validate_repo.py", "README.md"),
         ("setup-Windows.ps1", "AGENTS.md"),
         ("setup-macOS.sh", "AGENTS.md"),
         ("setup-Windows.ps1", "README.md"),
@@ -242,6 +244,11 @@ def main() -> int:
                 f"Instruction chain for {relative} is {size} bytes; "
                 f"default limit is {MAX_INSTRUCTION_BYTES}."
             )
+        elif size > SOFT_INSTRUCTION_BYTES:
+            warnings.append(
+                f"Instruction chain for {relative} is {size} bytes; review for "
+                f"duplication before it reaches the {MAX_INSTRUCTION_BYTES}-byte hard limit."
+            )
 
     if not args.no_diff_check:
         changed = changed_paths(root, args.base_ref)
@@ -266,6 +273,8 @@ def main() -> int:
 
     for note in notes:
         print(f"NOTE: {note}")
+    for warning in warnings:
+        print(f"WARNING: {warning}")
     if errors:
         for error in errors:
             print(f"ERROR: {error}", file=sys.stderr)

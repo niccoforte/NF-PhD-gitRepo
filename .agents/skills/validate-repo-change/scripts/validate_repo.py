@@ -31,11 +31,11 @@ CONTRACT_PREFIXES = (
     "resources/MLmodels.py",
     "resources/MLmetrics.py",
     ".agents/skills/review-p1-p2-data-contract/",
-    "tests/fixtures/synthetic_contract/",
+    ".agents/skills/validate-repo-change/fixtures/synthetic_contract/",
 )
 IGNORED_PARTS = {".git", ".venv", "__pycache__", "OldScriptVersions"}
 SCOPES = {
-    "root": ("AGENTS.md", "README.md", ".agents/", ".github/", "tools/", "tests/"),
+    "root": ("AGENTS.md", "README.md", ".agents/", ".github/"),
     "resources": ("resources/",),
     "p1": ("p1-DisorderLatticeProperties/",),
     "p2": ("p2-DisorderML/",),
@@ -239,7 +239,7 @@ def check_powershell(root: Path, paths: list[str]) -> list[Result]:
 
 
 def check_contract_fixture(root: Path) -> list[Result]:
-    path = root / "tests/fixtures/synthetic_contract/contract.json"
+    path = root / ".agents/skills/validate-repo-change/fixtures/synthetic_contract/contract.json"
     try:
         fixture = json.loads(path.read_text(encoding="utf-8"))
         if fixture.get("fixture_kind") != "synthetic_non_scientific_contract":
