@@ -13,23 +13,13 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 
-## Mechanics Vocabulary
-
-- `Ductile` and `UT` refer to uniaxial/ductile stress-strain simulations and properties such as ductility, strength, stiffness, and work of fracture.
-- `Fracture` and `FT` refer to compact-tension/fracture simulations and properties such as force, displacement, `K_IC`, and `K_JIC`.
-- `MULTI` or `both` means aligned UT/FT samples where shared sample indices matter.
-- `per` is the periodic/reference lattice case and is represented as simulation id `0` in processed data.
-- `disNodes` is nodal disorder; `disStruts` is strut-thickness disorder. Current p2 work mainly consumes `disNodes`.
-
 ## Data Conventions
 
 - Current local Ti data generally resolves through `DATA(path=1, LAT=..., nnx=..., dis=..., dN=..., mechMode=...)`.
 - `DATA(path=1, ...)` points into `Z:/p1/data/Ti/{dis}/{path_add}/{dN}/{LAT}/` and uses `PATH_PER` for `Z:/p1/data/Ti/per/{LAT}/`.
 - `path_add` values such as `Target-xs` are part of the data tree. Keep them explicit in notebook configuration cells.
 - Active lattice names include `FCC`, `tri`, `kagome`, and `hex`; older helpers also know about `square` and `45square`.
-- Raw transfer files use names such as `IN-n...csv`, `IN-s...csv`, `IN-f...csv`, `OUT-Ductile...csv`, `OUT-Fracture...csv`, and `FIELDu-...npz`.
-- Processed curve files are written beside the data root with names such as `Ductile-disNodes-IN.csv`, `Ductile-disNodes-OUT.csv`, `Fracture-disNodes-IN.csv`, and per-mode manifest CSVs.
-- Processed field files are first stacked into names such as `Ductile-disNodes-FIELDu.npz` and `Fracture-disNodes-FIELDu.npz`; `MLdata` save helpers then convert them into final `allFIELD.npz` products consumed by `DATA(..., output_kind="field")`.
+- Detailed transfer names, processed schemas, sample alignment, field metadata, and downstream consumers are maintained in the `review-p1-p2-data-contract` skill reference. Use it whenever those boundaries change.
 
 ## Shared Helpers To Respect
 

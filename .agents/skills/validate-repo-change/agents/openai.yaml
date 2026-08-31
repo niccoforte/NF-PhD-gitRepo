@@ -1,0 +1,4 @@
+interface:
+  display_name: "Validate Repo Change"
+  short_description: "Run proportionate repository checks"
+  default_prompt: "Use $validate-repo-change to validate the current repository changes and report evidence and skipped checks."

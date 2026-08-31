@@ -18,21 +18,7 @@
 
 ## Pipeline Contract
 
-The main data path is:
-
-```text
-p1 SIMscripts -> transfer CSV/NPZ files -> data_processing.py -> MLdata products -> p2 training/post-processing
-```
-
-Preserve these tokens and meanings across modules:
-
-- `Ductile`/`UT`: uniaxial or ductile stress-strain branch.
-- `Fracture`/`FT`: compact-tension or fracture branch.
-- `MULTI`/`both`: aligned UT and FT samples.
-- `per`: periodic/reference sample, represented as id `0`.
-- `disNodes`: nodal disorder.
-- `disStruts`: strut-thickness disorder.
-- `IN-n`, `IN-s`, `IN-f`, `OUT-`, and `FIELDu-`: transfer-file families used by p1 and p2.
+`resources/` is the transformation boundary between p1 producers and p2 consumers. Use `review-p1-p2-data-contract` for its detailed file families, identity rules, schemas, field metadata, saved layouts, and impact map. Preserve the contract or migrate every affected consumer together.
 
 ## Abaqus Boundary
 
@@ -53,9 +39,7 @@ Preserve these tokens and meanings across modules:
 - `data_processing.py` reads raw files from `Path(dat.PATH) / "transfer"` and periodic references from `dat.PATH_PER` when available.
 - Processed curve CSVs are written to `dat.PATH` and aligned by integer simulation id.
 - Manifest CSVs record missing inputs, missing outputs, frequency handling, NaNs, failure-index drops, and final inclusion. Preserve this audit trail when changing filtering.
-- Field raw files are expected to contain `Y` plus useful metadata such as `valid_mask`, `frame_values`, `node_labels`, `node_coords`, `components`, `sample_id`, and source paths.
-- Stacked field arrays use `[sample, frame, node, component]` before `MLdata.py` reshapes them for models.
-- Body-node filtering removes non-body UT grip nodes to match input-node conventions. Do not disable it without checking downstream p2 field shapes.
+- Field metadata, array layout, and body-node filtering are contract details maintained in the data-contract skill reference. Do not change them without tracing p1 exporters through p2 diagnostics.
 
 ## ML Data And Model Rules
 

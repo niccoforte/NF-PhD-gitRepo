@@ -2,6 +2,8 @@
 
 This paper folder is the finite-element and data-generation layer of the repository. It studies quasi-disordered 2D lattice mechanical response under uniaxial/ductile and compact-tension/fracture loading, then prepares the simulation outputs that p2 uses for machine-learning surrogates.
 
+Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it records changing priorities without duplicating these durable rules.
+
 ## Folder Map
 
 - `SIMscripts/` contains the active Abaqus model-generation, post-processing, Slurm, local-run, and transfer scripts. Read `SIMscripts/AGENTS.md` before editing or running anything there.
@@ -23,18 +25,10 @@ In practical terms:
 - `DataProcessing.ipynb` and `InputsOutputs.ipynb` convert transfer files into aligned ML-ready inputs, outputs, properties, and field arrays.
 - p2 consumes those ML-ready products through `resources.MLdata.DATA`.
 
-## Core Conventions
-
-- `Ductile`/`UT` means uniaxial or ductile stress-strain response.
-- `Fracture`/`FT` means compact-tension or fracture response.
-- `MULTI`/`both` means aligned UT and FT samples.
-- `per` is the periodic/reference sample and is represented downstream as simulation id `0`.
-- `disNodes` is nodal disorder; `disStruts` is strut-thickness disorder.
-- `IN-n`, `IN-s`, `IN-f`, `OUT-Ductile`, `OUT-Fracture`, and `FIELDu` file names are part of the p1-to-p2 data contract.
-
 ## How To Work Here
 
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
+- For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.
 - Keep active p1 scripts and notebooks lean. Remove abandoned approaches, stale cells, obsolete helper paths, and superseded experiments as work progresses.
 - Treat changes to lattice geometry, node counts, material laws, boundary conditions, smoothing, fracture-index logic, stiffness fits, and outlier rules as scientific changes, not simple refactors.
 - Do not run Abaqus, Slurm, archive-transfer, ODB-upgrade, or recursive rename/delete scripts casually. Confirm the target paths and whether the script modifies research artifacts.

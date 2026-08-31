@@ -1,0 +1,4 @@
+interface:
+  display_name: "Review P1-P2 Data Contract"
+  short_description: "Protect the FEA-to-ML data contract"
+  default_prompt: "Use $review-p1-p2-data-contract to review this change across the p1-to-p2 producer and consumer chain."

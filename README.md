@@ -14,10 +14,16 @@ At a high level:
 From the repository root, run:
 
 ```powershell
-.\setup.ps1
+.\setup-Windows.ps1
 ```
 
-That sets up the shared `resources` package for both standard Python and Abaqus Python, then verifies imports from outside the repo root. After setup, code can use imports such as:
+On macOS, run:
+
+```bash
+./setup-macOS.sh
+```
+
+The Windows script sets up the shared `resources` package for both standard Python and Abaqus Python. The macOS script creates or refreshes the isolated `nf-phd` Conda environment for standard Python; Abaqus is not available on macOS. Both scripts verify imports from outside the repo root. After setup, code can use imports such as:
 
 ```python
 from resources.MLdata import DATA
@@ -25,23 +31,97 @@ from resources.lattices import Geometry
 from resources.data_processing import create_inputCSV, create_outputCSV
 ```
 
-If you are only working with notebooks or standard Python tools, `.\setup.ps1 -OnlyPython` is usually enough. If you are only preparing Abaqus-side helpers, use `.\setup.ps1 -OnlyAbaqus`.
+On Windows, `-OnlyPython` and `-OnlyAbaqus` select one interpreter. Pass `-remove` to either platform script to reverse its setup.
 
 The root `requirements.txt` is set up for a standard local Python environment, including CPU PyTorch wheels. The GPU/HPC machine-learning environment is managed separately by `p2-DisorderML/HPC/B0_ML-env-setup.sh`.
+
+## Agent Guidance And Repo Skills
+
+Repository guidance is tracked with the code so a fresh checkout carries the same working agreements:
+
+- Start with the root `AGENTS.md`, then read the closest nested `AGENTS.md` before working in a paper folder, notebook folder, HPC folder, or `resources/`.
+- The root and nested `AGENTS.md` files provide the minimum repository and local context. Agents should additionally consult the relevant README sections for unfamiliar or cross-project work and for setup, navigation, commands, workflows, interpretation, or maintenance; repository-wide or unclear-scope work requires the full README.
+- Project-specific guidance includes `p1-DisorderLatticeProperties/AGENTS.md`, `p2-DisorderML/AGENTS.md`, `p3-DisorderIcingMitigation/AGENTS.md`, and `resources/AGENTS.md`.
+- Each paper has a concise `PROJECT_STATUS.md` for continuation, planning, and handoff. It holds only changing objectives, current evidence, decisions, external requirements, and the next task; durable rules stay in `AGENTS.md`.
+- Repo-scoped skills live under `.agents/skills/`. `maintain-repo-guidance` keeps instructions synchronized, `validate-repo-change` selects proportionate checks, `review-p1-p2-data-contract` protects the FEA-to-ML producer-consumer boundary, and `operate-p2-hpc` loads cluster procedures only for relevant work.
+- Human-facing setup, structure, commands, workflows, and limitations belong in this README and must stay current whenever those facts change. Agent-specific routing, safety, and validation rules belong in the closest relevant `AGENTS.md`. Reusable procedures belong in a skill.
+- Current guidance should be edited in place; Git history records the chronology.
+
+Before completing a change, run:
+
+```powershell
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed
+```
+
+Useful broader scopes are `--scope resources`, `--scope p1`, `--scope p2`, `--scope p3`, `--scope contract`, and `--scope all`. The validator:
+
+- runs `git diff --check` and the guidance-integrity checker, which reports every effective `AGENTS.md` chain, warns above 24 KiB, and fails above 32 KiB;
+- compiles selected Python without executing it and labels Abaqus-dependent code `SYNTAX-ONLY`;
+- imports applicable `resources` modules in fresh Python processes;
+- checks notebook JSON/required structure, `bash -n`, and PowerShell parsing when those interpreters are available;
+- checks the explicitly non-scientific contract fixture for aligned sample ids, periodic id `0`, field shapes/metadata, and CSV/NPZ serialization;
+- reports Abaqus, Slurm/HPC, external `Z:` data, saved-run, and scientific execution as `SKIP` when they were not exercised.
+
+The synthetic fixture contains only minimal identities and shapes, not experimental or simulated research values. It detects structural breakage; it cannot establish scientific correctness. The `.github/workflows/guidance-integrity.yml` workflow runs the changed-surface validator on pushes and pull requests to the public GitHub.com mirror. The job is skipped before runner allocation on the QMUL Enterprise mirror because that server currently cancels runner-backed jobs; this prevents misleading cancellation warnings while the public mirror remains the authoritative remote CI host. Local validation remains required.
+
+The `review-p1-p2-data-contract` skill treats the boundary like an internal API: p1 writes named, indexed CSV/NPZ products; shared resources transform/load them; p2 assumes the same identity, shape, metadata, and saved-run layout. Use it when a change could make one stage produce data that another stage misreads even though both stages still run.
+
+`update-repo.ps1` is a legacy manual multi-checkout workflow, not a setup or validation command. It runs pulls, broad staging, commits, pushes, and an SSH login against hard-coded local, OneDrive, `Z:`, and QMUL HPC locations. Do not run it without explicitly reviewing and confirming every target; whether it should be retired or redesigned is `Decision required`.
+
+## Git Remotes And Dual Push
+
+The intended setup fetches from QMUL GitHub while a single `git push` publishes the current branch to both QMUL GitHub and the public GitHub.com mirror. Configure each fresh clone once because push URLs live in that clone's local `.git/config` and are not versioned:
+
+```powershell
+git remote set-url origin https://github.qmul.ac.uk/exy053/NF-PhD-gitRepo.git
+git config --unset-all remote.origin.pushurl
+git config --add remote.origin.pushurl https://github.qmul.ac.uk/exy053/NF-PhD-gitRepo.git
+git config --add remote.origin.pushurl https://github.com/niccoforte/NF-PhD-gitRepo.git
+git remote -v
+```
+
+After that, ordinary `git pull`/`git fetch` use the single QMUL fetch URL, while `git push` or `git push origin main` pushes to both configured destinations. Authentication must work for both servers.
+
+A multi-destination push is not atomic: one server can accept a commit before the other rejects it or becomes unavailable. If `git push` reports any failure, compare both remote branch tips before retrying:
+
+```powershell
+git ls-remote https://github.qmul.ac.uk/exy053/NF-PhD-gitRepo.git refs/heads/main
+git ls-remote https://github.com/niccoforte/NF-PhD-gitRepo.git refs/heads/main
+```
+
+Do not set these `origin` push URLs globally, because that would affect unrelated repositories that also call their remote `origin`.
 
 ## Repository Map
 
 ```text
 00-PhD-gitRepo/
++-- AGENTS.md
 +-- README.md
++-- .agents/
+|   +-- skills/
+|       +-- maintain-repo-guidance/
+|       +-- operate-p2-hpc/
+|       +-- review-p1-p2-data-contract/
+|       +-- validate-repo-change/
+|           +-- scripts/
+|           |   +-- validate_repo.py
+|           +-- fixtures/
+|               +-- synthetic_contract/
+|                   +-- contract.json
++-- .github/
+|   +-- workflows/
+|       +-- guidance-integrity.yml
 +-- pyproject.toml
 +-- requirements.txt
 +-- requirements-abaqus.txt
-+-- setup.ps1
-+-- remove-setup.ps1
++-- setup-Windows.ps1
++-- setup-macOS.sh
 +-- update-repo.ps1
 +-- p1-DisorderLatticeProperties/
+|   +-- AGENTS.md
+|   +-- PROJECT_STATUS.md
 |   +-- code/
+|   |   +-- AGENTS.md
 |   |   +-- DataProcessing.ipynb
 |   |   +-- InputsOutputs.ipynb
 |   |   +-- SIMresults.ipynb
@@ -50,6 +130,7 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 |   |   +-- ValConvPlots.ipynb
 |   |   +-- AK-*.ipynb and exploratory notebooks
 |   +-- SIMscripts/
+|       +-- AGENTS.md
 |       +-- A1_FractureToughness-Ductility.py
 |       +-- A2_INpostProcess.py
 |       +-- A2_OUTpostProcess.py
@@ -63,7 +144,10 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 |       +-- odbUpgrade.py
 |       +-- OldScriptVersions/
 +-- p2-DisorderML/
+|   +-- AGENTS.md
+|   +-- PROJECT_STATUS.md
 |   +-- code/
+|   |   +-- AGENTS.md
 |   |   +-- ML-CurveOutputs.ipynb
 |   |   +-- ML-FieldOutputs.ipynb
 |   |   +-- ML-FieldToCurveOutputs.ipynb
@@ -74,16 +158,21 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 |   |   +-- TOKENIZATION_NEXT_STEPS.md
 |   |   +-- exploratory/prototype notebooks
 |   +-- HPC/
+|       +-- AGENTS.md
 |       +-- B0_ML-env-setup.sh
 |       +-- B1_ML-new.sh
+|       +-- B2_ML-resumeHPO.sh
 |       +-- B3_ML-transfer.sh
 |       +-- CurveOutputs/
 |       +-- FieldOutputs/
 |       +-- FieldToCurve/
 +-- p3-DisorderIcingMitigation/
+|   +-- AGENTS.md
+|   +-- PROJECT_STATUS.md
 |   +-- SIMscripts/
 |       +-- A1_IcingModels.py
 +-- resources/
+    +-- AGENTS.md
     +-- abaqus.py
     +-- calculations.py
     +-- data_processing.py
@@ -188,7 +277,7 @@ This folder is the local notebook workspace for model development and post-proce
 | --- | --- |
 | `ML-CurveOutputs.ipynb` | Main local curve-output training/HPO notebook for MLP, GCN/GAT/GNN, and Transformer models. |
 | `ML-FieldOutputs.ipynb` | Main local field-output training/HPO notebook for node-compatible models such as GCN/GAT/GNN and Transformer. |
-| `ML-FieldToCurveOutputs.ipynb` | Exploratory Transformer workflow that maps nodal displacement-field histories to global mechanical curves. |
+| `ML-FieldToCurveOutputs.ipynb` | Exploratory field-input to curve-output notebook aligned with the HPC field-to-curve framework. |
 | `ML-CurvePostProcessing.ipynb` | Diagnostics for one saved curve run. |
 | `ML-FieldPostProcessing.ipynb` | Diagnostics and visualization for one saved field run. |
 | `ML-HPOpostProcess.ipynb` | HPO study comparison and best-run inspection. |
@@ -223,6 +312,8 @@ L_total = sum over m in {UT, FT} [
 
 `MaskedFieldMSELoss` is the current pointwise field baseline and requires further development. `CombinedCurveLoss` is the current full-curve objective. How to balance the simultaneous field and curve objectives remains an open modelling decision; this architecture and loss are documented targets, not yet implemented code.
 
+See `p2-DisorderML/PROJECT_STATUS.md` for the current evidence, blockers, decisions, and next implementation task.
+
 ### `p2-DisorderML/HPC/`
 
 This folder contains the QMUL HPC/Slurm training and HPO workflow.
@@ -231,12 +322,13 @@ This folder contains the QMUL HPC/Slurm training and HPO workflow.
 | --- | --- |
 | `B0_ML-env-setup.sh` | Creates or refreshes the `nf-ml-gpu` conda environment with CUDA PyTorch, PyTorch Geometric, Optuna, BoTorch/GPyTorch, and related ML dependencies. |
 | `B1_ML-new.sh` | Main Slurm submit wrapper. Copies the selected run script and `resources/` to scratch, runs training/HPO, and rsyncs outputs to the archive root. |
+| `B2_ML-resumeHPO.sh` | Resumes archived cross-model Optuna studies and supports a non-running `--dry-run` plan check. |
 | `B3_ML-transfer.sh` | Transfers saved p2 run folders from HPC archives to local `Z:/p2` or fallback local folders. |
-| `CurveOutputs/A0-HPC_Curve-test.py` | Curve-output smoke/debug entry point. |
+| `CurveOutputs/A0-HPC_Curve-test.py` | Production-oriented single-run curve entry point; reduced debug runs require explicit CLI overrides. |
 | `CurveOutputs/A0-HPC_Curve-CrossModelHPO.py` | Cross-model HPO entry point for curve surrogates. |
-| `FieldOutputs/A0-HPC_Field-test.py` | Field-output smoke/debug entry point. |
+| `FieldOutputs/A0-HPC_Field-test.py` | Production-oriented single-run field entry point; reduced debug runs require explicit CLI overrides. |
 | `FieldOutputs/A0-HPC_Field-CrossModelHPO.py` | Cross-model HPO entry point for field surrogates. |
-| `FieldToCurve/A0-HPC_FieldToCurve-test.py` | Field-input to curve-output Transformer smoke/debug entry point. |
+| `FieldToCurve/A0-HPC_FieldToCurve-test.py` | Production-oriented Transformer single-run entry point for field-input to curve-output models. |
 | `FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py` | Cross-model HPO entry point for field-to-curve surrogates. |
 
 Important HPC conventions:
@@ -244,20 +336,22 @@ Important HPC conventions:
 - `DATA_ROOT` should point to the parent folder containing `MLdata`, not directly to the `MLdata` folder.
 - `ML_RUN_ROOT` points to scratch during a job.
 - `ML_ARCHIVE_ROOT` records the archive target in saved metadata.
-- `ML_RUN_CONTEXT=HPC` prefixes run descriptors/study names where needed.
+- `ML_RUN_CONTEXT=HPC` records cluster context but must not alter run descriptors or study names.
 - Production GPU jobs should fail clearly if CUDA is unavailable; `--allow-cpu` is for local/debug use.
 
 ## Paper 3: Disorder Icing Mitigation
 
-`p3-DisorderIcingMitigation/` currently contains early Abaqus simulation work for ice-mitigation concepts:
+`p3-DisorderIcingMitigation/` currently contains provisional Abaqus work intended for a future ice-mitigation study:
 
 ```text
 p3-DisorderIcingMitigation/
++-- AGENTS.md
++-- PROJECT_STATUS.md
 +-- SIMscripts/
     +-- A1_IcingModels.py
 ```
 
-This area is less settled than p1 and p2. The current script is a large Abaqus model file with inline geometry/disorder helpers. Treat it as active research scaffolding rather than a polished framework.
+This area is less settled than p1 and p2. The current file is a large Abaqus lattice model with inline geometry, disorder, material, ductile, and fracture logic. The repository does not yet establish a validated icing-interface, adhesion, thermal, cohesive, or de-icing model. Its scientific scope, validation target, and authoritative workflow are `To be confirmed`; read the local `AGENTS.md` and do not infer them from p1.
 
 ## Shared Package: `resources/`
 
@@ -301,43 +395,58 @@ Generated data, Abaqus artifacts, model checkpoints, HPO databases, Slurm logs, 
 
 ## Setup (Python + Abaqus)
 
-Recommended one-command setup from repo root:
+Recommended setup from the repository root:
 
 ```powershell
-.\setup.ps1
+.\setup-Windows.ps1
 ```
 
-This installs for both interpreters:
+```bash
+./setup-macOS.sh
+```
+
+On Windows, this installs for both interpreters:
 
 - all dependencies from `requirements.txt` into standard Python
 - all dependencies from `requirements-abaqus.txt` into Abaqus Python
 - the local repo package (`resources`) for standard Python
 - the local repo package (`resources`) for Abaqus Python
 
+On macOS, the script creates or refreshes the `nf-phd` Conda environment, installs the standard-Python dependencies with macOS-compatible PyTorch and TensorFlow versions, and installs the local `resources` package. It does not attempt to install Abaqus.
+
+The macOS script expects Miniforge at `~/miniforge3` by default. Set `CONDA_ROOT` to another installation, `CONDA_ENV` to choose another environment name, or `PYTHON_VERSION` to override Python 3.12 before running it. Its dependency list intentionally mirrors the standard requirements while replacing Windows/Linux-specific PyTorch and TensorFlow pins; dependency changes must review both `requirements.txt` and `setup-macOS.sh`.
+
 Important implementation details:
 
 - setup writes a `.pth` hook (`phd_shared_resources_repo.pth`) in Abaqus user site-packages for reliability and to cover local-package pip failures
 - setup verifies imports from a temp directory, not from the repo root, so import checks are real
 - if `PIP_NO_INDEX` is set in the shell, setup temporarily unsets it during install and restores it afterwards
+- setup and removal change external environments; repository validation parses these scripts but does not execute installation or removal automatically
 
 Optional flags:
 
-- `.\setup.ps1 -OnlyPython` runs only standard Python setup
-- `.\setup.ps1 -OnlyAbaqus` runs only Abaqus Python setup
+- `.\setup-Windows.ps1 -OnlyPython` runs only standard Python setup
+- `.\setup-Windows.ps1 -OnlyAbaqus` runs only Abaqus Python setup
 
 ## Remove Setup
 
 To uninstall everything installed by setup for both interpreters, run:
 
 ```powershell
-.\remove-setup.ps1
+.\setup-Windows.ps1 -remove
 ```
 
-Default behavior:
+```bash
+./setup-macOS.sh -remove
+```
+
+Windows removal behavior:
 
 - standard Python: uninstall local `resources` package and uninstall all packages listed in `requirements.txt`
 - Abaqus Python: uninstall local `resources` package and uninstall all packages listed in `requirements-abaqus.txt`
 - remove fallback `.pth` hooks (`phd_shared_resources_repo.pth`) for both Python and Abaqus if present
+
+On macOS, removal deletes the isolated `nf-phd` Conda environment. It does not delete the repository, Miniforge, or packages in other Python environments.
 
 Important:
 
@@ -346,15 +455,16 @@ Important:
 
 Optional flags:
 
-- `.\remove-setup.ps1 -OnlyPython` runs only standard Python removal
-- `.\remove-setup.ps1 -OnlyAbaqus` runs only Abaqus removal
-- `.\remove-setup.ps1 -SkipPythonRequirementsUninstall` removes the local `resources` package/hook but keeps packages from `requirements.txt` and `requirements-abaqus.txt` installed
+- `.\setup-Windows.ps1 -remove -OnlyPython` runs only standard Python removal
+- `.\setup-Windows.ps1 -remove -OnlyAbaqus` runs only Abaqus removal
+- `.\setup-Windows.ps1 -remove -SkipPythonRequirementsUninstall` removes the local `resources` package/hook but keeps packages from `requirements.txt` and `requirements-abaqus.txt` installed
+- `./setup-macOS.sh -remove` removes the isolated `nf-phd` Conda environment and leaves the repository untouched
 
 ## Working Notes
 
 - Standard Python and Abaqus Python are separate environments. Code that touches `mdb`, `session`, `openOdb`, or Abaqus constants needs Abaqus Python for real execution.
-- `python -m py_compile` can catch syntax issues in Python files, but it does not validate Abaqus API behavior.
-- `AGENTS.md` files exist locally as agent guidance for root, p1, p2, and `resources`. The repository currently ignores `*AGENTS.md`, so they are local guidance unless force-added or the ignore rule is changed.
-- `resources/abaqus.py` is central to the p1 workflow, but it may be hidden from some file-search listings because `.gitignore` contains `abaqus*`.
+- `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` labels compiled Abaqus-dependent Python as `SYNTAX-ONLY`; it does not validate Abaqus API behavior.
+- `AGENTS.md` files and `.agents/skills/` are tracked repository infrastructure and must stay current with the code and this README.
+- `.gitignore` excludes standard Abaqus replay/session files by their specific names without hiding the tracked `resources/abaqus.py` source module from normal file discovery.
 - `phd_shared_resources.egg-info/` can be created by editable installs and is expected.
 - pip warnings such as `Ignoring invalid distribution -ygments/-ympy` come from existing broken metadata in the Python environment, not from this repository.

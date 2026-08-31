@@ -15,4 +15,8 @@
 .abaqus-pydeps/
 
 *codex*
-abaqus*
+abaqus.rpy*
+abaqus.jnl
+abaqus.rec
+abaqus.cae
+abaqus.lck

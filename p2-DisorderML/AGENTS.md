@@ -2,6 +2,8 @@
 
 This paper folder is the machine-learning and optimization layer of the PhD repository. It uses ML surrogates to map nodal disorder in 2D FCC lattice geometries to mechanical response, then uses those surrogates and diagnostics to guide design decisions. Keep edits tied to that workflow.
 
+Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it records changing priorities and target runs without duplicating these durable rules.
+
 ## Repository Relationship
 
 - `p2-DisorderML/code/` contains notebooks for local exploration, training, HPO post-processing, saved-run diagnostics, tokenization, and optimization.
@@ -43,7 +45,7 @@ This paper folder is the machine-learning and optimization layer of the PhD repo
 - Use `input_kind="field", output_kind="curve"` for field-to-curve runs. Keep this separate from ordinary geometry-to-curve runs in saving, loading, run listing, transfer, and post-processing path helpers.
 - Field-output `DATA` currently requires node-compatible models: `GNN`, `GCN`, `GAT`, `TR`, or `Transformer`. MLP is curve-only in the current field/HPO path.
 - For graph and Transformer inputs, preserve node structure. Do not apply input PCA/reduction before node tokenization.
-- Field-to-curve inputs are also node-token inputs. The smoke route is Transformer with `pool="mean"` and PCA-reduced curve targets; cross-model HPO may compare GCN, GAT, and Transformer. MLP is not a supported fallback for this input contract.
+- Field-to-curve inputs are also node-token inputs. The single-run reference route is Transformer with `pool="mean"` and PCA-reduced curve targets; cross-model HPO may compare GCN, GAT, and Transformer. MLP is not a supported fallback for this input contract.
 - Field targets are flattened as `[samples, nodes, frames * components]` for model training, then reconstructed for diagnostics.
 - Field `.npz` files are expected to contain arrays such as `Y`, `U`, `field`, or `values`, plus useful metadata keys when available (`frame_values`, `node_labels`, `coords0`, `components`, `valid_mask`, `sample_ids`).
 - UT field outputs must use main-body nodes only. Grip-section nodes are cropped to match the input-processing convention.
@@ -52,13 +54,9 @@ This paper folder is the machine-learning and optimization layer of the PhD repo
 
 - The intended unified surrogate has one nodal disorder/geometry input and separate UT and FT branches.
 - Each branch is serial: a disorder-to-field Transformer predicts `u(x,y,t)` and `v(x,y,t)`, then a field-to-curve Transformer predicts the corresponding global response curve.
-- UT produces a displacement field followed by a stress-strain curve. FT produces a displacement field followed by a force-displacement curve.
-- Do not replace this with parallel field and curve readouts from the same latent representation. The learned displacement field is the required intermediary.
-- Direct disorder-to-curve models have been tried and have not learned the relationship adequately.
-- The main unresolved implementation problem is joint training with two objectives acting at different depths. The field loss directly supervises the first Transformer; the curve loss supervises the second Transformer and backpropagates through both stages.
-- Conceptually, the objective is `L_total = sum_m(lambda_field,m * L_field,m + lambda_curve,m * L_curve,m)` for `m in {UT, FT}`.
-- `MaskedFieldMSELoss` is the current pointwise field baseline and needs future development. `CombinedCurveLoss` is the current full-curve objective. Loss weighting/balancing remains undecided.
-- Treat this as a documented research target rather than implemented behavior until the data are accessible and the user explicitly resumes model development.
+- Do not replace the serial field intermediary with parallel field and curve readouts from the same latent representation.
+- Joint end-to-end training requires field supervision after the first Transformer and curve supervision after the second, with curve gradients propagating through both stages.
+- Current evidence, loss choices, unresolved weighting, data-access blockers, and next implementation work belong in `PROJECT_STATUS.md`.
 
 ## Saved Artifacts
 
@@ -67,10 +65,7 @@ This paper folder is the machine-learning and optimization layer of the PhD repo
 - Treat `predictions.npz` as saved prediction/truth arrays for visualization and diagnostics, not as model weights. Prefer using it for post-processing so saved runs can be inspected without a model forward pass.
 - HPO runs use Optuna `full_study.db` plus `best_params.json`, `best_trial_user_attrs.json`, and, when enabled, `best_model.*` with `best_model_results/`.
 - HPO post-processing should strongly prefer `best_model.*` and `best_model_results/` when present, while remaining flexible to missing or varied artifacts.
-- Standard run layout is `RUN_ROOT/{UT|FT|MULTI}/{Curve|Field|FieldToCurve}/{Model}/{run_descriptor}`.
-- Model-specific HPO layout is `RUN_ROOT/{Task}/{Curve|Field|FieldToCurve}/{Model}/HPO/{run_descriptor}`.
-- Cross-model HPO layout is `RUN_ROOT/{Task}/{Curve|Field|FieldToCurve}/HPO/{run_descriptor}/{Model}`.
-- If adding or changing an output-layout token, update `MODEL` save paths, model JSON `run_layout`, `MLmetrics` run listing/HPO path parsers, post-processing saved-output-kind inference, and `B3_ML-transfer.sh` examples/prompts together.
+- Detailed run layouts and the complete producer-consumer impact map live in the `review-p1-p2-data-contract` skill reference. Use it when changing names, metadata, save/load behavior, or transfer paths.
 
 ## How To Work Here
 

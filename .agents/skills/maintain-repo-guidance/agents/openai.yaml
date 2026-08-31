@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain Repo Guidance"
+  short_description: "Keep repository guidance synchronized"
+  default_prompt: "Use $maintain-repo-guidance to keep affected AGENTS.md, README.md, PROJECT_STATUS.md, and repo skills current without duplicating durable and changing information."

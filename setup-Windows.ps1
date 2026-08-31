@@ -2,7 +2,9 @@
 param(
     [string]$RepoRoot,
     [switch]$OnlyPython,
-    [switch]$OnlyAbaqus
+    [switch]$OnlyAbaqus,
+    [switch]$Remove,
+    [switch]$SkipPythonRequirementsUninstall
 )
 
 if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
@@ -209,8 +211,156 @@ print("ML_IMPORT_OK")
     }
 }
 
+function Invoke-StepBestEffort {
+    param(
+        [string]$Exe,
+        [string[]]$CommandArgs
+    )
+
+    $cmd = "$Exe $($CommandArgs -join ' ')"
+    Write-Host "Running: $cmd"
+    & $Exe @CommandArgs
+    if ($LASTEXITCODE -ne 0) {
+        Write-Warning "Command returned non-zero (exit $LASTEXITCODE): $cmd"
+    }
+}
+
+function Get-RequirementPackages {
+    param([string]$Path)
+
+    if (-not (Test-Path $Path)) { return @() }
+
+    $packages = New-Object System.Collections.Generic.List[string]
+    foreach ($line in Get-Content $Path) {
+        $req = $line.Trim()
+        if (-not $req) { continue }
+        if ($req.StartsWith('#') -or $req.StartsWith('--') -or $req.StartsWith('-e')) { continue }
+        $req = ($req -split '\s+#', 2)[0].Trim()
+        if ($req -match '^[A-Za-z0-9_.-]+') {
+            $packages.Add($Matches[0])
+        }
+    }
+
+    return @($packages | Sort-Object -Unique)
+}
+
+function Remove-PathHook {
+    param([string]$Path)
+    if (Test-Path $Path) {
+        Remove-Item -LiteralPath $Path -Force
+        Write-Host "Removed $Path"
+    }
+}
+
+function Verify-NotImportable {
+    param(
+        [string]$Exe,
+        [string[]]$PrefixArgs,
+        [string]$RepoRootPath
+    )
+
+    $script = @'
+import importlib.util
+import os
+import sys
+import tempfile
+
+repo_root = os.path.abspath(sys.argv[1]).lower()
+os.chdir(tempfile.gettempdir())
+sys.path = [
+    p for p in sys.path
+    if p and not os.path.abspath(p).lower().startswith(repo_root)
+]
+print("REMOVED_OK" if importlib.util.find_spec("resources") is None else "STILL_IMPORTABLE")
+'@
+
+    $tmpPy = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString() + '.py')
+    try {
+        Set-Content -Path $tmpPy -Value $script
+        $commandArgs = @($PrefixArgs + @($tmpPy, $RepoRootPath))
+        & $Exe @commandArgs
+    }
+    finally {
+        if (Test-Path $tmpPy) {
+            Remove-Item -LiteralPath $tmpPy -Force
+        }
+    }
+}
+
+function Remove-Setup {
+    param([string]$Root)
+
+    $resourceNames = @("phd-shared-resources", "phd_shared_resources", "resources")
+
+    if ($runPython -and (Get-Command python -ErrorAction SilentlyContinue)) {
+        Write-Host "=== Standard Python: uninstall local resources package ==="
+        foreach ($pkg in $resourceNames) {
+            Invoke-StepBestEffort -Exe "python" -CommandArgs @("-m", "pip", "uninstall", "-y", $pkg)
+        }
+
+        try {
+            $pyUserSite = (& python -c "import site; print(site.getusersitepackages())" 2>$null | Select-Object -First 1).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($pyUserSite)) {
+                Remove-PathHook -Path (Join-Path $pyUserSite "phd_shared_resources_repo.pth")
+            }
+        }
+        catch {
+            Write-Warning "Could not check standard Python user site-packages for a .pth path hook."
+        }
+
+        if (-not $SkipPythonRequirementsUninstall) {
+            foreach ($pkg in (Get-RequirementPackages -Path (Join-Path $Root "requirements.txt"))) {
+                Invoke-StepBestEffort -Exe "python" -CommandArgs @("-m", "pip", "uninstall", "-y", $pkg)
+            }
+        }
+    }
+    elseif ($runPython) {
+        Write-Warning "python command not found; skipping standard Python uninstall."
+    }
+
+    if ($runAbaqus -and (Get-Command abaqus -ErrorAction SilentlyContinue)) {
+        Write-Host "=== ABAQUS Python: uninstall local resources package ==="
+        foreach ($pkg in $resourceNames) {
+            Invoke-StepBestEffort -Exe "abaqus" -CommandArgs @("python", "-m", "pip", "uninstall", "-y", $pkg)
+        }
+
+        if (-not $SkipPythonRequirementsUninstall) {
+            foreach ($pkg in (Get-RequirementPackages -Path (Join-Path $Root "requirements-abaqus.txt"))) {
+                Invoke-StepBestEffort -Exe "abaqus" -CommandArgs @("python", "-m", "pip", "uninstall", "-y", $pkg)
+            }
+        }
+
+        try {
+            $userSite = (& abaqus python -c "import site; print(site.getusersitepackages())" 2>$null | Select-Object -First 1).Trim()
+            if (-not [string]::IsNullOrWhiteSpace($userSite)) {
+                Remove-PathHook -Path (Join-Path $userSite "phd_shared_resources_repo.pth")
+            }
+        }
+        catch {
+            Write-Warning "Could not check ABAQUS user site-packages for a .pth path hook."
+        }
+    }
+    elseif ($runAbaqus) {
+        Write-Warning "abaqus command not found; skipping ABAQUS uninstall."
+    }
+
+    if ($runPython -and (Get-Command python -ErrorAction SilentlyContinue)) {
+        Verify-NotImportable -Exe "python" -PrefixArgs @() -RepoRootPath $Root
+    }
+    if ($runAbaqus -and (Get-Command abaqus -ErrorAction SilentlyContinue)) {
+        Verify-NotImportable -Exe "abaqus" -PrefixArgs @("python") -RepoRootPath $Root
+    }
+
+    Write-Host "Removal completed successfully."
+}
+
 Push-Location $RepoRoot
 try {
+    if ($Remove) {
+        Remove-Setup -Root $RepoRoot
+        return
+    }
+
     if ($runPython -and -not (Get-Command python -ErrorAction SilentlyContinue)) {
         throw "python command not found on PATH."
     }
