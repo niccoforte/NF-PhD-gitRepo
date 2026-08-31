@@ -64,7 +64,7 @@ Use the `maintain-repo-guidance` skill for every repository change and run its c
 
 Use `validate-repo-change` to select proportionate checks, `review-p1-p2-data-contract` whenever a change can affect the p1-to-p2 producer-consumer boundary, and `operate-p2-hpc` for cluster-facing p2 work.
 
-`.github/workflows/guidance-integrity.yml` runs the changed-surface validator on pushes and pull requests. Keep local validation authoritative when remote Actions are unavailable.
+`.github/workflows/guidance-integrity.yml` runs the changed-surface validator on GitHub.com pushes and pull requests. Its job is skipped before runner allocation on the QMUL Enterprise mirror, whose runner-backed jobs are currently cancelled. Keep local validation authoritative when remote Actions are unavailable.
 
 ## Cleanup Constraint
 

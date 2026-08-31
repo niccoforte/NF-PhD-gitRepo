@@ -6,6 +6,9 @@ on:
 
 jobs:
   check-guidance:
+    # The QMUL Enterprise mirror cancels runner-backed jobs; the public mirror
+    # is the authoritative remote CI host for this dual-pushed repository.
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
