@@ -48,6 +48,18 @@ This paper folder is the machine-learning and optimization layer of the PhD repo
 - Field `.npz` files are expected to contain arrays such as `Y`, `U`, `field`, or `values`, plus useful metadata keys when available (`frame_values`, `node_labels`, `coords0`, `components`, `valid_mask`, `sample_ids`).
 - UT field outputs must use main-body nodes only. Grip-section nodes are cropped to match the input-processing convention.
 
+## Target Dual-Output Architecture
+
+- The intended unified surrogate has one nodal disorder/geometry input and separate UT and FT branches.
+- Each branch is serial: a disorder-to-field Transformer predicts `u(x,y,t)` and `v(x,y,t)`, then a field-to-curve Transformer predicts the corresponding global response curve.
+- UT produces a displacement field followed by a stress-strain curve. FT produces a displacement field followed by a force-displacement curve.
+- Do not replace this with parallel field and curve readouts from the same latent representation. The learned displacement field is the required intermediary.
+- Direct disorder-to-curve models have been tried and have not learned the relationship adequately.
+- The main unresolved implementation problem is joint training with two objectives acting at different depths. The field loss directly supervises the first Transformer; the curve loss supervises the second Transformer and backpropagates through both stages.
+- Conceptually, the objective is `L_total = sum_m(lambda_field,m * L_field,m + lambda_curve,m * L_curve,m)` for `m in {UT, FT}`.
+- `MaskedFieldMSELoss` is the current pointwise field baseline and needs future development. `CombinedCurveLoss` is the current full-curve objective. Loss weighting/balancing remains undecided.
+- Treat this as a documented research target rather than implemented behavior until the data are accessible and the user explicitly resumes model development.
+
 ## Saved Artifacts
 
 - `MODEL.save()` writes a model checkpoint, model JSON, and DATA sidecar JSON.

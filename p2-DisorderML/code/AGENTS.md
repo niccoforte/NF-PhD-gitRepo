@@ -19,6 +19,8 @@ This directory contains the local notebook layer for the p2 disorder-to-response
 - Curve-output models predict macroscopic stress-strain or force-displacement curves.
 - Field-output models predict per-node displacement fields over Abaqus field-output frames.
 - Field-to-curve models use field displacement histories as node-token inputs and curve data as outputs. They use `DATA(input_kind="field", output_kind="curve")`, but must remain distinct from ordinary geometry-to-curve runs through the saved output-layout token `FieldToCurve`.
+- The target unified model has one disorder/geometry input and separate UT and FT serial branches: disorder-to-field Transformer, predicted `u(x,y,t)` and `v(x,y,t)`, then field-to-curve Transformer and global curve.
+- Direct disorder-to-curve models have been tried and have not learned the relationship adequately; do not remove the learned field intermediary from the target architecture.
 - Current field target is displacement `U` only, usually components `U1` and `U2`.
 - Field data is stored in final ML-ready `.npz` files named with the existing input/output convention, ending in `allFIELD.npz`.
 - UT field outputs must use main-body nodes only. Grip-section nodes are dropped to match the input-processing convention.
@@ -50,13 +52,15 @@ This directory contains the local notebook layer for the p2 disorder-to-response
 ## Training Notebook Conventions
 
 - Use `DATA(..., output_kind="curve")` for geometry-to-curve targets and `DATA(..., output_kind="field", field_config=...)` for geometry-to-field targets.
-- Use `DATA(..., input_kind="field", output_kind="curve", field_input_config=...)` for field-to-curve runs. Keep the notebook aligned with `FieldToCurveOutputs/A0-HPC_FieldToCurve-test.py`: Transformer first, `pool="mean"`, PCA output reduction, and no MLP fallback unless the framework contract changes.
+- Use `DATA(..., input_kind="field", output_kind="curve", field_input_config=...)` for field-to-curve runs. Keep the notebook aligned with `FieldToCurve/A0-HPC_FieldToCurve-test.py`: Transformer first, `pool="mean"`, PCA output reduction, and no MLP fallback unless the framework contract changes.
 - Use `model="MLP"` for flattened curve inputs, and `model="GNN"`, `GCN`, `GAT`, or `TR` for node-shaped inputs.
 - For graph and Transformer curve models, preserve `geom_feats=(True, True)` when node coordinates and boundary flags are intended as features.
 - Field models should use node-compatible models only, with `pool="node"` and `MaskedFieldMSELoss`.
 - Curve HPO can compare MLP, GCN, GAT, and Transformer; field HPO currently compares GCN, GAT, and Transformer.
 - Keep HPO search spaces explicit in notebooks. Do not silently broaden trial counts, epochs, or model families.
 - `CombinedCurveLoss` is the current curve-aware loss wrapper. Build future physics/constraint losses on it or adjacent helpers rather than reviving old PINN-style code blindly.
+- The unresolved dual-model training problem is simultaneous supervision at two depths: field loss after the disorder-to-field stage and curve loss after the field-to-curve stage, with curve gradients flowing through both. Balance UT/FT and field/curve terms explicitly when implementation resumes.
+- Do not implement or prototype this unified loss while the required data are unavailable unless the user explicitly changes scope.
 
 ## Post-Processing Notebook Separation
 

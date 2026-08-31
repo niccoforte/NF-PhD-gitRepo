@@ -66,6 +66,7 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 |   +-- code/
 |   |   +-- ML-CurveOutputs.ipynb
 |   |   +-- ML-FieldOutputs.ipynb
+|   |   +-- ML-FieldToCurveOutputs.ipynb
 |   |   +-- ML-CurvePostProcessing.ipynb
 |   |   +-- ML-FieldPostProcessing.ipynb
 |   |   +-- ML-HPOpostProcess.ipynb
@@ -78,6 +79,7 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 |       +-- B3_ML-transfer.sh
 |       +-- CurveOutputs/
 |       +-- FieldOutputs/
+|       +-- FieldToCurve/
 +-- p3-DisorderIcingMitigation/
 |   +-- SIMscripts/
 |       +-- A1_IcingModels.py
@@ -186,6 +188,7 @@ This folder is the local notebook workspace for model development and post-proce
 | --- | --- |
 | `ML-CurveOutputs.ipynb` | Main local curve-output training/HPO notebook for MLP, GCN/GAT/GNN, and Transformer models. |
 | `ML-FieldOutputs.ipynb` | Main local field-output training/HPO notebook for node-compatible models such as GCN/GAT/GNN and Transformer. |
+| `ML-FieldToCurveOutputs.ipynb` | Exploratory Transformer workflow that maps nodal displacement-field histories to global mechanical curves. |
 | `ML-CurvePostProcessing.ipynb` | Diagnostics for one saved curve run. |
 | `ML-FieldPostProcessing.ipynb` | Diagnostics and visualization for one saved field run. |
 | `ML-HPOpostProcess.ipynb` | HPO study comparison and best-run inspection. |
@@ -193,7 +196,32 @@ This folder is the local notebook workspace for model development and post-proce
 | `TOKENIZATION_NEXT_STEPS.md` | Current planning notes for the tokenization workflow. |
 | `DimensionalityReduction.ipynb`, `GPR.ipynb`, `ML-DisorderDistribution.ipynb`, `Optimization.ipynb`, `AK-ML-StressStrain.ipynb` | Exploratory/prototype notebooks and research history. |
 
-Curve-output models predict macroscopic stress-strain or force-displacement curves. Field-output models predict per-node displacement fields over Abaqus frames. Field data is normally stored as final ML-ready `allFIELD.npz` products after raw `FIELDu-...npz` files have been stacked and saved.
+Curve-output models predict macroscopic stress-strain or force-displacement curves. Field-output models predict per-node displacement fields over Abaqus frames. Field-to-curve models then learn the second, serial mapping from displacement histories to the corresponding global curve. Field data is normally stored as final ML-ready `allFIELD.npz` products after raw `FIELDu-...npz` files have been stacked and saved.
+
+### Target dual-output surrogate
+
+The intended unified model has one nodal disorder/geometry input and two load-case branches:
+
+```text
+shared disorder input
++-- UT: disorder-to-field Transformer -> u_UT(x,y,t), v_UT(x,y,t)
+|       -> field-to-curve Transformer -> stress-strain curve
+`-- FT: disorder-to-field Transformer -> u_FT(x,y,t), v_FT(x,y,t)
+        -> field-to-curve Transformer -> force-displacement curve
+```
+
+The current notebooks implement the two serial stages separately. Direct geometry/disorder-to-curve models have been tested but have not learned this relationship adequately, which motivates retaining the displacement field as a learned intermediate representation.
+
+The main unresolved training problem is joint supervision of the large end-to-end model. A field loss must directly correct each disorder-to-field stage while a curve loss corrects the downstream field-to-curve prediction and backpropagates through both stages:
+
+```text
+L_total = sum over m in {UT, FT} [
+    lambda_field,m * L_field,m
+  + lambda_curve,m * L_curve,m
+]
+```
+
+`MaskedFieldMSELoss` is the current pointwise field baseline and requires further development. `CombinedCurveLoss` is the current full-curve objective. How to balance the simultaneous field and curve objectives remains an open modelling decision; this architecture and loss are documented targets, not yet implemented code.
 
 ### `p2-DisorderML/HPC/`
 
@@ -208,6 +236,8 @@ This folder contains the QMUL HPC/Slurm training and HPO workflow.
 | `CurveOutputs/A0-HPC_Curve-CrossModelHPO.py` | Cross-model HPO entry point for curve surrogates. |
 | `FieldOutputs/A0-HPC_Field-test.py` | Field-output smoke/debug entry point. |
 | `FieldOutputs/A0-HPC_Field-CrossModelHPO.py` | Cross-model HPO entry point for field surrogates. |
+| `FieldToCurve/A0-HPC_FieldToCurve-test.py` | Field-input to curve-output Transformer smoke/debug entry point. |
+| `FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py` | Cross-model HPO entry point for field-to-curve surrogates. |
 
 Important HPC conventions:
 
