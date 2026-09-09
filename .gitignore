@@ -2,6 +2,7 @@
 /shelf/
 /workspace.xml
 */code/models/*
+data/
 
 # Additional ignored files
 *.idea*
