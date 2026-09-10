@@ -2,13 +2,14 @@
 
 This directory is the local notebook layer for p2 training, diagnostics, tokenization, and exploration. Read the called `resources/` helper before changing notebook behavior. For active priorities, target runs, evidence, and the next handoff task, read `../PROJECT_STATUS.md`.
 
-Dual notebooks default to the downloaded smoke run under repo-root `data/MULTI/Dual/Transformer/dual-MULTI-test-260907`. The training notebook previews saved inputs without a training dataset; `RUN_TRAINING` stays false. Executed notebook copies/figures belong inside the ignored run directory. Do not depend on the ignored `samples/` folder for default notebook execution or unit tests.
+Dual notebooks default to the user's locally renamed `data/MULTI/Dual/Transformer/dual-MULTI-trial1`. Keep the archived run identity in metadata unchanged. Training/HPO are opt-in; saved artifacts are not a training dataset. Executed notebook copies/figures belong inside the ignored run directory. Do not depend on ignored `samples/` code for notebook execution or unit tests.
 
 ## Notebook Roles
 
 - `ML-CurveOutputs.ipynb` and `ML-FieldOutputs.ipynb` are the main local curve- and field-output training/HPO notebooks.
 - `ML-FieldToCurveOutputs.ipynb` is the exploratory field-input to curve-output notebook and should stay aligned with the HPC framework.
-- `ML-DualOutputs.ipynb` previews paired input construction and optionally calls the real-data dual runner. `ML-DualPostProcessing.ipynb` reads dual saved arrays, input audits and four loss terms. Keep their safe no-data defaults and reuse `MLdual`/`MLmetrics`; do not extend legacy checkpoint loaders implicitly.
+- `ML-DualOutputs.ipynb` follows imports → Task → ML Model Name → DATA → HPO → MODEL. It configures opt-in training/HPO; saved prediction review belongs only in `ML-DualPostProcessing.ipynb`.
+- `ML-DualPostProcessing.ipynb` follows inputs/config → Curve Models → Field Models → additional paired diagnostics. Reuse the existing curve/field diagnostic helpers through `load_dual_diagnostics`; never route dual checkpoints through legacy loaders. Feature generation and worked input examples belong in `samples/`, not these notebooks.
 - `ML-CurvePostProcessing.ipynb` and `ML-FieldPostProcessing.ipynb` inspect one saved curve or field run respectively.
 - `ML-HPOpostProcess.ipynb` compares model-specific and cross-model HPO studies.
 - `Tokenization.ipynb` follows the separate handoff in `TOKENIZATION_NEXT_STEPS.md`.
@@ -20,6 +21,9 @@ Dual notebooks default to the downloaded smoke run under repo-root `data/MULTI/D
 - Shared loading, diagnostics, and visualization logic belongs in `resources/MLdata.py` or `resources/MLmetrics.py` when more than one notebook needs it.
 - Use saved `metrics.json`, diagnostic tables, `predictions.npz`, and `loss_history.csv` when available instead of rerunning a model merely for post-processing.
 - Save post-processing figures under the run's `results/postProcessing/`, or `best_model_results/postProcessing/` for HPO best models. Do not create timestamped post-processing folders by default.
+- The interactive field viewer is a required staple of field post-processing, alongside a static keyframe strip. Keep explicit sample/ID, frame and component controls; default FT maps to points because generic contour interpolation can bridge cracks. Maps use saved reference coordinates, not asserted mesh connectivity.
+- Always plot losses on logarithmic axes. Keep raw task losses distinct from weighted contributions and physical diagnostic errors. HPO ranking is a fixed validation score, not its tunable weighted training objective.
+- Dual HPO uses `HPO/<study>/best/results/`; point the dual review notebook at `best/`. Saved train-mean baseline scores remain authoritative when baseline arrays were not saved: do not replace them with validation means.
 - Keep `Curve`, `Field`, and `FieldToCurve` behavior distinct. For names, shapes, metadata, layouts, and affected consumers, use `review-p1-p2-data-contract`.
 
 ## Training Conventions

@@ -9,7 +9,7 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 - `B2_ML-resumeHPO.sh` resumes archived cross-model studies.
 - `B3_ML-transfer-windows.sh` preserves the Windows/Git Bash download path. `B3_ML-transfer-mac.sh` supports macOS Bash 3.2, rsync/ControlMaster, `--dry-run`, and defaults to ignored repo-root `data/`. Neither transfer script deletes source data.
 - `CurveOutputs/`, `FieldOutputs/`, and `FieldToCurve/` own their respective single-run and cross-model HPO entry points.
-- `DualOutputs/A0-HPC-Dual-test.py` owns the joint UT/FT single run. `A0-HPC-Dual-trial1.py` is a thin HPO-informed preset calling it; B1 stages both scripts for that preset. The adjacent README records source runs and parameter compromises. `test_dual_contract.py` protects active synthetic invariants, not legacy syntax. Dual HPO/resume is not implemented yet.
+- `DualOutputs/A0-HPC-Dual-test.py` owns the joint UT/FT single run. `A0-HPC-Dual-trial1.py` is a thin preset calling it; B1 stages both. `A0-HPC-Dual-HPO.py` calls `resources/MLdualHPO.py` for single-worker full-data HPO and explicit `--resume` through B1. The adjacent README owns search ranges, ranking and recovery instructions. `test_dual_contract.py` protects active invariants, including HPO and saved-review adapters.
 
 ## Durable Guardrails
 
@@ -21,6 +21,8 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 - Keep CLI arguments stable or provide a clear migration. Do not introduce local Windows paths except as documented transfer destinations.
 - Do not submit Slurm jobs, resume studies, transfer archives, or alter external environments unless the user requested that operation.
 - Keep active scripts lean; remove abandoned debug branches and obsolete compatibility paths.
+- Dual HPO uses `MULTI/Dual/Transformer/HPO/<study>` with a scratch SQLite DB, consistent archive backups, an exclusive archive lock and explicit study-level resume. Do not pass it through legacy B2. Never clear a stale lock without verifying the recorded job stopped. Resume retries an interrupted configuration from epoch one; it is not optimizer-state continuation.
+- Rank dual HPO by fixed equal-task, physical, train-mean-baseline-relative validation MSE; tuned loss weights must not change ranking. Keep full paired data, splits, normalization, masks and all four positive supervision weights. Default 230-hour Python budget leaves margin under the unchanged ten-day Slurm limit; checkpoints and DB backups protect unexpected termination.
 
 ## Validation
 

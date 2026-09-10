@@ -7,7 +7,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 - Opt-in joint two-stage UT/FT model: `resources/MLdual.py`. Each stage uses one shared encoder call with task streams stacked along the batch dimension. Field and curve losses train both stages through one optimizer.
 - Legacy `DATA`, `MODEL`, separate-task networks and notebooks retain their existing paths.
 - Real-data runner and HPO-informed trial preset: `HPC/DualOutputs/`. The adjacent README owns run commands, exact HPO sources and the configuration rationale.
-- Dual notebooks: `code/ML-DualOutputs.ipynb` and `code/ML-DualPostProcessing.ipynb`. They use shared helpers, default to safe illustrative/read-only routes, and do not reinterpret dual checkpoints as legacy models.
+- Dual notebooks: `code/ML-DualOutputs.ipynb` follows data/HPO/model configuration with opt-in execution; `code/ML-DualPostProcessing.ipynb` contains full curve and field diagnostic sections, interactive field viewing and log-scale task losses. Both default to the user's renamed local Trial 1 folder; worked inputs belong in `samples/`.
 - Human review material: `samples/README.md`, including controlled examples and three actual HPC input reports. Shared reference features and task-specific body-interface/pin/crack features are active. Degree and graph-relative attention remain explanatory examples, not active inputs.
 - Existing single-task/HPO notebooks and `HPC/FieldOutputs/`, `HPC/FieldToCurve/` remain the independent baseline surfaces. `code/TOKENIZATION_NEXT_STEPS.md` owns the separate exploratory tokenisation handoff.
 
@@ -22,19 +22,21 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Deployment on 10 September 2026
 
-- Full-data Trial 1 was submitted as Slurm **26267130**, `dual-MULTI-trial1-260910`, through B1 from `/data/home/exy053/p2/MULTI/Dual/Transformer/dual-MULTI-trial1-260910`. Slurm accepted the job on `andrena` with one GPU, 12 CPUs, 90 GB RAM and the existing ten-day limit. Initial state: pending. The user will monitor completion.
-- Training implementation: Git `7da7e72`. No smoke overrides: all paired data, maximum 450 epochs, early stopping, batch 2, full 201-point curves and validation diagnostics. Results and metrics are collected by the shared tested runner; archive destination is `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/dual-MULTI-trial1-260910/`. Submission is not evidence of successful full-data training.
+- Full-data Trial 1, Slurm **26267130**, `dual-MULTI-trial1-260910`, completed successfully in 3 h 37 min. Downloaded to repo-root `data/`; the user renamed its local folder to `dual-MULTI-trial1`. Remote metadata retains the original dated name.
+- Training implementation: Git `7da7e72`. Splits: 7,137 train / 793 validation / 881 locked test; 149 epochs logged, best checkpoint 74. Validation RMSE improvements over the training mean: UT field +5.47%, FT field -23.58%, UT curve +3.42%, FT curve +14.53%. See the dual HPC README for numerical context and limitations; raw weighted-loss sizes alone do not identify the weakest task.
 - Nine dual contract tests passed. Repository contract validation finished with 64 non-failing checks and zero failures. Both saved-run review notebooks executed successfully; visible-output copies and figures are in the downloaded smoke run's `results/postProcessing/` directory.
 
-- The completed smoke archive is downloaded under repo-root `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`. Both dual notebooks now read this run by default, with training disabled. macOS transfer uses `HPC/B3_ML-transfer-mac.sh`; the renamed `-windows.sh` script preserves the previous Windows route.
+- The completed smoke archive is also downloaded (locally renamed `dual-MULTI-test`); it remains execution evidence, not the default accuracy review. macOS transfer uses `HPC/B3_ML-transfer-mac.sh`; `-windows.sh` preserves the Windows route.
 - Generated `data/` and `samples/` content remains ignored. Only `samples/AGENTS.md` is exempted to keep required guidance tracked. Tests no longer depend on ignored sample generators.
 - Both Git hosting destinations received the implementation commit, and the clean HPC checkout was fast-forwarded through a verified incremental Git bundle because direct Git SSH authentication was unavailable. Its obsolete origin URL was corrected. No credentials were copied.
 
 ## Next evidence
 
-- Run and inspect the full-data trial before tuning predictive accuracy. Check paired split coverage, all four loss contributions, held-out validation diagnostics and learning behaviour.
+- `resources/MLdualHPO.py` and `HPC/DualOutputs/A0-HPC-Dual-HPO.py` prepare a broad conditional, single-worker study with four positive task weights, fixed balanced validation ranking, periodic backups and study-level resume through B1. Default budget: 200 completed/pruned evaluations, up to 450 epochs, 230 hours. No HPO job has been submitted. Review the scope and confirm launch before any remote execution.
 - Review the labelled pin/interface examples against the intended production geometry. The current profile uses the A1 Ti/Al proportions and the sample's initial disordered coordinates.
 - Validate reconstructed lattice connectivity against one original producer/INP artifact before claiming agreement with archived meshes. Do not process thousands of INPs by default.
-- Dual HPO, resumable HPO, locked-test evaluation, full-dimensional optimisation and new FEA verification are not completed by this implementation.
+- HPO execution, repeated-seed finalist confirmation, locked-test evaluation, full-dimensional optimisation and new FEA verification remain outstanding. Study resume does not continue a partially trained optimizer; interrupted configurations restart from epoch one.
+- Local checks cover the expanded architecture, strict reload of the actual Trial 1 checkpoint, HPO archive-to-new-scratch resume, exclusive-lock refusal and saved diagnostic adapters. Both full review routes (UT and FT field selection) executed on Trial 1 with inline plots; copies are in its ignored `results/postProcessing/`. Repository contract validation passed (67 non-failing, zero failures). No new GPU/HPO job was run.
+- HPC code synchronization currently requires renewal of the user's SSH ControlMaster connection; a read-only check found the old connection broken. Do not claim this iteration is deployed remotely until the checkout hash is verified.
 - Keep the field intermediary and full 201-point curves. User-reported true-field FT full-curve performance is promising; numerical manuscript claims still require the saved evidence.
 - SSH access uses the user's active ControlMaster socket. Access availability is temporary and does not itself authorize arbitrary remote changes. Never store passwords in chat or repo files.

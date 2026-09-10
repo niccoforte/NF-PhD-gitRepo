@@ -662,7 +662,10 @@ def plot_curve_diagnostics(
     ax.plot(x, point["true_std"], color="darkgreen", label="Truth std")
     ax.plot(x, point["pred_std"], color="orangered", label="Prediction std")
     ax2 = ax.twinx()
-    ax2.plot(x, point["std_ratio"], color="tab:purple", alpha=0.65, label="Pred/true std")
+    # A nearly deterministic/unloaded point has no interpretable diversity ratio.
+    # Mask its plotted ratio only; never change stored diagnostics or summaries.
+    ratio = point["std_ratio"].where(point["true_std"] > max(float(point["true_std"].max()) * 1e-6, 1e-12))
+    ax2.plot(x, ratio, color="tab:purple", alpha=0.65, label="Pred/true std (defined points)")
     ax2.axhline(1.0, color="gray", linestyle="--", linewidth=0.8)
     _add_zone_lines(ax, x, summary.get("zone_boundaries"), color="gray", linestyle=":", alpha=0.5)
     ax.set_title(f"Diversity Collapse Ratio = {_fmt_metric(summary.get('collapse_ratio'), 3)}")
@@ -4151,6 +4154,70 @@ def plot_field_sample_frame_evolution(diagnostics, sample=0, figsize=None):
     fig.tight_layout()
     plt.show()
     return fig, axes
+
+def load_dual_diagnostics(run_dir, kind, mode):
+    """Adapt saved dual arrays to the existing single-task plotting contract.
+
+    Load one task at a time to bound field memory. Saved train-baseline summaries
+    remain authoritative: never substitute a validation-mean baseline silently.
+    """
+    run_dir = Path(run_dir)
+    results = run_dir / "results"
+    metrics = json.loads((results / "metrics.json").read_text())
+    split = metrics["evaluation_split"]
+    mode = str(mode).upper()
+    if kind not in ("curve", "field") or mode not in ("UT", "FT"):
+        raise ValueError("Choose kind=curve/field and mode=UT/FT.")
+    with np.load(results / "predictions.npz", allow_pickle=False) as arrays:
+        pred = arrays[f"{mode}_{split}_{kind}_outputs"]
+        truth = arrays[f"{mode}_{split}_{kind}_truth"]
+        ids = arrays["sample_ids"]
+        if kind == "curve":
+            diag = curve_performance_diagnostics(
+                pred, truth, x_values=arrays[f"{mode}_curve_x_values"],
+                zone_boundaries=metrics["diagnostics"][kind][mode].get("zone_boundaries"),
+            )
+        else:
+            present = arrays[f"{mode}_node_mask"].astype(bool)
+            mask = arrays[f"{mode}_{split}_field_mask"].astype(bool)
+            truth = np.where(mask, truth, np.nan)
+            components = arrays[f"{mode}_components"].tolist()
+            frames = arrays[f"{mode}_frame_values"]
+            diag = field_performance_diagnostics(
+                pred[:, present], truth[:, present],
+                field_shape=(len(frames), int(present.sum()), len(components)),
+                frame_values=frames, components=components,
+                node_labels=np.flatnonzero(present), node_coords=arrays["canonical_coords"][present],
+            )
+    diag["summary"] = metrics["diagnostics"][kind][mode]
+    # Legacy runs saved the baseline score, not the baseline array.
+    diag.pop(f"baseline_{kind}", None)
+    diag["sample_ids"] = ids
+    diag["sample_metrics"]["sample_id"] = ids
+    diag["mode"], diag["split"] = mode, split
+    return diag
+
+
+def plot_dual_loss_history(history, kind=None, best_epoch=None, weighted=True):
+    """Log-scale joint objective and task contributions, shared across notebooks."""
+    terms = [(k, m) for k in ((kind,) if kind else ("field", "curve")) for m in ("UT", "FT")]
+    fig, axes = plt.subplots(1, len(terms) + 1, figsize=(5 * (len(terms) + 1), 4), squeeze=False)
+    group = "weighted" if weighted else "raw"
+    for ax, term in zip(axes[0], [None] + terms):
+        suffix = "loss" if term is None else f"{group}_{term[0]}_{term[1]}"
+        for split in ("train", "val"):
+            column = f"{split}_{suffix}"
+            if column in history:
+                ax.plot(history["epoch"], history[column].where(history[column] > 0), label=split)
+        ax.set(title="Joint objective" if term is None else f"{term[1]} {term[0]} ({group})",
+               xlabel="Epoch", ylabel="Loss", yscale="log")
+        if best_epoch is not None:
+            ax.axvline(best_epoch, color="grey", ls="--", label="Saved best epoch")
+        ax.legend()
+    fig.tight_layout()
+    plt.show()
+    return fig, axes
+
 
 def plot_loss_history(loss_history, metrics=None, figsize=(9, 4)):
     metrics = metrics or ["train_loss", "val_loss"]

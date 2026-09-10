@@ -9,7 +9,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 - `B2_ML-resumeHPO.sh`: resumes archived cross-model Optuna studies; use `--dry-run` before launch.
 - `B3_ML-transfer-windows.sh`: preserves the Windows/Git Bash download path to `Z:/p2` or a fallback. `B3_ML-transfer-mac.sh`: macOS Bash 3.2/rsync download to repo-root `data/`, with `--dry-run` and optional `SSH_CONTROL_PATH`. Both keep the saved-run relative tree.
 - `CurveOutputs/`, `FieldOutputs/`, and `FieldToCurve/`: single-run and cross-model HPO entry points for each output family.
-- `DualOutputs/`: joint UT/FT two-stage single-run entry point, thin `A0-HPC-Dual-trial1.py` preset and active synthetic contract tests; no dual HPO entry point yet. The trial preset reuses `A0-HPC-Dual-test.py`, so B1 stages that companion script too. See the adjacent README for HPO provenance and parameter choices.
+- `DualOutputs/`: joint single-run entry point, thin Trial 1 preset, active contract tests, and `A0-HPC-Dual-HPO.py`. Dual HPO runs/resumes through B1 using `--study-name` and explicit `--resume`, not legacy B2. It uses model-specific `MULTI/Dual/Transformer/HPO/<study>` storage, one archive lock, SQLite backups and fixed validation ranking. See the adjacent README for ranges, artifacts and recovery limitations.
 
 ## Production and debug policy
 
@@ -60,7 +60,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## HPO, resume, and transfer
 
-For dual single runs use `B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py`. Defaults are all samples, CUDA, 450 epochs, validation diagnostics, full curves, and a joint normalized-field/physical-curve objective. Explicit smoke overrides are `--nsims 64 --epochs 3 --batch 2 --no-range-split`; `--allow-cpu` is local/debug only. Outputs follow `MULTI/Dual/Transformer/<run-label>` and include one `model.mdl`, JSON metadata, loss history, physical predictions/masks and existing field/curve diagnostic CSVs. Best checkpoints and history are written during training so the launcher can collect partial results on failure. Do not route these checkpoints through legacy `MODEL`, existing single-task notebooks, or `B2_ML-resumeHPO.sh`; dual HPO/resume remains future work. Transfer uses the standard `B3_ML-transfer-windows.sh MULTI Dual Transformer <run-label>` path.
+For dual single runs use `B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py`. Defaults are all samples, CUDA, 450 epochs, validation diagnostics, full curves, and a joint normalized-field/physical-curve objective. Explicit smoke overrides are `--nsims 64 --epochs 3 --batch 2 --no-range-split`; `--allow-cpu` is local/debug only. Outputs follow `MULTI/Dual/Transformer/<run-label>`. Do not route checkpoints through legacy `MODEL` or B2. Dual HPO uses B1 with `DualOutputs/A0-HPC-Dual-HPO.py`; `--resume` restores completed study history and retries an interrupted configuration from epoch one. A 230-hour budget leaves margin below the unchanged ten-day limit. Best physical diagnostics are under `HPO/<study>/best/results/`; the dual notebook consumes that directory. Transfer a study using the platform B3 script with `MULTI Dual Transformer HPO <study>`.
 
 - Prefer the Slurm `-J` value as the HPO study descriptor unless the study folder intentionally differs.
 - Model-specific HPO and cross-model HPO layouts are defined in the data-contract reference.

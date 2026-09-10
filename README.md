@@ -283,8 +283,8 @@ This folder is the local notebook workspace for model development and post-proce
 | `ML-CurveOutputs.ipynb` | Main local curve-output training/HPO notebook for MLP, GCN/GAT/GNN, and Transformer models. |
 | `ML-FieldOutputs.ipynb` | Main local field-output training/HPO notebook for node-compatible models such as GCN/GAT/GNN and Transformer. |
 | `ML-FieldToCurveOutputs.ipynb` | Exploratory field-input to curve-output notebook aligned with the HPC field-to-curve framework. |
-| `ML-DualOutputs.ipynb` | Paired feature preview and opt-in joint training through the shared dual runner. |
-| `ML-DualPostProcessing.ipynb` | Dual input audits, four losses, paired curves and displacement maps from saved arrays. |
+| `ML-DualOutputs.ipynb` | Task/model/data/HPO/training configuration; opt-in execution through the shared runners. |
+| `ML-DualPostProcessing.ipynb` | Full curve and field diagnostics for paired UT/FT outputs, including the interactive field viewer and log-scale losses. |
 | `ML-CurvePostProcessing.ipynb` | Diagnostics for one saved curve run. |
 | `ML-FieldPostProcessing.ipynb` | Diagnostics and visualization for one saved field run. |
 | `ML-HPOpostProcess.ipynb` | HPO study comparison and best-run inspection. |
@@ -298,7 +298,7 @@ Curve-output models predict macroscopic stress-strain or force-displacement curv
 
 On macOS, run `bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-MULTI-test-260907` from the repo root. Prefix `--dry-run` before the task to preview the transfer. The default destination is `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`; `LOCAL_ROOT`, `REMOTE`, `REMOTE_ROOT`, and `SSH_CONTROL_PATH` are explicit overrides. No remote writes or deletions occur. The former `B3_ML-transfer.sh` is now named `B3_ML-transfer-windows.sh` and retains its Windows/Git Bash behaviour.
 
-Both dual notebooks default to this completed run. The training notebook previews its saved input examples with training disabled; the post-processing notebook reads saved losses, fields, curves and metrics without reloading the full ML dataset. Executed review copies and plots belong under the ignored run directory, not in tracked notebook outputs. `data/` and paper `samples/` remain ignored; active tests must not depend on ignored examples.
+Both dual notebooks now default to Trial 1, locally renamed by the user to `data/MULTI/Dual/Transformer/dual-MULTI-trial1`. The archive retains its original dated name. The training notebook reviews configuration with training/HPO disabled; the post-processing notebook reads saved losses, fields, curves and metrics without reloading the full dataset. It contains both curve branches and a selectable UT/FT field branch to bound memory. Interactive field viewing and log-scale losses are core features. Input/feature calculations belong in `samples/`. Executed review copies belong under the ignored run's `results/postProcessing/`, not in tracked notebook outputs. `data/` and generated `samples/` remain ignored; tests must not depend on ignored examples.
 
 ### Joint dual-output surrogate
 
@@ -376,7 +376,9 @@ sbatch -J dual-MULTI-TR B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py
 sbatch -J dual-MULTI-TR-smoke B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py --nsims 64 --epochs 3 --batch 2 --no-range-split
 ```
 
-Runs save under `MULTI/Dual/Transformer/<run-label>/`: best/final `model.mdl` and its JSON descriptor, `model_data.json`, run metadata/source fingerprints, loss history, and `results/` containing physical-unit predictions, masks, metrics, and per-task diagnostic CSVs with train-mean baselines. The launcher archives the same tree and attaches its Slurm log. `B3_ML-transfer-mac.sh MULTI Dual Transformer <run-label>` (macOS, repo-root `data/`) or its `-windows.sh` counterpart transfers it through the existing path-based workflow. Reconstruct the architecture with `DualStageTransformer.from_config(descriptor["model_config"])` and load its weights through a matching `DUAL_MODEL.load` wrapper; legacy `MODEL` reload, HPO resume, and legacy single-task postprocessing notebooks do not yet support dual checkpoints. Dual HPO follows successful real-data single-run validation; no dual HPO entry point exists yet.
+Runs save under `MULTI/Dual/Transformer/<run-label>/`: best `model.mdl` and its JSON descriptor, `model_data.json`, metadata/source fingerprints, losses, physical predictions, masks and diagnostics with train-mean baselines. B1 archives that tree and its Slurm log. `B3_ML-transfer-mac.sh MULTI Dual Transformer <run-label>` downloads it. Load checkpoints through `DualStageTransformer.from_config` and `DUAL_MODEL.load`, not legacy `MODEL`.
+
+Dual HPO is prepared through `DualOutputs/A0-HPC-Dual-HPO.py`: default 200 completed/pruned evaluations, up to 450 epochs each, 230 hours per job. It searches architecture, regularization, optimization and loss weights while ranking by a fixed, balanced validation score. Resume the same study through B1 with `--resume`, not B2. See [the dual run guide](p2-DisorderML/HPC/DualOutputs/README.md) for exact ranges, storage, commands and limitations. More trials do not guarantee a global optimum; shortlisted models still need repeated-seed confirmation before locked-test evaluation.
 
 See `p2-DisorderML/PROJECT_STATUS.md` for the current evidence, blockers, decisions, and next implementation task.
 

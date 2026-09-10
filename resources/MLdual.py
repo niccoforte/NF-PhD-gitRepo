@@ -785,6 +785,10 @@ class DualTaskTransformer(nn.Module):
         pos_encoding="none",
         use_cls_token=None,
         bias=True,
+        norm_first=False,
+        head_dropout=None,
+        attention_dropout=None,
+        head_hidden_mult=0,
     ):
         super().__init__()
         self.in_sizes = _mode_sizes(in_size, "in_size")
@@ -800,6 +804,10 @@ class DualTaskTransformer(nn.Module):
         self.pool = str(pool).lower()
         self.pos_encoding = str(pos_encoding).lower()
         self.bias = bool(bias)
+        self.norm_first = bool(norm_first)
+        self.head_dropout = self.dropout if head_dropout is None else float(head_dropout)
+        self.attention_dropout = self.dropout if attention_dropout is None else float(attention_dropout)
+        self.head_hidden_mult = int(head_hidden_mult)
         self.use_cls_token = self.pool == "cls" if use_cls_token is None else bool(use_cls_token)
 
         if self.seq_len < 1:
@@ -851,14 +859,20 @@ class DualTaskTransformer(nn.Module):
             activation=self.activation,
             batch_first=True,
             bias=self.bias,
+            norm_first=self.norm_first,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.n_layers)
+        for layer in self.encoder.layers:
+            layer.self_attn.dropout = self.attention_dropout
         self.heads = nn.ModuleDict(
             {
                 mode: nn.Sequential(
                     nn.LayerNorm(self.d_model),
-                    nn.Dropout(self.dropout),
-                    nn.Linear(self.d_model, self.out_sizes[mode], bias=self.bias),
+                    nn.Dropout(self.head_dropout),
+                    *([nn.Linear(self.d_model, self.d_model * self.head_hidden_mult, bias=self.bias),
+                       nn.GELU() if self.activation == "gelu" else nn.ReLU(), nn.Dropout(self.head_dropout)]
+                      if self.head_hidden_mult else []),
+                    nn.Linear(self.d_model * max(1, self.head_hidden_mult), self.out_sizes[mode], bias=self.bias),
                 )
                 for mode in DUAL_MODES
             }
@@ -986,6 +1000,10 @@ class DualTaskTransformer(nn.Module):
             "pos_encoding": self.pos_encoding,
             "use_cls_token": self.use_cls_token,
             "bias": self.bias,
+            "norm_first": self.norm_first,
+            "head_dropout": self.head_dropout,
+            "attention_dropout": self.attention_dropout,
+            "head_hidden_mult": self.head_hidden_mult,
         }
 
 
@@ -1180,6 +1198,9 @@ class DUAL_MODEL:
         dataloaders=None,
         num_workers=0,
         pin_memory=None,
+        grad_clip=None,
+        curve_lr_factor=1.0,
+        selection_metric=None,
     ):
         if not isinstance(model, DualStageTransformer):
             raise TypeError("DUAL_MODEL requires a DualStageTransformer.")
@@ -1192,10 +1213,17 @@ class DUAL_MODEL:
         self.batch = int(batch)
         self.lr = float(lr)
         self.scheduler_cfg = scheduler
+        self.grad_clip = grad_clip
+        self.curve_lr_factor = float(curve_lr_factor)
+        self.selection_metric = selection_metric
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model.to(self.device)
         self.lossf.to(self.device)
-        self.optimizer = _model_optimizer(self.model.parameters(), opt=self.opt_cfg, lr=self.lr)
+        parameters = self.model.parameters() if curve_lr_factor == 1 else [
+            {"params": self.model.field_model.parameters(), "lr": self.lr},
+            {"params": self.model.curve_model.parameters(), "lr": self.lr * curve_lr_factor},
+        ]
+        self.optimizer = _model_optimizer(parameters, opt=self.opt_cfg, lr=self.lr)
         self.scheduler = _model_scheduler(self.optimizer, self.scheduler_cfg)
         if dataloaders is None:
             if data is None:
@@ -1247,9 +1275,13 @@ class DUAL_MODEL:
                     raise FloatingPointError("Non-finite joint loss; refusing to continue training.")
                 if training:
                     loss.backward()
+                    if self.grad_clip is not None:
+                        torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip, error_if_nonfinite=True)
                     self.optimizer.step()
                 batch_size = int(batch["geometry"].shape[0])
                 values = {"loss": float(loss.detach().item()), **self._flatten_components(details)}
+                if not training and self.selection_metric is not None:
+                    values.update(self.selection_metric(predictions, targets, batch["field_mask"]))
                 for key, value in values.items():
                     totals[key] = totals.get(key, 0.0) + value * batch_size
                 n_samples += batch_size
@@ -1265,6 +1297,7 @@ class DUAL_MODEL:
         early_stop_delta=0.0,
         checkpoint_path=None,
         metadata=None,
+        epoch_callback=None,
     ):
         n_epochs = int(n_epochs)
         if n_epochs < 1:
@@ -1276,11 +1309,12 @@ class DUAL_MODEL:
         for epoch in range(1, n_epochs + 1):
             train_metrics = self._run_loader(self.dataloaders["train"], training=True)
             val_metrics = self._run_loader(val_loader, training=False) if val_loader is not None else train_metrics
-            monitored = val_metrics["loss"]
+            monitored = val_metrics.get("selection_score", val_metrics["loss"])
             row = {"epoch": epoch}
             row.update({f"train_{key}": value for key, value in train_metrics.items()})
             row.update({f"val_{key}": value for key, value in val_metrics.items()})
             self.history.append(row)
+            row["learning_rate"] = self.optimizer.param_groups[0]["lr"]
 
             if monitored < self.best_loss - float(early_stop_delta):
                 self.best_loss = monitored
@@ -1301,6 +1335,8 @@ class DUAL_MODEL:
                     f"Dual epoch {epoch}/{n_epochs} | train={train_metrics['loss']:.6f} "
                     f"| val={val_metrics['loss']:.6f} | lr={self.optimizer.param_groups[0]['lr']:.2e}"
                 )
+            if epoch_callback is not None and epoch_callback(self, row):
+                break
             if early_stop_patience is not None and patience_count >= int(early_stop_patience):
                 break
 
@@ -1367,6 +1403,9 @@ class DUAL_MODEL:
                 "batch": self.batch,
                 "lr": self.lr,
                 "scheduler": self.scheduler_cfg,
+                "grad_clip": self.grad_clip,
+                "curve_lr_factor": self.curve_lr_factor,
+                "selection_metric": "fixed dual validation score" if self.selection_metric else "joint loss",
                 "best_epoch": self.best_epoch,
                 "best_loss": self.best_loss,
             },

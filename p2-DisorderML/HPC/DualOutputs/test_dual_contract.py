@@ -139,6 +139,65 @@ class DualMLTest(unittest.TestCase):
         self.assertTrue(any(parameter.grad is not None for parameter in self.model.field_model.encoder.parameters()))
         self.assertTrue(any(parameter.grad is not None for parameter in self.model.curve_model.encoder.parameters()))
 
+    def test_dual_hpo_score_resume_and_saved_review(self):
+        import optuna
+        from resources.MLdualHPO import DualValidationScore, suggest_config, trial1_parameters, run_dual_hpo
+        from resources.MLmetrics import load_dual_diagnostics
+        score = DualValidationScore(self.data)
+        batch = next(iter(self.data.make_dataloaders(batch_size=2)["val"]))
+        truth = {kind: batch[kind] for kind in ("field", "curve")}
+        self.assertEqual(score(truth, truth, batch["field_mask"])["selection_score"], 0.0)
+        output = self.model(batch["geometry"], batch["task_features"], batch["node_mask"])
+        before = score(output, truth, batch["field_mask"])
+        output["field"]["FT"][:, ~self.node_masks["FT"]] = 1e9
+        self.assertEqual(before, score(output, truth, batch["field_mask"]))
+        cfg = suggest_config(optuna.trial.FixedTrial(trial1_parameters()))
+        self.assertAlmostEqual(sum(sum(v.values()) for v in cfg["weights"].values()), 4)
+        cfg.update(curve_lr_factor=2., grad_clip=1.)
+        for stage in cfg["stages"].values():
+            stage.update(d_model=8, n_heads=2, n_layers=1, ff_mult=2, dropout=0.)
+        with tempfile.TemporaryDirectory() as directory:
+            root, archive = Path(directory) / "scratch", Path(directory) / "archive"
+            with patch("resources.MLdualHPO.suggest_config", return_value=cfg):
+                study = run_dual_hpo(self.data, root, archive_dir=archive, study_name="unit", target_trials=1,
+                                     epochs=2, timeout_hours=1, device="cpu")
+                self.assertEqual(len(study.get_trials(states=(optuna.trial.TrialState.COMPLETE,))), 1)
+                self.assertTrue((archive / "best/results/predictions.npz").is_file())
+                self.assertFalse((archive / "study.lock").exists())
+                self.assertTrue((archive / "full_study.db").is_file())
+                # A new scratch directory exercises actual archive-based resume.
+                resumed = run_dual_hpo(self.data, Path(directory) / "scratch2", archive_dir=archive,
+                    study_name="unit", target_trials=2, epochs=2, timeout_hours=1, device="cpu", resume=True)
+                self.assertEqual(len(resumed.get_trials(states=(optuna.trial.TrialState.COMPLETE,))), 2)
+            for kind in ("field", "curve"):
+                for mode in ("UT", "FT"):
+                    diag = load_dual_diagnostics(archive / "best", kind, mode)
+                    self.assertEqual(len(diag["sample_ids"]), 2)
+                    self.assertEqual(diag["summary"][f"mean_{kind}_baseline_source"], f"train_mean_{kind}")
+                    self.assertNotIn(f"baseline_{kind}", diag)
+
+    def test_dual_hpo_architecture_config_roundtrip(self):
+        config = self.model.get_config()
+        config["field_model"].update(norm_first=True, head_dropout=.23)
+        config["curve_model"].update(attention_dropout=.17, head_hidden_mult=2)
+        restored = DualStageTransformer.from_config(config)
+        self.assertEqual(restored.get_config(), config)
+        batch = next(iter(self.data.make_dataloaders(batch_size=2)["val"]))
+        output = restored(batch["geometry"], batch["task_features"], batch["node_mask"])
+        self.assertEqual(output["curve"]["FT"].shape, (2, 201))
+
+    def test_hpo_refuses_existing_lock_and_missing_resume(self):
+        from resources.MLdualHPO import run_dual_hpo
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "study.lock").write_text("Existing owner")
+            with self.assertRaises(FileExistsError):
+                run_dual_hpo(self.data, root, study_name="locked", device="cpu")
+            self.assertEqual((root / "study.lock").read_text(), "Existing owner")
+            with self.assertRaises(FileNotFoundError):
+                run_dual_hpo(self.data, root / "missing", study_name="missing", device="cpu", resume=True)
+            self.assertFalse((root / "missing/study.lock").exists())
+
     def test_optional_position_encodings(self):
         batch = next(iter(self.data.make_dataloaders(batch_size=2)["val"]))
         for encoding in ("learned", "sinusoidal"):
