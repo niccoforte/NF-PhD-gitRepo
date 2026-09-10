@@ -11,6 +11,7 @@
 - `data_processing.py` owns conversion from p1 raw `transfer/` files into processed input/output CSVs, manifests, field indexes, and stacked field NPZ files.
 - `MLdata.py` owns the `DATA` class, path resolution, p1/p2 ML-ready data loading, property extraction, split construction, scaling, dimensionality reduction, node filtering, field loading, and MLdata saving.
 - `MLmodels.py` owns model classes, `MODEL`, data loaders, train/predict/evaluate orchestration, checkpoint metadata, saved-run layout, and result artifact writing.
+- `MLdual.py` owns the opt-in joint UT/FT serial Transformer path. Its `DUAL_DATA` adapter reuses existing `DATA` products; its two Transformer stages share parameters across tasks and train through one scalar objective/optimizer without changing legacy behavior.
 - `MLfunc.py` owns training loops, curve/field losses, HPO helpers, activation diagnostics, and older ML plotting helpers.
 - `MLmetrics.py` owns saved-run loading, curve/field diagnostics, plotting, HPO summaries, and post-processing helpers.
 - `tokenization.py` owns the output-informed tokenization prototype for recurring disorder motifs.
@@ -48,6 +49,9 @@
 - Curve models may use flattened or node-shaped inputs. Field models must preserve node structure and use node-compatible models such as GNN/GCN/GAT/Transformer.
 - Do not apply input PCA/reduction before node tokenization or graph/Transformer node-shape workflows.
 - `MODEL.save()` and `MODEL.save_results()` produce checkpoint, JSON metadata, prediction, metric, loss-history, and diagnostics artifacts consumed by `MLmetrics.py`.
+- `DUAL_MODEL` checkpoints use their own versioned descriptor and do not pass through legacy `MODEL` reload logic. Keep this separation until every dual saved-run consumer is explicitly implemented.
+- The dual `fcc_ti` context profile validates the canonical FCC grid and FT subset. Reference x0/y0/designable are shared; presence, UT body interfaces, FT pin/coupling and nominal-tip features are task-specific. Pin membership uses each sample's initial disordered coordinates before scaling. Never label coupled body nodes as directly fixed/prescribed DOFs. Use the same context helpers in the data adapter, reports and notebooks.
+- Dual saved results reuse `MLmetrics` field/curve diagnostics in physical units. Preserve canonical prediction arrays and explicit validity masks; exclude absent task nodes from field diagnostics. Pass inverse-affine curves to `CombinedCurveLoss` using Torch buffers so physical curve features and joint gradients remain meaningful; normalized MSE remains an explicit alternative.
 - HPO helpers save Optuna studies and best-model artifacts in model-specific or cross-model layouts. Keep these layouts stable unless all loaders are updated.
 
 ## Editing Guidance

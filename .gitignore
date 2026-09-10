@@ -2,8 +2,9 @@
 /shelf/
 /workspace.xml
 */code/models/*
-*/data/
-*/samples/
+/data/
+*/samples/*
+!*/samples/AGENTS.md
 
 # Additional ignored files
 *.idea*

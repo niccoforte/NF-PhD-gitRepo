@@ -1,63 +1,35 @@
-# p2 Project Status
+# p2 Implementation Status
 
-Read this file for continuation, planning, or handoff work. Durable framework rules remain in `AGENTS.md`; Git history records completed changes.
+This is a compact repository handoff, not a second research plan or an Obsidian mirror. Scientific objectives, manuscript reasoning and supervisor decisions remain in the vault's `Writing/p2/` and `Writing/Research Plans/`. Durable contracts belong in `AGENTS.md`; completed changes belong in Git history.
 
-## Current Objective
+## Active implementation
 
-- Build and independently verify an end-to-end design route from the full FCC nodal-disorder field to paired tensile and fracture performance.
-- The intended surrogate has one nodal disorder/geometry input and two load-case branches linked by the same disorder sample. Each branch is serial: geometry -> predicted displacement-field history -> predicted macroscopic response curve -> derived mechanical properties.
-- Use the frozen surrogate in a constrained multi-objective optimisation (MOO) workflow to estimate the attainable Pareto set, then verify predeclared extreme and knee/compromise candidates through fresh paired FEA.
+- Opt-in joint two-stage UT/FT model: `resources/MLdual.py`. Each stage uses one shared encoder call with task streams stacked along the batch dimension. Field and curve losses train both stages through one optimizer.
+- Legacy `DATA`, `MODEL`, separate-task networks and notebooks retain their existing paths.
+- Real-data runner and HPO-informed trial preset: `HPC/DualOutputs/`. The adjacent README owns run commands, exact HPO sources and the configuration rationale.
+- Dual notebooks: `code/ML-DualOutputs.ipynb` and `code/ML-DualPostProcessing.ipynb`. They use shared helpers, default to safe illustrative/read-only routes, and do not reinterpret dual checkpoints as legacy models.
+- Human review material: `samples/README.md`, including controlled examples and three actual HPC input reports. Shared reference features and task-specific body-interface/pin/crack features are active. Degree and graph-relative attention remain explanatory examples, not active inputs.
+- Existing single-task/HPO notebooks and `HPC/FieldOutputs/`, `HPC/FieldToCurve/` remain the independent baseline surfaces. `code/TOKENIZATION_NEXT_STEPS.md` owns the separate exploratory tokenisation handoff.
 
-## Authoritative Working Surfaces
+## Verified on 7 September 2026
 
-- Geometry-to-curve training and diagnostics: `code/ML-CurveOutputs.ipynb` and `code/ML-CurvePostProcessing.ipynb`.
-- Geometry-to-field training and diagnostics: `code/ML-FieldOutputs.ipynb`, `code/ML-FieldPostProcessing.ipynb`, and `code/ML-HPOpostProcess.ipynb`.
-- Field-to-curve development: `code/ML-FieldToCurveOutputs.ipynb` and `HPC/FieldToCurve/`.
-- Optimisation prototypes: `code/Optimization.ipynb`; this is not yet a production full-dimensional FCC MOO implementation.
-- Shared loading and diagnostics: `resources/MLdata.py` and `resources/MLmetrics.py`.
-- Saved-run behavior: `resources/MLmodels.py`; training/loss behavior: `resources/MLfunc.py`.
-- Tokenisation remains a preliminary future design-space direction with a separate handoff in `code/TOKENIZATION_NEXT_STEPS.md`; it is not part of the core current MOO implementation.
+- Remote MULTI headers contain UT `(8811,21,800,2)` and FT `(8811,21,788,2)`, aligned by sample ID. The adapter uses reference-coordinate mapping, preserves the canonical order and masks twelve absent FT nodes. Header counts alone do not establish final complete-case/split counts.
+- Slurm job **25868425**, `dual-MULTI-test-260907`, completed successfully: 64 selected pairs, three epochs, one A100, validation diagnostics. Home staging, scratch execution and archive collection all ran. See `samples/hpc-test-report.md` for evidence and limitations.
+- The archive is `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/dual-MULTI-test-260907/`. An isolated home code snapshot was used; the remote Git checkout and ML source data were not edited.
+- Nine synthetic contract tests passed, covering encoder counts/calls, masks, joint gradients, affine loss reconstruction, checkpoints, reordered FT mapping, pin calculations, trial configuration and saved artifacts.
+- Independent UT/FT field and full-201-point field-to-curve HPO parameter records were recovered. Trial 1 is a transparent capacity/lr compromise, not a dual-HPO optimum.
+- Trial 1 is prepared for full-data submission from the synchronized HPC Git checkout through B1. It keeps the documented 450-epoch maximum, early stopping, batch 2, full curves and validation diagnostics; no smoke overrides apply.
+- Three-epoch smoke predictions remain worse than training-mean baselines. Do not cite the execution test as accuracy, negative-transfer or optimisation evidence.
 
-## Current Scientific Decisions
+## Next evidence
 
-- Optimise the complete 722-node by two-degree-of-freedom disorder representation: 1,444 continuous design variables.
-- Keep generated candidates within the training-domain disorder bound corresponding to 20% of the shortest strut length. The production generator must be checked to freeze whether this is a coordinate-wise or radial bound.
-- Use one shared geometry across aligned UT and FT/C(T) branches.
-- Current recommended primary objectives are UT work to failure and FT `K_JIC`, with tensile ductility and crack-initiation displacement reported separately. The exact tensile objective remains subject to supervisor confirmation.
-- Retain tensile strength through a predeclared data-derived constraint based on the strongest strength-retaining, high-performance training samples. The operational threshold must be fixed before final optimisation.
-- Treat optimisation output as an estimated finite-search Pareto set. Any reported meeting point is a selected knee/compromise candidate, not a unique or global optimum.
-- Require fresh paired FEA before claiming that a generated candidate improves performance or remains Pareto dominant.
+- The completed smoke archive is downloaded under repo-root `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`. Both dual notebooks now read this run by default, with training disabled. macOS transfer uses `HPC/B3_ML-transfer-mac.sh`; the renamed `-windows.sh` script preserves the previous Windows route.
+- Generated `data/` and `samples/` content remains ignored. Only `samples/AGENTS.md` is exempted to keep required guidance tracked. Tests no longer depend on ignored sample generators.
+- The HPC checkout's obsolete origin URL and unavailable Git SSH authentication require a verified Git-bundle fast-forward for this deployment. No credentials are copied. Record the submitted job ID here once Slurm accepts it.
 
-## Current Inputs And Evidence
-
-- Expected local data: `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata`.
-- The authoritative data drive is temporarily inaccessible at the QM Engineering building following a fire. Do not infer final dataset counts or rerun data-dependent studies from partial local notebook outputs while access is unavailable.
-- Available saved notebook outputs are validation/HPO evidence rather than untouched final-test evidence.
-- Direct geometry-to-UT-curve MLP validation currently performs approximately at the mean-curve baseline and exhibits severe response-diversity collapse; it is not optimisation-ready.
-- Direct geometry/disorder-to-curve attempts have not learned the relationship adequately. The displacement field is therefore retained as the learned intermediary rather than using a parallel curve readout from the geometry latent state.
-- UT field-to-curve Transformer validation using true FEA fields is the strongest current curve result, but it does not establish end-to-end geometry-to-response performance.
-- Geometry-to-field Transformer validation is currently modest for UT and stronger for FT; both require frozen-manifest locked-test evaluation.
-- The two serial stages currently exist as separate workflows; the unified one-input, UT/FT dual-output model is not implemented.
-- The principal unresolved training problem is simultaneous supervision at different depths:
-
-  `L_total = sum_m(lambda_field,m * L_field,m + lambda_curve,m * L_curve,m)`, for `m in {UT, FT}`.
-
-  The field loss directly supervises the disorder-to-field stage, while the curve loss supervises the field-to-curve stage and backpropagates through both Transformers. `MaskedFieldMSELoss` is the current pointwise field baseline and needs further development; `CombinedCurveLoss` is the current full-curve objective. The weighting/balancing strategy is not yet fixed.
-- Exact generated, completed, failed, filtered and paired sample counts conflict across historical sources and must be resolved from recovered manifests.
-
-## Evidence Required Before Full Manuscript Claims
-
-- Freeze authoritative sample and split manifests, preserving a genuinely untouched test set.
-- Complete fair direct geometry-to-curve baselines and both geometry-to-field-to-curve chains, including FT field-to-curve modelling.
-- Develop and predeclare the field-specific loss and field/curve/UT/FT weighting strategy for unified end-to-end training.
-- Evaluate chained inference with predicted rather than true FEA fields and quantify propagated error in optimisation-relevant metrics.
-- Select and implement the production 1,444-variable constrained MOO algorithm with matched-budget simple-search baselines, repeated seeds, convergence diagnostics, geometric feasibility, and uncertainty/out-of-distribution safeguards.
-- Re-simulate a predeclared set of Pareto candidates under paired UT and C(T) FEA and recompute dominance from FEA outputs.
-- Keep tokenisation outside the principal manuscript result unless held-out enrichment, stability, and motif intervention tests are completed.
-
-## Decisions And Next Task
-
-- `Decision required`: confirm with supervisors whether UT work to failure, ductility, or both define the tensile optimisation objective; freeze the strength-threshold rule; and select the primary MOO strategy.
-- While the data drive remains inaccessible, keep the unified architecture and loss formulation at the presentation/documentation stage unless the user explicitly resumes code work. Synthetic/toy interface checks may be planned separately without claiming scientific validation.
-- Once data access is restored, the first task is to inventory and freeze the paired manifests and split IDs before any final retraining, test evaluation, or optimisation run.
-- Full training, locked-test evaluation, full-dimensional MOO, fresh FEA verification, `Z:`-data validation, and HPC validation have not been run during this status update.
+- Run and inspect the full-data trial before tuning predictive accuracy. Check paired split coverage, all four loss contributions, held-out validation diagnostics and learning behaviour.
+- Review the labelled pin/interface examples against the intended production geometry. The current profile uses the A1 Ti/Al proportions and the sample's initial disordered coordinates.
+- Validate reconstructed lattice connectivity against one original producer/INP artifact before claiming agreement with archived meshes. Do not process thousands of INPs by default.
+- Dual HPO, resumable HPO, locked-test evaluation, full-dimensional optimisation and new FEA verification are not completed by this implementation.
+- Keep the field intermediary and full 201-point curves. User-reported true-field FT full-curve performance is promising; numerical manuscript claims still require the saved evidence.
+- SSH access uses the user's active ControlMaster socket. Access availability is temporary and does not itself authorize arbitrary remote changes. Never store passwords in chat or repo files.

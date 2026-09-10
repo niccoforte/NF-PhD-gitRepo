@@ -1,17 +1,20 @@
 #!/bin/bash
 
+# Windows/Git Bash transfer entry point. On macOS use B3_ML-transfer-mac.sh.
+
 set -euo pipefail
 
 REMOTE=${REMOTE:-exy053@login.hpc.qmul.ac.uk}
 REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 
 # Usage examples:
-#   bash B3_ML-transfer.sh "UT/Curve/MLP/ut-mlp-260514-142233"
-#   bash B3_ML-transfer.sh UT Curve MLP ut-mlp-260514-142233
-#   bash B3_ML-transfer.sh UT FieldToCurve Transformer field-to-curve-UT-full
-#   bash B3_ML-transfer.sh UT Curve MLP HPO MLP_full_hOpt
-#   bash B3_ML-transfer.sh UT Field HPO cross_model_hOpt
-#   bash B3_ML-transfer.sh UT Field HPO cross_model_hOpt GAT  # optional single model subfolder
+#   bash B3_ML-transfer-windows.sh "UT/Curve/MLP/ut-mlp-260514-142233"
+#   bash B3_ML-transfer-windows.sh UT Curve MLP ut-mlp-260514-142233
+#   bash B3_ML-transfer-windows.sh UT FieldToCurve Transformer field-to-curve-UT-full
+#   bash B3_ML-transfer-windows.sh MULTI Dual Transformer dual-MULTI-TR-full
+#   bash B3_ML-transfer-windows.sh UT Curve MLP HPO MLP_full_hOpt
+#   bash B3_ML-transfer-windows.sh UT Field HPO cross_model_hOpt
+#   bash B3_ML-transfer-windows.sh UT Field HPO cross_model_hOpt GAT  # optional single model subfolder
 
 if [ -d "Z:/" ]; then
     LOCAL_ROOT=${LOCAL_ROOT:-Z:/p2}
@@ -97,7 +100,7 @@ if [ -z "$RUN_PATH" ]; then
     RUN_KIND=${RUN_KIND:-}
 
     prompt_required TASK "Task, e.g. UT, FT, MULTI"
-    prompt_required OUTPUT_KIND "Output kind, e.g. Curve, Field, or FieldToCurve"
+    prompt_required OUTPUT_KIND "Output kind, e.g. Curve, Field, FieldToCurve, or Dual"
     prompt_default RUN_KIND "Run kind: regular, model-hpo, compare-hpo" "regular"
 
     case "${RUN_KIND,,}" in

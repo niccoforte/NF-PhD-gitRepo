@@ -2,10 +2,13 @@
 
 This directory is the local notebook layer for p2 training, diagnostics, tokenization, and exploration. Read the called `resources/` helper before changing notebook behavior. For active priorities, target runs, evidence, and the next handoff task, read `../PROJECT_STATUS.md`.
 
+Dual notebooks default to the downloaded smoke run under repo-root `data/MULTI/Dual/Transformer/dual-MULTI-test-260907`. The training notebook previews saved inputs without a training dataset; `RUN_TRAINING` stays false. Executed notebook copies/figures belong inside the ignored run directory. Do not depend on the ignored `samples/` folder for default notebook execution or unit tests.
+
 ## Notebook Roles
 
 - `ML-CurveOutputs.ipynb` and `ML-FieldOutputs.ipynb` are the main local curve- and field-output training/HPO notebooks.
 - `ML-FieldToCurveOutputs.ipynb` is the exploratory field-input to curve-output notebook and should stay aligned with the HPC framework.
+- `ML-DualOutputs.ipynb` previews paired input construction and optionally calls the real-data dual runner. `ML-DualPostProcessing.ipynb` reads dual saved arrays, input audits and four loss terms. Keep their safe no-data defaults and reuse `MLdual`/`MLmetrics`; do not extend legacy checkpoint loaders implicitly.
 - `ML-CurvePostProcessing.ipynb` and `ML-FieldPostProcessing.ipynb` inspect one saved curve or field run respectively.
 - `ML-HPOpostProcess.ipynb` compares model-specific and cross-model HPO studies.
 - `Tokenization.ipynb` follows the separate handoff in `TOKENIZATION_NEXT_STEPS.md`.

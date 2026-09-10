@@ -29,6 +29,7 @@ CONTRACT_PREFIXES = (
     "resources/data_processing.py",
     "resources/MLdata.py",
     "resources/MLmodels.py",
+    "resources/MLdual.py",
     "resources/MLmetrics.py",
     ".agents/skills/review-p1-p2-data-contract/",
     ".agents/skills/validate-repo-change/fixtures/synthetic_contract/",

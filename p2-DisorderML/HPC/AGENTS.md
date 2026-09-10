@@ -7,15 +7,16 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 - `B0_ML-env-setup.sh` manages the GPU environment.
 - `B1_ML-new.sh` stages and submits work through scratch to the archive.
 - `B2_ML-resumeHPO.sh` resumes archived cross-model studies.
-- `B3_ML-transfer.sh` downloads saved runs.
+- `B3_ML-transfer-windows.sh` preserves the Windows/Git Bash download path. `B3_ML-transfer-mac.sh` supports macOS Bash 3.2, rsync/ControlMaster, `--dry-run`, and defaults to ignored repo-root `data/`. Neither transfer script deletes source data.
 - `CurveOutputs/`, `FieldOutputs/`, and `FieldToCurve/` own their respective single-run and cross-model HPO entry points.
+- `DualOutputs/A0-HPC-Dual-test.py` owns the joint UT/FT single run. `A0-HPC-Dual-trial1.py` is a thin HPO-informed preset calling it; B1 stages both scripts for that preset. The adjacent README records source runs and parameter compromises. `test_dual_contract.py` protects active synthetic invariants, not legacy syntax. Dual HPO/resume is not implemented yet.
 
 ## Durable Guardrails
 
 - Active entry points are production-oriented: full data and realistic training budgets by default. Small datasets, short epochs/trials, and CPU execution must be explicit debug overrides.
 - Do not change Slurm partition, account, license, CPU, memory, or time policy without the user's target cluster policy.
 - Preserve explicit scratch cleanup guards and verify every archive, resume, transfer, or cleanup target before use.
-- Slurm job/run names, `Curve`/`Field`/`FieldToCurve` layouts, metadata, diagnostics, and transfer paths form a shared saved-run contract. Use `review-p1-p2-data-contract` when they change.
+- Slurm job/run names, `Curve`/`Field`/`FieldToCurve`/`Dual` layouts, metadata, diagnostics, and transfer paths form a shared saved-run contract. Use `review-p1-p2-data-contract` when they change. Dual runs use `MULTI/Dual/Transformer/<run-label>` and the existing staging/archive/transfer scripts, but their checkpoint loader is `DUAL_MODEL`, not legacy `MODEL`.
 - Keep CLI arguments stable or provide a clear migration. Do not introduce local Windows paths except as documented transfer destinations.
 - Do not submit Slurm jobs, resume studies, transfer archives, or alter external environments unless the user requested that operation.
 - Keep active scripts lean; remove abandoned debug branches and obsolete compatibility paths.

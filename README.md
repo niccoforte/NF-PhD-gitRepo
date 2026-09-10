@@ -42,7 +42,7 @@ Repository guidance is tracked with the code so a fresh checkout carries the sam
 - Start with the root `AGENTS.md`, then read the closest nested `AGENTS.md` before working in a paper folder, notebook folder, HPC folder, or `resources/`.
 - The root and nested `AGENTS.md` files provide the minimum repository and local context. Agents should additionally consult the relevant README sections for unfamiliar or cross-project work and for setup, navigation, commands, workflows, interpretation, or maintenance; repository-wide or unclear-scope work requires the full README.
 - Project-specific guidance includes `p1-DisorderLatticeProperties/AGENTS.md`, `p2-DisorderML/AGENTS.md`, `p3-DisorderIcingMitigation/AGENTS.md`, and `resources/AGENTS.md`.
-- Each paper has a concise `PROJECT_STATUS.md` for continuation, planning, and handoff. It holds only changing objectives, current evidence, decisions, external requirements, and the next task; durable rules stay in `AGENTS.md`.
+- Each paper has a `PROJECT_STATUS.md` for repository continuation and handoff: implementation state, verified runs, blockers, and the next computational task. These are independent Markdown files, not synced copies of Obsidian notes. Keep scientific planning and manuscript development in Obsidian; reference that context without maintaining a second detailed research plan here. Durable rules stay in `AGENTS.md`.
 - Repo-scoped skills live under `.agents/skills/`. `maintain-repo-guidance` keeps instructions synchronized, `validate-repo-change` selects proportionate checks, `review-p1-p2-data-contract` protects the FEA-to-ML producer-consumer boundary, and `operate-p2-hpc` loads cluster procedures only for relevant work.
 - Human-facing setup, structure, commands, workflows, and limitations belong in this README and must stay current whenever those facts change. Agent-specific routing, safety, and validation rules belong in the closest relevant `AGENTS.md`. Reusable procedures belong in a skill.
 - Current guidance should be edited in place; Git history records the chronology.
@@ -162,10 +162,14 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 |       +-- B0_ML-env-setup.sh
 |       +-- B1_ML-new.sh
 |       +-- B2_ML-resumeHPO.sh
-|       +-- B3_ML-transfer.sh
+|       +-- B3_ML-transfer-mac.sh
+|       +-- B3_ML-transfer-windows.sh
 |       +-- CurveOutputs/
 |       +-- FieldOutputs/
 |       +-- FieldToCurve/
+|       +-- DualOutputs/
+|           +-- A0-HPC-Dual-test.py
+|           +-- test_dual_contract.py
 +-- p3-DisorderIcingMitigation/
 |   +-- AGENTS.md
 |   +-- PROJECT_STATUS.md
@@ -179,6 +183,7 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
     +-- lattices.py
     +-- MLdata.py
     +-- MLfunc.py
+    +-- MLdual.py
     +-- MLmetrics.py
     +-- MLmodels.py
     +-- tokenization.py
@@ -278,6 +283,8 @@ This folder is the local notebook workspace for model development and post-proce
 | `ML-CurveOutputs.ipynb` | Main local curve-output training/HPO notebook for MLP, GCN/GAT/GNN, and Transformer models. |
 | `ML-FieldOutputs.ipynb` | Main local field-output training/HPO notebook for node-compatible models such as GCN/GAT/GNN and Transformer. |
 | `ML-FieldToCurveOutputs.ipynb` | Exploratory field-input to curve-output notebook aligned with the HPC field-to-curve framework. |
+| `ML-DualOutputs.ipynb` | Paired feature preview and opt-in joint training through the shared dual runner. |
+| `ML-DualPostProcessing.ipynb` | Dual input audits, four losses, paired curves and displacement maps from saved arrays. |
 | `ML-CurvePostProcessing.ipynb` | Diagnostics for one saved curve run. |
 | `ML-FieldPostProcessing.ipynb` | Diagnostics and visualization for one saved field run. |
 | `ML-HPOpostProcess.ipynb` | HPO study comparison and best-run inspection. |
@@ -287,21 +294,61 @@ This folder is the local notebook workspace for model development and post-proce
 
 Curve-output models predict macroscopic stress-strain or force-displacement curves. Field-output models predict per-node displacement fields over Abaqus frames. Field-to-curve models then learn the second, serial mapping from displacement histories to the corresponding global curve. Field data is normally stored as final ML-ready `allFIELD.npz` products after raw `FIELDu-...npz` files have been stacked and saved.
 
-### Target dual-output surrogate
+### Downloaded run review
 
-The intended unified model has one nodal disorder/geometry input and two load-case branches:
+On macOS, run `bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-MULTI-test-260907` from the repo root. Prefix `--dry-run` before the task to preview the transfer. The default destination is `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`; `LOCAL_ROOT`, `REMOTE`, `REMOTE_ROOT`, and `SSH_CONTROL_PATH` are explicit overrides. No remote writes or deletions occur. The former `B3_ML-transfer.sh` is now named `B3_ML-transfer-windows.sh` and retains its Windows/Git Bash behaviour.
+
+Both dual notebooks default to this completed run. The training notebook previews its saved input examples with training disabled; the post-processing notebook reads saved losses, fields, curves and metrics without reloading the full ML dataset. Executed review copies and plots belong under the ignored run directory, not in tracked notebook outputs. `data/` and paper `samples/` remain ignored; active tests must not depend on ignored examples.
+
+### Joint dual-output surrogate
+
+The first real-data smoke run completed on Apocrita (job 25868425). See `p2-DisorderML/samples/hpc-test-report.md` for its execution evidence and limitations. `HPC/DualOutputs/A0-HPC-Dual-trial1.py` is the HPO-informed full-data preset; its adjacent README records the independent HPO sources and intentional architectural differences. Both scripts share the same runner and result collection.
+
+The opt-in dual framework in `resources/MLdual.py` retains the legacy `DATA`, `MODEL`, and `Transformer` paths and implements two jointly trained Transformer stages:
 
 ```text
-shared disorder input
-+-- UT: disorder-to-field Transformer -> u_UT(x,y,t), v_UT(x,y,t)
-|       -> field-to-curve Transformer -> stress-strain curve
-`-- FT: disorder-to-field Transformer -> u_FT(x,y,t), v_FT(x,y,t)
-        -> field-to-curve Transformer -> force-displacement curve
+canonical UT disorder [B, N, F]
+        |
+        v
+dual field Transformer (one shared encoder, UT/FT task masks, two heads)
+        +-- UT displacement field
+        `-- FT displacement field
+                    |
+                    v
+dual curve Transformer (one shared encoder, UT/FT task masks, two heads)
+        +-- UT stress-strain curve
+        `-- FT force-displacement curve
 ```
 
-The current notebooks implement the two serial stages separately. Direct geometry/disorder-to-curve models have been tested but have not learned this relationship adequately, which motivates retaining the displacement field as a learned intermediate representation.
+Each stage stacks its UT and FT streams along the batch dimension and executes one shared Transformer encoder call. Task embeddings, static task features, attention masks, and small output heads distinguish the load cases; there are two Transformer parameter sets in total, not four independently trained task Transformers. The canonical node axis retains all UT nodes, while the FT presence flag is also used as an attention and field-loss mask for crack-region nodes.
 
-The main unresolved training problem is joint supervision of the large end-to-end model. A field loss must directly correct each disorder-to-field stage while a curve loss corrects the downstream field-to-curve prediction and backpropagates through both stages:
+`DualStageTransformer.forward()` returns:
+
+```python
+{
+    "field": {"UT": ut_field, "FT": ft_field},
+    "curve": {"UT": ut_curve, "FT": ft_curve},
+}
+```
+
+The minimal framework entry point is:
+
+```python
+from resources.MLdual import DUAL_DATA, DUAL_MODEL, DualLoss, DualStageTransformer
+
+data = DUAL_DATA.from_files(path="HPC", split_seed=42)
+network = DualStageTransformer.from_data(data)
+model = DUAL_MODEL(network, DualLoss(), data=data, batch=4, lr=2e-4)
+model.train(450)
+```
+
+`DUAL_DATA.from_files` delegates existing CSV/NPZ loading and split construction to `DATA`; it only aligns the paired products to the canonical node axis and owns the shared normalisation bridge.
+
+The default `fcc_ti` task context shares normalised reference coordinates and the designable flag. Task-specific channels contain presence, UT body interfaces, FT pin/coupling membership and reference crack-tip offsets/distance. Pin membership is evaluated on initial disordered coordinates using the A1 Ti/Al selection proportions, before standardisation; body interfaces are not incorrectly marked as directly prescribed grips. The profile validates the 800-node FCC geometry and the twelve absent FT nodes. `extra_task_features` can add explicitly named channels. See `p2-DisorderML/samples/` for readable formulas, controlled examples and actual HPC examples. Reconstructed degree and graph-relative attention are documented but not active model features.
+
+Both stages train end to end with one optimizer and one scalar objective containing the UT/FT field and curve terms. Full ordered curves are the initial target; PCA is optional future work. Direct geometry/disorder-to-curve models have not learned the relationship adequately, which motivates retaining the displacement field as the learned intermediary.
+
+The joint objective directly corrects the disorder-to-field stage with field losses while the downstream curve losses backpropagate through both stages:
 
 ```text
 L_total = sum over m in {UT, FT} [
@@ -310,7 +357,26 @@ L_total = sum over m in {UT, FT} [
 ]
 ```
 
-`MaskedFieldMSELoss` is the current pointwise field baseline and requires further development. `CombinedCurveLoss` is the current full-curve objective. How to balance the simultaneous field and curve objectives remains an open modelling decision; this architecture and loss are documented targets, not yet implemented code.
+`MaskedFieldMSELoss` is the pointwise field baseline and `CombinedCurveLoss` is the full-curve objective. Loss weights remain an HPO/validation decision, but normalisation and masks must be fixed before tuning them. The non-scientific smoke check is:
+
+```bash
+python -m unittest discover -s p2-DisorderML/HPC/DualOutputs -p 'test_dual_contract.py' -v
+```
+
+It checks joint output shapes, gradient flow through both Transformer stages, FT absent-node isolation, optional positional encodings, one-optimizer training, checkpoint round trips, and the production runner's artifact layout using synthetic data. It requires the configured ML environment and is not validation on research data.
+
+The real-data entry point is `HPC/DualOutputs/A0-HPC-Dual-test.py`. It defaults to all paired samples, CUDA, 450 epochs, full curves, plateau scheduling, early stopping, and validation-set diagnostics. Field losses use train-normalized targets; `CombinedCurveLoss` receives differentiably reconstructed physical curves. `--loss mse` instead uses normalized curve MSE. Four task/stage weights and separate field/curve encoder sizes are explicit CLI options for later HPO. Use `--eval-split test` only for a locked final evaluation.
+
+From `p2-DisorderML/HPC`, the normal launcher handles staging and collection without a dual-specific shell wrapper:
+
+```bash
+# Production defaults (submit only when ready)
+sbatch -J dual-MULTI-TR B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py
+# Explicit small real-data smoke run
+sbatch -J dual-MULTI-TR-smoke B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py --nsims 64 --epochs 3 --batch 2 --no-range-split
+```
+
+Runs save under `MULTI/Dual/Transformer/<run-label>/`: best/final `model.mdl` and its JSON descriptor, `model_data.json`, run metadata/source fingerprints, loss history, and `results/` containing physical-unit predictions, masks, metrics, and per-task diagnostic CSVs with train-mean baselines. The launcher archives the same tree and attaches its Slurm log. `B3_ML-transfer-mac.sh MULTI Dual Transformer <run-label>` (macOS, repo-root `data/`) or its `-windows.sh` counterpart transfers it through the existing path-based workflow. Reconstruct the architecture with `DualStageTransformer.from_config(descriptor["model_config"])` and load its weights through a matching `DUAL_MODEL.load` wrapper; legacy `MODEL` reload, HPO resume, and legacy single-task postprocessing notebooks do not yet support dual checkpoints. Dual HPO follows successful real-data single-run validation; no dual HPO entry point exists yet.
 
 See `p2-DisorderML/PROJECT_STATUS.md` for the current evidence, blockers, decisions, and next implementation task.
 
@@ -323,7 +389,8 @@ This folder contains the QMUL HPC/Slurm training and HPO workflow.
 | `B0_ML-env-setup.sh` | Creates or refreshes the `nf-ml-gpu` conda environment with CUDA PyTorch, PyTorch Geometric, Optuna, BoTorch/GPyTorch, and related ML dependencies. |
 | `B1_ML-new.sh` | Main Slurm submit wrapper. Copies the selected run script and `resources/` to scratch, runs training/HPO, and rsyncs outputs to the archive root. |
 | `B2_ML-resumeHPO.sh` | Resumes archived cross-model Optuna studies and supports a non-running `--dry-run` plan check. |
-| `B3_ML-transfer.sh` | Transfers saved p2 run folders from HPC archives to local `Z:/p2` or fallback local folders. |
+| `B3_ML-transfer-mac.sh` | macOS Bash 3.2-compatible rsync download to ignored repo-root `data/`; supports `--dry-run`, SSH ControlMaster and `LOCAL_ROOT` overrides. |
+| `B3_ML-transfer-windows.sh` | Transfers saved p2 run folders from HPC archives to local `Z:/p2` or fallback local folders. |
 | `CurveOutputs/A0-HPC_Curve-test.py` | Production-oriented single-run curve entry point; reduced debug runs require explicit CLI overrides. |
 | `CurveOutputs/A0-HPC_Curve-CrossModelHPO.py` | Cross-model HPO entry point for curve surrogates. |
 | `FieldOutputs/A0-HPC_Field-test.py` | Production-oriented single-run field entry point; reduced debug runs require explicit CLI overrides. |
@@ -365,6 +432,7 @@ This area is less settled than p1 and p2. The current file is a large Abaqus lat
 | `lattices.py` | `Geometry`, lattice dimensions, relative-density thicknesses, node counts, connectivity, effective properties, stiffness matrices, isotropy, and anisotropy helpers. |
 | `MLdata.py` | `DATA`, path resolution, ML-ready loading, split construction, scaling, dimensionality reduction, node filtering, field loading, and MLdata saving. |
 | `MLfunc.py` | Training loops, loss functions, HPO helpers, activation diagnostics, and older ML plotting helpers. |
+| `MLdual.py` | Opt-in paired UT/FT data adapter, two-stage dual Transformer, four-term objective, one-optimizer training, and dual checkpointing. |
 | `MLmetrics.py` | Saved-run loading, curve/field diagnostics, plotting, HPO summaries, and post-processing helpers. |
 | `MLmodels.py` | Model classes, `MODEL`, dataloaders, train/predict/evaluate orchestration, checkpoint metadata, saved-run layout, and result artifact writing. |
 | `tokenization.py` | Output-informed tokenization prototype for recurring disorder motifs. |

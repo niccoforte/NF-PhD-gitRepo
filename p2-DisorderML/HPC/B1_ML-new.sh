@@ -46,6 +46,7 @@ HPC_USER=${HPC_USER:-${USER:-exy053}}
 #   ML_SCRIPT=FieldOutputs/A0-HPC_Field-test.py sbatch -J field-UT-TR-full B1_ML-new.sh -- --task UT --model-type TR
 #   ML_SCRIPT=FieldToCurve/A0-HPC_FieldToCurve-test.py sbatch -J field-to-curve-FT-full B1_ML-new.sh -- --task FT --output-reduction none
 #   ML_SCRIPT=FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py sbatch -J Field2Curve-FT-HPO B1_ML-new.sh -- --task FT
+#   sbatch -J dual-MULTI-TR-full B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py
 #
 # ML_SCRIPT may be either:
 #   - a filename inside p2-DisorderML/HPC, e.g. B0-example.py
@@ -69,7 +70,7 @@ CONDA_ENV=${CONDA_ENV:-nf-ml-gpu}
 # Data and archive locations. MLdata.py appends "MLdata/..." to DATA(path=...),
 # so DATA_ROOT must be the parent directory containing MLdata, not MLdata itself.
 # ARCHIVE_ROOT receives the framework run layout directly:
-#   {UT|FT|MULTI}/{Curve|Field|FieldToCurve}/{Model}/{Run}
+#   {UT|FT|MULTI}/{Curve|Field|FieldToCurve|Dual}/{Model}/{Run}
 # With these defaults, Python should use DATA(path=os.environ["ML_DATA_ROOT"], ...).
 DATA_ROOT=${DATA_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 ARCHIVE_ROOT=${ARCHIVE_ROOT:-${ARCHIVE_PARENT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}}
@@ -208,7 +209,7 @@ sync_job_log_to_archive_roots() {
         rel=${scratch_root#"$SCRATCH_RUN_ROOT"/}
         archive_target="$ARCHIVE_ROOT/$rel"
         mkdir -p "$archive_target"
-        rsync -av "$log_file" "$archive_target/"
+        rsync -av "$log_file" "$archive_target/" || return
     done < <(job_log_roots)
 }
 
@@ -217,7 +218,10 @@ finish() {
     set +e
 
     /bin/echo "Archiving outputs at: $(date)"
-    sync_run_outputs
+    if ! sync_run_outputs; then
+        /bin/echo "ERROR: Archive copy failed; preserving scratch."
+        status=1
+    fi
 
     if [ "$zip" = true ]; then
         tar -czf "$SCRATCH_DIR/C2_mlruns-$RUN_LABEL-$SLURM_JOB_ID.tgz" -C "$SCRATCH_DIR" mlruns
@@ -226,7 +230,10 @@ finish() {
 
     /bin/echo "Job finished with status $status at: $(date)"
     /bin/echo "Data saved under: $ARCHIVE_ROOT"
-    sync_job_log_to_archive_roots
+    if ! sync_job_log_to_archive_roots; then
+        /bin/echo "ERROR: Log copy failed; preserving scratch."
+        status=1
+    fi
 
     if [ "$status" -eq 0 ] && [ "$delete_scratch" = true ]; then
         if [[ "$SCRATCH_DIR" == /gpfs/scratch/"$HPC_USER"/"$SLURM_JOB_ID" ]]; then
@@ -275,6 +282,7 @@ export ML_RUN_ROOT=$SCRATCH_RUN_ROOT
 export ML_ARCHIVE_ROOT=$ARCHIVE_ROOT
 export ML_JOB_NAME=$ML_JOB_NAME
 export ML_RUN_CONTEXT=HPC
+export ML_SOURCE_REVISION="${ML_SOURCE_REVISION:-$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || true)}"
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_GPU:-$SLURM_NTASKS}
 export MKL_NUM_THREADS=$OMP_NUM_THREADS
 export NUMEXPR_NUM_THREADS=$OMP_NUM_THREADS
@@ -294,9 +302,12 @@ if [ ! -e "$SCRIPT_SRC" ]; then
     exit 2
 fi
 
-# Copy only the shared framework and the one run-specific script to scratch.
+# Copy the framework and entry point; the dual preset reuses its tested runner.
 rsync -av "$REPO_ROOT/resources/" "$SCRATCH_DIR/resources/"
 rsync -av "$SCRIPT_SRC" "$SCRIPT_LOCAL"
+if [ "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-trial1.py" ]; then
+    rsync -av "$(dirname "$SCRIPT_SRC")/A0-HPC-Dual-test.py" "$SCRATCH_DIR/"
+fi
 
 cd "$SCRATCH_DIR"
 /bin/echo "Working in scratch directory: $(pwd)"

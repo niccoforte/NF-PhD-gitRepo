@@ -7,8 +7,9 @@ Read only the section relevant to the task and confirm it against the actual scr
 - `B0_ML-env-setup.sh`: creates or refreshes the `nf-ml-gpu` environment.
 - `B1_ML-new.sh`: stages `resources/` plus a selected Python entry point to scratch, runs it, and archives outputs.
 - `B2_ML-resumeHPO.sh`: resumes archived cross-model Optuna studies; use `--dry-run` before launch.
-- `B3_ML-transfer.sh`: copies saved runs from the HPC archive to `Z:/p2` or a fallback local folder.
+- `B3_ML-transfer-windows.sh`: preserves the Windows/Git Bash download path to `Z:/p2` or a fallback. `B3_ML-transfer-mac.sh`: macOS Bash 3.2/rsync download to repo-root `data/`, with `--dry-run` and optional `SSH_CONTROL_PATH`. Both keep the saved-run relative tree.
 - `CurveOutputs/`, `FieldOutputs/`, and `FieldToCurve/`: single-run and cross-model HPO entry points for each output family.
+- `DualOutputs/`: joint UT/FT two-stage single-run entry point, thin `A0-HPC-Dual-trial1.py` preset and active synthetic contract tests; no dual HPO entry point yet. The trial preset reuses `A0-HPC-Dual-test.py`, so B1 stages that companion script too. See the adjacent README for HPO provenance and parameter choices.
 
 ## Production and debug policy
 
@@ -24,6 +25,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 - `ML_RUN_ROOT` is scratch; `ARCHIVE_ROOT` receives final rsync output; `ML_ARCHIVE_ROOT` records that mapping in metadata.
 - The Slurm `-J` value becomes the default `ML_JOB_NAME` and archive/run label. Explicit `ARCHIVE_ROOT`, `ML_JOB_NAME`, `RUN_LABEL`, `--run-label`, or `--study-name` overrides take precedence.
 - `ML_RUN_CONTEXT=HPC` records context but must not prefix or otherwise change run names.
+- `ML_SOURCE_REVISION` records the staged checkout's Git revision. The dual runner additionally hashes its script and model module because uncommitted edits are not represented by the revision alone.
 - Preserve the explicit scratch-path cleanup guard and `MPLBACKEND=Agg` non-interactive behavior.
 
 ## Slurm assumptions
@@ -57,6 +59,8 @@ Read only the section relevant to the task and confirm it against the actual scr
 - PCA targets use latent MSE; full curves may use curve-aware losses. MLP requires a deliberate contract redesign before support.
 
 ## HPO, resume, and transfer
+
+For dual single runs use `B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py`. Defaults are all samples, CUDA, 450 epochs, validation diagnostics, full curves, and a joint normalized-field/physical-curve objective. Explicit smoke overrides are `--nsims 64 --epochs 3 --batch 2 --no-range-split`; `--allow-cpu` is local/debug only. Outputs follow `MULTI/Dual/Transformer/<run-label>` and include one `model.mdl`, JSON metadata, loss history, physical predictions/masks and existing field/curve diagnostic CSVs. Best checkpoints and history are written during training so the launcher can collect partial results on failure. Do not route these checkpoints through legacy `MODEL`, existing single-task notebooks, or `B2_ML-resumeHPO.sh`; dual HPO/resume remains future work. Transfer uses the standard `B3_ML-transfer-windows.sh MULTI Dual Transformer <run-label>` path.
 
 - Prefer the Slurm `-J` value as the HPO study descriptor unless the study folder intentionally differs.
 - Model-specific HPO and cross-model HPO layouts are defined in the data-contract reference.

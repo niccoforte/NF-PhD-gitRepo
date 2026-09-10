@@ -8,6 +8,194 @@ from pathlib import Path
 # Curve Metrics
 # =============================================================================
 
+def plot_dual_input_example(coords, raw_delta, contexts, node_masks, feature_names, spec, sample_id):
+    """Four labelled views of inputs, not predicted or FEA-deformed geometry."""
+    from matplotlib.patches import Circle
+
+    coords, raw_delta = np.asarray(coords), np.asarray(raw_delta)
+    actual = coords + raw_delta
+    names = {name: i for i, name in enumerate(feature_names)}
+    fig, axes = plt.subplots(2, 2, figsize=(13, 11), constrained_layout=True)
+    for ax in axes.flat:
+        ax.set_aspect("equal")
+        ax.set_xlabel("x — input-coordinate units")
+        ax.set_ylabel("y — input-coordinate units")
+    ax = axes[0, 0]
+    ax.scatter(*coords.T, s=5, c="0.78", label="Reference node")
+    ax.quiver(*coords.T, *raw_delta.T, angles="xy", scale_units="xy", scale=1,
+              width=.002, color="#137c8b", label="Disorder vector (true scale)")
+    ax.set_title("1. Shared geometry: position = reference + disorder")
+    ax.legend(fontsize=8, loc="upper right")
+    ax = axes[0, 1]
+    designable = np.asarray(contexts["UT"])[:, names["designable"]].astype(bool)
+    for mask, color, label in ((~designable, "0.55", "Not designable"),
+                                (designable, "#137c8b", "Designable")):
+        ax.scatter(*coords[mask].T, s=9, c=color, label=f"{label}: {mask.sum()}")
+    ax.set_title("2. Shared reference context: x₀, y₀, designable")
+    ax.legend(fontsize=8, loc="upper right")
+    for ax, mode in zip(axes[1], ("UT", "FT")):
+        present = np.asarray(node_masks[mode], dtype=bool)
+        ax.scatter(*actual[present].T, s=7, c="0.7", label=f"Present body nodes: {present.sum()}")
+        roles = (("bottom_interface", "#3265ac"), ("top_interface", "#e1901d")) if mode == "UT" else (
+            ("coupled_fixity", "#3265ac"), ("coupled_load", "#e1901d"))
+        for role, color in roles:
+            if role not in names:
+                continue
+            selected = present & (np.asarray(contexts[mode])[:, names[role]] > .5)
+            ax.scatter(*actual[selected].T, s=28, c=color, label=f"{role.replace('_', ' ')}: {selected.sum()}")
+        if (~present).any():
+            ax.scatter(*coords[~present].T, s=24, marker="x", c="#bd3947", label=f"Absent (masked): {(~present).sum()}")
+        if mode == "FT" and spec.get("profile") == "fcc_ti":
+            for key, color in (("fixed_pin", "#3265ac"), ("moving_pin", "#e1901d")):
+                ax.add_patch(Circle(spec[key], spec["pin_radius"], fill=False, ec=color, lw=1.5))
+                ax.scatter(*spec[key], marker="+", c=color, s=90)
+            ax.scatter(*spec["nominal_tip"], marker="*", c="#bd3947", s=110, label="Nominal tip a₀")
+        ax.set_title(f"{3 if mode == 'UT' else 4}. {mode} task context, before attention")
+        ax.legend(fontsize=8, loc="upper right")
+    fig.suptitle(f"Input construction • sample {sample_id}\nDisorder is not the predicted displacement field", fontsize=15)
+    return fig
+
+
+def write_dual_input_audit(data, output_dir, split="train", sample_indices=None):
+    """Small human-readable input audit; no model execution or full data export.
+
+    Save up to three representative inputs by default. The NPZ is a compact
+    companion for notebook replay; Markdown and labelled PNGs are the primary
+    reading surface. Membership is taken from the actual Dataset tensors.
+    """
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    dataset = data.datasets[split]
+    if not len(dataset):
+        raise ValueError(f"Cannot audit empty {split} split.")
+    indices = sorted(set([0, len(dataset) // 2, len(dataset) - 1])) if sample_indices is None else list(sample_indices)
+    if not indices or any(i < 0 or i >= len(dataset) for i in indices):
+        raise ValueError("Audit sample indices must select existing samples.")
+    coords = np.asarray(data.metadata["canonical_coords"])
+    spec = data.metadata.get("context_spec", {})
+    names = data.task_feature_names
+    stats = data.normalizers["geometry"]
+    saved = {"canonical_coords": coords, "feature_names": np.asarray(names)}
+    ids, raw_examples, normalized_examples = [], [], []
+    feature_examples = {mode: [] for mode in ("UT", "FT")}
+    index_lines = ["# Dual input audit", "", f"Source: {data.metadata.get('source', 'explicit data object')}", "",
+                   f"Split: **{split}**. These are input-construction examples, not evidence of prediction accuracy.", "",
+                   "Coordinates are in the stored input units; no metre/mm conversion is guessed. Disorder means the initial nodal offset, not the simulated field U.", ""]
+    for order, index in enumerate(indices, 1):
+        item = dataset[index]
+        normalized = item["geometry"].numpy()
+        mean_vector = np.asarray(stats["mean"]).reshape(-1)
+        scale_vector = np.asarray(stats["scale"]).reshape(-1)
+        raw = normalized * scale_vector + mean_vector
+        contexts = {mode: item["task_features"][mode].numpy() for mode in ("UT", "FT")}
+        sample_id = item["sample_id"]
+        stem = f"sample-{order:02d}"
+        fig = plot_dual_input_example(coords, raw, contexts, data.node_masks, names, spec, sample_id)
+        fig.savefig(out / f"{stem}.png", dpi=150)
+        plt.close(fig)
+        lines = [f"# {split} sample {sample_id}", "", f"![Four labelled input views]({stem}.png)", "",
+                 "## Reading the features", "",
+                 "The first three context channels (x₀, y₀, designable) are identical in UT and FT, including padded FT rows. Presence controls whether a row participates in FT attention; UT retains every canonical body node. Field-validity masks are separate and can still exclude missing frames/components in either task.", "",
+                 "Disorder is standardised using training-only mean and scale. Reference coordinates are mapped to [0,1] by specimen extent. Binary masks stay 0/1. Nominal-tip offsets and distance are divided by W. Context is linearly projected and added to the pointwise disorder token plus a learned task embedding **before** the shared encoder. This addition does not create extra node tokens.", ""]
+        lookup = {name: j for j, name in enumerate(names)}
+        if spec.get("profile") == "fcc_ti":
+            lines += ["## Geometry and selection formulas", "",
+                      f"Cell size = {spec['cell_size']:.6g}; L = {spec['span'][0]:.6g}; H = {spec['span'][1]:.6g}; W = L/1.25 = {spec['W']:.6g}.", "",
+                      f"Fixed pin centre = {np.asarray(spec['fixed_pin']).tolist()}; moving pin centre = {np.asarray(spec['moving_pin']).tolist()}; radius = 0.1875 W / 2 = {spec['pin_radius']:.6g}.", "",
+                      f"Nominal tip = {np.asarray(spec['nominal_tip']).tolist()}. It is a₀, not the crack-deletion rectangle endpoint.", "",
+                      "A retained FT body node belongs to a pin set when √((x₀+δx−cx)²+(y₀+δy−cy)²) ≤ radius. The Dataset calculates membership before standardisation. The displayed inverse-standardised coordinates may differ by floating-point round-off. Pin flags below are the actual stored decisions.", "",
+                      "UT interfaces use reference y at the body bottom/top. They are not the directly prescribed outer grips. FT pin sets are kinematically coupled to reference points; no claim is made that individual pin nodes have zero displacement. Mesh-interior nodes are not represented here.", ""]
+            radius = spec["pin_radius"]
+            margin = abs(np.linalg.norm(coords + raw - spec["fixed_pin"], axis=1) - radius)
+            candidates = [int(np.argmin(margin)), int(np.argmin(np.linalg.norm(coords - spec["nominal_tip"], axis=1))),
+                          int(np.flatnonzero(~data.node_masks["FT"])[0]),
+                          int(np.flatnonzero(contexts["UT"][:, lookup["bottom_interface"]])[0]),
+                          int(np.flatnonzero(contexts["UT"][:, lookup["top_interface"]])[0])]
+            for role in ("coupled_fixity", "coupled_load"):
+                selected = np.flatnonzero(contexts["FT"][:, lookup[role]])
+                if len(selected):
+                    candidates.append(int(selected[0]))
+            moving = np.linalg.norm(raw, axis=1) > 1e-5 * spec["cell_size"]
+            near_pin = margin < .2 * spec["cell_size"]
+            candidates.extend(np.flatnonzero(moving & near_pin)[:2].tolist())
+        else:
+            candidates = [0, len(coords) // 2, len(coords) - 1]
+        lines += ["## Worked nodes (canonical indices, zero-based)", ""]
+        mean = np.broadcast_to(mean_vector, raw.shape)
+        scale = np.broadcast_to(scale_vector, raw.shape)
+        for node in dict.fromkeys(candidates):
+            x, y = coords[node]
+            dx, dy = raw[node]
+            lines += [f"### Node {node}: reference ({x:.6g}, {y:.6g})", "",
+                      f"Initial disordered position = ({x:.6g} + {dx:.6g}, {y:.6g} + {dy:.6g}) = ({x+dx:.6g}, {y+dy:.6g}).", "",
+                      f"Standardised δx = ({dx:.6g} − {mean[node,0]:.6g}) / {scale[node,0]:.6g} = **{normalized[node,0]:.6g}**; δy = ({dy:.6g} − {mean[node,1]:.6g}) / {scale[node,1]:.6g} = **{normalized[node,1]:.6g}**.", "",
+                      "| Context channel | UT | FT |", "| --- | ---: | ---: |"]
+            for name, a, b in zip(names, contexts["UT"][node], contexts["FT"][node]):
+                lines.append(f"| {name} | {a:.6g} | {b:.6g} |")
+            lines.append("")
+            if spec.get("profile") == "fcc_ti":
+                for key, role in (("fixed_pin", "coupled_fixity"), ("moving_pin", "coupled_load")):
+                    ox, oy = coords[node] + raw[node] - spec[key]
+                    distance = np.hypot(ox, oy)
+                    lines += [f"{role}: √(({ox:.6g})² + ({oy:.6g})²) = {distance:.6g}; compare with {spec['pin_radius']:.6g}. With present={int(data.node_masks['FT'][node])}, the actual flag is **{int(contexts['FT'][node,lookup[role]])}**.", ""]
+        (out / f"{stem}.md").write_text("\n".join(lines), encoding="utf-8")
+        index_lines.append(f"- [Sample {sample_id}: plotted construction and worked nodes]({stem}.md)")
+        ids.append(sample_id)
+        raw_examples.append(raw)
+        normalized_examples.append(normalized)
+        for mode in ("UT", "FT"):
+            feature_examples[mode].append(contexts[mode])
+    saved.update(sample_ids=np.asarray(ids), raw_disorder=np.asarray(raw_examples), normalized_disorder=np.asarray(normalized_examples))
+    for mode in ("UT", "FT"):
+        saved[f"{mode}_context"] = np.asarray(feature_examples[mode])
+        saved[f"{mode}_node_mask"] = data.node_masks[mode]
+    np.savez(out / "input_examples.npz", **saved)
+    (out / "README.md").write_text("\n".join(index_lines) + "\n", encoding="utf-8")
+    return out / "README.md"
+
+
+def plot_dual_predictions(arrays, split, sample_index=0, frame_index=-1, component_index=1):
+    """Saved-only paired curve and field views; never load weights or a dataset."""
+    from matplotlib.colors import Normalize
+
+    coords = np.asarray(arrays["canonical_coords"])
+    sid = np.asarray(arrays["sample_ids"])[sample_index]
+    curves, curve_axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
+    fields, field_axes = plt.subplots(2, 3, figsize=(13, 8), constrained_layout=True)
+    for row, mode in enumerate(("UT", "FT")):
+        x = arrays[f"{mode}_curve_x_values"]
+        curve_axes[row].plot(x, arrays[f"{mode}_{split}_curve_truth"][sample_index], label="FEA truth", color="black")
+        curve_axes[row].plot(x, arrays[f"{mode}_{split}_curve_outputs"][sample_index], label="Joint prediction", color="#d17528")
+        curve_axes[row].set(title=f"{mode} • sample {sid}", xlabel="Strain (stored units)" if mode == "UT" else "Displacement (stored units)",
+                            ylabel="Stress (stored units)" if mode == "UT" else "Force (stored units)")
+        curve_axes[row].legend()
+        n_components = len(arrays[f"{mode}_components"])
+        n_frames = len(arrays[f"{mode}_frame_values"])
+        if not -n_frames <= frame_index < n_frames or not 0 <= component_index < n_components:
+            raise IndexError(f"{mode}: frame/component selection is outside saved dimensions.")
+        frame = frame_index % n_frames
+        column = frame * n_components + component_index
+        truth = arrays[f"{mode}_{split}_field_truth"][sample_index, :, column]
+        pred = arrays[f"{mode}_{split}_field_outputs"][sample_index, :, column]
+        valid = arrays[f"{mode}_{split}_field_mask"][sample_index, :, column].astype(bool)
+        valid &= arrays[f"{mode}_node_mask"].astype(bool) & np.isfinite(truth) & np.isfinite(pred)
+        values = np.r_[truth[valid], pred[valid]]
+        if not len(values):
+            for ax in field_axes[row]:
+                ax.text(.5, .5, f"{mode}: no valid field values", ha="center", transform=ax.transAxes)
+            continue
+        norm = Normalize(float(values.min()), float(values.max()))
+        for col, (label, value) in enumerate((("FEA truth", truth), ("Prediction", pred), ("Absolute error", abs(pred-truth)))):
+            ax = field_axes[row, col]
+            sc = ax.scatter(*coords[valid].T, c=value[valid], s=12, cmap="viridis" if col < 2 else "magma", norm=norm if col < 2 else None)
+            fields.colorbar(sc, ax=ax, label="Displacement (stored units)", shrink=.8)
+            ax.set_aspect("equal")
+            ax.set(title=f"{mode} • {label}", xlabel="Reference x", ylabel="Reference y")
+        component = arrays[f"{mode}_components"][component_index]
+        field_axes[row, 0].set_ylabel(f"{component}; frame {arrays[f'{mode}_frame_values'][frame]:.4g}\nReference y")
+    fields.suptitle(f"Sample {sid}: valid nodes only; truth/prediction share a colour scale within each task")
+    return curves, fields
+
 def _curve_2d_array(data, name):
     arr = np.asarray(data, dtype=float)
     if arr.ndim == 1:
@@ -2312,10 +2500,12 @@ def _postprocess_output_kind_token(output_kind):
         return "Field"
     if key.lower() == "curve":
         return "Curve"
+    if key.lower() == "dual":
+        return "Dual"
     return key
 
 def _postprocess_layout_output_kinds():
-    return {"CURVE", "FIELD", "FIELDTOCURVE"}
+    return {"CURVE", "FIELD", "FIELDTOCURVE", "DUAL"}
 
 def _postprocess_path_parts(path, run_root=None):
     path = Path(path)
@@ -3969,7 +4159,8 @@ def plot_loss_history(loss_history, metrics=None, figsize=(9, 4)):
         return None, None
 
     fig, ax = plt.subplots(figsize=figsize)
-    for mode, mode_history in loss_history.groupby("mode"):
+    groups = loss_history.groupby("mode") if "mode" in loss_history else [("Joint", loss_history)]
+    for mode, mode_history in groups:
         for metric in metrics:
             if metric in mode_history.columns:
                 ax.plot(mode_history["epoch"], mode_history[metric], label=f"{mode} {metric}")

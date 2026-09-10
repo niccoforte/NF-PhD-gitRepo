@@ -26,6 +26,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 
 - `resources/MLdata.py` owns `DATA`, path resolution, UT/FT/MULTI loading, splitting, scaling, node filtering, field `.npz` loading, field component selection, and reconstruction metadata.
 - `resources/MLmodels.py` owns `MODEL`, model classes, dataloaders, training/evaluation orchestration, checkpoint metadata, result saving, and model reload behavior.
+- `resources/MLdual.py` owns the joint UT/FT serial Transformer adapter, architecture, four-term objective, and one-optimizer trainer. It composes the legacy framework; it does not replace `DATA`, `MODEL`, or `Transformer`.
 - `resources/MLfunc.py` owns training loops, HPO helpers, loss functions, activation diagnostics, and older general ML plotting helpers.
 - `resources/MLmetrics.py` owns curve/field diagnostics, post-processing loaders, saved-run artifact discovery, diagnostic plotting, HPO summaries, and saved-run visualization helpers.
 - `resources/tokenization.py` owns the output-informed tokenization prototype.
@@ -52,10 +53,14 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 
 ## Target Dual-Output Architecture
 
-- The intended unified surrogate has one nodal disorder/geometry input and separate UT and FT branches.
-- Each branch is serial: a disorder-to-field Transformer predicts `u(x,y,t)` and `v(x,y,t)`, then a field-to-curve Transformer predicts the corresponding global response curve.
+- The unified surrogate has exactly two Transformer stages in series: one dual-output geometry-to-field stage and one dual-output field-to-curve stage.
+- Within each stage, UT and FT are task-conditioned parallel streams through one shared Transformer encoder and two small output heads. They are stacked along the batch dimension for one encoder call; they are not independent task Transformers.
+- The canonical representation retains the UT node count for both streams. `FT present=0` identifies crack-region nodes and must also act as an operational attention/field-loss mask so those nodes cannot influence FT predictions.
+- The public output order is `{"field": {"UT": ..., "FT": ...}, "curve": {"UT": ..., "FT": ...}}`.
 - Do not replace the serial field intermediary with parallel field and curve readouts from the same latent representation.
-- Joint end-to-end training requires field supervision after the first Transformer and curve supervision after the second, with curve gradients propagating through both stages.
+- Joint end-to-end training uses one forward pass, one four-term scalar loss, one backward pass, and one optimizer. Field supervision acts after stage one; curve supervision acts after stage two and propagates through both stages.
+- Initial dual runs use full ordered curves. PCA remains a possible later ablation but is not the default dual target.
+- Default physical context is the checked `fcc_ti` profile, documented with worked examples in `samples/`. Keep optional degree and graph-attention additions separate until the user agrees to that ablation. Do not silently replace coupling membership with per-node fixity.
 - Current evidence, loss choices, unresolved weighting, data-access blockers, and next implementation work belong in `PROJECT_STATUS.md`.
 
 ## Saved Artifacts
@@ -77,3 +82,4 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 - Prefer improving shared post-processing helpers in `resources/MLmetrics.py` when several notebooks need the same diagnostic behavior.
 - When changing training or HPO scripts, keep local/debug `--allow-cpu` behavior separate from production GPU/HPC behavior.
 - Validate syntax for Python and shell scripts after edits. Notebook validation can use import checks or targeted cell inspection when full execution requires data or HPC resources.
+- Run `python -m unittest discover -s p2-DisorderML/HPC/DualOutputs -p 'test_dual_contract.py' -v` from the repository root for synthetic dual architecture, masking, gradient, checkpoint, and runner-artifact checks. `HPC/DualOutputs/A0-HPC-Dual-test.py` is the distinct production-default real-data entry point, launched through `B1_ML-new.sh`; synthetic tests do not establish HPC or scientific performance.
