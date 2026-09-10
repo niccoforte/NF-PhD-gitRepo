@@ -16,6 +16,7 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 - Active entry points are production-oriented: full data and realistic training budgets by default. Small datasets, short epochs/trials, and CPU execution must be explicit debug overrides.
 - Do not change Slurm partition, account, license, CPU, memory, or time policy without the user's target cluster policy.
 - Preserve explicit scratch cleanup guards and verify every archive, resume, transfer, or cleanup target before use.
+- B1 must retain scratch and return failure if copying run outputs or job logs to the archive fails, even when Python training succeeded.
 - Slurm job/run names, `Curve`/`Field`/`FieldToCurve`/`Dual` layouts, metadata, diagnostics, and transfer paths form a shared saved-run contract. Use `review-p1-p2-data-contract` when they change. Dual runs use `MULTI/Dual/Transformer/<run-label>` and the existing staging/archive/transfer scripts, but their checkpoint loader is `DUAL_MODEL`, not legacy `MODEL`.
 - Keep CLI arguments stable or provide a clear migration. Do not introduce local Windows paths except as documented transfer destinations.
 - Do not submit Slurm jobs, resume studies, transfer archives, or alter external environments unless the user requested that operation.

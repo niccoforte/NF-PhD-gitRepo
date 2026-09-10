@@ -18,14 +18,19 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 - The archive is `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/dual-MULTI-test-260907/`. An isolated home code snapshot was used; the remote Git checkout and ML source data were not edited.
 - Nine synthetic contract tests passed, covering encoder counts/calls, masks, joint gradients, affine loss reconstruction, checkpoints, reordered FT mapping, pin calculations, trial configuration and saved artifacts.
 - Independent UT/FT field and full-201-point field-to-curve HPO parameter records were recovered. Trial 1 is a transparent capacity/lr compromise, not a dual-HPO optimum.
-- Trial 1 is prepared for full-data submission from the synchronized HPC Git checkout through B1. It keeps the documented 450-epoch maximum, early stopping, batch 2, full curves and validation diagnostics; no smoke overrides apply.
 - Three-epoch smoke predictions remain worse than training-mean baselines. Do not cite the execution test as accuracy, negative-transfer or optimisation evidence.
 
-## Next evidence
+## Deployment on 10 September 2026
+
+- Full-data Trial 1 was submitted as Slurm **26267130**, `dual-MULTI-trial1-260910`, through B1 from `/data/home/exy053/p2/MULTI/Dual/Transformer/dual-MULTI-trial1-260910`. Slurm accepted the job on `andrena` with one GPU, 12 CPUs, 90 GB RAM and the existing ten-day limit. Initial state: pending. The user will monitor completion.
+- Training implementation: Git `7da7e72`. No smoke overrides: all paired data, maximum 450 epochs, early stopping, batch 2, full 201-point curves and validation diagnostics. Results and metrics are collected by the shared tested runner; archive destination is `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/dual-MULTI-trial1-260910/`. Submission is not evidence of successful full-data training.
+- Nine dual contract tests passed. Repository contract validation finished with 64 non-failing checks and zero failures. Both saved-run review notebooks executed successfully; visible-output copies and figures are in the downloaded smoke run's `results/postProcessing/` directory.
 
 - The completed smoke archive is downloaded under repo-root `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`. Both dual notebooks now read this run by default, with training disabled. macOS transfer uses `HPC/B3_ML-transfer-mac.sh`; the renamed `-windows.sh` script preserves the previous Windows route.
 - Generated `data/` and `samples/` content remains ignored. Only `samples/AGENTS.md` is exempted to keep required guidance tracked. Tests no longer depend on ignored sample generators.
-- The HPC checkout's obsolete origin URL and unavailable Git SSH authentication require a verified Git-bundle fast-forward for this deployment. No credentials are copied. Record the submitted job ID here once Slurm accepts it.
+- Both Git hosting destinations received the implementation commit, and the clean HPC checkout was fast-forwarded through a verified incremental Git bundle because direct Git SSH authentication was unavailable. Its obsolete origin URL was corrected. No credentials were copied.
+
+## Next evidence
 
 - Run and inspect the full-data trial before tuning predictive accuracy. Check paired split coverage, all four loss contributions, held-out validation diagnostics and learning behaviour.
 - Review the labelled pin/interface examples against the intended production geometry. The current profile uses the A1 Ti/Al proportions and the sample's initial disordered coordinates.
