@@ -66,6 +66,8 @@ Use `validate-repo-change` to select proportionate checks, `review-p1-p2-data-co
 
 `.github/workflows/guidance-integrity.yml` runs the changed-surface validator on GitHub.com pushes and pull requests. Its job is skipped before runner allocation on the QMUL Enterprise mirror, whose runner-backed jobs are currently cancelled. Keep local validation authoritative when remote Actions are unavailable.
 
+Checkout and Python setup use Node 24-based v7 actions to avoid deprecated action runtimes.
+
 ## Cleanup Constraint
 
 Treat the user's cleanup preference as a high-priority engineering constraint, not a cosmetic preference.
