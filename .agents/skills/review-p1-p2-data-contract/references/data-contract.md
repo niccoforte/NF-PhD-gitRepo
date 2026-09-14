@@ -62,6 +62,7 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 - Dual single runs: `{RUN_ROOT}/MULTI/Dual/Transformer/{Run}`. Standard staging/archive/transfer support this layout; reconstruct architecture from `DualStageTransformer.from_config` and load weights through `DUAL_MODEL.load`. Legacy `MODEL` reload and single-task notebook loaders are not dual consumers. Dual HPO: `{RUN_ROOT}/MULTI/Dual/Transformer/HPO/{Study}`, with winner in `best/` and diagnostics in `best/results/`; use the dual notebook and B1 `--resume`, not B2. A fixed equal-task physical validation-MSE ratio selects trials independently of tunable training-loss weights. Code/data/split fingerprints reject mismatched resume.
 - Model-specific HPO: `{RUN_ROOT}/{Task}/{OutputKind}/{Model}/HPO/{Study}`.
 - Cross-model HPO: `{RUN_ROOT}/{Task}/{OutputKind}/HPO/{Study}/{Model}`.
+- Dual notebook consumers: Outputs constructs DUAL_DATA/DUAL_MODEL or loads saved artifacts through `postprocess_load_dual_run`; the existing `ML-HPOpostProcess.ipynb` reviews the dual study and its `best/` winner. No new saved layout or separate HPO notebook is required. Dual post-processing joins specimen errors by sample ID and displays both task fields with their own masks. Keep all executable notebooks under p2 `code/`, not `data/`.
 - If an output-layout token or metadata key changes, update model save paths, `run_layout`, run listing, HPO resolution, output-kind inference, diagnostics, and transfer helpers together.
 
 ## Synthetic boundary check

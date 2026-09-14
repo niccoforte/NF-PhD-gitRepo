@@ -186,6 +186,95 @@ class DualMLTest(unittest.TestCase):
         output = restored(batch["geometry"], batch["task_features"], batch["node_mask"])
         self.assertEqual(output["curve"]["FT"].shape, (2, 201))
 
+    def test_saved_dual_loader_and_paired_error_alignment(self):
+        from resources.MLmetrics import postprocess_load_dual_run, load_dual_diagnostics, plot_dual_sample_errors
+        import matplotlib.pyplot as plt
+
+        trainer = DUAL_MODEL(self.model, DualLoss(), data=self.data, device="cpu", batch=2)
+        trainer.train(2, verbose=0)
+        with tempfile.TemporaryDirectory() as directory:
+            trainer.save(directory)
+            trainer.save_results(eval_split="val")
+            artifacts, loaded, data, restored = postprocess_load_dual_run(directory, load_model=True, device="cpu")
+            self.assertIsNone(data)
+            self.assertEqual(restored.best_epoch, trainer.best_epoch)
+            pd.testing.assert_frame_equal(pd.DataFrame(restored.history), pd.DataFrame(trainer.history))
+            self.assertEqual(restored.lossf.get_config(), trainer.lossf.get_config())
+            for key, value in trainer.model.state_dict().items():
+                torch.testing.assert_close(value, restored.model.state_dict()[key])
+            _, _, _, attached = postprocess_load_dual_run(directory, load_model=True, data=self.data)
+            np.testing.assert_allclose(attached.predict("val")["prediction"]["curve"]["UT"],
+                                       trainer.predict("val")["prediction"]["curve"]["UT"])
+            original = self.data.sample_ids["val"].copy()
+            self.data.sample_ids["val"] = original[::-1]
+            with self.assertRaisesRegex(ValueError, "sample_ids"):
+                postprocess_load_dual_run(directory, load_model=True, data=self.data)
+            self.data.sample_ids["val"] = original
+            curves = {m: load_dual_diagnostics(directory, "curve", m) for m in ("UT", "FT")}
+            fields = {m: load_dual_diagnostics(directory, "field", m) for m in ("UT", "FT")}
+            fields["FT"]["sample_metrics"] = fields["FT"]["sample_metrics"].iloc[::-1]
+            with patch("matplotlib.pyplot.show"):
+                paired, fig, axes = plot_dual_sample_errors(curves, fields)
+            self.assertEqual(axes.shape, (2, 2))
+            expected = fields["FT"]["sample_metrics"].set_index("sample_id").sample_rmse
+            np.testing.assert_allclose(paired.set_index("sample_id")["FT field RMSE"], expected.reindex(paired.sample_id))
+            plt.close(fig)
+            fields["FT"]["sample_metrics"].iloc[0, fields["FT"]["sample_metrics"].columns.get_loc("sample_id")] = "missing-id"
+            with self.assertRaisesRegex(ValueError, "same sample IDs"):
+                plot_dual_sample_errors(curves, fields)
+
+    def test_field_viewers_do_not_close_each_other(self):
+        import ipywidgets as widgets
+        from resources.MLmetrics import field_sample_viewer
+        diag = {"sample_metrics": pd.DataFrame({"sample": [0, 1], "sample_rmse": [1., 2.]}),
+                "y_pred": np.zeros((2, 2, 3, 2)), "components": ["U1", "U2"], "node_coords": None}
+        with patch.object(widgets.Widget, "close_all") as close_all, patch("IPython.display.display"):
+            first = field_sample_viewer(diag)
+            second = field_sample_viewer(diag)
+            close_all.assert_not_called()
+            self.assertIsNotNone(first)
+            self.assertIsNotNone(second)
+            self.assertIsNotNone(first[0].comm)
+            for viewer in (first, second):
+                for widget in viewer:
+                    widget.close()
+
+    def test_outputs_notebook_fresh_build_train_save_and_hpo_call(self):
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from unittest.mock import Mock
+        notebook = Path(__file__).resolve().parents[2] / "code/ML-DualOutputs.ipynb"
+        cells = json.loads(notebook.read_text())["cells"]
+        namespace = {}
+        with tempfile.TemporaryDirectory() as directory, redirect_stdout(StringIO()):
+            with patch.object(DUAL_DATA, "from_files", return_value=self.data):
+                for index, cell in enumerate(cells):
+                    if cell["cell_type"] != "code":
+                        continue
+                    code = "".join(cell["source"])
+                    if code.startswith("%"):
+                        continue
+                    if index == 5:
+                        code = code.replace('RUN_ROOT = REPO / "data"', f'RUN_ROOT = Path({directory!r})')
+                        code = code.replace('LOAD_MODEL = True', 'LOAD_MODEL = False').replace('LOAD_DATA = False', 'LOAD_DATA = True')
+                        code = code.replace('DATA_ROOT = None', 'DATA_ROOT = Path("fixture")')
+                    if index == 10:
+                        code = code.replace('d_model=256', 'd_model=8').replace('n_layers=4', 'n_layers=1').replace('n_layers=2', 'n_layers=1')
+                    if index == 11:
+                        code = code.replace('RUN_TRAINING = False', 'RUN_TRAINING = True').replace('N_EPOCHS = 450', 'N_EPOCHS = 1')
+                    exec(compile(code, f"DualOutputs cell {index}", "exec"), namespace)
+            self.assertIs(namespace["DAT"], self.data)
+            self.assertIsInstance(namespace["TR_DUAL"], DUAL_MODEL)
+            self.assertIn("UT_val_curve_outputs", namespace["predictions"])
+            self.assertTrue((namespace["NEW_RUN"] / "results/metrics.json").is_file())
+            hpo = Mock()
+            namespace["run_dual_hpo"] = hpo
+            code = "".join(cells[8]["source"]).replace('RUN_HPO = False', 'RUN_HPO = True').replace('ALLOW_CPU_HPO = False', 'ALLOW_CPU_HPO = True')
+            exec(code, namespace)
+            hpo.assert_called_once()
+            self.assertIs(hpo.call_args.kwargs["data"], self.data)
+            self.assertFalse(hpo.call_args.kwargs["resume"])
+
     def test_hpo_refuses_existing_lock_and_missing_resume(self):
         from resources.MLdualHPO import run_dual_hpo
         with tempfile.TemporaryDirectory() as directory:

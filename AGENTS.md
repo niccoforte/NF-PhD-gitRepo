@@ -72,6 +72,7 @@ Checkout and Python setup use Node 24-based v7 actions to avoid deprecated actio
 
 Treat the user's cleanup preference as a high-priority engineering constraint, not a cosmetic preference.
 
+- **High priority: no surprises.** Do not expand scope, relocate files or create alternate notebook copies without explicit authorization. Keep p2 notebooks in `p2-DisorderML/code/`. `data/` holds datasets, results and requested figures—not executable notebooks, scripts or deployment bundles. Use outside-repository temporary directories for validation intermediates.
 - Keep active scripts, notebooks, and helpers compact, current, and intentional. Remove abandoned approaches, stale notebook cells and outputs, duplicated or superseded code, obsolete workaround helpers, and unnecessary compatibility or fallback scaffolding as part of the change.
 - Prefer direct code and compact helpers: inline one-off helpers that do not clarify the flow, and move genuinely reused logic into the appropriate `resources/` module.
 - Important exception: archived or explicitly historical folders, such as `p1-DisorderLatticeProperties/SIMscripts/OldScriptVersions/`, can preserve old versions. Active/current scripts and notebooks should not accumulate old experiments.

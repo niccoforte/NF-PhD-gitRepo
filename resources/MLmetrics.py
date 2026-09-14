@@ -3868,7 +3868,6 @@ def field_sample_viewer(
 
     try:
         import ipywidgets as widgets
-        widgets.Widget.close_all()
     except Exception:
         widgets = None
 
@@ -4154,6 +4153,97 @@ def plot_field_sample_frame_evolution(diagnostics, sample=0, figsize=None):
     fig.tight_layout()
     plt.show()
     return fig, axes
+
+def postprocess_load_dual_run(run_path, *, load_model=False, data=None, device="cpu"):
+    """Inspect a dual run (or HPO winner) without loading the training dataset.
+
+    Optional checkpoint reconstruction uses the saved dual architecture/loss,
+    never the legacy MODEL loader. Pass an explicitly built DUAL_DATA to enable
+    new predictions; its split, normalization and geometry contract must match.
+    Loading is inference-only: this does not resume optimizer/training state.
+    """
+    root = Path(run_path).expanduser()
+    is_hpo = (root / "full_study.db").exists() or root.parent.name == "HPO"
+    run = root / "best" if is_hpo else root
+    results = run / "results"
+    artifacts = dict(input_path=root, run_dir=run, results_dir=results, is_hpo=is_hpo,
+                     model_json=run / "model.json", model_mdl=run / "model.mdl",
+                     data_json=run / "model_data.json", metrics_json=results / "metrics.json",
+                     predictions_npz=results / "predictions.npz", loss_history_csv=run / "loss_history.csv",
+                     diagnostics_summary_json=results / "diagnostics_summary.json")
+    if is_hpo:
+        artifacts.update(data_json=root / "model_data.json",
+                         hpo_best_params_json=root / "best_params.json",
+                         hpo_best_trial_user_attrs_json=root / "best_trial_user_attrs.json")
+    loaded = {}
+    for key in ("model", "metrics", "data", "diagnostics_summary"):
+        path = artifacts[f"{key}_json"]
+        loaded[key] = json.loads(path.read_text()) if path.is_file() else None
+    path = artifacts["loss_history_csv"]
+    loaded["loss_history"] = pd.read_csv(path) if path.is_file() else pd.DataFrame()
+    model = None
+    if load_model:
+        from resources.MLdual import DUAL_MODEL, DualLoss, DualStageTransformer, _json_safe
+        from resources.MLmodels import _model_build_loss_from_config
+
+        descriptor = loaded["model"]
+        if not descriptor or not artifacts["model_mdl"].is_file():
+            raise FileNotFoundError(f"Dual model.json/model.mdl not found in {run}.")
+        if descriptor.get("kind") != "dual-stage-transformer":
+            raise ValueError("Expected a dual-stage-transformer checkpoint.")
+        if data is not None:
+            saved, current = descriptor["data"], _json_safe(data.to_metadata())
+            for key in ("sample_ids", "normalizers", "node_masks", "reference_task_features",
+                        "geometry_feature_names", "task_feature_names", "field_feature_sizes", "curve_sizes"):
+                if saved[key] != current[key]:
+                    raise ValueError(f"Loaded DUAL_DATA does not match checkpoint {key}.")
+            for key in ("canonical_coords", "context_spec", "field_components", "field_frame_values", "curve_x_values"):
+                if saved["metadata"].get(key) != current["metadata"].get(key):
+                    raise ValueError(f"Loaded DUAL_DATA does not match checkpoint {key}.")
+        loss = descriptor["loss_config"]
+        objective = DualLoss(
+            field_loss={m: _model_build_loss_from_config(c) for m, c in loss["field_losses"].items()},
+            curve_loss={m: _model_build_loss_from_config(c) for m, c in loss["curve_losses"].items()},
+            weights=loss["weights"], scales=loss["scales"], curve_normalizers=loss.get("curve_normalizers"),
+        )
+        training = descriptor["training"]
+        model = DUAL_MODEL(
+            DualStageTransformer.from_config(descriptor["model_config"]), objective,
+            data=data, dataloaders=None if data is not None else {"train": []}, device=device,
+            **{k: training[k] for k in ("opt", "batch", "lr", "scheduler", "grad_clip", "curve_lr_factor") if k in training},
+        ).load(artifacts["model_mdl"])
+        model.best_epoch, model.best_loss = training["best_epoch"], training["best_loss"]
+        model.history = loaded["loss_history"].to_dict("records")
+        model.model_file, model.save_dir = str(artifacts["model_mdl"]), str(run)
+        model.model.eval()
+    return artifacts, loaded, data, model
+
+
+def plot_dual_sample_errors(curves, fields):
+    """Four specimen-paired RMSE comparisons, aligned by unique simulation ID."""
+    paired = None
+    for kind, diagnostics in (("curve", curves), ("field", fields)):
+        for mode in ("UT", "FT"):
+            table = diagnostics[mode]["sample_metrics"][["sample_id", "sample_rmse"]].rename(
+                columns={"sample_rmse": f"{mode} {kind} RMSE"})
+            if table["sample_id"].duplicated().any():
+                raise ValueError("Paired diagnostics require unique simulation IDs.")
+            if paired is not None and set(paired.sample_id) != set(table.sample_id):
+                raise ValueError("All four diagnostics must describe the same sample IDs.")
+            paired = table if paired is None else paired.merge(table, on="sample_id", validate="one_to_one")
+    comparisons = [("UT field", "UT curve"), ("FT field", "FT curve"),
+                   ("FT curve", "UT curve"), ("FT field", "UT field")]
+    fig, axes = plt.subplots(2, 2, figsize=(12, 9))
+    for ax, (x, y) in zip(axes.flat, comparisons):
+        values = paired[[f"{x} RMSE", f"{y} RMSE"]].replace([np.inf, -np.inf], np.nan).dropna()
+        correlation = values.corr().iloc[0, 1]
+        ax.scatter(values.iloc[:, 0], values.iloc[:, 1], s=12, alpha=.5)
+        ax.set(xlabel=f"{x} RMSE (native units)", ylabel=f"{y} RMSE (native units)",
+               title=f"{y} vs {x} · r={correlation:.2f} · n={len(values)}")
+    fig.tight_layout()
+    plt.show()
+    return paired, fig, axes
+
 
 def load_dual_diagnostics(run_dir, kind, mode):
     """Adapt saved dual arrays to the existing single-task plotting contract.

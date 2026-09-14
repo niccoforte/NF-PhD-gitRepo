@@ -283,11 +283,11 @@ This folder is the local notebook workspace for model development and post-proce
 | `ML-CurveOutputs.ipynb` | Main local curve-output training/HPO notebook for MLP, GCN/GAT/GNN, and Transformer models. |
 | `ML-FieldOutputs.ipynb` | Main local field-output training/HPO notebook for node-compatible models such as GCN/GAT/GNN and Transformer. |
 | `ML-FieldToCurveOutputs.ipynb` | Exploratory field-input to curve-output notebook aligned with the HPC field-to-curve framework. |
-| `ML-DualOutputs.ipynb` | Task/model/data/HPO/training configuration; opt-in execution through the shared runners. |
+| `ML-DualOutputs.ipynb` | Direct DUAL_DATA/DUAL_MODEL build or saved-checkpoint load, fresh HPO, train/save/predict cells in the independent Outputs order. |
 | `ML-DualPostProcessing.ipynb` | Full curve and field diagnostics for paired UT/FT outputs, including the interactive field viewer and log-scale losses. |
 | `ML-CurvePostProcessing.ipynb` | Diagnostics for one saved curve run. |
 | `ML-FieldPostProcessing.ipynb` | Diagnostics and visualization for one saved field run. |
-| `ML-HPOpostProcess.ipynb` | HPO study comparison and best-run inspection. |
+| `ML-HPOpostProcess.ipynb` | Shared curve/field/dual HPO study comparison and best-run inspection; dual winners show all four outputs. |
 | `Tokenization.ipynb` | Output-informed tokenization prototype for recurring disorder motifs. |
 | `TOKENIZATION_NEXT_STEPS.md` | Current planning notes for the tokenization workflow. |
 | `DimensionalityReduction.ipynb`, `GPR.ipynb`, `ML-DisorderDistribution.ipynb`, `Optimization.ipynb`, `AK-ML-StressStrain.ipynb` | Exploratory/prototype notebooks and research history. |
@@ -298,7 +298,11 @@ Curve-output models predict macroscopic stress-strain or force-displacement curv
 
 On macOS, run `bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-MULTI-test-260907` from the repo root. Prefix `--dry-run` before the task to preview the transfer. The default destination is `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`; `LOCAL_ROOT`, `REMOTE`, `REMOTE_ROOT`, and `SSH_CONTROL_PATH` are explicit overrides. No remote writes or deletions occur. The former `B3_ML-transfer.sh` is now named `B3_ML-transfer-windows.sh` and retains its Windows/Git Bash behaviour.
 
-Both dual notebooks now default to Trial 1, locally renamed by the user to `data/MULTI/Dual/Transformer/dual-MULTI-trial1`. The archive retains its original dated name. The training notebook reviews configuration with training/HPO disabled; the post-processing notebook reads saved losses, fields, curves and metrics without reloading the full dataset. It contains both curve branches and a selectable UT/FT field branch to bound memory. Interactive field viewing and log-scale losses are core features. Input/feature calculations belong in `samples/`. Executed review copies belong under the ignored run's `results/postProcessing/`, not in tracked notebook outputs. `data/` and generated `samples/` remain ignored; tests must not depend on ignored examples.
+Both dual notebooks default to Trial 1, locally renamed by the user to `data/MULTI/Dual/Transformer/dual-MULTI-trial1`. The archive retains its original dated name. In Outputs, `LOAD_MODEL=True` loads saved architecture/loss/weights and predictions without raw data; for a fresh model set `LOAD_MODEL=False`, `LOAD_DATA=True`, supply `DATA_ROOT`, and enable `RUN_TRAINING`. `RUN_HPO=True` calls the shared search on the constructed DAT; a new local study name avoids the live HPC study. Training and HPO remain disabled by default. Raw datasets are needed for new predictions/training, not saved-result review.
+
+DualPostProcessing displays **both UT and FT in every field and curve subsection**, including two live field viewers, log-scale losses and a sample-ID-aligned 2×2 joint error comparison. This retains both field datasets in memory. Plot controls sit beside their plots. For dual HPO use the existing `ML-HPOpostProcess.ipynb` with `OUTPUT_KIND="dual"`, `TASK="MULTI"`, `MODEL="Transformer"`, `RUN_TYPE="model_hpo"` and the downloaded study name. Its history, importance, leaderboard, best parameters, artifact inspection and light winner review are retained. Cross-family comparison is only meaningful for cross-model studies; raw DATA reconstruction belongs in Outputs. Missing winner files are reported without preventing available study-history review. Detailed winner review uses DualPostProcessing with `RUN_DIR` pointing to `HPO/<study>/best`.
+
+All maintained notebooks stay in `p2-DisorderML/code/`. **Do not create scripts or executed notebook copies in `data/`.** It holds datasets/results/checkpoints and requested figures only. Input/feature calculations belong in `samples/`; validation intermediates belong outside the repository. `data/` and generated `samples/` remain ignored; tests must not depend on ignored examples.
 
 ### Joint dual-output surrogate
 
