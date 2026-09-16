@@ -151,8 +151,14 @@ def train_model(
     earlyStop=None, 
     verbose=10, 
     optTrial=None, 
-    RMSEtarget=False
+    RMSEtarget=False,
+    selection_metric="loss",
+    epoch_callback=None,
 ):
+    if selection_metric not in {"loss", "mse"}:
+        raise ValueError("selection_metric must be 'loss' or 'mse'.")
+    if isinstance(lossf, nn.Module):
+        lossf.to(device)
     train_lossLog, val_lossLog = [], []
     best_loss, best_mse, best_rmse, best_epoch, best_model_state = float("inf"), float("inf"), (False, float("inf")), 0, None
     for epoch in range(1, n_epochs+1):
@@ -166,7 +172,7 @@ def train_model(
             #torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             opt.step()
 
-            _update_epoch_stats(train_stats, opt_loss, y_predict, y)
+            _update_epoch_stats(train_stats, opt_loss, y_predict, y, lossf)
             if isinstance(scheduler, (torch.optim.lr_scheduler.OneCycleLR,
                           torch.optim.lr_scheduler.CosineAnnealingLR)):
                 scheduler.step()
@@ -184,6 +190,15 @@ def train_model(
         mse = val_metric_mse if val_dataloader else train_metric_mse
         rmse = val_metric_rmse if val_dataloader else train_metric_rmse
         target_range = val_target_range if val_dataloader else train_target_range
+
+        if epoch_callback is not None:
+            epoch_callback(epoch, {"train_loss": train_lossAvg,
+                           "val_loss": val_lossAvg if val_dataloader else train_lossAvg,
+                           **{f"train_{k}": v/train_stats["loss_weight"] for k,v in train_stats["components"].items()},
+                           **{f"val_{k}": v for k,v in getattr(lossf, "validation_components", {}).items()},
+                           "val_mse": mse, "learning_rate": opt.param_groups[0]["lr"]}, model)
+        if selection_metric == "mse":
+            lossAvg = mse
 
         if lossAvg < best_loss:
             best_loss = lossAvg
@@ -229,7 +244,7 @@ def train_model(
     if best_model_state:
         model.load_state_dict(best_model_state)
     
-    print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with LOSS: {best_loss:.6f}, MSE: {best_mse:.6f} and RMSE: {best_rmse[1]:.6f} ==================")
+    print(f"================ Training Complete ================\n Best Epoch: {best_epoch}, with selection {selection_metric.upper()}: {best_loss:.6f}, MSE: {best_mse:.6f} and RMSE: {best_rmse[1]:.6f} ==================")
     return model, epoch, train_lossLog, val_lossLog, best_loss, best_mse, best_rmse, best_epoch
 
 def _gnn_fixed_node_count(data_batch, context="GNN batch"):
@@ -351,12 +366,15 @@ def _new_epoch_stats():
         "n": 0,
         "target_min": float("inf"),
         "target_max": -float("inf"),
+        "components": {},
     }
 
-def _update_epoch_stats(stats, opt_loss, y_predict, y):
+def _update_epoch_stats(stats, opt_loss, y_predict, y, lossf=None):
     batch_weight = y.shape[0] if y.ndim > 0 else 1
     stats["loss_sum"] += opt_loss.item()*batch_weight
     stats["loss_weight"] += batch_weight
+    for key, value in getattr(lossf, "last_components", {}).items():
+        stats["components"][key] = stats["components"].get(key, 0.) + float(value)*batch_weight
     valid = torch.isfinite(y) & torch.isfinite(y_predict.detach())
     if not torch.any(valid):
         return
@@ -386,7 +404,9 @@ def _evaluate_model(typ, model, lossf, dataloader, device, context="validation")
         for batch in dataloader:
             y_predict, y = _forward_batch(typ, model, batch, device, context=context)
             opt_loss = lossf(y_predict, y)
-            _update_epoch_stats(stats, opt_loss, y_predict, y)
+            _update_epoch_stats(stats, opt_loss, y_predict, y, lossf)
+    if getattr(lossf, "structured_field", False):
+        lossf.validation_components = {k: v/max(stats["loss_weight"], 1) for k,v in stats["components"].items()}
     return _finalize_epoch_stats(stats)
 
 def _rmse_target_value(RMSEtarget, target_range):

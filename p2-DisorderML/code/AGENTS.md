@@ -29,6 +29,8 @@ Dual notebooks default to the user's locally renamed `data/MULTI/Dual/Transforme
 
 ## Training Conventions
 
+- Outputs notebooks expose `FIELD_LOSS=None` to retain legacy behaviour, or an explicit dictionary of spatial/temporal/localisation weights. The shared `MLfield.field_loss_from_data` fits training-only scales. This does not change the existing HPO loss space. PostProcessing notebooks use saved motion/component diagnostics when present and clearly report absence for old runs; loss axes remain logarithmic. Do not equate motion-activity proxies with Abaqus failure labels.
+
 - Geometry-to-curve uses `output_kind="curve"`; geometry-to-field uses `output_kind="field"`; field-to-curve uses `input_kind="field", output_kind="curve"` while saving under `FieldToCurve`.
 - MLP consumes flattened curve inputs. Graph and Transformer workflows preserve node shape; field targets require node-compatible models, node-level output, and masked field loss.
 - Keep model, loss, scaling, split, reduction, HPO budget, and geometry-feature choices explicit in notebook configuration.

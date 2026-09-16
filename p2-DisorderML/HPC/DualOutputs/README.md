@@ -16,6 +16,8 @@ Use a unique job/run label. Both runners collect the same result tree under `MUL
 
 ## Trial 1: HPO-informed, not dual-HPO optimised
 
+The opt-in `A0-HPC-Dual-lossTrial.py` reuses this preset with `--field-loss-variant baseline|spatial|temporal|both` and fixed balanced validation selection. Spatial/temporal coefficients default to 0.1 and localisation gain to zero. After comparing those variants, `weighted` requires a positive explicit gain. Do not change the live HPO study or resume it against changed fingerprinted modules. See the root README's controlled displacement-loss section for the independent companion, artifacts and workflow. The new wrapper also saves a same-checkpoint true-field/normal-predicted-field curve comparison. This is a substitution diagnostic, not a separately pretrained curve oracle.
+
 The following independent-run `best_params.json` files were recovered from `/data/SEMS-TaoLab/Niccolo-Forte/p2/` on 7 September 2026. These are source records, not newly tuned dual results.
 
 | Setting | UT field | FT field | UT field → full curve | FT field → full curve | Dual trial 1 |

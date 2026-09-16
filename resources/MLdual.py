@@ -1134,7 +1134,7 @@ class DualLoss(nn.Module):
             field_prediction = predictions["field"][mode]
             field_target = targets["field"][mode]
             field_loss = self.field_losses[mode]
-            if isinstance(field_loss, MaskedFieldMSELoss):
+            if isinstance(field_loss, MaskedFieldMSELoss) or getattr(field_loss, "structured_field", False):
                 raw_field = field_loss(field_prediction, field_target, mask=mask)
             else:
                 valid = torch.isfinite(field_target) & torch.isfinite(field_prediction)
@@ -1158,7 +1158,13 @@ class DualLoss(nn.Module):
             )
             mode_total = weighted["field"][mode] + weighted["curve"][mode]
             total = mode_total if total is None else total + mode_total
-        return total, {"raw": raw, "weighted": weighted}
+        details = {"raw": raw, "weighted": weighted}
+        if all(getattr(self.field_losses[m], "structured_field", False) for m in DUAL_MODES):
+            details["field_components"] = {
+                term: {m: self.field_losses[m].last_components[term] for m in DUAL_MODES}
+                for term in ("displacement", "spatial", "temporal")
+            }
+        return total, details
 
     def get_config(self):
         return {
@@ -1386,6 +1392,39 @@ class DUAL_MODEL:
         self.predictions = getattr(self, "predictions", {})
         self.predictions[split] = result
         return result
+
+    def save_true_field_curves(self, path, split="val"):
+        """Same checkpoint, true versus predicted field input; no retraining.
+
+        Invalid true-field entries use DUAL_DATA's normalised zero convention.
+        Counts expose this limitation rather than describing imputed fields as exact.
+        """
+        from resources.MLmetrics import curve_performance_diagnostics
+        folder=Path(path);folder.mkdir(parents=True,exist_ok=True)
+        self.model.eval()
+        values={mode:[] for mode in DUAL_MODES};ids=[];invalid={mode:[] for mode in DUAL_MODES}
+        with torch.no_grad():
+            for batch in self.dataloaders[split]:
+                ids.extend(list(batch["sample_id"]))
+                batch=_move_to_device(batch,self.device)
+                curves=self.model.curve_model(batch["field"],task_features=batch["task_features"],node_masks=batch["node_mask"])
+                for mode in DUAL_MODES:
+                    values[mode].append(curves[mode].cpu().numpy())
+                    present=batch["node_mask"][mode].bool().unsqueeze(-1)
+                    invalid[mode].extend((present & ~batch["field_mask"][mode]).flatten(1).sum(1).cpu().tolist())
+        result=self.predictions.get(split) if hasattr(self,"predictions") else None
+        if result is None: result=self.predict(split)
+        if list(map(str,ids))!=list(map(str,result["sample_id"])):
+            raise ValueError("Oracle and end-to-end specimen order differs.")
+        arrays={"sample_ids":np.asarray(ids)}
+        for mode in DUAL_MODES:
+            prediction=self.data.inverse_curve(mode,np.concatenate(values[mode]))
+            truth=self.data.inverse_curve(mode,result["truth"]["curve"][mode])
+            arrays[mode+"_outputs"]=prediction
+            diag=curve_performance_diagnostics(prediction,truth,x_values=self.data.metadata["curve_x_values"][mode])
+            table=diag["sample_metrics"].copy();table["sample_id"]=ids;table["imputed_field_values"]=invalid[mode]
+            table.to_csv(folder/f"{mode}_{split}_true_field_curve_sample_metrics.csv",index=False)
+        np.savez(folder/"true_field_curves.npz",**arrays)
 
     def save(self, path, include_optimizer=False, metadata=None):
         path = Path(path)

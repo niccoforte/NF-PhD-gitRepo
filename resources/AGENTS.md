@@ -14,6 +14,7 @@
 - `MLdual.py` owns the opt-in joint UT/FT serial Transformer path. Its `DUAL_DATA` adapter reuses existing `DATA` products; its two Transformer stages share parameters across tasks and train through one scalar objective/optimizer without changing legacy behavior.
 - `MLdualHPO.py` owns the opt-in fixed-score search, conditional ranges, study lock, scratch/archive synchronization and study-level resume. Keep search implementation out of notebooks and preserve the single-run default training behaviour.
 - `MLfunc.py` owns training loops, curve/field losses, HPO helpers, activation diagnostics, and older ML plotting helpers.
+- `MLfield.py` owns opt-in signed displacement-difference losses, physical jump scales and specimen-specific localisation weights. Automatic edges use the existing periodic FCC connectivity and initial FT cut; other lattices require validated explicit edges.
 - `MLmetrics.py` owns saved-run loading, curve/field diagnostics, plotting, HPO summaries, and post-processing helpers.
 - `tokenization.py` owns the output-informed tokenization prototype for recurring disorder motifs.
 - `utilities.py` contains file renaming, Abaqus `.inp` editing, and backup-deletion helpers. Treat these as operational scripts, not general-purpose library functions.
@@ -59,6 +60,9 @@
 - HPO helpers save Optuna studies and best-model artifacts in model-specific or cross-model layouts. Keep these layouts stable unless all loaders are updated.
 
 ## Editing Guidance
+
+- Structured field losses preserve legacy defaults. Invert affine field scaling in Torch before spatial/temporal differences, fit jump scales on training targets only, mask both endpoints/frames, and node-average incident edge errors. Target-dependent capped weights are training-only and must not encode a presumed fracture region. Retain separate raw component logs and a fixed checkpoint-selection metric across ablations.
+- `field_motion_diagnostics` reports displacement activity, not verified damage. Timing and principal-axis metrics use explicit heuristic eligibility thresholds and must retain event counts/ambiguity. FT tip-region reporting is diagnostic only. Frozen independent curve comparisons use ID-aligned validation intersections, the original curve input scaler and unchanged static features; dual true-field substitution reports masked/imputed entries. Do not alter a live HPO objective when adding these diagnostics.
 
 - Avoid adding paper-specific assumptions to shared functions when a parameter or notebook/script configuration is enough.
 - Prefer small, named helper functions over copying data-processing code across notebooks.

@@ -26,5 +26,8 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 
 ## Validation
 
+- Preserve existing approved trial, test and HPO entry points unless the user explicitly requests their removal. Loss ablations use `FieldOutputs/A0-HPC_Field-lossTrial.py` (exact archived UT/FT architecture/training presets) and `DualOutputs/A0-HPC-Dual-lossTrial.py` (Trial 1 capacity). B1 stages their existing runner dependencies. Choose `--field-loss-variant baseline|spatial|temporal|both`; `weighted` additionally requires an explicit positive gain and follows evidence-based variant selection. Defaults remain full data/450 epochs, validation-only selection, and the existing resource policy. No damage/strain export or architecture/HPO extension is implied.
+- Independent ablations select checkpoints by unchanged normalised validation MSE; dual ablations use the unchanged balanced physical validation score. Always use unique run labels. Save field-loss components, motion diagnostics and paired true/predicted-field curve checks alongside standard results. Different single/dual populations must not be treated as a matched comparison.
+
 - Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` from the repository root. It performs Python and shell syntax checks where available but does not execute Slurm, GPUs, transfers, or research workloads.
 - For path changes, add focused dry-run checks for representative script forms and report any unavailable Bash/HPC checks.

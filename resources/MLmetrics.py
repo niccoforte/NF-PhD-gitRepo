@@ -1657,6 +1657,193 @@ def field_performance_diagnostics(
 # Field Post-Processing
 # =============================================================================
 
+def field_motion_diagnostics(prediction, truth, coords, mode, components=("U1", "U2"),
+                             sample_ids=None, valid_mask=None, event_quantile=0.9):
+    """Physical signed-motion diagnostics, one row per specimen.
+
+    Events are the largest target jumps within each specimen, not assumed crack
+    locations. The fixed quantile defines evaluation only; it is not a fitted
+    training weight. Report counts alongside sign accuracy and empty events as NaN.
+    Localisation overlap describes displacement activity, not confirmed damage.
+    """
+    from resources.MLfield import reference_field_edges
+    p, y = np.asarray(prediction), np.asarray(truth)
+    if p.shape != y.shape or p.ndim != 3 or not 0 < event_quantile < 1:
+        raise ValueError("Expected matching [sample,node,frame*component] arrays and a quantile in (0,1).")
+    c, n = len(components), len(coords)
+    if p.shape[1] != n or p.shape[-1] % c:
+        raise ValueError("Coordinates/components do not match fields.")
+    edges = reference_field_edges(coords, mode)
+    i,j = edges.T
+    ids = list(range(len(y))) if sample_ids is None else list(sample_ids)
+    if len(ids) != len(y): raise ValueError("Sample IDs do not match fields.")
+    rows=[]
+    for s in range(len(y)):
+        a,b = p[s].reshape(n,-1,c), y[s].reshape(n,-1,c)
+        ok=np.isfinite(b)
+        if valid_mask is not None: ok &= np.asarray(valid_mask[s],bool).reshape(b.shape)
+        if np.any(ok & ~np.isfinite(a)): raise ValueError("Nonfinite prediction at a valid target.")
+        a,b=np.where(ok,a,0),np.where(ok,b,0)
+        ev=ok[i]&ok[j];av=ev.all(axis=-1)
+        dp,dy=a[j]-a[i],b[j]-b[i]
+        err=np.where(ev,(dp-dy)**2,0.)
+        node_sum=np.zeros_like(b);node_count=np.zeros_like(b)
+        for endpoint in (i,j):
+            np.add.at(node_sum,endpoint,err);np.add.at(node_count,endpoint,ev)
+        node_error=node_sum/np.maximum(node_count,1)
+        tv=ok[:,1:]&ok[:,:-1];tp,ty=np.diff(a,axis=1),np.diff(b,axis=1)
+        mag=np.linalg.norm(dy,axis=-1);pmag=np.linalg.norm(dp,axis=-1)
+        threshold=np.quantile(mag[av],event_quantile) if av.any() else np.inf
+        event=av & (mag>=threshold) & (mag>1e-12)
+        def activity(v):
+            total=np.zeros(n);count=np.zeros(n)
+            for endpoint in (i,j):
+                np.add.at(total,endpoint,np.where(av,v,0).sum(axis=1))
+                np.add.at(count,endpoint,av.sum(axis=1))
+            return total/np.maximum(count,1),count>0
+        target_activity,present=activity(mag);pred_activity,_=activity(pmag)
+        def active_nodes(v):
+            threshold=np.quantile(v[present],event_quantile) if present.any() else np.inf
+            return present & (v>=threshold) & (v>1e-12)
+        true_nodes,pred_nodes=active_nodes(target_activity),active_nodes(pred_activity)
+        union=(true_nodes|pred_nodes).sum()
+        row={"sample_id":ids[s],"field_rmse":float(np.sqrt(np.mean((a-b)[ok]**2))) if ok.any() else np.nan,
+             "spatial_rmse":float(np.sqrt(np.mean(node_error[node_count>0]))) if (node_count>0).any() else np.nan,
+             "temporal_rmse":float(np.sqrt(np.mean((tp-ty)[tv]**2))) if tv.any() else np.nan,
+             "local_jump_rmse":float(np.sqrt(np.mean((dp-dy)[event]**2))) if event.any() else np.nan,
+             "local_jump_count":int(event.sum()),
+             "activity_node_jaccard":float((true_nodes&pred_nodes).sum()/union) if union else np.nan}
+        if "U2" in components:
+            u=components.index("U2");v=tv[:,:,u];true=ty[:,:,u];pred=tp[:,:,u]
+            q=np.quantile(np.abs(true[v]),event_quantile) if v.any() else np.inf
+            jump=v & (np.abs(true)>=q) & (np.abs(true)>1e-12)
+            row["u2_jump_sign_accuracy"]=float(np.mean(np.sign(pred[jump])==np.sign(true[jump]))) if jump.any() else np.nan
+            row["u2_jump_count"]=int(jump.sum())
+            if str(mode).upper()=='FT':
+                xy=np.asarray(coords,dtype=float)
+                reference=(xy-xy.min(axis=0))*(200/np.ptp(xy[:,0]))
+                tip=np.linalg.norm(reference-[117.6,95.],axis=1)<=20.
+                region=v&tip[:,None]
+                q=np.quantile(np.abs(true[region]),event_quantile) if region.any() else np.inf
+                events=region&(np.abs(true)>=q)&(np.abs(true)>1e-12)
+                row['tip_u2_sign_accuracy']=float(np.mean(np.sign(pred[events])==np.sign(true[events]))) if events.any() else np.nan
+                row['tip_u2_event_count']=int(events.sum())
+        if ty.shape[1]:
+            actual=np.where(tv,np.abs(ty),-np.inf)
+            estimated=np.where(tv,np.abs(tp),-np.inf)
+            peak=actual.max(axis=1)
+            typical=np.ma.median(np.ma.masked_where(~tv,np.abs(ty)),axis=1).filled(np.nan)
+            eligible=np.isfinite(peak)&(peak>np.maximum(2*typical,1e-12))
+            # Avoid assigning a unique event time to tied maxima.
+            tied=np.isclose(actual,peak[:,None,:],rtol=0.01,atol=1e-12).sum(axis=1)>1
+            eligible &= ~tied
+            cutoff=np.quantile(peak[eligible],event_quantile) if eligible.any() else np.inf
+            selected=eligible&(peak>=cutoff)
+            row['jump_interval_mae']=float(np.abs(actual.argmax(axis=1)-estimated.argmax(axis=1))[selected].mean()) if selected.any() else np.nan
+            row['jump_timing_event_count']=int(selected.sum())
+        def axis(v):
+            weights=np.where(present,v,0.)
+            if weights.sum()<=1e-12:return np.nan,0.
+            xy=np.asarray(coords);centred=xy-np.average(xy,axis=0,weights=weights)
+            eig,vec=np.linalg.eigh((centred*weights[:,None]).T@centred/weights.sum())
+            return np.arctan2(vec[1,-1],vec[0,-1]),float(eig[-1]/max(eig[0],1e-12))
+        at,rt=axis(target_activity);ap,rp=axis(pred_activity)
+        row['target_activity_axis_anisotropy']=rt
+        row['activity_axis_error_deg']=float(np.degrees(abs((ap-at+np.pi/2)%np.pi-np.pi/2))) if min(rt,rp)>=1.5 else np.nan
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def save_field_motion_diagnostics(results_dir, data, mode, split="val"):
+    """Add optional motion CSV/definitions without changing prediction archives."""
+    from pathlib import Path
+    import json
+    folder=Path(results_dir)
+    dual=hasattr(data,"normalizers") and hasattr(data,"splits")
+    key=f"{mode}_{split}" + ("_field" if dual else "")
+    with np.load(folder/"predictions.npz",allow_pickle=False) as z:
+        pred,true=z[key+"_outputs"],z[key+"_truth"]
+        ids=z["sample_ids"] if dual else getattr(data,f"{mode}_{split}_in_df").index.astype(str)
+    coords=(data.metadata["canonical_coords"] if dual else getattr(data,f"{mode}_IN_df").iloc[0].to_numpy().reshape(-1,2))
+    components=list(data.metadata["field_components"][mode] if dual else getattr(data,f"{mode}_field_components"))
+    mask=data.splits[split]["field_mask"][mode] if dual else getattr(data,f"{mode}_{split}_valid_mask",None)
+    table=field_motion_diagnostics(pred,true,coords,mode,components,ids,mask)
+    table.to_csv(folder/f"{mode}_{split}_field_motion.csv",index=False)
+    definitions={"space":"physical displacement units", "event_quantile":0.9,
+        "spatial_rmse":"Signed edge-error MSE averaged over incident valid edges per node, then nodes/frames/components; square root.",
+        "temporal_rmse":"Signed adjacent retained-frame increment error; not velocity.",
+        "local_jump_rmse":"Edge errors where target relative-motion magnitude is in the specimen's top decile and nonzero.",
+        "activity_node_jaccard":"Overlap of target/predicted top-decile nodal relative-motion activity; a kinematic proxy, not broken-strut truth.",
+        "u2_jump_sign_accuracy":"Correct sign for nonzero top-decile absolute target U2 temporal increments; inspect event counts.",
+        "jump_interval_mae":"Strongest temporal-increment index error. Keep unique peaks (1% tie tolerance) >2x median absolute increment, then top decile of eligible peak sizes. Report event counts. Units: retained-frame intervals, not confirmed fracture times.",
+        "tip_u2_sign_accuracy":"FT reporting-only radius of two reference cells (20/200 specimen width) around nominal (117.6,95), top-decile nonzero target increments within region. Does not change loss weights or inputs.",
+        "activity_axis_error_deg":"Exploratory principal axis of relative-motion activity, modulo 180 degrees, reported only if both covariance eigenvalue ratios >=1.5. Not a verified fracture-band label.",
+        "population":"Current evaluation split only. No test-set fitting or regional training mask."}
+    (folder/"field_motion_definitions.json").write_text(json.dumps(definitions,indent=2))
+    return table
+
+
+def plot_field_motion_results(results_dir, split="val", modes=("UT","FT")):
+    """Shared notebook view of saved motion diagnostics; missing old artifacts are explicit."""
+    from pathlib import Path
+    tables={m:pd.read_csv(Path(results_dir)/f"{m}_{split}_field_motion.csv") for m in modes
+            if (Path(results_dir)/f"{m}_{split}_field_motion.csv").is_file()}
+    if not tables:
+        print("No field-motion diagnostics saved for this run. Existing field diagnostics remain available.")
+        return None
+    columns=["field_rmse","spatial_rmse","temporal_rmse","local_jump_rmse","activity_node_jaccard","u2_jump_sign_accuracy",
+             "tip_u2_sign_accuracy","jump_interval_mae","activity_axis_error_deg"]
+    fig,axes=plt.subplots(3,3,figsize=(15,11))
+    for ax,col in zip(axes.flat,columns):
+        for mode,t in tables.items():
+            if col in t and t[col].notna().any(): ax.hist(t[col].dropna(),bins=25,alpha=.5,label=mode)
+        ax.set_title(col.replace('_',' '));ax.set_ylabel('Specimens')
+        if ax.get_legend_handles_labels()[0]: ax.legend()
+        else: ax.text(.5,.5,'No eligible events',ha='center',transform=ax.transAxes)
+    for mode,t in tables.items():
+        counts=[c for c in ('u2_jump_count','tip_u2_event_count','jump_timing_event_count') if c in t]
+        print(f'{mode}: median event counts ' + ', '.join(f'{c}={t[c].median():g}' for c in counts))
+    fig.suptitle('Field motion: errors in physical units; overlap/sign scores in [0, 1]')
+    fig.tight_layout()
+    return fig
+
+
+def plot_field_loss_components(history):
+    """Raw displacement/spatial/temporal terms on log axes for either trainer."""
+    if history is None or not any('spatial' in c for c in history.columns):
+        print('No structured field-loss history for this run (legacy/default loss).')
+        return None
+    fig,axes=plt.subplots(1,3,figsize=(15,4))
+    for ax,term in zip(axes,('displacement','spatial','temporal')):
+        columns=[c for c in history.columns if c in (f'train_{term}',f'val_{term}') or f'_field_components_{term}_' in c]
+        for col in columns:
+            ax.plot(history.epoch,history[col].where(history[col]>0),label=col.replace('field_components_',''))
+        ax.set(title=f'Raw {term} loss',xlabel='Epoch',yscale='log');ax.legend(fontsize=8)
+    fig.tight_layout()
+    return fig
+
+
+def plot_true_field_curve_comparison(results_dir, split='val', modes=('UT','FT')):
+    """Pair specimen curve errors for true-field substitution and normal inference."""
+    from pathlib import Path
+    folder=Path(results_dir);fig=None
+    for k,mode in enumerate(modes):
+        oracle=folder/f'{mode}_{split}_true_field_curve_sample_metrics.csv'
+        standard=folder/f'{mode}_{split}_curve_sample_metrics.csv'
+        if not oracle.is_file() or not standard.is_file(): continue
+        a,b=pd.read_csv(oracle),pd.read_csv(standard)
+        joined=a.merge(b,on='sample_id',suffixes=('_true_field','_pred_field'),validate='one_to_one')
+        if len(joined)!=len(a) or len(joined)!=len(b):raise ValueError('Curve oracle specimen sets differ.')
+        if fig is None:fig,axes=plt.subplots(1,len(modes),figsize=(6*len(modes),4),squeeze=False)
+        ax=axes[0,k];x=joined.sample_rmse_pred_field;y=joined.sample_rmse_true_field
+        ax.scatter(x,y,s=12,alpha=.5);lim=max(x.max(),y.max());ax.plot([0,lim],[0,lim],'k--')
+        ax.set(title=f'{mode}: same curve checkpoint',xlabel='RMSE with predicted fields',ylabel='RMSE with true fields')
+        print(f'{mode}: {len(joined)} paired specimens; {(a.imputed_field_values>0).sum()} true-field inputs contain masked/zero-filled entries.')
+    if fig is None: print('No true-field substitution comparison saved for this run.')
+    else:fig.tight_layout()
+    return fig
+
+
 def print_field_diagnostics(diagnostics, label="Field"):
     summary = diagnostics.get("summary", diagnostics)
     print(

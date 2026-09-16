@@ -28,6 +28,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 - `resources/MLmodels.py` owns `MODEL`, model classes, dataloaders, training/evaluation orchestration, checkpoint metadata, result saving, and model reload behavior.
 - `resources/MLdual.py` owns the joint UT/FT serial Transformer adapter, architecture, four-term objective, and one-optimizer trainer. It composes the legacy framework; it does not replace `DATA`, `MODEL`, or `Transformer`.
 - `resources/MLfunc.py` owns training loops, HPO helpers, loss functions, activation diagnostics, and older general ML plotting helpers.
+- `resources/MLfield.py` owns the opt-in physical displacement-difference objective shared by single and dual runs; legacy losses remain the default. Its frozen field-to-curve diagnostic aligns validation sample IDs and preserves the curve model's own training-fitted scaling.
 - `resources/MLmetrics.py` owns curve/field diagnostics, post-processing loaders, saved-run artifact discovery, diagnostic plotting, HPO summaries, and saved-run visualization helpers.
 - `resources/tokenization.py` owns the output-informed tokenization prototype.
 

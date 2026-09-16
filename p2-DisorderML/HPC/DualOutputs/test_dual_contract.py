@@ -139,6 +139,21 @@ class DualMLTest(unittest.TestCase):
         self.assertTrue(any(parameter.grad is not None for parameter in self.model.field_model.encoder.parameters()))
         self.assertTrue(any(parameter.grad is not None for parameter in self.model.curve_model.encoder.parameters()))
 
+    def test_structured_loss_checkpoint_and_true_field_curves(self):
+        from resources.MLfield import StructuredFieldLoss
+        from resources.MLmetrics import postprocess_load_dual_run
+        losses={m:StructuredFieldLoss([[0,2],[2,3],[3,4],[4,5]],6,
+                    **self.data.normalizers['field'][m]) for m in ('UT','FT')}
+        trainer=DUAL_MODEL(self.model,DualLoss(field_loss=losses),data=self.data,batch=2,device='cpu')
+        trainer.train(1,verbose=0)
+        self.assertIn('val_field_components_spatial_UT',trainer.history[0])
+        with tempfile.TemporaryDirectory() as tmp:
+            trainer.save(tmp);trainer.save_results()
+            trainer.save_true_field_curves(Path(tmp)/'results')
+            self.assertTrue((Path(tmp)/'results/true_field_curves.npz').is_file())
+            _,_,_,loaded=postprocess_load_dual_run(tmp,load_model=True,device='cpu')
+            self.assertIsInstance(loaded.lossf.field_losses['UT'],StructuredFieldLoss)
+
     def test_dual_hpo_score_resume_and_saved_review(self):
         import optuna
         from resources.MLdualHPO import DualValidationScore, suggest_config, trial1_parameters, run_dual_hpo

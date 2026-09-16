@@ -43,7 +43,12 @@ def parse_args(argv=None):
     parser.add_argument("--pos-encoding", choices=["none", "learned", "sinusoidal"], default="none")
     parser.add_argument("--curve-pool", choices=["cls", "mean"], default="cls")
     parser.add_argument("--curve-cls-token", action=argparse.BooleanOptionalAction, default=None)
-    parser.add_argument("--loss", choices=["mse", "combined"], default="combined", help="Curve loss; field losses always use masked MSE.")
+    parser.add_argument("--loss", choices=["mse", "combined"], default="combined", help="Curve loss; field loss defaults to masked MSE.")
+    parser.add_argument("--field-loss-variant", choices=["baseline", "spatial", "temporal", "both", "weighted"])
+    parser.add_argument("--spatial-weight", type=float, default=0.1)
+    parser.add_argument("--temporal-weight", type=float, default=0.1)
+    parser.add_argument("--localization-gain", type=float, default=0.)
+    parser.add_argument("--fixed-selection-score", action="store_true", help="Use the unchanged balanced validation score across loss variants.")
     parser.add_argument("--mse-weight", type=float, default=1.0)
     parser.add_argument("--weighted-mse-weight", type=float, default=0.5)
     parser.add_argument("--derivative-weight", type=float, default=0.05)
@@ -187,13 +192,25 @@ def main(argv=None, preset=None):
                 SoftPeak_beta=args.soft_peak_beta, normalization_eps=args.loss_eps,
             ) for mode in ("UT", "FT")
         }
+    field_losses = None
+    if args.field_loss_variant:
+        from resources.MLfield import field_loss_from_data, field_loss_weights
+        field_losses = {mode:field_loss_from_data(data, mode, **field_loss_weights(
+            args.field_loss_variant, args.spatial_weight, args.temporal_weight, args.localization_gain))
+            for mode in ("UT", "FT")}
     objective = DualLoss(
+        field_loss=field_losses,
         curve_loss=curve_losses, weights=weights,
         curve_normalizers=data.normalizers["curve"] if args.loss == "combined" else None,
     )
+    selection_score = None
+    if args.fixed_selection_score:
+        from resources.MLdualHPO import DualValidationScore
+        selection_score = DualValidationScore(data)
     model = DUAL_MODEL(
         network, objective, data=data, opt=("adamw", args.weight_decay), batch=args.batch,
         lr=args.lr, device=device, num_workers=args.num_workers,
+        selection_metric=selection_score,
         scheduler=("plateau", "min", args.scheduler_factor, args.scheduler_patience, args.scheduler_threshold),
     )
     print(network)
@@ -206,6 +223,11 @@ def main(argv=None, preset=None):
     metadata["training_seconds"] = time.monotonic() - started
     checkpoint = model.save(run_dir, metadata=metadata)
     results = model.save_results(eval_split=args.eval_split, run_config=vars(args), metadata=metadata)
+    if args.field_loss_variant:
+        from resources.MLmetrics import save_field_motion_diagnostics
+        for mode in ("UT", "FT"):
+            save_field_motion_diagnostics(results, data, mode, args.eval_split)
+        model.save_true_field_curves(results, args.eval_split)
     metadata.update({"checkpoint": checkpoint, "results_dir": results, "status": "complete"})
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"Saved checkpoint: {checkpoint}\nSaved {args.eval_split} results: {results}", flush=True)

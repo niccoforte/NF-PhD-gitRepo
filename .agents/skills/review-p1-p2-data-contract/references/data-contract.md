@@ -58,6 +58,8 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 
 ## Saved-run boundary
 
+- Opt-in structured field trials add `field_loss_history.csv` for independent runs, raw field-component columns to dual history, `{mode}_{split}_field_motion.csv`, and `field_motion_definitions.json`. Existing prediction keys/layouts do not change. Frozen curve comparisons add paired curve metric tables and an auxiliary NPZ; single-task comparisons use only the intersection held out from both stages. They do not redefine old HPO metrics or overwrite source checkpoints. Physical jump losses reconstruct the existing affine normalization, without refitting the serial bridge.
+
 - Standard: `{RUN_ROOT}/{UT|FT|MULTI}/{Curve|Field|FieldToCurve}/{Model}/{Run}`.
 - Dual single runs: `{RUN_ROOT}/MULTI/Dual/Transformer/{Run}`. Standard staging/archive/transfer support this layout; reconstruct architecture from `DualStageTransformer.from_config` and load weights through `DUAL_MODEL.load`. Legacy `MODEL` reload and single-task notebook loaders are not dual consumers. Dual HPO: `{RUN_ROOT}/MULTI/Dual/Transformer/HPO/{Study}`, with winner in `best/` and diagnostics in `best/results/`; use the dual notebook and B1 `--resume`, not B2. A fixed equal-task physical validation-MSE ratio selects trials independently of tunable training-loss weights. Code/data/split fingerprints reject mismatched resume.
 - Model-specific HPO: `{RUN_ROOT}/{Task}/{OutputKind}/{Model}/HPO/{Study}`.

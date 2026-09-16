@@ -183,6 +183,7 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
     +-- lattices.py
     +-- MLdata.py
     +-- MLfunc.py
+    +-- MLfield.py
     +-- MLdual.py
     +-- MLmetrics.py
     +-- MLmodels.py
@@ -304,7 +305,25 @@ DualPostProcessing displays **both UT and FT in every field and curve subsection
 
 All maintained notebooks stay in `p2-DisorderML/code/`. **Do not create scripts or executed notebook copies in `data/`.** It holds datasets/results/checkpoints and requested figures only. Input/feature calculations belong in `samples/`; validation intermediates belong outside the repository. `data/` and generated `samples/` remain ignored; tests must not depend on ignored examples.
 
-### Joint dual-output surrogate
+### Controlled displacement-loss trials
+
+`resources/MLfield.py` adds **opt-in** signed spatial and temporal supervision to masked displacement MSE. Physical differences use the existing affine field scaler and training-only jump scales. Periodic FCC connectivity supplies neighbours; the FT initial cut removes absent connections. Incident edge errors average by node. Optional localisation weights depend on each target specimen's jumps, are capped and normalised, and do not assume a crack path. Defaults and old checkpoints remain unchanged.
+
+Run one named ablation per job through the existing home → scratch → archive workflow. `FieldOutputs/A0-HPC_Field-lossTrial.py` reads the exact archived independent HPO architecture and training configuration; `DualOutputs/A0-HPC-Dual-lossTrial.py` uses the HPO-informed Trial 1 capacity. Both default to full data and up to 450 epochs. Use `--field-loss-variant baseline`, `spatial`, `temporal` or `both`; initial spatial/temporal coefficients are 0.1, exploratory rather than optimised. Compare these before adding `weighted --localization-gain 2` to the selected formulation (individual coefficients can be zero to retain only the selected term).
+
+```bash
+# From the relevant home-side task/model launch directory, using its B1 link/copy:
+sbatch --time=240:00:00 -J field-UT-loss-spatial B1_ML-new.sh FieldOutputs/A0-HPC_Field-lossTrial.py --task UT --field-loss-variant spatial
+sbatch --time=240:00:00 -J dual-loss-spatial B1_ML-new.sh DualOutputs/A0-HPC-Dual-lossTrial.py --field-loss-variant spatial
+```
+
+Use fresh labels for every run and check archive destinations first. Independent checkpoint selection remains normalised validation MSE; dual selection uses the existing fixed balanced physical score. Do not compare the magnitudes of differently weighted objectives. Loss variants share splits/seeds/architecture within their workflow; independent and dual sample populations can differ.
+
+Standard results now have optional motion CSVs/definitions and component loss logs, displayed in the existing Field/Dual PostProcessing notebooks. The frozen independent field-to-curve comparison uses only ID-aligned specimens held out from **both** models, its original input scaler, and unchanged static features. Dual true-field substitution uses the same trained curve stage and exposes missing-field imputation counts. All loss plots remain log-scale. Worked examples and archived-data evidence belong in `p2-DisorderML/samples/field-loss-review/`, not the review notebooks. No damage targets, strain targets, graph/CNN architectural changes or new HPO are included.
+
+The `FIELD_LOSS` dictionary in the Field/Dual Outputs notebooks enables these losses for fresh models; `None` preserves the legacy default. The existing HPO study/space is unchanged. Preserve existing trial/test/HPO scripts unless explicitly asked to remove them. Submission status and blockers are recorded in `p2-DisorderML/PROJECT_STATUS.md`.
+
+### Joint dual-output surrogate details
 
 The first real-data smoke run completed on Apocrita (job 25868425). See `p2-DisorderML/samples/hpc-test-report.md` for its execution evidence and limitations. `HPC/DualOutputs/A0-HPC-Dual-trial1.py` is the HPO-informed full-data preset; its adjacent README records the independent HPO sources and intentional architectural differences. Both scripts share the same runner and result collection.
 

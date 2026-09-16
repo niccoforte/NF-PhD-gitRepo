@@ -87,7 +87,7 @@ def context_label(label):
     return label if label else None
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Generic single-GPU field-output training run for GCN, GAT, and Transformer models."
     )
@@ -160,6 +160,14 @@ def parse_args():
     parser.add_argument("--use-cls-token", action="store_true", help="Add a Transformer CLS token. Node pooling ignores it.")
 
     parser.add_argument("--loss", default="masked", choices=["auto", "masked", "mse"])
+    parser.add_argument("--field-loss-variant", choices=["baseline", "spatial", "temporal", "both", "weighted"])
+    parser.add_argument("--spatial-weight", type=float, default=0.1)
+    parser.add_argument("--temporal-weight", type=float, default=0.1)
+    parser.add_argument("--localization-gain", type=float, default=0.)
+    parser.add_argument("--hpo-model-json", help="Use the exact saved architecture and DATA config, without loading weights.")
+    parser.add_argument("--curve-model-json", help="Frozen field-to-curve HPO checkpoint for ID-aligned validation-only bridge diagnostics.")
+    parser.add_argument("--selection-metric", choices=["loss", "mse"], default="loss")
+    parser.add_argument("--eval-split", choices=["test", "val"], default="test")
     parser.add_argument("--scheduler-patience", type=int, default=20)
     parser.add_argument("--scheduler-factor", type=float, default=0.5)
     parser.add_argument("--scheduler-threshold", type=float, default=1e-4)
@@ -168,7 +176,7 @@ def parse_args():
     parser.add_argument("--verbose", type=int, default=1)
     parser.add_argument("--diag-samples", type=int, default=16)
     parser.add_argument("--allow-cpu", action="store_true", help="Allow running without CUDA.")
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def primary_mode(data):
@@ -196,6 +204,12 @@ def has_invalid_targets(data):
 
 
 def build_loss(args, data, nn, MaskedFieldMSELoss):
+    if args.field_loss_variant:
+        from resources.MLfield import field_loss_from_data, field_loss_weights
+        if args.task == "MULTI":
+            raise ValueError("Use the dual runner for paired structured field supervision.")
+        return field_loss_from_data(data, args.task, **field_loss_weights(
+            args.field_loss_variant, args.spatial_weight, args.temporal_weight, args.localization_gain))
     invalid_targets = has_invalid_targets(data)
     if args.loss in ["auto", "masked"] and invalid_targets:
         print("Using MaskedFieldMSELoss because field targets contain invalid or masked entries.")
@@ -261,8 +275,8 @@ def build_inner_model(args, model_type, in_shape, out_size, device, GNN, Transfo
     raise ValueError(f"Unsupported field model type: {model_type}")
 
 
-def main():
-    args = parse_args()
+def main(argv=None):
+    args = parse_args(argv)
     model_type = canonical_model_type(args.model_type)
     nsims = parse_nsims(args.nsims)
     components = parse_components(args.components)
@@ -318,7 +332,7 @@ def main():
     }
     write_json(os.environ.get("ML_RUN_METADATA"), metadata)
 
-    data = DATA(
+    data_config = dict(
         path=args.data_path,
         load=True,
         load_split=False,
@@ -341,6 +355,18 @@ def main():
         round_decimals=args.round_decimals,
         geom_feats=(bool(args.geom_feats), bool(args.coord_norm) if args.geom_feats else False),
     )
+    if args.hpo_model_json:
+        source = Path(args.hpo_model_json)
+        import hashlib
+        descriptor = json.loads(source.read_text())
+        saved_data = json.loads(source.with_name(source.stem + "_data.json").read_text())["data_config"]
+        if saved_data["mechMode"] != args.task or saved_data["output_kind"] != "field":
+            raise ValueError("HPO preset must be a field model for the requested task.")
+        data_config = {**saved_data, "path":args.data_path, "nsims":nsims, "split_seed":args.seed,
+                       "range_split":(args.range_split, False), "load_split":False, "save_split":False}
+        metadata["hpo_source"] = {"path":str(source), "sha256":hashlib.sha256(source.read_bytes()).hexdigest(),
+                                   "trial":descriptor.get("hpo_best_trial", {}).get("trial_number")}
+    data = DATA(**data_config)
 
     split_sizes = split_size_summary(data)
     print(f"Split sizes: {split_sizes}")
@@ -353,7 +379,14 @@ def main():
     print(f"{mode} field shape: {getattr(data, f'{mode}_field_shape')}")
     print(f"{mode} field components: {getattr(data, f'{mode}_field_components')}")
 
-    inner_model = build_inner_model(args, model_type, in_shape, out_size, device, GNN, Transformer)
+    if args.hpo_model_json:
+        from resources.MLmodels import _model_build_inner_model
+        cfg = descriptor["reload_config"]["model_config"]
+        if (cfg["params"]["in_size"], cfg["params"]["seq_len"], cfg["params"]["out_size"]) != (in_shape[-1], in_shape[-2], out_size):
+            raise ValueError("Archived HPO architecture dimensions do not match loaded data.")
+        inner_model = _model_build_inner_model(cfg).to(device)
+    else:
+        inner_model = build_inner_model(args, model_type, in_shape, out_size, device, GNN, Transformer)
     print(inner_model)
     lossf = build_loss(args, data, nn, MaskedFieldMSELoss)
 
@@ -374,9 +407,13 @@ def main():
         scan_matches_on_init=False,
     )
 
-    model.train(n_epochs=args.epochs, verbose=args.verbose, plot=False)
+    history = []
+    def record_epoch(epoch, row, network):
+        history.append({"epoch":epoch, **row})
+    model.train(n_epochs=args.epochs, verbose=args.verbose, plot=False,
+                selection_metric=args.selection_metric, epoch_callback=record_epoch)
 
-    eval_split = "test"
+    eval_split = args.eval_split
     if any(sizes["test"] == 0 for sizes in split_sizes.values()):
         eval_split = "val"
         print("Test split is empty; evaluating the validation split instead.")
@@ -384,9 +421,21 @@ def main():
 
     checkpoint = model.save(path=None, name=context_label(args.run_label))
     results_dir = model.save_results(run_config=run_config, eval_split=eval_split, metadata=metadata)
+    if args.field_loss_variant:
+        import pandas as pd
+        from resources.MLmetrics import save_field_motion_diagnostics
+        results = Path(results_dir)
+        pd.DataFrame(history).to_csv(results/"field_loss_history.csv", index=False)
+        write_json(results/"split_manifest.json", {s:list(getattr(data,f"{mode}_{s}_in_df").index.astype(str))
+            for s in ("train","val","test")})
+        save_field_motion_diagnostics(results, data, mode, eval_split)
+        if args.curve_model_json:
+            from resources.MLfield import evaluate_independent_curve_bridge
+            evaluate_independent_curve_bridge(data,args.curve_model_json,results,mode,device,eval_split)
 
     print(f"Saved checkpoint: {checkpoint}")
     print(f"Saved results in: {results_dir}")
+    return model
 
 
 if __name__ == "__main__":

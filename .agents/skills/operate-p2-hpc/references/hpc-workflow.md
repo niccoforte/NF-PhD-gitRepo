@@ -50,6 +50,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 - Field models use node-level output and `MaskedFieldMSELoss`; MLP is not compatible with this contract.
 - Component selection and unloaded-frame retention are explicit CLI/config choices.
 - No FT-specific crack-tip, notch, ligament, or similar input feature is currently established.
+- `FieldOutputs/A0-HPC_Field-lossTrial.py` reuses the single-run runner with exact archived Transformer presets and fixed MSE checkpoint selection. `DualOutputs/A0-HPC-Dual-lossTrial.py` reuses Trial 1 with the fixed dual score. Select one loss variant per unique B1 job. B1 stages companion runners. Collect validation motion metrics and true-field curve comparisons as well as standard predictions; localisation weighting follows the first four variants, not a simultaneous new HPO. Retain existing scripts.
 
 ## Field-to-curve entry points
 

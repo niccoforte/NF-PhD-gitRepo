@@ -141,7 +141,7 @@ class MODEL:
             _model_scheduler(getattr(self, f"{mode}_opt"), self.scheduler_cfg),
         )
     
-    def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False):
+    def train(self, n_epochs, verbose=10, plot=False, RMSEtarget=False, selection_metric="loss", epoch_callback=None):
         if self.data.UTmechTest:
             self.UT_model, \
                 self.UT_epoch, \
@@ -162,7 +162,9 @@ class MODEL:
                                                  earlyStop=copy.deepcopy(self.earlyStop), 
                                                  verbose=verbose,
                                                  optTrial=self.optTrial,
-                                                 RMSEtarget=RMSEtarget)
+                                                 RMSEtarget=RMSEtarget,
+                                                 selection_metric=selection_metric,
+                                                 epoch_callback=epoch_callback)
         
             if plot:
                 plot_loss(self.UT_epoch, self.UT_train_lossLog, self.UT_val_lossLog)
@@ -187,7 +189,9 @@ class MODEL:
                                                  earlyStop=copy.deepcopy(self.earlyStop), 
                                                  verbose=verbose,
                                                  optTrial=self.optTrial,
-                                                 RMSEtarget=RMSEtarget)
+                                                 RMSEtarget=RMSEtarget,
+                                                 selection_metric=selection_metric,
+                                                 epoch_callback=epoch_callback)
         
             if plot:
                 plot_loss(self.FT_epoch, self.FT_train_lossLog, self.FT_val_lossLog)
@@ -2211,6 +2215,8 @@ def _model_loss_to_config(lossf):
         }
 
     class_name = lossf.__class__.__name__
+    if class_name == "StructuredFieldLoss":
+        return {"class": class_name, "params": lossf.get_config()}
     if isinstance(lossf, nn.MSELoss):
         return {"class": "MSELoss", "params": {"reduction": lossf.reduction}}
     if isinstance(lossf, MaskedFieldMSELoss):
@@ -2364,7 +2370,9 @@ def _model_build_loss_from_config(loss_config):
         MaskedFieldMSELoss,
     )
 
+    from resources.MLfield import StructuredFieldLoss
     builders = {
+        "StructuredFieldLoss": StructuredFieldLoss,
         "CombinedCurveLoss": CombinedCurveLoss,
         "QuantileLoss": QuantileLoss,
         "QuantileLossMATLAB": QuantileLossMATLAB,
