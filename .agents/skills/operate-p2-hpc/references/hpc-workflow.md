@@ -27,6 +27,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 - `ML_RUN_CONTEXT=HPC` records context but must not prefix or otherwise change run names.
 - `ML_SOURCE_REVISION` records the staged checkout's Git revision. The dual runner additionally hashes its script and model module because uncommitted edits are not represented by the revision alone.
 - Preserve the explicit scratch-path cleanup guard and `MPLBACKEND=Agg` non-interactive behavior.
+- For new loss-trial routes, complete a GPU preflight through the same B1 diagnostics/archive path. Full runs may be submitted with `--dependency=afterok:<matching-preflight-id> --kill-on-invalid-dep=yes`; record dependencies and do not describe scheduler acceptance as GPU validation. If the preflight fails, inspect retained scratch/logs before any replacement submission.
 
 ## Slurm assumptions
 
