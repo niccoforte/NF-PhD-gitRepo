@@ -46,6 +46,12 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Field entry points
 
+- Dual architecture comparisons use the existing dual test runner's `--experiment`
+  and optional `--base-model-json`, with no new shell wrapper. Keep each change
+  separate, use unique labels and fixed split seed, retain all result/motion/design
+  diagnostics and gate production runs on an authorised GPU preflight. See its
+  README; private encoders do not mean complete task independence.
+
 - `FieldOutputs/A0-HPC_Field-test.py`: production-default single run for GCN, GAT, GNN, or Transformer.
 - `FieldOutputs/A0-HPC_Field-CrossModelHPO.py`: cross-model GCN/GAT/Transformer HPO.
 - Field models use node-level output and `MaskedFieldMSELoss`; MLP is not compatible with this contract.

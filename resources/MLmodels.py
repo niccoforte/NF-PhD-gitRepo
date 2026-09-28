@@ -69,7 +69,8 @@ class MODEL:
         w_init=None, 
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
         optTrial=None,
-        scan_matches_on_init=True
+        scan_matches_on_init=True,
+        graph_semantics="historical",
     ):
         self.typ = typ
         self.model_template = model
@@ -79,6 +80,9 @@ class MODEL:
         self.scheduler_cfg = scheduler
         self.w_init = w_init
         self.data = data
+        if graph_semantics not in {"historical", "fcc_initial_v1"}:
+            raise ValueError("Unknown graph_semantics.")
+        self.graph_semantics = graph_semantics
         _model_configure_sequence_input(typ, self.model, data=data)
         self.w_init_fn = resolve_weight_init(w_init, self.model)
         self.w_init_name = getattr(self.w_init_fn, "__name__", str(w_init)) if self.w_init_fn else None
@@ -133,6 +137,7 @@ class MODEL:
             data=self.data,
             batch=self.batch,
             dataloaders=dataloaders,
+            graph_semantics=self.graph_semantics,
         )
         _model_assign_task_components(self, mode, components)
         setattr(
@@ -1556,7 +1561,7 @@ def _model_scheduler(optimizer, scheduler):
 def _model_is_gnn_type(typ):
     return str(typ).lower() in ["gnn", "gcn", "gat"]
 
-def _model_task_graph(mode, data):
+def _model_task_graph(mode, data, graph_semantics="historical"):
     in_df = getattr(data, f"{mode}_IN_df")
     train_in_df = getattr(data, f"{mode}_train_in_df", None)
     if hasattr(train_in_df, "columns"):
@@ -1574,8 +1579,19 @@ def _model_task_graph(mode, data):
 
     nodes = in_df.loc[:, node_columns].iloc[0].to_numpy(dtype=float)
     nodes = nodes.reshape(len(node_columns)//2, 2)
-    edges = connectivity(data.LAT, nodes, data.geom)[:, 1:] - 1
-    edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
+    if graph_semantics == "fcc_initial_v1":
+        from resources.MLfield import reference_field_edges
+        if str(data.LAT).upper() != "FCC":
+            raise ValueError("fcc_initial_v1 requires FCC geometry.")
+        edges = reference_field_edges(nodes, mode)
+        # PyG message passing needs both directions for an undirected strut.
+        directed = np.concatenate([edges, edges[:, ::-1]], axis=0)
+    elif graph_semantics == "historical":
+        edges = connectivity(data.LAT, nodes, data.geom)[:, 1:] - 1
+        directed = edges
+    else:
+        raise ValueError("Unknown graph_semantics.")
+    edge_index = torch.tensor(directed, dtype=torch.long).t().contiguous()
     return nodes, edges, edge_index
 
 def _model_make_loaders(trainDS, valDS, testDS, batch, dataloaders, gnn=False):
@@ -1589,13 +1605,16 @@ def _model_make_loaders(trainDS, valDS, testDS, batch, dataloaders, gnn=False):
         loader(dataset=testDS, batch_size=batch, shuffle=False),
     )
 
-def _model_make_task_components(mode, typ, model, opt, lr, data, batch, dataloaders=None):
+def _model_make_task_components(mode, typ, model, opt, lr, data, batch, dataloaders=None, graph_semantics="historical"):
     components = {
         "model": model,
     }
 
     if _model_is_gnn_type(typ):
-        nodes, edges, edge_index = _model_task_graph(mode, data)
+        nodes, edges, edge_index = _model_task_graph(mode, data, graph_semantics)
+        if graph_semantics == "fcc_initial_v1" and mode == "FT" and len(nodes) == 800:
+            raise ValueError("Corrected legacy FT GNN training requires the native 788-node DATA view; "
+                             "its pooling does not implement canonical absent-node masks. Use DUAL_MODEL for padded FT.")
         train_x, val_x, test_x = (
             getattr(data, f"{mode}_train_in"),
             getattr(data, f"{mode}_val_in"),
@@ -2091,6 +2110,8 @@ def _mp_build_setup_signature(model_obj, include_data_values=True):
         "data_signature": _mp_collect_data_signature(model_obj),
         "model_structure": model_structure,
     }
+    if getattr(model_obj, "graph_semantics", "historical") != "historical":
+        signature["graph_semantics"] = model_obj.graph_semantics
     if include_data_values:
         data = getattr(model_obj, "data", None)
         fp = {}
@@ -2328,6 +2349,7 @@ def _model_reload_config(model_obj):
             "earlyStop": _model_earlystop_config(getattr(model_obj, "earlyStop", None)),
             "w_init": _mp_to_serializable(getattr(model_obj, "w_init", None)),
             "device": str(getattr(model_obj, "device", "")),
+            "graph_semantics": getattr(model_obj, "graph_semantics", "historical"),
         },
     }
 
@@ -2450,6 +2472,7 @@ def _model_from_json(
     scheduler = overrides.pop("scheduler", training_config.get("scheduler", None))
     earlyStop = overrides.pop("earlyStop", _model_build_earlystop(training_config.get("earlyStop")))
     w_init = overrides.pop("w_init", training_config.get("w_init", None))
+    graph_semantics = overrides.pop("graph_semantics", training_config.get("graph_semantics", "historical"))
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device = torch.device(device)
@@ -2468,6 +2491,7 @@ def _model_from_json(
         w_init=w_init,
         device=device,
         scan_matches_on_init=scan_matches_on_init,
+        graph_semantics=graph_semantics,
         **overrides,
     )
     model_obj.descriptor = descriptor

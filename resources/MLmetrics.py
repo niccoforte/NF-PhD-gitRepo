@@ -4397,13 +4397,71 @@ def postprocess_load_dual_run(run_path, *, load_model=False, data=None, device="
         model = DUAL_MODEL(
             DualStageTransformer.from_config(descriptor["model_config"]), objective,
             data=data, dataloaders=None if data is not None else {"train": []}, device=device,
-            **{k: training[k] for k in ("opt", "batch", "lr", "scheduler", "grad_clip", "curve_lr_factor") if k in training},
+            **{k: training[k] for k in ("opt", "batch", "lr", "scheduler", "grad_clip", "curve_lr_factor", "true_curve_weight") if k in training},
         ).load(artifacts["model_mdl"])
         model.best_epoch, model.best_loss = training["best_epoch"], training["best_loss"]
         model.history = loaded["loss_history"].to_dict("records")
         model.model_file, model.save_dir = str(artifacts["model_mdl"]), str(run)
         model.model.eval()
     return artifacts, loaded, data, model
+
+
+def dual_design_diagnostics(predictions, x_values, top_fraction=0.1, minimum_ut_strength=None):
+    """Validation-only design screening, not a Pareto search or a training loss.
+
+    UT integral ends at its own first post-peak 1%-strength crossing. FT uses
+    the full recorded domain: this is work, NOT J_IC/K_IC or fracture-initiation
+    work, because displacement-only exports do not identify that event.
+    """
+    if not 0 < top_fraction <= 1:
+        raise ValueError("top_fraction must lie in (0,1].")
+    report = {"scope": "validation diagnostics, no candidate generation or test-set selection", "tasks": {}}
+    for mode in ("UT", "FT"):
+        p = np.asarray(predictions[f"{mode}_val_curve_outputs"])
+        y = np.asarray(predictions[f"{mode}_val_curve_truth"])
+        x = np.asarray(x_values[mode]).reshape(-1)
+        if p.shape != y.shape or p.ndim != 2 or p.shape[1] != len(x) or not len(p):
+            raise ValueError("Require paired validation curves and their physical x axis.")
+        if not all(np.isfinite(a).all() for a in (p, y, x)) or not np.all(np.diff(x) > 0):
+            raise ValueError("Design diagnostics require finite curves and increasing physical x.")
+        def quantities(a):
+            peak = a.max(axis=1)
+            ends = []
+            crossed = []
+            for row, height in zip(a, peak):
+                start = int(row.argmax())
+                hits = np.flatnonzero(row[start:] <= .01*height) if mode == "UT" and height > 0 else []
+                ends.append(start+int(hits[0]) if len(hits) else len(row)-1)
+                crossed.append(bool(len(hits)))
+            area = np.array([np.trapz(row[:end+1], x[:end+1]) for row, end in zip(a, ends)])
+            return peak, np.asarray(ends), np.asarray(crossed), area
+        pp, pe, pc, pa = quantities(p)
+        yp, ye, yc, ya = quantities(y)
+        k = max(1, int(np.ceil(top_fraction*len(y))))
+        chosen = np.argsort(-pa, kind="stable")[:k]
+        best = np.argsort(-ya, kind="stable")[:k]
+        rank_y, rank_p = pd.Series(ya).rank(), pd.Series(pa).rank()
+        correlation = float(rank_y.corr(rank_p)) if rank_y.nunique() > 1 and rank_p.nunique() > 1 else None
+        task = {"n_samples": len(y), "top_count": k, "top_fraction": top_fraction,
+                "objective": "UT work to first post-peak 1% crossing" if mode == "UT" else "FT full-domain work proxy, not fracture toughness",
+                "rank_spearman": correlation,
+                "top_recovery": len(set(chosen)&set(best))/k,
+                "false_elite_fraction": 1-len(set(chosen)&set(best))/k,
+                "selection_regret": float(ya[best].mean()-ya[chosen].mean()),
+                "integral_mae": float(np.abs(pa-ya).mean()),
+                "peak_mae": float(np.abs(pp-yp).mean()),
+                "tied_objective_warning": len(np.unique(ya)) < len(ya) or len(np.unique(pa)) < len(pa)}
+        if mode == "UT":
+            both = pc & yc
+            task.update(true_cutoff_found=int(yc.sum()), predicted_cutoff_found=int(pc.sum()),
+                        cutoff_mae_when_both_found=float(np.abs(x[pe[both]]-x[ye[both]]).mean()) if both.any() else None)
+            if minimum_ut_strength is not None:
+                if not np.isfinite(minimum_ut_strength): raise ValueError("Strength threshold must be finite.")
+                accepted = pp >= minimum_ut_strength
+                task.update(minimum_strength=float(minimum_ut_strength), predicted_feasible=int(accepted.sum()),
+                            false_feasible=int((accepted & (yp < minimum_ut_strength)).sum()))
+        report["tasks"][mode] = task
+    return report
 
 
 def plot_dual_sample_errors(curves, fields):

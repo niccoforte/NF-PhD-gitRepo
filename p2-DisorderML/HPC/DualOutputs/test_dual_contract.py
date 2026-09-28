@@ -40,6 +40,111 @@ def _synthetic_split(rng, samples, nodes, field_features, curve_points, ft_node_
 
 
 class DualMLTest(unittest.TestCase):
+    def test_encoder_sharing_modes_and_reload(self):
+        batch = next(iter(self.data.make_dataloaders(2)["val"]))
+        for private in (0, 1, 2):
+            cfg = dict(d_model=8, n_heads=2, n_layers=2, dropout=0., private_layers=private)
+            net = DualStageTransformer.from_data(self.data, field_kwargs=cfg,
+                        curve_kwargs=dict(d_model=8, n_heads=2, n_layers=1, dropout=0.))
+            net.eval()
+            out = net(batch["geometry"], batch["task_features"], batch["node_mask"])
+            clone = DualStageTransformer.from_config(net.get_config())
+            clone.load_state_dict(net.state_dict(), strict=True)
+            clone.eval()
+            other = clone(batch["geometry"], batch["task_features"], batch["node_mask"])
+            torch.testing.assert_close(out["curve"]["FT"], other["curve"]["FT"])
+            if private:
+                out["field"]["UT"].sum().backward()
+                self.assertTrue(any(p.grad is not None for p in net.field_model.task_encoders["UT"].parameters()))
+                self.assertFalse(any(p.grad is not None for p in net.field_model.task_encoders["FT"].parameters()))
+            changed = {m: x.clone() for m,x in batch["task_features"].items()}
+            changed["FT"] += 13
+            torch.testing.assert_close(out["curve"]["UT"], net(batch["geometry"], changed, batch["node_mask"])["curve"]["UT"])
+
+    def test_local_graph_mask_geometry_and_checkpoint(self):
+        from resources.MLdual import LocalFieldGraph
+        cfg = dict(coords=self.data.metadata["canonical_coords"],
+                   edges={"UT": [[0,1],[1,2],[2,3],[3,4],[4,5]], "FT": [[0,2],[2,3],[3,4],[4,5]]},
+                   geometry_mean=self.data.normalizers["geometry"]["mean"], geometry_scale=self.data.normalizers["geometry"]["scale"])
+        net = DualStageTransformer.from_data(self.data, field_kwargs=dict(d_model=8,n_heads=2,n_layers=1,dropout=0.,local_graph=cfg),
+                   curve_kwargs=dict(d_model=8,n_heads=2,n_layers=1,dropout=0.))
+        batch = next(iter(self.data.make_dataloaders(2)["val"]))
+        net.eval()
+        before = net(batch["geometry"], batch["task_features"], batch["node_mask"])
+        changed = batch["geometry"].clone(); changed[:,1] += 100
+        after = net(changed, batch["task_features"], batch["node_mask"])
+        torch.testing.assert_close(before["field"]["FT"], after["field"]["FT"])
+        before["field"]["FT"].square().sum().backward()
+        self.assertTrue(any(p.grad is not None and p.grad.abs().sum() > 0 for p in net.field_model.local_graph.parameters()))
+        clone = DualStageTransformer.from_config(net.get_config()); clone.load_state_dict(net.state_dict()); clone.eval()
+        torch.testing.assert_close(before["field"]["FT"], clone(batch["geometry"],batch["task_features"],batch["node_mask"])["field"]["FT"])
+        self.assertEqual(sum(isinstance(m,LocalFieldGraph) for m in net.modules()),1)
+
+    def test_detached_interface_and_auxiliary_curve_training(self):
+        cfg = dict(d_model=8,n_heads=2,n_layers=1,dropout=0.)
+        net = DualStageTransformer.from_data(self.data, field_kwargs=cfg,curve_kwargs=cfg,detach_fields=True)
+        batch = next(iter(self.data.make_dataloaders(2)["val"]))
+        out = net(batch["geometry"],batch["task_features"],batch["node_mask"])
+        out["curve"]["UT"].square().mean().backward()
+        self.assertFalse(any(p.grad is not None for p in net.field_model.parameters()))
+        self.assertTrue(any(p.grad is not None for p in net.curve_model.parameters()))
+        trainer = DUAL_MODEL(net,DualLoss(),data=self.data,batch=2,device="cpu",true_curve_weight=.5)
+        trainer.train(1,verbose=0)
+        self.assertIn("train_auxiliary_true_curve_UT",trainer.history[0])
+        self.assertTrue(DualStageTransformer.from_config(net.get_config()).detach_fields)
+
+    def test_residual_normalization_is_train_only_and_invertible(self):
+        raw = {s:{"geometry":self.data.splits[s]["geometry"].copy(),
+                  "field":{m:self.data.inverse_field(m,self.data.splits[s]["field"][m]) for m in ("UT","FT")},
+                  "field_mask":self.data.splits[s]["field_mask"],
+                  "curve":self.data.splits[s]["curve"]} for s in ("train","val","test")}
+        def build():
+            return DUAL_DATA(raw,self.node_masks,self.task_features,residual_fields=True,residual_scale_floor=.1)
+        data = build()
+        valid = raw["val"]["field_mask"]["UT"]
+        np.testing.assert_allclose(data.inverse_field("UT",data.splits["val"]["field"]["UT"])[valid],raw["val"]["field"]["UT"][valid],rtol=1e-5,atol=1e-6)
+        np.testing.assert_allclose(data.splits["train"]["field"]["UT"].mean(axis=0),0,atol=1e-6)
+        raw["val"]["field"]["UT"] += 1000
+        again = build()
+        np.testing.assert_array_equal(data.normalizers["field"]["UT"]["scale"],again.normalizers["field"]["UT"]["scale"])
+        self.assertFalse(data.splits["train"]["field"]["FT"][:,1].any())
+
+    def test_design_screening_distinguishes_correct_and_reversed_rankings(self):
+        from resources.MLmetrics import dual_design_diagnostics
+        x=np.linspace(0,1,201); shape=np.maximum(0,1-np.abs(x-.3)/.3)
+        y=np.arange(1,21)[:,None]*shape
+        arrays={f"{m}_val_curve_{k}": y.copy() for m in ("UT","FT") for k in ("outputs","truth")}
+        good=dual_design_diagnostics(arrays,{m:x for m in ("UT","FT")},minimum_ut_strength=10)
+        self.assertEqual(good["tasks"]["UT"]["top_recovery"],1)
+        self.assertEqual(good["tasks"]["UT"]["integral_mae"],0)
+        arrays["UT_val_curve_outputs"]=y[::-1]
+        bad=dual_design_diagnostics(arrays,{m:x for m in ("UT","FT")})
+        self.assertEqual(bad["tasks"]["UT"]["top_recovery"],0)
+        self.assertLess(bad["tasks"]["UT"]["rank_spearman"],-.99)
+
+    def test_corrected_legacy_graph_is_explicit_and_handles_native_and_padded_ft(self):
+        from resources.MLmodels import _model_task_graph, _model_make_task_components
+        coords=np.asarray([(10*x,10*y) for y in range(20) for x in range(21)]+
+                          [(10*x+5,10*y+5) for y in range(19) for x in range(20)],float)
+        keep=~((coords[:,1]==95)&(coords[:,0]<118))
+        for mode,xy,count in (("UT",coords,2319),("FT",coords,2259),("FT",coords[keep],2259)):
+            frame=pd.DataFrame([xy.ravel()])
+            data=SimpleNamespace(LAT="FCC",**{f"{mode}_IN_df":frame,f"{mode}_train_in_df":frame})
+            _,edges,directed=_model_task_graph(mode,data,"fcc_initial_v1")
+            self.assertEqual(len(edges),count);self.assertEqual(directed.shape[1],2*count)
+            index={tuple(p):i for i,p in enumerate(xy)}
+            pairs={frozenset(e) for e in edges}
+            if mode=="FT":
+                node=index[(100,100)]
+                self.assertEqual(int((edges==node).sum()),5)
+                for neighbour in ((100,90),(95,95),(105,95)):
+                    if neighbour in index:self.assertNotIn(frozenset([node,index[neighbour]]),pairs)
+                self.assertIn(frozenset([index[(120,90)],index[(120,100)]]),pairs)
+                if len(xy) == 800:
+                    with self.assertRaisesRegex(ValueError, "native 788-node"):
+                        _model_make_task_components(mode, "GCN", None, None, None, data, 1,
+                                                    graph_semantics="fcc_initial_v1")
+
     def setUp(self):
         rng = np.random.default_rng(7)
         self.nodes = 6
@@ -431,6 +536,43 @@ class DualMLTest(unittest.TestCase):
         invalid[1, 0] += 1
         with self.assertRaisesRegex(ValueError, "Reference coordinates"):
             dual_node_context(invalid, data.task_features["UT"][:, 2], data.node_masks)
+
+    def test_initial_crack_face_is_opt_in_and_not_a_tip_node(self):
+        from resources.MLdual import dual_node_context
+
+        coords = np.asarray([(10*x, 10*y) for y in range(20) for x in range(21)] +
+                            [(10*x+5, 10*y+5) for y in range(19) for x in range(20)], dtype=float)
+        masks = {"UT": np.ones(800, dtype=bool),
+                 "FT": ~((coords[:, 1] == 95) & (coords[:, 0] < 118))}
+        designable = (coords[:, 0] > 0) & (coords[:, 0] < 200) & (coords[:, 1] > 0) & (coords[:, 1] < 190)
+        old, old_names, _ = dual_node_context(coords, designable, masks)
+        features, names, spec = dual_node_context(coords, designable, masks, crack_face=True)
+        self.assertEqual(len(old_names), 11)
+        self.assertEqual(names, old_names + ["initial_crack_face"])
+        expected = np.isin(coords[:, 1], [90, 100]) & (coords[:, 0] <= 120)
+        self.assertEqual(int(expected.sum()), 26)
+        np.testing.assert_array_equal(features["FT"][:, -1], expected)
+        self.assertFalse(features["UT"][:, -1].any())
+        for mode in masks:
+            np.testing.assert_array_equal(features[mode][:, :-1], old[mode])
+        np.testing.assert_array_equal(spec["nominal_tip"], [120, 95])
+        self.assertFalse(np.any(np.all(coords == spec["nominal_tip"], axis=1)))
+        for point, dy in (([120, 90], -.03125), ([120, 100], .03125)):
+            i = np.flatnonzero(np.all(coords == point, axis=1))[0]
+            np.testing.assert_allclose(features["FT"][i, 8:11], [0, dy, .03125])
+        order = np.random.default_rng(5).permutation(800)
+        moved, _, _ = dual_node_context(coords[order]*.001 + [3, 4], designable[order],
+                                        {m: v[order] for m, v in masks.items()}, crack_face=True)
+        # Check crack context independently of pin-circle boundary rounding.
+        np.testing.assert_allclose(moved["FT"][:, 8:], features["FT"][order, 8:], atol=1e-6)
+        with self.assertRaisesRegex(ValueError, "fcc_ti"):
+            dual_node_context(coords, designable, masks, profile="shared", crack_face=True)
+
+        # The file adapter must not accidentally forward this option to legacy DATA.
+        with patch("resources.MLdual.DATA") as loader, patch.object(DUAL_DATA, "from_data") as adapter:
+            DUAL_DATA.from_files(path="unused", crack_face=True)
+            self.assertNotIn("crack_face", loader.call_args.kwargs)
+            self.assertTrue(adapter.call_args.kwargs["crack_face"])
 
     def test_physical_curve_loss_keeps_joint_gradients(self):
         from resources.MLfunc import CombinedCurveLoss

@@ -307,6 +307,8 @@ All maintained notebooks stay in `p2-DisorderML/code/`. **Do not create scripts 
 
 ### Controlled displacement-loss trials
 
+For a new dual feature ablation, `DUAL_DATA.from_data(..., crack_face=True)` or `from_files(..., crack_face=True)` appends `initial_crack_face`: retained FT nodes losing initial UT connections (26 nodes on the current FCC body), with zero values for UT. Defaults retain 11 context channels; the opt-in model has 12 and must not be attached to an old 11-channel checkpoint. The nominal tip is a point on a retained strut, not a node. This option does not add damage prediction or graph-aware attention; existing runs and HPO configurations are unchanged.
+
 `resources/MLfield.py` adds **opt-in** signed spatial and temporal supervision to masked displacement MSE. Physical differences use the existing affine field scaler and training-only jump scales. Periodic FCC connectivity supplies neighbours; the FT initial cut removes absent connections. Incident edge errors average by node. Optional localisation weights depend on each target specimen's jumps, are capped and normalised, and do not assume a crack path. Defaults and old checkpoints remain unchanged.
 
 Run one named ablation per job through the existing home → scratch → archive workflow. `FieldOutputs/A0-HPC_Field-lossTrial.py` reads the exact archived independent HPO architecture and training configuration; `DualOutputs/A0-HPC-Dual-lossTrial.py` uses the HPO-informed Trial 1 capacity. Both default to full data and up to 450 epochs. Use `--field-loss-variant baseline`, `spatial`, `temporal` or `both`; initial spatial/temporal coefficients are 0.1, exploratory rather than optimised. Compare these before adding `weighted --localization-gain 2` to the selected formulation (individual coefficients can be zero to retain only the selected term).
@@ -326,6 +328,15 @@ Standard results now have optional motion CSVs/definitions and component loss lo
 The `FIELD_LOSS` dictionary in the Field/Dual Outputs notebooks enables these losses for fresh models; `None` preserves the legacy default. The existing HPO study/space is unchanged. Preserve existing trial/test/HPO scripts unless explicitly asked to remove them. Submission status and blockers are recorded in `p2-DisorderML/PROJECT_STATUS.md`.
 
 ### Joint dual-output surrogate details
+
+Opt-in architecture/interface experiments reuse the existing dual runner: baseline,
+crack-face-only, local graph, partial/private field encoders, true-field curve
+supervision, stopped interface gradients, residual fields and localisation weights.
+See [the experiment guide](p2-DisorderML/HPC/DualOutputs/README.md) for matched
+configuration anchors, split/seed controls, diagnostics and the precise distinction
+between private encoders and fully independent legacy pipelines. Preparation does
+not submit jobs. [Follow-up task briefs](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md)
+cover damage-on-struts export and field-only optimisation feasibility.
 
 The first real-data smoke run completed on Apocrita (job 25868425). See `p2-DisorderML/samples/hpc-test-report.md` for its execution evidence and limitations. `HPC/DualOutputs/A0-HPC-Dual-trial1.py` is the HPO-informed full-data preset; its adjacent README records the independent HPO sources and intentional architectural differences. Both scripts share the same runner and result collection.
 

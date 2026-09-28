@@ -159,13 +159,15 @@ def _apply_standardizer(values, stats, mask=None):
     return np.where(valid, output, 0.0).astype(np.float32)
 
 
-def dual_node_context(coords, designable, node_masks, profile="fcc_ti"):
+def dual_node_context(coords, designable, node_masks, profile="fcc_ti", crack_face=False):
     """Reference context in a common schema; pin membership is updated per sample.
 
     The named production profile is deliberately restricted to the current
     20-by-19 FCC body and Ti/Al A1 pin geometry. It accepts uniform coordinate
     rescaling/translation, but refuses an unrecognised lattice or crack mask.
     ``shared`` is an explicit geometry-only option for synthetic/custom data.
+    ``crack_face`` appends initial connection-loss membership, not evolving damage.
+    It is opt-in to preserve existing eleven-channel checkpoints and experiments.
     """
     coords = np.asarray(coords, dtype=float)
     origin = coords.min(axis=0)
@@ -179,6 +181,8 @@ def dual_node_context(coords, designable, node_masks, profile="fcc_ti"):
     spec = {"profile": profile, "origin": origin, "span": span,
             "shared_features": names[:3], "coordinate_units": "input-coordinate units (not inferred SI units)"}
     if profile == "shared":
+        if crack_face:
+            raise ValueError("crack_face requires the validated fcc_ti context profile.")
         return features, names, spec
     if profile != "fcc_ti":
         raise ValueError("context_profile must be 'fcc_ti' or explicit geometry-only 'shared'.")
@@ -198,6 +202,7 @@ def dual_node_context(coords, designable, node_masks, profile="fcc_ti"):
     width = span[0] / 1.25
     fixed = origin + [span[0] - width, span[1] / 2 - .375 * width]
     moving = origin + [span[0] - width, span[1] / 2 + .375 * width]
+    # Nominal tip lies on the first intact vertical strut, not a lattice node.
     tip = origin + [.75 * width, span[1] / 2]
     names += ["bottom_interface", "top_interface", "coupled_fixity", "coupled_load",
               "tip_dx_ref", "tip_dy_ref", "tip_distance_ref"]
@@ -211,6 +216,19 @@ def dual_node_context(coords, designable, node_masks, profile="fcc_ti"):
             extra[:, 4:6] = offset
             extra[:, 6] = np.linalg.norm(offset, axis=1)
         features[mode] = np.column_stack([features[mode], extra])
+    if crack_face:
+        from resources.MLfield import reference_field_edges
+
+        degrees = {
+            mode: np.bincount(reference_field_edges(coords, mode, node_masks[mode]).ravel(),
+                              minlength=len(coords))
+            for mode in DUAL_MODES
+        }
+        face = np.asarray(node_masks["FT"], dtype=bool) & (degrees["UT"] > degrees["FT"])
+        names.append("initial_crack_face")
+        features["UT"] = np.column_stack([features["UT"], np.zeros(len(coords), dtype=np.float32)])
+        features["FT"] = np.column_stack([features["FT"], face.astype(np.float32)])
+        spec["initial_crack_face_definition"] = "Retained FT node losing incident edges under the initial UT-to-FT cut; UT=0. Not damage."
     spec.update({"cell_size": cell, "W": width, "fixed_pin": fixed, "moving_pin": moving,
                  "pin_radius": .1875 * width / 2, "nominal_tip": tip,
                  "pin_feature_indices": [6, 7], "feature_names": names,
@@ -296,6 +314,8 @@ class DUAL_DATA:
         metadata=None,
         geometry_feature_names=None,
         task_feature_names=None,
+        residual_fields=False,
+        residual_scale_floor=0.1,
     ):
         self.mechMode = "MULTI"
         self.input_kind = "geometry"
@@ -304,6 +324,12 @@ class DUAL_DATA:
         self.FTmechTest = True
         self.normalization = _normalization_flags(normalize)
         self.metadata = dict(metadata or {})
+        self.residual_fields = bool(residual_fields)
+        self.residual_scale_floor = float(residual_scale_floor)
+        if self.residual_fields:
+            if not self.normalization["field"] or not 0 < self.residual_scale_floor <= 1:
+                raise ValueError("Residual fields require normalization and a scale floor in (0,1].")
+            self.metadata["field_representation"] = {"kind": "train_mean_residual", "scale_floor": self.residual_scale_floor}
         self.geometry_feature_names = list(geometry_feature_names or ["dx", "dy"])
         self.task_feature_names = list(task_feature_names or [])
 
@@ -459,6 +485,17 @@ class DUAL_DATA:
                 if self.normalization["curve"]
                 else _identity_standardizer(train["curve"][mode], axes=(0, 1))
             )
+            if self.residual_fields:
+                values = np.asarray(train["field"][mode], dtype=np.float64)
+                valid = train["field_mask"][mode] & np.isfinite(values)
+                count = valid.sum(axis=0, keepdims=True)
+                mean = np.where(valid, values, 0).sum(axis=0, keepdims=True)/np.maximum(count, 1)
+                variance = np.where(valid, (values-mean)**2, 0).sum(axis=0, keepdims=True)/np.maximum(count, 1)
+                # Same frame/component floor everywhere: do not amplify quiet nodes without bound.
+                floor = np.maximum(self.residual_scale_floor*field_stats[mode]["scale"], 1e-8)
+                scale = np.maximum(np.sqrt(variance), floor)
+                field_stats[mode] = {"mean": mean.astype(np.float32),
+                                     "scale": np.where(count > 0, scale, 1).astype(np.float32)}
         return {"geometry": geometry_stats, "field": field_stats, "curve": curve_stats}
 
     def _normalize_splits(self):
@@ -484,6 +521,9 @@ class DUAL_DATA:
         context_profile="fcc_ti",
         extra_task_features=None,
         extra_task_feature_names=None,
+        crack_face=False,
+        residual_fields=False,
+        residual_scale_floor=0.1,
     ):
         if not all(bool(getattr(data, f"{mode}mechTest", False)) for mode in DUAL_MODES):
             raise ValueError("DUAL_DATA requires aligned UT and FT data.")
@@ -552,7 +592,7 @@ class DUAL_DATA:
             raise ValueError("UT designable-node mask cannot be aligned to the canonical body nodes.")
 
         task_features, base_feature_names, context_spec = dual_node_context(
-            canonical_coords, designable, node_masks, profile=context_profile
+            canonical_coords, designable, node_masks, profile=context_profile, crack_face=crack_face
         )
         extra_names = list(extra_task_feature_names or [])
         extra_feature_count = None
@@ -666,6 +706,8 @@ class DUAL_DATA:
             metadata=metadata,
             geometry_feature_names=["dx", "dy"],
             task_feature_names=base_feature_names + extra_names,
+            residual_fields=residual_fields,
+            residual_scale_floor=residual_scale_floor,
         )
 
     @classmethod
@@ -677,6 +719,9 @@ class DUAL_DATA:
         context_profile="fcc_ti",
         extra_task_features=None,
         extra_task_feature_names=None,
+        crack_face=False,
+        residual_fields=False,
+        residual_scale_floor=0.1,
         **data_kwargs,
     ):
         required = {
@@ -704,6 +749,9 @@ class DUAL_DATA:
             context_profile=context_profile,
             extra_task_features=extra_task_features,
             extra_task_feature_names=extra_task_feature_names,
+            crack_face=crack_face,
+            residual_fields=residual_fields,
+            residual_scale_floor=residual_scale_floor,
         )
 
     def make_dataloaders(self, batch_size=4, num_workers=0, pin_memory=False):
@@ -761,12 +809,52 @@ def _sinusoidal_encoding(length, d_model):
     return encoding.unsqueeze(0)
 
 
+class LocalFieldGraph(nn.Module):
+    """One shared, degree-averaged message step on task-specific initial struts.
+
+    Edges are unique undirected pairs; both message directions are constructed
+    here. Geometry is initial/disordered, never the predicted displacement.
+    """
+
+    def __init__(self, d_model, coords, edges, geometry_mean, geometry_scale):
+        super().__init__()
+        self.config = _json_safe(dict(coords=coords, edges=edges,
+                                     geometry_mean=geometry_mean, geometry_scale=geometry_scale))
+        self.register_buffer("coords", torch.as_tensor(coords, dtype=torch.float32))
+        self.register_buffer("geometry_mean", torch.as_tensor(geometry_mean, dtype=torch.float32))
+        self.register_buffer("geometry_scale", torch.as_tensor(geometry_scale, dtype=torch.float32))
+        for mode in DUAL_MODES:
+            pairs = torch.as_tensor(edges[mode], dtype=torch.long).reshape(-1, 2)
+            if not len(pairs) or pairs.min() < 0 or pairs.max() >= len(coords):
+                raise ValueError("Invalid local graph endpoints.")
+            if torch.any(pairs[:, 0] == pairs[:, 1]) or len(torch.unique(pairs.sort(1).values, dim=0)) != len(pairs):
+                raise ValueError("Local edges must be unique undirected non-self pairs.")
+            self.register_buffer(f"edges_{mode}", pairs)
+        self.message = nn.Sequential(nn.Linear(2*d_model+3, d_model), nn.GELU(), nn.Linear(d_model, d_model))
+        self.norm = nn.LayerNorm(d_model)
+
+    def forward(self, tokens, geometry, mode, mask):
+        pairs = getattr(self, f"edges_{mode}")
+        src = torch.cat([pairs[:, 0], pairs[:, 1]])
+        dst = torch.cat([pairs[:, 1], pairs[:, 0]])
+        xy = self.coords + geometry*self.geometry_scale + self.geometry_mean
+        # Dimensionless vectors retain direction and specimen-dependent length.
+        length_scale = (self.coords.max(0).values-self.coords.min(0).values).max().clamp_min(1e-8)
+        delta = (xy[:, src]-xy[:, dst])/length_scale
+        valid = mask[:, src] & mask[:, dst]
+        msg = self.message(torch.cat([tokens[:, dst], tokens[:, src], delta, delta.norm(dim=-1, keepdim=True)], -1))
+        msg = msg.masked_fill(~valid.unsqueeze(-1), 0.)
+        aggregate = torch.zeros_like(tokens).index_add(1, dst, msg)
+        degree = tokens.new_zeros((*tokens.shape[:2], 1)).index_add(1, dst, valid.unsqueeze(-1).to(tokens.dtype))
+        return (tokens+self.norm(aggregate/degree.clamp_min(1))).masked_fill(~mask.unsqueeze(-1), 0.)
+
+
 class DualTaskTransformer(nn.Module):
-    """One shared Transformer encoder with UT and FT task conditioning/heads.
+    """Task-conditioned shared Transformer with optional private encoder tails.
 
     ``tokenizer`` is a per-node linear projection: it changes feature width but
-    does not mix information between nodes. Cross-node mixing begins only in
-    ``encoder``, after each task's node mask has been applied.
+    does not mix information between nodes. Cross-node mixing begins in the
+    optional local graph or encoder, after each task's mask has been applied.
     """
 
     def __init__(
@@ -789,6 +877,8 @@ class DualTaskTransformer(nn.Module):
         head_dropout=None,
         attention_dropout=None,
         head_hidden_mult=0,
+        private_layers=0,
+        local_graph=None,
     ):
         super().__init__()
         self.in_sizes = _mode_sizes(in_size, "in_size")
@@ -808,6 +898,12 @@ class DualTaskTransformer(nn.Module):
         self.head_dropout = self.dropout if head_dropout is None else float(head_dropout)
         self.attention_dropout = self.dropout if attention_dropout is None else float(attention_dropout)
         self.head_hidden_mult = int(head_hidden_mult)
+        self.private_layers = int(private_layers)
+        if not 0 <= self.private_layers <= self.n_layers:
+            raise ValueError("private_layers must lie between zero and n_layers.")
+        self.local_graph = LocalFieldGraph(self.d_model, **local_graph) if local_graph else None
+        if local_graph and (self.pool != "node" or set(self.in_sizes.values()) != {2}):
+            raise ValueError("Local graph is only supported on the geometry-to-field stage.")
         self.use_cls_token = self.pool == "cls" if use_cls_token is None else bool(use_cls_token)
 
         if self.seq_len < 1:
@@ -861,9 +957,13 @@ class DualTaskTransformer(nn.Module):
             bias=self.bias,
             norm_first=self.norm_first,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=self.n_layers)
-        for layer in self.encoder.layers:
-            layer.self_attn.dropout = self.attention_dropout
+        encoder_layer.self_attn.dropout = self.attention_dropout
+        shared_layers = self.n_layers-self.private_layers
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=shared_layers) if shared_layers else None
+        self.task_encoders = nn.ModuleDict({
+            mode: nn.TransformerEncoder(encoder_layer, num_layers=self.private_layers)
+            for mode in DUAL_MODES
+        }) if self.private_layers else None
         self.heads = nn.ModuleDict(
             {
                 mode: nn.Sequential(
@@ -948,6 +1048,9 @@ class DualTaskTransformer(nn.Module):
             task_id = torch.full((batch_size,), task_index, dtype=torch.long, device=values.device)
             task_tokens = task_tokens + self.task_embedding(task_id).unsqueeze(1)
 
+            if self.local_graph is not None:
+                task_tokens = self.local_graph(task_tokens, masked_values, mode, mask)
+
             if self.use_cls_token:
                 cls = self.cls_token.expand(batch_size, -1, -1) + self.task_embedding(task_id).unsqueeze(1)
                 task_tokens = torch.cat([cls, task_tokens], dim=1)
@@ -964,8 +1067,11 @@ class DualTaskTransformer(nn.Module):
 
         stacked_tokens = torch.cat(tokens, dim=0)
         stacked_mask = torch.cat(masks, dim=0)
-        encoded = self.encoder(stacked_tokens, src_key_padding_mask=~stacked_mask)
+        encoded = self.encoder(stacked_tokens, src_key_padding_mask=~stacked_mask) if self.encoder is not None else stacked_tokens
         encoded_by_task = dict(zip(DUAL_MODES, encoded.split(batch_size, dim=0)))
+        if self.task_encoders is not None:
+            encoded_by_task = {mode: self.task_encoders[mode](encoded_by_task[mode], src_key_padding_mask=~mask)
+                               for mode, mask in zip(DUAL_MODES, masks)}
 
         outputs = {}
         for mode, task_encoded, mask in zip(DUAL_MODES, encoded_by_task.values(), masks):
@@ -1004,13 +1110,15 @@ class DualTaskTransformer(nn.Module):
             "head_dropout": self.head_dropout,
             "attention_dropout": self.attention_dropout,
             "head_hidden_mult": self.head_hidden_mult,
+            "private_layers": self.private_layers,
+            "local_graph": self.local_graph.config if self.local_graph is not None else None,
         }
 
 
 class DualStageTransformer(nn.Module):
     """Two jointly trained dual-task Transformers connected in series."""
 
-    def __init__(self, field_model, curve_model):
+    def __init__(self, field_model, curve_model, detach_fields=False):
         super().__init__()
         if field_model.pool != "node":
             raise ValueError("field_model must use pool='node'.")
@@ -1022,11 +1130,18 @@ class DualStageTransformer(nn.Module):
             raise ValueError("Field output sizes must match curve-stage input sizes for each task.")
         self.field_model = field_model
         self.curve_model = curve_model
+        self.detach_fields = bool(detach_fields)
 
     @classmethod
-    def from_data(cls, data, field_kwargs=None, curve_kwargs=None):
+    def from_data(cls, data, field_kwargs=None, curve_kwargs=None, detach_fields=False):
         field_kwargs = dict(field_kwargs or {})
         curve_kwargs = dict(curve_kwargs or {})
+        if field_kwargs.get("local_graph") is True:
+            from resources.MLfield import reference_field_edges
+            coords = data.metadata["canonical_coords"]
+            field_kwargs["local_graph"] = dict(coords=coords, edges={
+                mode: reference_field_edges(coords, mode, data.node_masks[mode]) for mode in DUAL_MODES
+            }, geometry_mean=data.normalizers["geometry"]["mean"], geometry_scale=data.normalizers["geometry"]["scale"])
         field_model = DualTaskTransformer(
             in_size=data.geometry_feature_size,
             out_size=data.field_feature_sizes,
@@ -1043,7 +1158,7 @@ class DualStageTransformer(nn.Module):
             pool=curve_kwargs.pop("pool", "cls"),
             **curve_kwargs,
         )
-        return cls(field_model, curve_model)
+        return cls(field_model, curve_model, detach_fields=detach_fields)
 
     def forward(self, geometry, task_features=None, node_masks=None):
         fields = self.field_model(
@@ -1052,7 +1167,7 @@ class DualStageTransformer(nn.Module):
             node_masks=node_masks,
         )
         curves = self.curve_model(
-            fields,
+            {mode: field.detach() for mode, field in fields.items()} if self.detach_fields else fields,
             task_features=task_features,
             node_masks=node_masks,
         )
@@ -1062,6 +1177,7 @@ class DualStageTransformer(nn.Module):
         return {
             "field_model": self.field_model.get_config(),
             "curve_model": self.curve_model.get_config(),
+            "detach_fields": self.detach_fields,
         }
 
     @classmethod
@@ -1069,6 +1185,7 @@ class DualStageTransformer(nn.Module):
         return cls(
             DualTaskTransformer(**dict(config["field_model"])),
             DualTaskTransformer(**dict(config["curve_model"])),
+            detach_fields=config.get("detach_fields", False),
         )
 
 
@@ -1207,6 +1324,7 @@ class DUAL_MODEL:
         grad_clip=None,
         curve_lr_factor=1.0,
         selection_metric=None,
+        true_curve_weight=0.0,
     ):
         if not isinstance(model, DualStageTransformer):
             raise TypeError("DUAL_MODEL requires a DualStageTransformer.")
@@ -1222,6 +1340,9 @@ class DUAL_MODEL:
         self.grad_clip = grad_clip
         self.curve_lr_factor = float(curve_lr_factor)
         self.selection_metric = selection_metric
+        self.true_curve_weight = float(true_curve_weight)
+        if not math.isfinite(self.true_curve_weight) or self.true_curve_weight < 0:
+            raise ValueError("true_curve_weight must be finite and nonnegative.")
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
         self.model.to(self.device)
         self.lossf.to(self.device)
@@ -1277,6 +1398,16 @@ class DUAL_MODEL:
                     targets,
                     field_masks=batch["field_mask"],
                 )
+                if self.true_curve_weight:
+                    true_curves = self.model.curve_model(batch["field"], batch["task_features"], batch["node_mask"])
+                    auxiliary = {}
+                    for mode in DUAL_MODES:
+                        scale = getattr(self.lossf, f"curve_scale_{mode}")
+                        mean = getattr(self.lossf, f"curve_mean_{mode}")
+                        term = self.lossf.curve_losses[mode](true_curves[mode]*scale+mean, batch["curve"][mode]*scale+mean)
+                        auxiliary[mode] = self.true_curve_weight*self.lossf.weights["curve"][mode]*term/self.lossf.scales["curve"][mode]
+                    loss = loss+sum(auxiliary.values())
+                    details["auxiliary"] = {"true_curve": auxiliary}
                 if not torch.isfinite(loss):
                     raise FloatingPointError("Non-finite joint loss; refusing to continue training.")
                 if training:
@@ -1444,6 +1575,7 @@ class DUAL_MODEL:
                 "scheduler": self.scheduler_cfg,
                 "grad_clip": self.grad_clip,
                 "curve_lr_factor": self.curve_lr_factor,
+                "true_curve_weight": self.true_curve_weight,
                 "selection_metric": "fixed dual validation score" if self.selection_metric else "joint loss",
                 "best_epoch": self.best_epoch,
                 "best_loss": self.best_loss,

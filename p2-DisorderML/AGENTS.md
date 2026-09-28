@@ -54,6 +54,8 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 
 ## Target Dual-Output Architecture
 
+- The following describes the unchanged default. Optional controlled experiments in the existing runner may separate field encoder blocks, add one local graph message block, change the field residual coordinates, or diagnose the serial gradient interface. The curve stage/default checkpoints and legacy MODEL routes remain intact. `private` is explicitly encoder-only separation, not complete independence of UT and FT. Keep each first comparison isolated; see HPC/DualOutputs README and HANDOFFS.md.
+
 - The unified surrogate has exactly two Transformer stages in series: one dual-output geometry-to-field stage and one dual-output field-to-curve stage.
 - Within each stage, UT and FT are task-conditioned parallel streams through one shared Transformer encoder and two small output heads. They are stacked along the batch dimension for one encoder call; they are not independent task Transformers.
 - The canonical representation retains the UT node count for both streams. `FT present=0` identifies crack-region nodes and must also act as an operational attention/field-loss mask so those nodes cannot influence FT predictions.

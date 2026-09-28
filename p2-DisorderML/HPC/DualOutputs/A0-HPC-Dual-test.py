@@ -23,6 +23,14 @@ def parse_args(argv=None):
     parser.add_argument("--split-frac", type=float, default=0.9)
     parser.add_argument("--range-split", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--split-seed", type=int, default=None, help="Experiments default to fixed split 42 independently of training seed.")
+    parser.add_argument("--experiment", choices=["baseline", "crack_face", "local_graph", "partial", "private", "true_field", "detach", "residual", "localization"],
+                        help="One opt-in change relative to baseline; never mutates an HPO study.")
+    parser.add_argument("--base-model-json", help="Reuse saved dual architecture/loss/training settings, not weights; CLI overrides still apply.")
+    parser.add_argument("--private-layers", type=int, default=1)
+    parser.add_argument("--true-curve-weight", type=float, default=0.5)
+    parser.add_argument("--residual-scale-floor", type=float, default=0.1)
+    parser.add_argument("--minimum-ut-strength", type=float, default=None, help="Optional physical screening threshold; no arbitrary threshold is assumed.")
     parser.add_argument("--epochs", type=int, default=450)
     parser.add_argument("--batch", type=int, default=4)
     parser.add_argument("--lr", type=float, default=2e-4)
@@ -37,6 +45,12 @@ def parse_args(argv=None):
         parser.add_argument(f"--{stage}-n-layers", type=int, default=3)
         parser.add_argument(f"--{stage}-ff-mult", type=int, default=4)
         parser.add_argument(f"--{stage}-dropout", type=float, default=0.1)
+        parser.add_argument(f"--{stage}-head-dropout", type=float, default=None)
+        parser.add_argument(f"--{stage}-attention-dropout", type=float, default=None)
+        parser.add_argument(f"--{stage}-head-hidden-mult", type=int, default=0)
+        parser.add_argument(f"--{stage}-activation", choices=["relu", "gelu"], default=None)
+        parser.add_argument(f"--{stage}-position", choices=["none", "learned", "sinusoidal"], default=None)
+        parser.add_argument(f"--{stage}-norm-first", action=argparse.BooleanOptionalAction, default=False)
         for mode in ("ut", "ft"):
             parser.add_argument(f"--{stage}-{mode}-weight", type=float, default=1.0)
     parser.add_argument("--encoder-act", choices=["gelu", "relu"], default="gelu")
@@ -65,7 +79,53 @@ def parse_args(argv=None):
     parser.add_argument("--early-stop-delta", type=float, default=1e-5)
     parser.add_argument("--verbose", type=int, default=1)
     parser.add_argument("--allow-cpu", action="store_true", help="Allow CPU execution for local/debug runs.")
+    parser.add_argument("--optimizer", choices=["adamw", "adam"], default="adamw")
+    parser.add_argument("--curve-lr-factor", type=float, default=1.)
+    parser.add_argument("--grad-clip", type=float, default=None)
+    initial, _ = parser.parse_known_args(argv)
+    if initial.base_model_json:
+        descriptor = json.loads(Path(initial.base_model_json).read_text())
+        if descriptor.get("kind") != "dual-stage-transformer":
+            parser.error("--base-model-json requires a dual checkpoint descriptor.")
+        defaults = {}
+        for stage in ("field", "curve"):
+            cfg = descriptor["model_config"][f"{stage}_model"]
+            if cfg.get("private_layers", 0) or cfg.get("local_graph"):
+                parser.error("The experiment anchor must be a fully shared, non-graph baseline.")
+            for key in ("d_model", "n_heads", "n_layers", "ff_mult", "dropout", "head_dropout", "attention_dropout", "head_hidden_mult", "activation", "norm_first"):
+                if key in cfg: defaults[f"{stage}_{key}"] = cfg[key]
+            defaults[f"{stage}_position"] = cfg.get("pos_encoding", "none")
+        cfg = descriptor["model_config"]["curve_model"]
+        defaults.update(curve_pool=cfg["pool"], curve_cls_token=cfg["use_cls_token"])
+        training = descriptor["training"]
+        defaults.update({k: training[k] for k in ("batch", "lr", "curve_lr_factor", "grad_clip") if k in training})
+        defaults.update(optimizer=training["opt"][0], weight_decay=training["opt"][1])
+        recorded = descriptor.get("metadata", {}).get("run_config", {})
+        if "early_stop_patience" in recorded:
+            defaults["early_stop_patience"] = recorded["early_stop_patience"]
+        if recorded.get("curve_loss") in {"mse", "combined"}:
+            defaults["loss"] = recorded["curve_loss"]
+        if training.get("scheduler"):
+            s = training["scheduler"]
+            defaults.update(scheduler_factor=s[2], scheduler_patience=s[3], scheduler_threshold=s[4])
+        for kind, modes in descriptor["loss_config"]["weights"].items():
+            defaults.update({f"{kind}_{mode.lower()}_weight": weight for mode, weight in modes.items()})
+        # Loss modules themselves are restored below; their full definitions are not guessed from CLI names.
+        parser.set_defaults(**defaults)
     args = parser.parse_args(argv)
+    if args.base_model_json and not args.experiment:
+        parser.error("--base-model-json is for fresh --experiment runs, not resume.")
+    if args.experiment:
+        args.fixed_selection_score = True
+        if args.eval_split != "val": parser.error("Development experiments must use validation, not locked test.")
+        if args.split_seed is None: args.split_seed = 42
+        if args.field_loss_variant: parser.error("Do not combine experiment and independent loss-ablation switches.")
+        if args.experiment == "partial" and not 0 < args.private_layers < args.field_n_layers:
+            parser.error("Partial sharing requires 0 < private-layers < field-n-layers.")
+        if args.experiment == "localization" and args.localization_gain < 0:
+            parser.error("Localization gain cannot be negative.")
+        if args.experiment == "residual" and not 0 < args.residual_scale_floor <= 1:
+            parser.error("Residual scale floor must lie in (0,1].")
     try:
         args.nsims = None if str(args.nsims).lower() == "all" else int(args.nsims)
     except ValueError:
@@ -152,7 +212,9 @@ def main(argv=None, preset=None):
 
     print(f"Loading paired data: {args.data_path}; nsims={args.nsims or 'all'}", flush=True)
     data = DUAL_DATA.from_files(
-        path=args.data_path, nsims=args.nsims, split_frac=args.split_frac, split_seed=args.seed,
+        path=args.data_path, nsims=args.nsims, split_frac=args.split_frac, split_seed=args.split_seed if args.split_seed is not None else args.seed,
+        crack_face=args.experiment == "crack_face",
+        residual_fields=args.experiment == "residual", residual_scale_floor=args.residual_scale_floor,
         range_split=(args.range_split, False), load_split=False, save_split=False,
         LAT="FCC", nnx=20, dis="disNodes", dN=0.2, d_data="in", freq=False,
         field_input_config={
@@ -172,13 +234,18 @@ def main(argv=None, preset=None):
 
     stage_config = {
         stage: {
-            **{key: getattr(args, f"{stage}_{key}") for key in ("d_model", "n_heads", "n_layers", "ff_mult", "dropout")},
-            "activation": args.encoder_act, "pos_encoding": args.pos_encoding,
+            **{key: getattr(args, f"{stage}_{key}") for key in ("d_model", "n_heads", "n_layers", "ff_mult", "dropout", "head_dropout", "attention_dropout", "head_hidden_mult", "norm_first")},
+            "activation": getattr(args, f"{stage}_activation") or args.encoder_act,
+            "pos_encoding": getattr(args, f"{stage}_position") or args.pos_encoding,
         }
         for stage in ("field", "curve")
     }
     stage_config["curve"].update(pool=args.curve_pool, use_cls_token=args.curve_cls_token)
-    network = DualStageTransformer.from_data(data, field_kwargs=stage_config["field"], curve_kwargs=stage_config["curve"])
+    stage_config["field"].update(private_layers=args.field_n_layers if args.experiment == "private" else
+                                  args.private_layers if args.experiment == "partial" else 0,
+                                  local_graph=args.experiment == "local_graph")
+    network = DualStageTransformer.from_data(data, field_kwargs=stage_config["field"], curve_kwargs=stage_config["curve"],
+                                             detach_fields=args.experiment == "detach")
     weights = {kind: {mode: getattr(args, f"{kind}_{mode.lower()}_weight") for mode in ("UT", "FT")} for kind in ("field", "curve")}
     curve_losses = nn.MSELoss()
     if args.loss == "combined":
@@ -203,13 +270,34 @@ def main(argv=None, preset=None):
         curve_loss=curve_losses, weights=weights,
         curve_normalizers=data.normalizers["curve"] if args.loss == "combined" else None,
     )
+    if args.base_model_json:
+        from resources.MLmodels import _model_build_loss_from_config
+        saved_loss = json.loads(Path(args.base_model_json).read_text())["loss_config"]
+        objective = DualLoss(
+            field_loss={m: _model_build_loss_from_config(v) for m,v in saved_loss["field_losses"].items()},
+            curve_loss={m: _model_build_loss_from_config(v) for m,v in saved_loss["curve_losses"].items()},
+            weights=weights, scales=saved_loss["scales"],
+            curve_normalizers=data.normalizers["curve"] if saved_loss.get("curve_normalizers") is not None else None)
+        if any(getattr(v, "structured_field", False) for v in objective.field_losses.values()):
+            raise ValueError("Architecture comparisons require an MSE field-loss anchor, not a fitted structured-loss checkpoint.")
+        metadata["anchor_sha256"] = hashlib.sha256(Path(args.base_model_json).read_bytes()).hexdigest()
+    if args.experiment == "localization":
+        from resources.MLfield import field_loss_from_data
+        gain = args.localization_gain or 1.0
+        # Isolate target-dependent displacement weighting; do not silently add spatial/temporal penalties.
+        objective.field_losses = nn.ModuleDict({m: field_loss_from_data(data, m, spatial_weight=0., temporal_weight=0.,
+                                                                       localization_gain=gain) for m in ("UT", "FT")})
+    metadata["parameter_counts"] = {s: sum(p.numel() for p in getattr(network, f"{s}_model").parameters()) for s in ("field", "curve")}
+    metadata["split_hash"] = hashlib.sha256(json.dumps(data.sample_ids, sort_keys=True, default=str).encode()).hexdigest()
     selection_score = None
     if args.fixed_selection_score:
         from resources.MLdualHPO import DualValidationScore
         selection_score = DualValidationScore(data)
     model = DUAL_MODEL(
-        network, objective, data=data, opt=("adamw", args.weight_decay), batch=args.batch,
+        network, objective, data=data, opt=(args.optimizer, args.weight_decay), batch=args.batch,
         lr=args.lr, device=device, num_workers=args.num_workers,
+        curve_lr_factor=args.curve_lr_factor, grad_clip=args.grad_clip,
+        true_curve_weight=args.true_curve_weight if args.experiment == "true_field" else 0.,
         selection_metric=selection_score,
         scheduler=("plateau", "min", args.scheduler_factor, args.scheduler_patience, args.scheduler_threshold),
     )
@@ -223,11 +311,25 @@ def main(argv=None, preset=None):
     metadata["training_seconds"] = time.monotonic() - started
     checkpoint = model.save(run_dir, metadata=metadata)
     results = model.save_results(eval_split=args.eval_split, run_config=vars(args), metadata=metadata)
-    if args.field_loss_variant:
+    if args.field_loss_variant or args.experiment:
         from resources.MLmetrics import save_field_motion_diagnostics
         for mode in ("UT", "FT"):
             save_field_motion_diagnostics(results, data, mode, args.eval_split)
         model.save_true_field_curves(results, args.eval_split)
+    if args.experiment:
+        from resources.MLmetrics import dual_design_diagnostics
+        with np.load(Path(results)/"predictions.npz", allow_pickle=False) as saved:
+            screening = dual_design_diagnostics(saved, data.metadata["curve_x_values"], minimum_ut_strength=args.minimum_ut_strength)
+        (Path(results)/"design_diagnostics.json").write_text(json.dumps(screening, indent=2))
+        lines = ["# Validation design screening", "", "No optimisation, candidate generation, or Pareto search was performed.", ""]
+        for mode, values in screening["tasks"].items():
+            lines += [f"## {mode}", "", f"Objective: {values['objective']}.",
+                      f"Top {values['top_count']} recovery: {values['top_recovery']:.1%}.",
+                      f"Rank correlation: {values['rank_spearman']}.",
+                      f"Mean true-objective shortfall of the selected set: {values['selection_regret']:.5g} (physical integral units).", ""]
+        lines += ["These metrics evaluate an experiment; they do not establish an improvement without a matched baseline.",
+                  "UT cutoff uses each curve independently; a missing crossing is reported, not invented. FT area is not a toughness estimate."]
+        (Path(results)/"design_diagnostics.md").write_text("\n".join(lines)+"\n")
     metadata.update({"checkpoint": checkpoint, "results_dir": results, "status": "complete"})
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     print(f"Saved checkpoint: {checkpoint}\nSaved {args.eval_split} results: {results}", flush=True)

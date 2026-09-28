@@ -1,5 +1,86 @@
 # Joint UT/FT runs
 
+## Controlled architecture and interface experiments
+
+The existing `A0-HPC-Dual-test.py` now accepts `--experiment`; no extra trainer or
+submission wrapper is introduced. All switches are opt-in. No new HPC jobs were
+submitted when preparing these experiments. The first comparison is baseline vs
+crack-face-only vs local-graph-only; do not combine changes before measuring them.
+
+| Experiment | One change from the anchor |
+|---|---|
+| `baseline` | unchanged shared field and curve stages |
+| `crack_face` | existing optional 26-node FT feature, UT zero; 12 context columns |
+| `local_graph` | one shared message MLP on separate initial UT/FT graphs before global attention; still 11 context columns |
+| `partial` | last field block private to UT/FT by default; earlier field blocks shared |
+| `private` | all field **encoder blocks** private; input projections and curve stage still shared |
+| `true_field` | additional same-curve-network supervision on true fields, coefficient 0.5 |
+| `detach` | curve losses no longer backpropagate into field predictions; field supervision retained |
+| `residual` | per-node/frame/component training mean + residual scaling, floored at 10% of pooled frame/component scale |
+| `localization` | existing target-activity displacement weights, gain 1; no spatial/temporal penalties added |
+
+`private` is an encoder-sharing control, **not** complete task independence.
+Small tokenizer/context projections and the entire curve stage still share
+parameters. Unlike legacy MODEL's independent task optimizers/sequential fits,
+every option keeps paired data, both stages, one optimizer, joint supervision and
+one checkpoint. A fully independent end-to-end UT/FT comparison would require
+separating those remaining components too; it is not silently substituted here.
+Private tails increase total parameters at fixed per-task depth. Counts by stage
+and a split hash are saved; do not attribute a gain exclusively to sharing before
+capacity/seed checks. The local graph MLP shares weights across tasks: graph lists
+are data, not trainable networks. Initial struts are not evolving damage labels.
+
+Use the final HPO winner as the common **configuration** anchor, training fresh
+weights. `--base-model-json` restores architecture, loss definitions/weights,
+optimizer, LR groups, scheduling and recorded early-stop patience. It does not
+resume weights or a study. Defaults remain 450 maximum epochs, fixed balanced
+validation selection, and split seed 42 independent of training seed. CLI
+overrides are recorded; keep them identical across variants. For a loss change,
+use the existing loss-trial route separately, not both switches together.
+
+```bash
+# First run a one-epoch B1 GPU preflight; this is an example, NOT a submission record.
+sbatch --time=02:00:00 -J dual-graph-preflight B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py \
+  --experiment local_graph --base-model-json /data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/HPO/dual-joint-hpo1/best/model.json \
+  --nsims 64 --epochs 1 --no-range-split --seed 42 --split-seed 42
+# Once GPU/staging/archive checks pass, one unique full-data job per variant/seed:
+sbatch --time=240:00:00 -J dual-baseline-s42 B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py \
+  --experiment baseline --base-model-json /data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/HPO/dual-joint-hpo1/best/model.json \
+  --seed 42 --split-seed 42
+```
+
+After the first baseline/crack/graph comparison, compare `partial` and `private`
+against that same baseline, then interface/residual/localisation variants one at
+a time. Repeat promising variants with training seeds 42/43/44 and fixed split
+42. No claim of scientific benefit follows from synthetic unit tests.
+
+Every experiment saves standard physical diagnostics, log-compatible loss history,
+motion diagnostics, true-field curve substitution, and `design_diagnostics.json`
+plus its readable Markdown summary. Design screening measures per-task objective
+ranking/top-10% recovery and selection regret; it does not generate designs or
+run a Pareto search. UT work uses its own post-peak 1% cutoff; FT full-domain work
+is labelled a proxy, **not** fracture toughness. Missing cutoff events are counted.
+`--minimum-ut-strength` enables false-feasibility counts only with a researcher-
+chosen physical threshold. Future physical FT cutoff/normalised multi-objective
+definitions remain an explicit scientific decision. Selection still uses the old
+fixed four-output score, not these newly added diagnostics.
+
+Worked arithmetic: `../../samples/dual-experiment-examples.md`. Copy/paste damage
+and field-only feasibility briefs: [HANDOFFS.md](HANDOFFS.md). Temporal decoder,
+attention bias and explainer work remain deferred. Do not interpret sparse field
+frames as requiring temporal averaging of the 201-point target curves.
+
+For independent GNNs, `MODEL(..., graph_semantics="fcc_initial_v1")` opts into
+the validated crack cut and bidirectional edge_index. Default/old descriptors
+retain `historical`, including their old graph semantics; never reinterpret an
+archived GNN checkpoint as having been trained on the corrected graph. The new
+dual graph block always uses the validated `reference_field_edges` graph.
+The edge helper is checked for native and padded FT indexing. Corrected legacy
+GNN **training** requires native 788-node FT data and rejects padded 800-node FT,
+because its pooling does not implement absent-node masks. The dual graph route
+supports canonical padding with masks. This explicit guard prevents ghost-node
+contributions rather than silently changing legacy pooling.
+
 `A0-HPC-Dual-test.py` is the real-data runner. `A0-HPC-Dual-trial1.py` is a small, explicit parameter preset calling that same runner: loading, training, checkpointing and diagnostics are not duplicated. `B1_ML-new.sh` stages the companion runner when launching trial 1.
 
 ## Validated smoke run
@@ -119,7 +200,7 @@ The study lives at `MULTI/Dual/Transformer/HPO/dual-joint-hpo1/`. B1 stages code
 - `best/`: current completed winner's `model.mdl`, metadata, history, physical validation predictions and all four diagnostic sets.
 - `best_params.json`, `best_trial_user_attrs.json`: selected parameters and recorded outcomes.
 
-Set the dual post-processing notebook's `RUN_DIR` to the study's `best/` directory. The general legacy HPO notebook/B2 loader is not a dual checkpoint consumer. Transfer with `B3_ML-transfer-mac.sh MULTI Dual Transformer HPO dual-joint-hpo1` (or the Windows counterpart).
+Set the dual post-processing notebook's `RUN_DIR` to the study's `best/` directory. `code/ML-HPOpostProcess.ipynb` supports dual studies through its dual branch; legacy `MODEL` and B2 are not dual checkpoint consumers. Transfer with `B3_ML-transfer-mac.sh MULTI Dual Transformer HPO dual-joint-hpo1` (or the Windows counterpart).
 
 Resume is **study-level**, not exact mid-epoch/optimizer continuation. A budget-interrupted configuration is queued for retraining from epoch one; completed trials remain. Median-pruned trials are not automatically rerun. A CUDA OOM records a failed trial and continues without secretly reducing batch size. Other unexpected errors stop the run so defects are not disguised as poor hyperparameters.
 
