@@ -65,8 +65,15 @@ chosen physical threshold. Future physical FT cutoff/normalised multi-objective
 definitions remain an explicit scientific decision. Selection still uses the old
 fixed four-output score, not these newly added diagnostics.
 
-Worked arithmetic: `../../samples/dual-experiment-examples.md`. Copy/paste damage
-and field-only feasibility briefs: [HANDOFFS.md](HANDOFFS.md). Temporal decoder,
+Worked arithmetic: `../../samples/dual-experiment-examples.md`. Consolidated
+continuation brief for Improve ML Accuracy, including the deferred damage and
+field-only work: [HANDOFFS.md](HANDOFFS.md). The latest explanatory diagrams and
+read-only evidence are `../../samples/dual-clarification-evidence.md` and the
+adjacent `dual-sharing-*.png`, `dual-peak-loss-explanation.png` and
+`dual-field-difficulty.png`. These do not activate new training choices.
+Current localisation weights measure neighbour/time differences, not departures
+from smooth affine motion; they can still favour moving-boundary nodes. See the
+handoff before treating them as fracture-anomaly weights. Temporal decoder,
 attention bias and explainer work remain deferred. Do not interpret sparse field
 frames as requiring temporal averaging of the 201-point target curves.
 

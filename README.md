@@ -335,8 +335,11 @@ supervision, stopped interface gradients, residual fields and localisation weigh
 See [the experiment guide](p2-DisorderML/HPC/DualOutputs/README.md) for matched
 configuration anchors, split/seed controls, diagnostics and the precise distinction
 between private encoders and fully independent legacy pipelines. Preparation does
-not submit jobs. [Follow-up task briefs](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md)
-cover damage-on-struts export and field-only optimisation feasibility.
+not submit jobs. The [consolidated Improve ML Accuracy handoff](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md)
+records completed work, saved interface/loss evidence, weighting caveats and
+deferred decisions, including damage-on-struts export and field-only feasibility.
+Readable sharing/peak-loss diagrams and the latest validation review are in
+`p2-DisorderML/samples/dual-clarification-evidence.md`; these do not change training defaults.
 
 The first real-data smoke run completed on Apocrita (job 25868425). See `p2-DisorderML/samples/hpc-test-report.md` for its execution evidence and limitations. `HPC/DualOutputs/A0-HPC-Dual-trial1.py` is the HPO-informed full-data preset; its adjacent README records the independent HPO sources and intentional architectural differences. Both scripts share the same runner and result collection.
 

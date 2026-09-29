@@ -26,6 +26,8 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 
 ## Validation
 
+- `DualOutputs/HANDOFFS.md` is the consolidated continuation brief for Improve ML Accuracy, including loss provenance, interface evidence and deferred ideas. Current localisation weighting is target activity, not affine-invariant anomaly detection; regional FT weighting is a separate proposal. Confirm the actual saved loss classes/nonzero coefficients before claiming a run used custom losses.
+
 - The dual test runner's `--experiment` prepares one-change baseline/crack-face/local-graph/encoder-sharing/interface/residual/localisation comparisons. `--base-model-json` uses a shared non-graph dual configuration anchor, not its weights; fixed split seed 42 and unchanged balanced selection make variants comparable. Parameter counts and split hashes are mandatory. Run local checks first, then an authorised B1 GPU preflight before full jobs; preparation is not submission. See DualOutputs README for exact semantics and deferred work.
 
 - Preserve existing approved trial, test and HPO entry points unless the user explicitly requests their removal. Loss ablations use `FieldOutputs/A0-HPC_Field-lossTrial.py` (exact archived UT/FT architecture/training presets) and `DualOutputs/A0-HPC-Dual-lossTrial.py` (Trial 1 capacity). B1 stages their existing runner dependencies. Choose `--field-loss-variant baseline|spatial|temporal|both`; `weighted` additionally requires an explicit positive gain and follows evidence-based variant selection. Defaults remain full data/450 epochs, validation-only selection, and the existing resource policy. No damage/strain export or architecture/HPO extension is implied.
