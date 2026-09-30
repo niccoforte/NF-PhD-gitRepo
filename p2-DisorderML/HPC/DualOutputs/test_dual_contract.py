@@ -40,6 +40,101 @@ def _synthetic_split(rng, samples, nodes, field_features, curve_points, ft_node_
 
 
 class DualMLTest(unittest.TestCase):
+    def test_new_suite_modes_through_runner(self):
+        from resources.MLdual import dual_node_context
+        xy=np.asarray([(10*x,10*y) for y in range(20) for x in range(21)]+
+                      [(10*x+5,10*y+5) for y in range(19) for x in range(20)],float)
+        masks={"UT":np.ones(800,bool),"FT":~((xy[:,1]==95)&(xy[:,0]<118))}
+        designable=(xy[:,0]>0)&(xy[:,0]<200)&(xy[:,1]>0)&(xy[:,1]<190)
+        features,names,spec=dual_node_context(xy,designable,masks)
+        rng=np.random.default_rng(7)
+        data=DUAL_DATA({s:_synthetic_split(rng,n,800,4,201,masks["FT"]) for s,n in (("train",4),("val",2),("test",2))},
+                      masks,features,task_feature_names=names,metadata={
+                          "canonical_coords":xy,"context_spec":spec,
+                          "field_components":{m:["U1","U2"] for m in masks},
+                          "field_frame_values":{m:np.array([.5,1.]) for m in masks},
+                          "curve_x_values":{m:np.linspace(0,1,201) for m in masks}})
+        runner=runpy.run_path(str(Path(__file__).with_name("A0-HPC-Dual-test.py")))["main"]
+        with tempfile.TemporaryDirectory() as directory, patch.object(DUAL_DATA,"from_files",return_value=data):
+            source=None
+            for variant in ("baseline","late_frame","ft_region","winner_probe","curve_predicted","curve_true"):
+                args=["--allow-cpu","--epochs","1","--batch","2","--run-root",directory,
+                      "--run-label",variant,"--experiment",variant,"--loss","mse",
+                      "--field-d-model","8","--field-n-heads","2","--field-n-layers","1",
+                      "--curve-d-model","8","--curve-n-heads","2","--curve-n-layers","1"]
+                if source:
+                    args += ["--base-model-json",source]
+                if variant in ("winner_probe","curve_predicted","curve_true"):
+                    args += ["--source-model-json",source]
+                model=runner(args)
+                if variant=="baseline": source=str(Path(model.model_file).with_suffix(".json"))
+                results=Path(model.results_dir)
+                self.assertTrue((results/"ft_region_metrics.json").is_file())
+                if variant.startswith("curve_"):
+                    self.assertTrue((results/"predicted_field_curves.npz").is_file())
+                    self.assertEqual(model.lossf.weights["field"]["FT"],0)
+
+    def test_curve_only_sources_freeze_fields_and_reload(self):
+        from resources.MLdualHPO import DualValidationScore
+        from resources.MLmetrics import postprocess_load_dual_run
+        cfg = dict(d_model=8, n_heads=2, n_layers=1, dropout=.2)
+        for source in ("true", "predicted"):
+            net = DualStageTransformer.from_data(self.data, field_kwargs=cfg, curve_kwargs=cfg)
+            before = {k:v.clone() for k,v in net.field_model.state_dict().items()}
+            trainer = DUAL_MODEL(net, DualLoss(), data=self.data, batch=2, device="cpu",
+                                 curve_only_source=source, selection_metric=DualValidationScore(self.data, kinds=("curve",)))
+            trainer.train(1, verbose=0)
+            self.assertFalse(net.field_model.training)
+            self.assertTrue(all(p.grad is None for p in net.field_model.parameters()))
+            for k,v in net.field_model.state_dict().items():
+                torch.testing.assert_close(v, before[k], rtol=0, atol=0)
+            row = trainer.history[0]
+            self.assertAlmostEqual(row["train_loss"], row["train_weighted_curve_UT"]+row["train_weighted_curve_FT"], places=5)
+            self.assertNotIn("val_selection_field_UT", row)
+            trainer.model.eval()
+            batch = next(iter(trainer.dataloaders["val"]))
+            result = trainer._predict_batch(batch)
+            inputs = batch["field"] if source == "true" else result["field"]
+            expected = net.curve_model(inputs, batch["task_features"], batch["node_mask"])
+            torch.testing.assert_close(result["curve"]["FT"], expected["FT"])
+            with tempfile.TemporaryDirectory() as folder:
+                trainer.save(folder)
+                _,_,_,loaded = postprocess_load_dual_run(folder, load_model=True, data=self.data)
+                self.assertEqual(loaded.curve_only_source, source)
+                np.testing.assert_allclose(trainer.predict("val")["prediction"]["curve"]["UT"],
+                                           loaded.predict("val")["prediction"]["curve"]["UT"], atol=1e-6)
+
+    def test_fixed_field_weights_mask_normalize_and_roundtrip(self):
+        from resources.MLfield import StructuredFieldLoss
+        from resources.MLmodels import _model_build_loss_from_config, _model_loss_to_config
+        for fixed in (np.array([1., 2.])[None,:,None], np.array([1.,2.,1.])[:,None,None]):
+            loss = StructuredFieldLoss([[0,1],[1,2]],3,2,spatial_weight=0.,temporal_weight=0.,fixed_weights=fixed)
+            pred = torch.arange(24,dtype=torch.float32).reshape(2,3,4).requires_grad_()
+            truth = torch.zeros_like(pred); mask = torch.ones_like(pred,dtype=torch.bool)
+            mask[1,1,2:] = False
+            valid = mask.reshape(2,3,2,2)
+            weights = torch.broadcast_to(torch.tensor(fixed),valid.shape)
+            average = (weights*valid).sum((1,2,3),keepdim=True)/valid.sum((1,2,3),keepdim=True)
+            expected = ((pred.reshape_as(valid)**2)*weights/average*valid).sum()/valid.sum()
+            torch.testing.assert_close(loss(pred,truth,mask),expected.to(torch.float32))
+            clone = _model_build_loss_from_config(_model_loss_to_config(loss))
+            torch.testing.assert_close(clone(pred,truth,mask),loss(pred,truth,mask))
+            loss(pred,truth,mask).backward()
+            self.assertFalse(pred.grad[~mask].any())
+
+    def test_fcc_crack_region_scales_and_excludes_absent_nodes(self):
+        from resources.MLfield import fcc_initial_crack_region
+        xy=np.asarray([(10*x,10*y) for y in range(20) for x in range(21)]+
+                      [(10*x+5,10*y+5) for y in range(19) for x in range(20)],float)
+        present=~((xy[:,1]==95)&(xy[:,0]<118))
+        region,box=fcc_initial_crack_region(xy,present)
+        np.testing.assert_allclose(box,[[96.6,54],[173.6,136]])
+        scaled,scaled_box=fcc_initial_crack_region(xy/1000+[.01,.02],present)
+        np.testing.assert_array_equal(region,scaled)
+        np.testing.assert_allclose(scaled_box,box/1000+[.01,.02])
+        self.assertFalse(region[~present].any())
+        self.assertEqual(region.sum(), 125)
+
     def test_encoder_sharing_modes_and_reload(self):
         batch = next(iter(self.data.make_dataloaders(2)["val"]))
         for private in (0, 1, 2):

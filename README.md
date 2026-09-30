@@ -335,7 +335,13 @@ supervision, stopped interface gradients, residual fields and localisation weigh
 See [the experiment guide](p2-DisorderML/HPC/DualOutputs/README.md) for matched
 configuration anchors, split/seed controls, diagnostics and the precise distinction
 between private encoders and fully independent legacy pipelines. Preparation does
-not submit jobs. The [consolidated Improve ML Accuracy handoff](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md)
+not submit jobs. `HPC/DualOutputs/B4_Dual-experiments.sh SUITE_NAME --submit`
+explicitly queues the matched suite through B1, gated by an all-mode GPU preflight;
+omit `--submit` to preview. It preserves an immutable home-side source snapshot
+and a job manifest. The suite includes positive mean-normalised late-frame/FT-box
+weights, frozen-winner substitution and two freshly trained true/predicted-field
+curve controls. See the guide for oracle limitations and two-curve selection.
+The [consolidated Improve ML Accuracy handoff](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md)
 records completed work, saved interface/loss evidence, weighting caveats and
 deferred decisions, including damage-on-struts export and field-only feasibility.
 Readable sharing/peak-loss diagrams and the latest validation review are in

@@ -26,9 +26,12 @@ class DualValidationScore:
     Validation is allowed for selection, never for fitting the mean/normalizers.
     """
 
-    def __init__(self, data):
+    def __init__(self, data, kinds=("field", "curve")):
+        self.kinds = tuple(kinds)
+        if self.kinds not in (("field", "curve"), ("curve",)):
+            raise ValueError("Selection must use all four tasks or the two frozen-source curve tasks.")
         self.scales, self.baseline_mse = {}, {}
-        for kind in ("field", "curve"):
+        for kind in self.kinds:
             for mode in ("UT", "FT"):
                 key = f"{kind}_{mode}"
                 train = data.splits["train"][kind][mode]
@@ -58,7 +61,7 @@ class DualValidationScore:
 
     def __call__(self, predictions, targets, masks):
         scores = {}
-        for kind in ("field", "curve"):
+        for kind in self.kinds:
             for mode in ("UT", "FT"):
                 key = f"{kind}_{mode}"
                 pred, true = predictions[kind][mode], targets[kind][mode]

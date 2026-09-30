@@ -47,7 +47,11 @@ Read only the section relevant to the task and confirm it against the actual scr
 ## Field entry points
 
 - Dual architecture comparisons use the existing dual test runner's `--experiment`
-  and optional `--base-model-json`, with no new shell wrapper. Keep each change
+  and optional `--base-model-json`. `DualOutputs/B4_Dual-experiments.sh` is a
+  preview-first suite submitter, not a replacement staging/training workflow.
+  Explicit `--submit` snapshots the clean checkout under the conventional home
+  launch directory and queues a 4-hour all-mode GPU preflight plus thirteen
+  240-hour B1 jobs with afterok/kill-on-invalid-dep. Keep each change
   separate, use unique labels and fixed split seed, retain all result/motion/design
   diagnostics and gate production runs on an authorised GPU preflight. See its
   README; private encoders do not mean complete task independence.

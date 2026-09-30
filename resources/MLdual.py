@@ -1325,6 +1325,7 @@ class DUAL_MODEL:
         curve_lr_factor=1.0,
         selection_metric=None,
         true_curve_weight=0.0,
+        curve_only_source=None,
     ):
         if not isinstance(model, DualStageTransformer):
             raise TypeError("DUAL_MODEL requires a DualStageTransformer.")
@@ -1341,6 +1342,14 @@ class DUAL_MODEL:
         self.curve_lr_factor = float(curve_lr_factor)
         self.selection_metric = selection_metric
         self.true_curve_weight = float(true_curve_weight)
+        if curve_only_source not in (None, "true", "predicted"):
+            raise ValueError("curve_only_source must be None, true or predicted.")
+        if curve_only_source is not None and self.true_curve_weight:
+            raise ValueError("Do not combine curve-only source comparisons with auxiliary true-field supervision.")
+        self.curve_only_source = curve_only_source
+        if curve_only_source is not None:
+            self.model.field_model.requires_grad_(False)
+            self.lossf.weights["field"] = {mode: 0. for mode in DUAL_MODES}
         if not math.isfinite(self.true_curve_weight) or self.true_curve_weight < 0:
             raise ValueError("true_curve_weight must be finite and nonnegative.")
         self.device = torch.device(device or ("cuda" if torch.cuda.is_available() else "cpu"))
@@ -1379,6 +1388,8 @@ class DUAL_MODEL:
 
     def _run_loader(self, loader, training):
         self.model.train(training)
+        if self.curve_only_source is not None:
+            self.model.field_model.eval()  # frozen dropout must not change the input distribution
         totals = {}
         n_samples = 0
         context = torch.enable_grad() if training else torch.no_grad()
@@ -1387,11 +1398,7 @@ class DUAL_MODEL:
                 batch = _move_to_device(batch, self.device)
                 if training:
                     self.optimizer.zero_grad(set_to_none=True)
-                predictions = self.model(
-                    batch["geometry"],
-                    task_features=batch["task_features"],
-                    node_masks=batch["node_mask"],
-                )
+                predictions = self._predict_batch(batch)
                 targets = {"field": batch["field"], "curve": batch["curve"]}
                 loss, details = self.lossf(
                     predictions,
@@ -1481,6 +1488,17 @@ class DUAL_MODEL:
             self.model.load_state_dict(best_state)
         return self
 
+    def _predict_batch(self, batch):
+        if self.curve_only_source is None:
+            return self.model(batch["geometry"], batch["task_features"], batch["node_mask"])
+        with torch.no_grad():
+            fields = self.model.field_model(batch["geometry"], batch["task_features"], batch["node_mask"])
+        inputs = batch["field"] if self.curve_only_source == "true" else fields
+        curves = self.model.curve_model(inputs, batch["task_features"], batch["node_mask"])
+        # Field artifacts always remain the frozen field stage's predictions,
+        # never a misleading perfect-field score for the true-input oracle.
+        return {"field": fields, "curve": curves}
+
     def predict(self, split="test"):
         split = str(split).lower()
         if split not in self.dataloaders:
@@ -1496,11 +1514,7 @@ class DUAL_MODEL:
                 for mode in DUAL_MODES:
                     mask_parts[mode].append(batch["field_mask"][mode].cpu())
                 batch = _move_to_device(batch, self.device)
-                predictions = self.model(
-                    batch["geometry"],
-                    task_features=batch["task_features"],
-                    node_masks=batch["node_mask"],
-                )
+                predictions = self._predict_batch(batch)
                 for kind in ("field", "curve"):
                     for mode in DUAL_MODES:
                         prediction_parts[kind][mode].append(predictions[kind][mode].detach().cpu())
@@ -1524,13 +1538,15 @@ class DUAL_MODEL:
         self.predictions[split] = result
         return result
 
-    def save_true_field_curves(self, path, split="val"):
+    def save_true_field_curves(self, path, split="val", source="true"):
         """Same checkpoint, true versus predicted field input; no retraining.
 
         Invalid true-field entries use DUAL_DATA's normalised zero convention.
         Counts expose this limitation rather than describing imputed fields as exact.
         """
         from resources.MLmetrics import curve_performance_diagnostics
+        if source not in ("true", "predicted"):
+            raise ValueError("Curve diagnostic source must be true or predicted.")
         folder=Path(path);folder.mkdir(parents=True,exist_ok=True)
         self.model.eval()
         values={mode:[] for mode in DUAL_MODES};ids=[];invalid={mode:[] for mode in DUAL_MODES}
@@ -1538,7 +1554,9 @@ class DUAL_MODEL:
             for batch in self.dataloaders[split]:
                 ids.extend(list(batch["sample_id"]))
                 batch=_move_to_device(batch,self.device)
-                curves=self.model.curve_model(batch["field"],task_features=batch["task_features"],node_masks=batch["node_mask"])
+                fields = batch["field"] if source == "true" else self.model.field_model(
+                    batch["geometry"], batch["task_features"], batch["node_mask"])
+                curves=self.model.curve_model(fields,task_features=batch["task_features"],node_masks=batch["node_mask"])
                 for mode in DUAL_MODES:
                     values[mode].append(curves[mode].cpu().numpy())
                     present=batch["node_mask"][mode].bool().unsqueeze(-1)
@@ -1553,9 +1571,10 @@ class DUAL_MODEL:
             truth=self.data.inverse_curve(mode,result["truth"]["curve"][mode])
             arrays[mode+"_outputs"]=prediction
             diag=curve_performance_diagnostics(prediction,truth,x_values=self.data.metadata["curve_x_values"][mode])
-            table=diag["sample_metrics"].copy();table["sample_id"]=ids;table["imputed_field_values"]=invalid[mode]
-            table.to_csv(folder/f"{mode}_{split}_true_field_curve_sample_metrics.csv",index=False)
-        np.savez(folder/"true_field_curves.npz",**arrays)
+            table=diag["sample_metrics"].copy();table["sample_id"]=ids
+            table["imputed_field_values"]=invalid[mode] if source == "true" else 0
+            table.to_csv(folder/f"{mode}_{split}_{source}_field_curve_sample_metrics.csv",index=False)
+        np.savez(folder/f"{source}_field_curves.npz",**arrays)
 
     def save(self, path, include_optimizer=False, metadata=None):
         path = Path(path)
@@ -1576,7 +1595,8 @@ class DUAL_MODEL:
                 "grad_clip": self.grad_clip,
                 "curve_lr_factor": self.curve_lr_factor,
                 "true_curve_weight": self.true_curve_weight,
-                "selection_metric": "fixed dual validation score" if self.selection_metric else "joint loss",
+                "curve_only_source": self.curve_only_source,
+                "selection_metric": ("fixed curve validation score" if self.curve_only_source else "fixed dual validation score") if self.selection_metric else "joint loss",
                 "best_epoch": self.best_epoch,
                 "best_loss": self.best_loss,
             },

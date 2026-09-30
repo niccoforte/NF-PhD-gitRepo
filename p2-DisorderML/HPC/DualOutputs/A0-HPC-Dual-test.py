@@ -24,9 +24,10 @@ def parse_args(argv=None):
     parser.add_argument("--range-split", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split-seed", type=int, default=None, help="Experiments default to fixed split 42 independently of training seed.")
-    parser.add_argument("--experiment", choices=["baseline", "crack_face", "local_graph", "partial", "private", "true_field", "detach", "residual", "localization"],
+    parser.add_argument("--experiment", choices=["baseline", "crack_face", "local_graph", "partial", "private", "true_field", "detach", "residual", "localization", "late_frame", "ft_region", "winner_probe", "curve_true", "curve_predicted"],
                         help="One opt-in change relative to baseline; never mutates an HPO study.")
     parser.add_argument("--base-model-json", help="Reuse saved dual architecture/loss/training settings, not weights; CLI overrides still apply.")
+    parser.add_argument("--source-model-json", help="Frozen checkpoint for winner_probe or fresh curve_true/curve_predicted comparisons; data must match exactly.")
     parser.add_argument("--private-layers", type=int, default=1)
     parser.add_argument("--true-curve-weight", type=float, default=0.5)
     parser.add_argument("--residual-scale-floor", type=float, default=0.1)
@@ -115,6 +116,9 @@ def parse_args(argv=None):
     args = parser.parse_args(argv)
     if args.base_model_json and not args.experiment:
         parser.error("--base-model-json is for fresh --experiment runs, not resume.")
+    needs_source = args.experiment in ("winner_probe", "curve_true", "curve_predicted")
+    if needs_source != bool(args.source_model_json):
+        parser.error("--source-model-json is required only for winner_probe, curve_true and curve_predicted.")
     if args.experiment:
         args.fixed_selection_score = True
         if args.eval_split != "val": parser.error("Development experiments must use validation, not locked test.")
@@ -246,6 +250,17 @@ def main(argv=None, preset=None):
                                   local_graph=args.experiment == "local_graph")
     network = DualStageTransformer.from_data(data, field_kwargs=stage_config["field"], curve_kwargs=stage_config["curve"],
                                              detach_fields=args.experiment == "detach")
+    source_model = None
+    if args.source_model_json:
+        from resources.MLmetrics import postprocess_load_dual_run
+        _, _, _, source_model = postprocess_load_dual_run(Path(args.source_model_json).parent,
+                                                         load_model=True, data=data, device=device)
+        if args.experiment == "winner_probe":
+            network = source_model.model
+        else:
+            # Fresh identically seeded curve stage; only copy the frozen field generator.
+            network.field_model.load_state_dict(source_model.model.field_model.state_dict(), strict=True)
+        metadata["source_checkpoint_sha256"] = hashlib.sha256(Path(args.source_model_json).with_suffix(".mdl").read_bytes()).hexdigest()
     weights = {kind: {mode: getattr(args, f"{kind}_{mode.lower()}_weight") for mode in ("UT", "FT")} for kind in ("field", "curve")}
     curve_losses = nn.MSELoss()
     if args.loss == "combined":
@@ -287,27 +302,53 @@ def main(argv=None, preset=None):
         # Isolate target-dependent displacement weighting; do not silently add spatial/temporal penalties.
         objective.field_losses = nn.ModuleDict({m: field_loss_from_data(data, m, spatial_weight=0., temporal_weight=0.,
                                                                        localization_gain=gain) for m in ("UT", "FT")})
+    if args.experiment in ("late_frame", "ft_region"):
+        from resources.MLfield import field_loss_from_data, fcc_initial_crack_region
+        fixed = {}
+        for mode in ("UT", "FT"):
+            if args.experiment == "late_frame":
+                times = np.asarray(data.metadata["field_frame_values"][mode], float)
+                if len(times) < 2 or np.any(np.diff(times) <= 0):
+                    raise ValueError("Late-frame weighting requires increasing recorded loading coordinates.")
+                fixed[mode] = (1+(times-times[0])/(times[-1]-times[0]))[None, :, None]
+            else:
+                region, box = fcc_initial_crack_region(data.metadata["canonical_coords"], data.node_masks["FT"])
+                fixed[mode] = (1+region.astype(float) if mode == "FT" else np.ones(data.n_nodes))[:, None, None]
+        objective.field_losses = nn.ModuleDict({m: field_loss_from_data(data, m, spatial_weight=0., temporal_weight=0.,
+                                                                       fixed_weights=fixed[m]) for m in ("UT", "FT")})
+        metadata["weighting"] = {"definition": "raw 1+relative saved load" if args.experiment == "late_frame" else "FT reference CrRegMESH nodes: 2 inside, 1 outside; UT: 1",
+                                 "normalization": "mean one over each specimen's valid nodes/frames/components",
+                                 "raw_weights": {m: w.tolist() for m, w in fixed.items()}}
+    curve_source = {"curve_true": "true", "curve_predicted": "predicted"}.get(args.experiment)
     metadata["parameter_counts"] = {s: sum(p.numel() for p in getattr(network, f"{s}_model").parameters()) for s in ("field", "curve")}
     metadata["split_hash"] = hashlib.sha256(json.dumps(data.sample_ids, sort_keys=True, default=str).encode()).hexdigest()
     selection_score = None
     if args.fixed_selection_score:
         from resources.MLdualHPO import DualValidationScore
-        selection_score = DualValidationScore(data)
+        selection_score = DualValidationScore(data, kinds=("curve",) if curve_source else ("field", "curve"))
     model = DUAL_MODEL(
         network, objective, data=data, opt=(args.optimizer, args.weight_decay), batch=args.batch,
         lr=args.lr, device=device, num_workers=args.num_workers,
         curve_lr_factor=args.curve_lr_factor, grad_clip=args.grad_clip,
         true_curve_weight=args.true_curve_weight if args.experiment == "true_field" else 0.,
+        curve_only_source=curve_source,
         selection_metric=selection_score,
         scheduler=("plateau", "min", args.scheduler_factor, args.scheduler_patience, args.scheduler_threshold),
     )
     print(network)
-    print(f"Parameters: {sum(p.numel() for p in network.parameters()):,}; joint weights: {weights}", flush=True)
+    metadata["training_mode"] = "evaluation_only" if args.experiment == "winner_probe" else "curve_only" if curve_source else "joint"
+    metadata["trainable_parameter_counts"] = {s: sum(p.numel() for p in getattr(network, f"{s}_model").parameters() if p.requires_grad)
+                                               if args.experiment != "winner_probe" else 0 for s in ("field", "curve")}
+    print(f"Parameters: {sum(p.numel() for p in network.parameters()):,}; active loss weights: {model.lossf.weights}", flush=True)
     started = time.monotonic()
-    model.train(
-        args.epochs, verbose=args.verbose, early_stop_patience=args.early_stop_patience,
-        early_stop_delta=args.early_stop_delta, checkpoint_path=run_dir, metadata=metadata,
-    )
+    if args.experiment == "winner_probe":
+        model.best_epoch, model.best_loss = source_model.best_epoch, source_model.best_loss
+        model.history = source_model.history
+    else:
+        model.train(
+            args.epochs, verbose=args.verbose, early_stop_patience=args.early_stop_patience,
+            early_stop_delta=args.early_stop_delta, checkpoint_path=run_dir, metadata=metadata,
+        )
     metadata["training_seconds"] = time.monotonic() - started
     checkpoint = model.save(run_dir, metadata=metadata)
     results = model.save_results(eval_split=args.eval_split, run_config=vars(args), metadata=metadata)
@@ -316,10 +357,19 @@ def main(argv=None, preset=None):
         for mode in ("UT", "FT"):
             save_field_motion_diagnostics(results, data, mode, args.eval_split)
         model.save_true_field_curves(results, args.eval_split)
+        if curve_source:
+            model.save_true_field_curves(results, args.eval_split, source="predicted")
     if args.experiment:
         from resources.MLmetrics import dual_design_diagnostics
         with np.load(Path(results)/"predictions.npz", allow_pickle=False) as saved:
             screening = dual_design_diagnostics(saved, data.metadata["curve_x_values"], minimum_ut_strength=args.minimum_ut_strength)
+            # Identical regional reporting for every comparison, including the baseline.
+            from resources.MLfield import fcc_initial_crack_region
+            region, box = fcc_initial_crack_region(data.metadata["canonical_coords"], data.node_masks["FT"])
+            error = saved["FT_val_field_outputs"]-saved["FT_val_field_truth"]
+            regions = {"inside": region, "outside": data.node_masks["FT"] & ~region, "global": data.node_masks["FT"]}
+            region_metrics = {name: {"nodes": int(mask.sum()), "rmse": float(np.sqrt(np.nanmean(error[:, mask]**2)))} for name, mask in regions.items()}
+            (Path(results)/"ft_region_metrics.json").write_text(json.dumps({"box": box.tolist(), "regions": region_metrics}, indent=2))
         (Path(results)/"design_diagnostics.json").write_text(json.dumps(screening, indent=2))
         lines = ["# Validation design screening", "", "No optimisation, candidate generation, or Pareto search was performed.", ""]
         for mode, values in screening["tasks"].items():

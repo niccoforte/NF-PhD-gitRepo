@@ -2,9 +2,8 @@
 
 ## Controlled architecture and interface experiments
 
-The existing `A0-HPC-Dual-test.py` now accepts `--experiment`; no extra trainer or
-submission wrapper is introduced. All switches are opt-in. No new HPC jobs were
-submitted when preparing these experiments. The first comparison is baseline vs
+The existing `A0-HPC-Dual-test.py` accepts `--experiment`; no extra trainer is
+introduced. All switches are opt-in. The first comparison is baseline vs
 crack-face-only vs local-graph-only; do not combine changes before measuring them.
 
 | Experiment | One change from the anchor |
@@ -18,6 +17,74 @@ crack-face-only vs local-graph-only; do not combine changes before measuring the
 | `detach` | curve losses no longer backpropagate into field predictions; field supervision retained |
 | `residual` | per-node/frame/component training mean + residual scaling, floored at 10% of pooled frame/component scale |
 | `localization` | existing target-activity displacement weights, gain 1; no spatial/temporal penalties added |
+| `late_frame` | displacement MSE weighted by raw 1 + relative recorded load; same rule for both tasks/components |
+| `ft_region` | displacement MSE weighted 2 inside the reference FT CrRegMESH node box, 1 outside; UT unchanged |
+| `winner_probe` | no training: evaluate the frozen HPO winner on predicted and true fields |
+| `curve_predicted` / `curve_true` | fresh shared UT/FT curve stage trained on frozen winner predictions / true fields respectively |
+
+### Reproducible matched suite
+
+On HPC, preview `bash DualOutputs/B4_Dual-experiments.sh dual-compare-260930`
+from the repository HPC directory; append `--submit` to launch. Use a fresh name
+for a new suite. It submits one **4-hour preflight** and thirteen dependent
+**240-hour jobs**, all through the unchanged B1 resource policy (one GPU,
+12 CPUs, 90,000 MB, andrena/pilot_andrena). `afterok` and
+`--kill-on-invalid-dep=yes` prevent full training after a failed preflight.
+The two fresh curve fits additionally depend on the full-data winner probe,
+which checks the original checkpoint/data contract before releasing those fits.
+The preflight exercises all thirteen modes on 64 pairs/one epoch, including
+checkpoints, true/predicted-source diagnostics and B1 archiving. Full experiments
+use all pairs, seed/split seed 42 and at most 450 epochs with early stopping.
+`winner_probe` is evaluation only. This is first-seed screening, not replicated
+evidence; repeat promising comparisons on additional seeds later.
+
+Home launch/log/manifest directory: `/data/home/exy053/p2/MULTI/Dual/Transformer/<suite>`.
+Its `source/` is an immutable Git snapshot, including current and earlier test
+scripts. B1 stages that snapshot's resources and selected entry point into
+`/gpfs/scratch/exy053/<job-id>` and archives `mlruns/` to
+`/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/<suite>-<variant>`.
+`jobs.tsv` records IDs/dependencies/revision. Successful archive/log copying
+permits scratch cleanup; failures retain scratch. Future repo edits cannot change
+already queued jobs. No executable files or deployment bundles go under local data/.
+
+The suite intentionally excludes `localization`: current activity weights are
+not the requested affine-departure detector. It includes all other variants
+listed above separately, not combinations. Source HPO artifacts are never edited.
+
+### Weighting and frozen-source comparisons
+
+Fixed weights are normalised to mean one over each specimen's valid values.
+Late-frame raw weights are `1+(t-t_first)/(t_last-t_first)`, so on equally spaced
+frames the effective weights span approximately 2/3 to 4/3. No adaptive error
+feedback, component priority or additional spatial/temporal penalty is added.
+FT's A1 box in cell-size-10 coordinates is x=96.6..173.6, y=54..136:
+`xCrE=120-1.2*0.2*10=117.6`; subtract/add 2.1/5.6 cells horizontally and
+4.1 cells vertically about y=95. It selects **125 retained reference nodes**.
+This is a node prior inspired by the meshing box, not Abaqus edge-set membership
+or the eventual crack path. Uniform unit/translation conversion is tested.
+Every experiment reports global/inside/outside FT RMSE in `ft_region_metrics.json`;
+frame/component diagnostics and unweighted selection remain unchanged.
+
+Frozen-source runs require `--source-model-json`, checked against reconstructed
+data IDs, scalers, features and frame coordinates. `winner_probe` copies the
+winner unchanged into a new diagnostic run. The two `curve_*` runs copy only its
+field stage, keep it frozen with dropout off, and train fresh identically seeded
+curve stages. They use the winner's **four** curve blocks, not one; field depth
+is three. They retain one shared UT/FT curve network with task conditioning.
+No field supervision contributes in these curve-only fits, and checkpoint
+selection averages the two unchanged curve baseline-relative scores (not four).
+The curve architecture/loss/task weights/learning rate are otherwise held fixed.
+
+Saved field arrays remain frozen field predictions even for `curve_true`;
+standard curve results use the declared training source. Both source evaluations
+are additionally saved as `true_field_curves.npz` / `predicted_field_curves.npz`
+and labelled per-sample metric tables. The true-source curve is an oracle
+diagnostic requiring true fields, not a deployable disorder-only inference result.
+Its ordinary network forward still accepts predicted fields; use the recorded
+source comparison tables for interpretation. Predicted training fields are
+in-sample predictions of the existing field model, not cross-fitted predictions;
+validation remains held out. This controls the interface comparison but is not
+a guaranteed upper bound or an independently tuned curve HPO.
 
 `private` is an encoder-sharing control, **not** complete task independence.
 Small tokenizer/context projections and the entire curve stage still share

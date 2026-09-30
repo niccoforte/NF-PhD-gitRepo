@@ -4397,7 +4397,7 @@ def postprocess_load_dual_run(run_path, *, load_model=False, data=None, device="
         model = DUAL_MODEL(
             DualStageTransformer.from_config(descriptor["model_config"]), objective,
             data=data, dataloaders=None if data is not None else {"train": []}, device=device,
-            **{k: training[k] for k in ("opt", "batch", "lr", "scheduler", "grad_clip", "curve_lr_factor", "true_curve_weight") if k in training},
+            **{k: training[k] for k in ("opt", "batch", "lr", "scheduler", "grad_clip", "curve_lr_factor", "true_curve_weight", "curve_only_source") if k in training},
         ).load(artifacts["model_mdl"])
         model.best_epoch, model.best_loss = training["best_epoch"], training["best_loss"]
         model.history = loaded["loss_history"].to_dict("records")

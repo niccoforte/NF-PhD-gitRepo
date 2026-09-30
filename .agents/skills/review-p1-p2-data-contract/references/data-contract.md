@@ -59,6 +59,15 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 
 ## Saved-run boundary
 
+- Frozen-source dual curve experiments record `training.curve_only_source` and
+  restore it through the dual loader. Standard field arrays are still frozen
+  predictions; standard curve arrays use the declared source. Additional true/
+  predicted-field curve NPZ/metric tables distinguish substitution from fresh
+  training. These fits use two-curve fixed selection; default joint runs/HPO
+  remain four-output. Optional fixed field-loss weights are saved in loss config;
+  old descriptors omit them and retain identical behaviour. No upstream export
+  or sample filtering change is involved.
+
 - Opt-in dual experiments preserve prediction keys/layouts. Architecture descriptors additionally record private encoder depth, local graph buffers/initial-geometry affine reconstruction and interface detachment. Residual-field normalization stores node-resolved train-only mean/scales with the floor definition in data metadata. True-field auxiliary weight is training metadata. Design diagnostics are validation-only additions; FT work is not a toughness label. Legacy GNN descriptors explicitly record historical vs validated FCC initial graph semantics; missing keys retain historical interpretation.
 
 - Opt-in structured field trials add `field_loss_history.csv` for independent runs, raw field-component columns to dual history, `{mode}_{split}_field_motion.csv`, and `field_motion_definitions.json`. Existing prediction keys/layouts do not change. Frozen curve comparisons add paired curve metric tables and an auxiliary NPZ; single-task comparisons use only the intersection held out from both stages. They do not redefine old HPO metrics or overwrite source checkpoints. Physical jump losses reconstruct the existing affine normalization, without refitting the serial bridge.

@@ -60,19 +60,37 @@ def reference_field_edges(coords, mode="UT", present=None):
     return edges
 
 
+def fcc_initial_crack_region(coords, present):
+    """Node prior from A1's FCC dN=.2 CrRegMESH box, not its edge selection.
+
+    Convert canonical reference coordinates to A1's cell-size-10 frame. The
+    box is [117.6-21,117.6+56,95-41,95+41]; use reference, not final geometry.
+    Supports translated/uniformly scaled copies of the validated FCC body.
+    """
+    xy = np.asarray(coords, dtype=float)
+    reference_field_edges(xy, "FT", present)  # validates the established topology
+    origin, unit_scale = xy.min(axis=0), np.ptp(xy[:, 0])/200.
+    native = (xy-origin)/unit_scale
+    mask = ((native[:, 0] >= 96.6) & (native[:, 0] <= 173.6) &
+            (native[:, 1] >= 54.) & (native[:, 1] <= 136.) & np.asarray(present, bool))
+    box = np.array([[96.6, 54.], [173.6, 136.]])*unit_scale+origin
+    return mask, box
+
+
 class StructuredFieldLoss(nn.Module):
     """Masked MSE + signed spatial and temporal differences in physical units.
 
-    Localisation weights depend only on each target's jumps, never its location
-    or predicted error. The unnormalised weight is in [1,1+localization_gain].
-    Each specimen's weights are normalised over its valid values. gain=0 disables
-    weighting exactly; spatial_weight=temporal_weight=0 recovers masked MSE.
+    Activity-localisation weights depend only on target jumps, not predicted
+    errors; their raw range is [1,1+localization_gain]. Optional fixed_weights
+    are separate a-priori node/frame weights. Products are normalised over each
+    specimen's valid values. With both kinds of weighting disabled, setting
+    spatial_weight=temporal_weight=0 recovers masked MSE.
     """
     structured_field = True
 
     def __init__(self, edges, n_nodes, n_components=2, mean=0., scale=1.,
                  spatial_scale=1., temporal_scale=1., spatial_weight=0.1,
-                 temporal_weight=0.1, localization_gain=0., eps=1e-8):
+                 temporal_weight=0.1, localization_gain=0., eps=1e-8, fixed_weights=None):
         super().__init__()
         self.n_nodes, self.n_components = int(n_nodes), int(n_components)
         self.spatial_weight, self.temporal_weight = float(spatial_weight), float(temporal_weight)
@@ -93,9 +111,15 @@ class StructuredFieldLoss(nn.Module):
                 raise ValueError(f"Invalid {name}.")
             self.register_buffer(name, tensor)
         self.last_components = {}
+        # Optional a-priori [node, frame, component] weights, never predicted errors.
+        fixed = None if fixed_weights is None else torch.as_tensor(fixed_weights, dtype=torch.float32)
+        if fixed is not None and (fixed.ndim != 3 or not torch.isfinite(fixed).all() or torch.any(fixed <= 0)):
+            raise ValueError("fixed_weights must be positive finite [node,frame,component] broadcast weights.")
+        self.register_buffer("fixed_weights", fixed)
 
     def get_config(self):
-        return {**{k: getattr(self, k) for k in ("n_nodes", "n_components", "spatial_weight",
+        return {"fixed_weights": None if self.fixed_weights is None else self.fixed_weights.cpu().tolist(),
+                **{k: getattr(self, k) for k in ("n_nodes", "n_components", "spatial_weight",
                 "temporal_weight", "localization_gain", "eps")},
                 **{k: getattr(self, k).detach().cpu().tolist() for k in
                    ("edges", "mean", "scale", "spatial_scale", "temporal_scale")}}
@@ -146,9 +170,12 @@ class StructuredFieldLoss(nn.Module):
                 temporal_activity[:, :, :-1] += increments
                 q = torch.sqrt((activity+temporal_activity).mean(dim=-1, keepdim=True).clamp_min(0))
                 weights = (1+self.localization_gain*q/(1+q)).expand_as(yu)
-                count = valid.sum(dim=(1,2,3), keepdim=True).clamp_min(1)
-                avg = torch.where(valid, weights, 0.).sum(dim=(1,2,3), keepdim=True)/count
-                weights = weights/avg.clamp_min(self.eps)
+        if self.fixed_weights is not None:
+            weights = weights * self.fixed_weights
+        if self.localization_gain or self.fixed_weights is not None:
+            count = valid.sum(dim=(1,2,3), keepdim=True).clamp_min(1)
+            avg = torch.where(valid, weights, 0.).sum(dim=(1,2,3), keepdim=True)/count
+            weights = weights/avg.clamp_min(self.eps)
         components = {
             "displacement": self._mean((p-y).reshape_as(yu).square()*weights, valid),
             "spatial": self._mean(node_spatial, node_valid),

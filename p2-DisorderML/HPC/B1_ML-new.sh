@@ -305,7 +305,7 @@ fi
 # Copy the framework and entry point; the dual preset reuses its tested runner.
 rsync -av "$REPO_ROOT/resources/" "$SCRATCH_DIR/resources/"
 rsync -av "$SCRIPT_SRC" "$SCRIPT_LOCAL"
-if [[ "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-trial1.py" || "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-lossTrial.py" ]]; then
+if [[ "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-trial1.py" || "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-lossTrial.py" || "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-preflight.py" ]]; then
     rsync -av "$(dirname "$SCRIPT_SRC")/A0-HPC-Dual-test.py" "$SCRATCH_DIR/"
 fi
 if [ "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-lossTrial.py" ]; then
