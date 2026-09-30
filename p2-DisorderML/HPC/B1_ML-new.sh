@@ -262,7 +262,13 @@ trap finish EXIT
 mkdir -p "$SCRATCH_DIR"
 mkdir -p "$SCRATCH_RUN_ROOT"
 
+# Non-interactive SSH submissions need not export the site's module function.
+if ! type module >/dev/null 2>&1; then
+    # shellcheck disable=SC1091
+    . /etc/profile.d/modules.sh
+fi
 # Load required modules.
+export HOSTNAME  # Required by the site's module-usage logging hook.
 module load miniforge
 init_conda_shell
 if [ -n "$CONDA_ENV" ]; then

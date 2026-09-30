@@ -24,6 +24,10 @@ crack-face-only vs local-graph-only; do not combine changes before measuring the
 
 ### Reproducible matched suite
 
+B1 bootstraps the site's module shell and exports Bash's host identity before
+loading Miniforge, so submissions through non-interactive SSH do not depend on
+an interactive login's exported functions. Resource requests are unchanged.
+
 On HPC, preview `bash DualOutputs/B4_Dual-experiments.sh dual-compare-260930`
 from the repository HPC directory; append `--submit` to launch. Use a fresh name
 for a new suite. It submits one **4-hour preflight** and thirteen dependent

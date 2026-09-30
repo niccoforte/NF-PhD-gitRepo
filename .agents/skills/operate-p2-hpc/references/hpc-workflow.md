@@ -21,6 +21,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 ## Submit, scratch, and archive contract
 
 - Submit `B1_ML-new.sh` from the intended task/output/model directory; it resolves `ML_SCRIPT` from an HPC filename, HPC-relative path, repository-relative path, or absolute path.
+- B1 initialises `/etc/profile.d/modules.sh` when `module` is absent and exports Bash's `HOSTNAME` for site module logging. Verify this bootstrap for non-interactive SSH; do not assume login-shell functions reach Slurm.
 - `DATA_ROOT` is the parent containing `MLdata`, not the `MLdata` directory itself.
 - `ML_RUN_ROOT` is scratch; `ARCHIVE_ROOT` receives final rsync output; `ML_ARCHIVE_ROOT` records that mapping in metadata.
 - The Slurm `-J` value becomes the default `ML_JOB_NAME` and archive/run label. Explicit `ARCHIVE_ROOT`, `ML_JOB_NAME`, `RUN_LABEL`, `--run-label`, or `--study-name` overrides take precedence.
