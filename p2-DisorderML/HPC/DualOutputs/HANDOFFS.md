@@ -1,7 +1,7 @@
 # Consolidated handoff to Improve ML Accuracy
 
-This is a copy/paste task brief, not an executable script. The user will attach
-it to their annotations in the existing **Improve ML Accuracy** thread
+This is the authoritative task brief, not an executable script. Ask the existing
+**Improve ML Accuracy** thread to read this file alongside the user's annotations
 (`01a08760-1e96-7cd3-893d-7d02ead914d7`). It has NOT been sent automatically.
 The 30 September user message authorises the matched dual experiment suite below.
 It does not authorise ODB exports, damage-head training or optimisation searches.
@@ -11,9 +11,9 @@ It does not authorise ODB exports, damage-head training or optimisation searches
 Continue the Dual Model work in this thread; do not reimplement completed work.
 Read repo AGENTS, applicable nested instructions and p2 PROJECT_STATUS first.
 Canonical checkout: `/Users/niccoloforte/Desktop/Code/NF-PhD-gitRepo`.
-Architecture/loss experiment implementation is commit `017be58`, published to
-QMUL and GitHub.com. The connection has been reopened for the new deployment;
-consult PROJECT_STATUS for its verified revision/job IDs. Never
+The matched-suite implementation is `37350e9`; its batch bootstrap correction
+is `6a3aee1`, published to both Git hosts and deployed before submission.
+Consult PROJECT_STATUS for the latest verified scheduler state. Never
 change a staged study or checkpoint to match newly edited source.
 
 Preserve legacy DATA/MODEL/Transformer workflows and historical checkpoints.
@@ -32,6 +32,33 @@ variants through B1 from an immutable home snapshot, gated by its all-mode GPU
 preflight. See the adjacent README for exact CLI, source/selection semantics,
 weights and paths; PROJECT_STATUS is the submission record. Do not resubmit
 existing labels or confuse a dependency queue entry with completed training.
+
+Submitted suite: `dual-compare-260930-r1`, immutable source `6a3aee1`.
+Preflight **29601762**; full jobs below all depend on its successful exit/archive.
+Both curve-only jobs additionally depend on winner_probe **29601773**.
+
+| Variant | Job | Isolated question |
+| --- | --- | --- |
+| baseline | 29601763 | Fresh matched fully shared reference |
+| partial | 29601764 | Private final field block |
+| private | 29601765 | All field encoder blocks private |
+| crack_face | 29601766 | Static crack-face input only |
+| local_graph | 29601767 | Shared local messages with task-specific initial graphs |
+| residual | 29601768 | Train-mean residuals and variation scaling |
+| late_frame | 29601769 | Fixed positive late-load emphasis |
+| ft_region | 29601770 | A-priori FT crack-tip neighbourhood emphasis |
+| true_field | 29601771 | Auxiliary true-field curve supervision in joint training |
+| detach | 29601772 | Stop curve gradients into field predictions |
+| winner_probe | 29601773 | Frozen HPO winner, field-input substitution only |
+| curve_predicted | 29601774 | Fresh curve stage trained on frozen predicted fields |
+| curve_true | 29601775 | Fresh curve stage trained on true fields |
+
+Preflight requests four hours; all thirteen dependents request 240 hours, one
+GPU, 12 CPUs and 90,000 MB on andrena/pilot_andrena. The first attempt
+`dual-compare-260930` failed before Python: module was absent in its batch
+environment (29598744), so dependents 29598745–29598757 cancelled automatically.
+Its home log/scratch are retained for audit; do not mistake it for a trained run.
+The correction initialises site modules and exports HOSTNAME for their logging.
 
 Use the HPO winner configuration (field THREE blocks, curve FOUR blocks), all
 paired data, seed42/split42, 450 maximum epochs/early stopping. Baseline, partial,
@@ -170,6 +197,16 @@ all custom losses or that MSE is universally best; studies/seeds are limited.
 New architecture runs anchored to this winner inherit those loss choices.
 Explicitly state active loss classes and nonzero coefficients before future jobs.
 
+The saved study contains 34 completed MSE trials (best fixed score .82661694)
+and 11 completed combined-loss trials (best .86242156). This is not a matched
+loss ablation: architecture, coefficients and optimisation also vary. The fixed
+score rewards baseline-relative MSE, not peak/work/ranking quality. Combined loss
+also changes per-specimen scaling (target-range normalisation versus train-fitted
+task scaling), as well as adding derivative/feature objectives. Predicted-field
+error could interact with these objectives, but is not established as the cause.
+The submitted source tests do NOT isolate loss choice. A later matched
+true/predicted-source × MSE/corrected-combined comparison could do so.
+
 ## Latest user clarifications and the next decisions
 
 1. **Weighting needs correction in interpretation, not a silent code change.**
@@ -244,11 +281,90 @@ Explicitly state active loss classes and nonzero coefficients before future jobs
   since soft centroid is not always the physical maximum. Disable only this
   term in a new combined-loss trial if necessary; do not alter archived losses
   or assume higher beta alone fixes consistency. Final winner MSE is unaffected.
+  Precisely: leave the prediction's soft centroid unchanged, replace only the
+  hard target argmax by the target's soft centroid using the SAME beta and
+  target amplitude scale. Equal curves then produce equal centroids/zero loss.
+  Keep all other combined-loss terms fixed in an isolated comparison; test
+  exact equality, shifted peaks, broad/double peaks and finite gradients.
+  No corrected peak-loss implementation or training is included in this suite.
 - Drop raw sum-of-element-failure maximisation, standalone direct-curve benchmark
   and standalone Pareto-specimen search per the user's earlier cancellation.
   Retain design-screening diagnostics and field-only feasibility below.
 
 ## Review material and continuation order
+
+### Collect and visualise this suite
+
+1. Read the home manifest and scheduler status before downloading. Launch and
+   logs: `/data/home/exy053/p2/MULTI/Dual/Transformer/dual-compare-260930-r1/`.
+   `jobs.tsv` is authoritative; `source/` is the immutable submission snapshot,
+   including the earlier test/trial/loss scripts. The maintained scripts remain
+   in the home Git checkout's `p2-DisorderML/HPC/` directories.
+2. B1 stages to `/gpfs/scratch/exy053/<job-id>`, writes `mlruns/`, copies outputs
+   and logs into archive `p2/MULTI/Dual/Transformer/<suite>-<variant>`, then
+   removes scratch only after success. Failed scratch is retained. Check exit
+   status AND archived model/results/logs; a queue entry alone is not a pass.
+3. Download each completed variant with the existing macOS script, from repo
+   root, for example:
+
+   ```bash
+   bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-compare-260930-r1-baseline
+   ```
+
+   This creates only artifacts under ignored `data/`. Do not copy notebooks or
+   processing scripts there. The preflight's thirteen tiny outputs have names
+   `<suite>-preflight-<variant>` and demonstrate execution, not predictive skill.
+4. In maintained `code/ML-DualOutputs.ipynb`, set `LOAD_RUN` to that local run,
+   `LOAD_MODEL=True`, `LOAD_DATA=False`, `RUN_HPO=False`, `RUN_TRAINING=False`.
+   This inspects a checkpoint without raw MLdata or accidental retraining.
+   Reconstructing source-conditioned predictions needs matching DUAL_DATA;
+   plotting existing saved arrays does not.
+5. In `code/ML-DualPostProcessing.ipynb`, change `RUN_DIR` to the same run and
+   rerun from the top. Both UT/FT curve and field dashboards, component/frame
+   errors, diversity, paired errors, live field viewers and log-loss plots
+   already consume the saved contract. Keep one maintained notebook in code/.
+6. Its source-comparison helper uses explicit `*_predicted_field_curve_sample_metrics.csv`
+   when available and `*_true_field_curve_sample_metrics.csv`, joined by ID.
+   For curve_true, standard curve outputs also use true fields: they must NOT
+   be labelled predicted-field inference. Missing explicit predicted tables in
+   this case raise an error. For ordinary runs, standard predictions are the
+   valid fallback. winner_probe preserves the source winner's history; it has
+   no NEW training epochs. Do not interpret that inherited loss plot as a refit.
+7. Read `results/design_diagnostics.md` for readable ranking/top10/regret
+   reports; the JSON is for cross-run aggregation. These are implemented in
+   MLmetrics and the experiment runner, not a dedicated existing notebook
+   dashboard or a retroactive addition to old runs. `ft_region_metrics.json`
+   provides inside/outside/global errors for the FT-region test. Interpret
+   these alongside the existing spatial viewer, not raw weighted loss alone.
+8. Compare fixed validation scores only within comparable training modes:
+   four-output joint fits versus baseline; two-curve fits against each other.
+   Compare physical per-task metrics and train-mean skill across all modes,
+   joined by identical sample IDs/splits. Inspect oracle/deployable sources,
+   epochs and parameter counts. Use ML-HPOpostProcess only for the original
+   Optuna study: this fixed ablation suite is NOT another HPO database.
+
+### Passing work to other chats
+
+Use one short prompt pointing to this file and the relevant section; do not
+copy several divergent versions of the whole handoff. Keep architecture, losses,
+interface tests and suite review together in Improve ML Accuracy because they
+edit shared modules. Give a separate damage-export task ONLY the element→strut
+brief below and ownership of extraction/samples; it must not independently edit
+the architecture. Field-only feasibility is optional later, not a new job here.
+No briefs have been dispatched and this conversation has not been archived.
+
+Suggested prompt for Improve ML Accuracy:
+
+> Read this chat's remaining annotations, then
+> /Users/niccoloforte/Desktop/Code/NF-PhD-gitRepo/p2-DisorderML/HPC/DualOutputs/HANDOFFS.md
+> and applicable repo instructions/PROJECT_STATUS. The matched suite is already
+> submitted: inspect its status and available results; do not submit duplicates.
+> Continue architecture/loss/evaluation work here, preserving legacy fallback
+> and staged snapshots. Use the existing notebooks and the review instructions
+> above. Further submissions, ODB export and optimisation need explicit scope;
+> do not treat every deferred proposal as authorised implementation.
+
+### Earlier visual explanations
 
 Generated on29Sep, ignored under p2/samples: dual-sharing-{baseline,partial,private}.png,
 dual-peak-loss-explanation.png, dual-field-difficulty.png,

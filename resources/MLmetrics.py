@@ -1824,12 +1824,20 @@ def plot_field_loss_components(history):
 
 
 def plot_true_field_curve_comparison(results_dir, split='val', modes=('UT','FT')):
-    """Pair specimen curve errors for true-field substitution and normal inference."""
+    """Compare the same checkpoint on both field sources, including oracle fits."""
     from pathlib import Path
     folder=Path(results_dir);fig=None
     for k,mode in enumerate(modes):
         oracle=folder/f'{mode}_{split}_true_field_curve_sample_metrics.csv'
         standard=folder/f'{mode}_{split}_curve_sample_metrics.csv'
+        predicted=folder/f'{mode}_{split}_predicted_field_curve_sample_metrics.csv'
+        if predicted.is_file():
+            standard=predicted
+        elif (folder/'metrics.json').is_file():
+            import json
+            metadata=json.loads((folder/'metrics.json').read_text())
+            if metadata.get('run_config',{}).get('experiment')=='curve_true':
+                raise ValueError('True-field fit needs its explicit predicted-field evaluation; standard curves use true fields.')
         if not oracle.is_file() or not standard.is_file(): continue
         a,b=pd.read_csv(oracle),pd.read_csv(standard)
         joined=a.merge(b,on='sample_id',suffixes=('_true_field','_pred_field'),validate='one_to_one')

@@ -40,6 +40,28 @@ def _synthetic_split(rng, samples, nodes, field_features, curve_points, ft_node_
 
 
 class DualMLTest(unittest.TestCase):
+    def test_curve_source_comparison_uses_explicit_predicted_results(self):
+        import matplotlib.pyplot as plt
+        from resources.MLmetrics import plot_true_field_curve_comparison
+        with tempfile.TemporaryDirectory() as directory:
+            folder=Path(directory)
+            standard=folder/'UT_val_curve_sample_metrics.csv'
+            predicted=folder/'UT_val_predicted_field_curve_sample_metrics.csv'
+            oracle=folder/'UT_val_true_field_curve_sample_metrics.csv'
+            pd.DataFrame({'sample_id':[1], 'sample_rmse':[1.], 'imputed_field_values':[0]}).to_csv(oracle,index=False)
+            pd.DataFrame({'sample_id':[1], 'sample_rmse':[2.]}).to_csv(standard,index=False)
+            fig=plot_true_field_curve_comparison(folder,modes=('UT',))
+            np.testing.assert_allclose(fig.axes[0].collections[0].get_offsets(),[[2.,1.]])
+            plt.close(fig)
+            pd.DataFrame({'sample_id':[1], 'sample_rmse':[3.]}).to_csv(predicted,index=False)
+            (folder/'metrics.json').write_text(json.dumps({'run_config':{'experiment':'curve_true'}}))
+            fig=plot_true_field_curve_comparison(folder,modes=('UT',))
+            np.testing.assert_allclose(fig.axes[0].collections[0].get_offsets(),[[3.,1.]])
+            plt.close(fig)
+            predicted.unlink()
+            with self.assertRaisesRegex(ValueError,'explicit predicted-field'):
+                plot_true_field_curve_comparison(folder,modes=('UT',))
+
     def test_new_suite_modes_through_runner(self):
         from resources.MLdual import dual_node_context
         xy=np.asarray([(10*x,10*y) for y in range(20) for x in range(21)]+

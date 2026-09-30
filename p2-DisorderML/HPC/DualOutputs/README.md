@@ -57,6 +57,12 @@ listed above separately, not combinations. Source HPO artifacts are never edited
 
 ### Weighting and frozen-source comparisons
 
+For submitted job IDs, download commands and the existing notebook review
+settings, read `HANDOFFS.md` → **Collect and visualise this suite**. Keep notebooks
+in `p2-DisorderML/code/`; saved runs alone belong in `data/`. The source-comparison
+plot uses explicit predicted-field evaluation tables when present, so a
+true-field-trained model is not inadvertently compared against itself.
+
 Fixed weights are normalised to mean one over each specimen's valid values.
 Late-frame raw weights are `1+(t-t_first)/(t_last-t_first)`, so on equally spaced
 frames the effective weights span approximately 2/3 to 4/3. No adaptive error
