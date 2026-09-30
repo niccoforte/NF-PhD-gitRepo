@@ -34,7 +34,9 @@ weights and paths; PROJECT_STATUS is the submission record. Do not resubmit
 existing labels or confuse a dependency queue entry with completed training.
 
 Submitted suite: `dual-compare-260930-r1`, immutable source `6a3aee1`.
-Preflight **29601762**; full jobs below all depend on its successful exit/archive.
+Preflight **29601762 completed 0:0 in 9m11s**; all thirteen archived checkpoints,
+metrics/design/regional/comparison reports and logs were verified, and B1 removed
+its scratch. Full jobs below have cleared that successful preflight gate.
 Both curve-only jobs additionally depend on winner_probe **29601773**.
 
 | Variant | Job | Isolated question |
