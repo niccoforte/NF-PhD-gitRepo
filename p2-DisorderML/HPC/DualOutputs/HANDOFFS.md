@@ -44,11 +44,24 @@ initial struts, FT degree5 at (100,100), removal of its three downward links and
 retention of (120,90)-(120,100). Tests use self-contained fixtures, not the ignored
 sample generators. They also cover software-only behaviour such as gradients,
 checkpoint reload and HPO locks which a geometry illustration cannot validate.
-Improve ML Accuracy should prepare a compact mapping of scientific assertions
-to corrected samples/producer evidence and counterexamples that must fail;
-request review of uncertain physical expectations, not approval inferred from
-successful test execution. Existing INP evidence is one paired specimen, not
-an exhaustive archive audit. Preserve the documented pin-boundary tolerance caveat.
+Owner: **Improve ML Accuracy**. Produce a human-readable, primarily visual guide
+in `p2-DisorderML/samples/` covering EACH test in `test_dual_contract.py`, including
+software checks, not just geometry assertions. Inventory the current tests by
+name; 28 is the previously verified count, not a permanent expected count.
+For every test show what it checks, why, how its inputs/manipulation/assertions
+work, expected versus observed outcomes/tolerances, what failure it detects and
+what it does NOT establish. Include small numerical examples where useful, but
+prioritise labelled diagrams/plots and concise explanations over raw tables/code.
+Examples: masked-node perturbation before/after; gradient paths that should be
+active/blocked; predictions before/after checkpoint reload; a timeline for lock
+and recovery tests. Related tests may share a figure, but each needs an explicit
+entry. Link scientific assertions to corrected samples/producer evidence and a
+deliberately broken counterexample that should fail. Reuse existing illustrations
+where accurate; do not create notebook copies in data/ or make automated tests
+depend on ignored samples. Request review of uncertain physical expectations,
+not approval inferred from successful execution. Existing INP evidence is one
+paired specimen, not an exhaustive archive audit. Preserve the documented
+pin-boundary tolerance caveat. This guide is requested, not already produced.
 
 ## Authorised matched suite and continuation
 
@@ -85,8 +98,31 @@ Preflight requests four hours; all thirteen dependents request 240 hours, one
 GPU, 12 CPUs and 90,000 MB on andrena/pilot_andrena. The first attempt
 `dual-compare-260930` failed before Python: module was absent in its batch
 environment (29598744), so dependents 29598745–29598757 cancelled automatically.
-Its home log/scratch are retained for audit; do not mistake it for a trained run.
+The user reports deleting its empty scratch `/gpfs/scratch/exy053/29598744`;
+its home log/source directory is retained. Do not mistake it for a trained run.
 The correction initialises site modules and exports HOSTNAME for their logging.
+
+### Pending HPC storage audit after reconnection
+
+Owner: Improve ML Accuracy if this chat is handed off before the audit. The user
+has retained `/data/home/exy053/p2/MULTI/Dual/Transformer/dual-compare-260930/`
+and reports that its failure log mentions archive storage. On renewed SSH access,
+read that exact log, manifest and staged B1 script to resolve actual archive
+destinations; verify existence/content rather than treating a printed destination
+as proof that results were copied. Reconcile the user's Python-error observation
+with the earlier module-bootstrap diagnosis using the actual log.
+Distinguish failed logs/empty folders/partial outputs from successful results and
+protect the separate `dual-compare-260930-r1` suite. Report exact failed-run archive
+paths, sizes and contents; the user does not want failed runs in the archive.
+Also inventory the user's `/gpfs/scratch/exy053` directories read-only, correlating
+job IDs with live/accounting state and verified archives. The user reports no
+running jobs; independently check this and other uses before classifying any
+directory as abandoned. Distinguish failed/cancelled jobs, archive-copy failures,
+manual working directories and unknown origins; absence from the queue alone
+does not make data disposable. List keep/review/removable candidates and reasons.
+Do not scan raw ODB contents or delete anything during this requested audit;
+obtain exact-target cleanup approval after reporting findings. No remote audit
+has been performed for this request; the empty scratch deletion is user-reported.
 
 Use the HPO winner configuration (field THREE blocks, curve FOUR blocks), all
 paired data, seed42/split42, 450 maximum epochs/early stopping. Baseline, partial,
@@ -111,6 +147,12 @@ Improve ML Accuracy and requiring explicit submission scope, are:
    errors as well as curve MSE. Existing CombinedCurveLoss already includes
    PeakStressLoss via peak_weight. Distinguish the later optional field-source
    true/predicted × loss comparison from the current source-only suite.
+   Improve ML Accuracy owns implementing and validating the agreed soft/soft
+   correction before that comparison. It remained pending because the recent
+   turns updated handoffs only, not because a new scientific decision is needed.
+   Check for concurrent implementation first, preserve historical checkpoint
+   semantics, and do not modify the submitted suite. Further HPC submissions
+   still need explicit scope.
 3. Local non-affine displacement weighting, ONLY after the affine/local-separation
    examples and boundary/conditioning checks described below are validated.
 4. Curve-stage sharing controls with fixed field sources if the interface
@@ -469,6 +511,9 @@ code. No changes made. Two corrections to my earlier explanation are important";
 then the status response "All twelve trials completed successfully". Review the
 preceding implementation report too if only its job table has been read. Actual
 read status cannot be observed; these are verified message anchors only.
+The user will finish reading/annotating from the quoted correction response and
+then paste this handoff into Improve ML Accuracy. Await that user-led transfer;
+do not automatically dispatch it or treat the unread material as approved.
 
 Next inspect this suite's preflight/archive status, then compare matched
 validation results. Keep baseline/crack-only/graph-only and encoder controls

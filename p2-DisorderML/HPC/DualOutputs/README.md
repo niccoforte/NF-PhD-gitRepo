@@ -83,6 +83,9 @@ true-field-trained model is not inadvertently compared against itself.
 The same handoff's named task-routing table, validation review status and
 notebook backlog distinguish existing functionality from pending work and
 automated checks from the researcher's personal review.
+Improve ML Accuracy owns the requested per-test visual guide under `samples/`
+and the agreed soft/soft peak correction. HANDOFFS also records the pending
+read-only failed-archive/scratch audit after reconnection; no cleanup is implied.
 
 Fixed weights are normalised to mean one over each specimen's valid values.
 Late-frame raw weights are `1+(t-t_first)/(t_last-t_first)`, so on equally spaced
