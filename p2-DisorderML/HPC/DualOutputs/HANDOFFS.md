@@ -24,6 +24,32 @@ Avoid duplicate trainers, loss implementations, notebook copies and classes.
 Architecture remains owned by resources/MLdual.py; field losses by MLfield.py;
 metrics/loaders by MLmetrics.py. This thread now coordinates their joint work.
 
+Current user decisions: leave both data/ and samples/ ignore policies unchanged;
+cross-computer data organisation is deferred. Soft-versus-soft peak-location
+supervision is agreed in principle, with hard location retained for reporting
+and the existing peak-height term retained. This documentation update does not
+implement that correction, alter submitted jobs or authorise extra submissions.
+
+### Validation review status
+
+The 28 checks in test_dual_contract.py are automated software regression tests,
+not 28 research models or a record of researcher sign-off. The user has reviewed
+and corrected samples, but there is no evidence that they personally audited
+every test assertion. Do not claim that approval or that passing tests prove
+the entire scientific formulation correct.
+
+Relevant assertions encode the corrected sample contract: UT800/FT788 nodes,
+nominal tip (120,95) not a node, 26 retained crack-face nodes, UT2319/FT2259
+initial struts, FT degree5 at (100,100), removal of its three downward links and
+retention of (120,90)-(120,100). Tests use self-contained fixtures, not the ignored
+sample generators. They also cover software-only behaviour such as gradients,
+checkpoint reload and HPO locks which a geometry illustration cannot validate.
+Improve ML Accuracy should prepare a compact mapping of scientific assertions
+to corrected samples/producer evidence and counterexamples that must fail;
+request review of uncertain physical expectations, not approval inferred from
+successful test execution. Existing INP evidence is one paired specimen, not
+an exhaustive archive audit. Preserve the documented pin-boundary tolerance caveat.
+
 ## Authorised matched suite and continuation
 
 The existing runner now also implements late_frame, ft_region, winner_probe,
@@ -68,6 +94,33 @@ private, crack-face, graph, residual, true-field auxiliary, detach, late-frame
 and FT-region runs are independently compared. Old activity localisation is
 excluded; its definition does not answer the user's local-anomaly question.
 Repeat promising variants across seeds before interpreting sharing/capacity.
+
+### Follow-up experiment priorities (not yet submitted)
+
+First inspect the already-submitted suite. Subsequent candidates, owned by
+Improve ML Accuracy and requiring explicit submission scope, are:
+
+1. Repeat baseline and promising variants over TRAINING seeds (initialisation,
+   minibatch shuffling, dropout), initially holding split seed42 and specimen IDs
+   fixed. Use the same seed set across variants and report dispersion. Changing
+   the dataset/split seed is a separate generalisation study, not this control.
+2. Matched curve-loss comparison: MSE; combined loss with peak-location weight
+   zero; combined loss with corrected soft/soft peak location. Keep other
+   combined-loss terms/configuration fixed when isolating the peak term, retain
+   peak-height supervision when enabled, and report hard location/height/work
+   errors as well as curve MSE. Existing CombinedCurveLoss already includes
+   PeakStressLoss via peak_weight. Distinguish the later optional field-source
+   true/predicted × loss comparison from the current source-only suite.
+3. Local non-affine displacement weighting, ONLY after the affine/local-separation
+   examples and boundary/conditioning checks described below are validated.
+4. Curve-stage sharing controls with fixed field sources if the interface
+   results warrant them; do not change both stages simultaneously.
+5. Capacity-matched field-sharing comparisons to distinguish extra parameters
+   from the effect of sharing. This complements, not replaces, matched seeds.
+
+Damage supervision still requires validated strut labels. Temporal decoding and
+graph-relative attention biases remain deferred; no extra HPO or design search
+is implicitly requested by this list.
 
 winner_probe uses frozen winner weights with true-field substitution, no fit.
 The two curve_* runs instead train fresh identically seeded shared UT/FT curve
@@ -278,7 +331,7 @@ true/predicted-source × MSE/corrected-combined comparison could do so.
   weighted predicted x with hard target argmax x. Exact prediction may have
   nonzero loss. Illustrative x=(0,1,2),y=(0,1,.99),beta20: hard1,soft1.450,
   normalized squared penalty .05066. This is not curve smoothing. Consider an
-  explicitly versioned soft-versus-soft term with the same scale/beta and
+  explicitly versioned soft-versus-soft term (now agreed in principle) with the same scale/beta and
   exact-match zero/finite-gradient tests; retain hard peak-position diagnostics
   since soft centroid is not always the physical maximum. Disable only this
   term in a new combined-loss trial if necessary; do not alter archived losses
@@ -347,13 +400,49 @@ true/predicted-source × MSE/corrected-combined comparison could do so.
 
 ### Passing work to other chats
 
-Use one short prompt pointing to this file and the relevant section; do not
-copy several divergent versions of the whole handoff. Keep architecture, losses,
-interface tests and suite review together in Improve ML Accuracy because they
-edit shared modules. Give a separate damage-export task ONLY the element→strut
-brief below and ownership of extraction/samples; it must not independently edit
-the architecture. Field-only feasibility is optional later, not a new job here.
-No briefs have been dispatched and this conversation has not been archived.
+Copying only the relevant named sections into separate chats is appropriate;
+alternatively point each chat to those sections here. No briefs are dispatched
+automatically. The current routing table is:
+
+| Destination | Sections to provide | Boundary |
+| --- | --- | --- |
+| Existing Improve ML Accuracy | Start here through Review material and continuation order, stopping before the Damage export brief | Architecture/losses, current suite, test-review mapping, follow-up experiments and notebook backlog below; one owner for shared ML modules |
+| New Strut damage extraction | Damage export: element → strut → loading history; plus item 4, Damage, under Latest user clarifications | Extraction, validated labels and readable samples; no independent architecture edits |
+| New Research context optimisation | Research context optimisation brief at the end of this file | Context/instruction audit and preservation plan; no ML behaviour changes or current data-sync migration |
+| Optional later Field-only objective feasibility | Field-only optimisation: feasibility and validation first | Investigate descriptors; no removal of curves or optimisation launch |
+
+Do not remove HANDOFFS.md merely because its text was sent. First migrate durable
+facts and pending actions to their proper tracked homes, confirm receipt/ownership
+and update inbound links; then retire obsolete sections/file through Git. The
+context task owns this lifecycle review. Chats alone are not the sole record.
+
+### Notebook backlog — owned by Improve ML Accuracy
+
+Existing DualPostProcessing supports saved UT/FT curve/field diagnostics, live
+field viewers, log-scale losses and same-checkpoint field-source comparisons.
+Shared ML-HPOpostProcess supports dual Optuna studies. These capabilities do NOT
+mean that every new experiment switch or diagnostic already has notebook UI.
+
+Pending targeted work, preserving current cells/user edits and familiar syntax:
+
+- Expose design ranking/top-recovery/false-elite/regret from the saved reports;
+  distinguish UT cutoff work from the FT full-domain work proxy.
+- Display dedicated FT inside/outside/global region comparisons from saved
+  ft_region_metrics.json, alongside the existing spatial viewer.
+- Expose fresh-run configuration for implemented sharing, graph/crack-face,
+  residual, interface and fixed-weight options in DualOutputs, through shared
+  framework methods rather than duplicate HPC subprocess/training logic.
+- Provide a matched suite-level comparison of all four outputs, source mode,
+  splits, seeds, parameter counts and epochs. Four-output joint selection scores
+  and two-curve fit scores are not interchangeable.
+
+Prefer existing notebooks for single-run controls/diagnostics. A small dedicated
+ablation-comparison notebook under p2/code may be justified for repeated multi-run
+review; propose it before creation, and do not create one notebook per variant
+or any notebooks in data/. Broad notebook rewrites require a scoped plan. Missing
+new artifacts must be clearly reported while older runs remain reviewable.
+All loss axes remain logarithmic; worked feature/weight calculations stay in
+samples/. This backlog is documented, not already implemented by this handoff.
 
 Suggested prompt for Improve ML Accuracy:
 
@@ -450,3 +539,44 @@ Provide readable worked examples and maps in `p2-DisorderML/samples/`, reuse
 Only propose a field-based objective if the evidence links it to the desired
 mechanics; then ask for approval of its definition/constraints before optimisation
 or FEA interventions. State explicitly if no reliable field proxy is found.
+
+## Research context optimisation brief
+
+This is a separate documentation task, not homework for the researcher. Confirm
+the repository/vault/global-instruction scope with the user before expanding
+beyond the PhD project. Do not change code, scientific assumptions, job scripts,
+checkpoints or data locations as a side effect of context cleanup.
+
+First propose a consolidation map for AGENTS files, repo skills/references,
+READMEs, PROJECT_STATUS, handoffs and links to Obsidian. The goal is less duplicated
+mandatory reading without losing the project's interconnected scientific detail.
+The user has deferred data/samples Git-policy changes and moving analysis to the
+university PC: leave .gitignore and cross-computer storage unchanged for now.
+
+Acceptance criteria:
+
+1. Provide a before/after map for every important rule, scientific assumption,
+   unresolved decision, provenance record and operational safeguard. Give each
+   one authoritative home; classify deletion as duplication or superseded fact,
+   never simply as text that is long. Preserve recoverable Git history/backups.
+2. Keep root instructions compact with mandatory safeguards and scope routing;
+   use nested instructions for specialised work. Keep complete mechanics/data
+   contracts in linked references that the relevant tasks explicitly read.
+3. Keep PROJECT_STATUS focused on verified current state and pending actions;
+   retain historical evidence with dates/provenance in suitable references.
+   Distinguish historical RUNNING snapshots from later completion evidence.
+4. Flag contradictions and uncertain scientific facts for user resolution;
+   do not silently select one version. Keep repository implementation context
+   distinct from Obsidian research reasoning, linking rather than mirroring it.
+5. Validate links, scope/discovery and representative tasks: HPC submission and
+   cleanup safeguards, p1→p2 data mapping, saved checkpoint review, dual/legacy
+   isolation, notebook edits and curve/field-loss changes. Verify that necessary
+   knowledge is still discoverable and not merely shorter.
+6. Retire handoffs only after their actions/facts have migrated and receiving
+   task ownership is clear; update all inbound references. Obtain approval of
+   the plan before material deletion/relocation. Never infer approval to erase
+   research artifacts from a documentation-cleanup request.
+
+Deliver the proposed map and verification checklist first, then implement the
+approved consolidation. No new tasks or edits elsewhere have been dispatched by
+writing this brief.

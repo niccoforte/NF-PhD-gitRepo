@@ -51,6 +51,24 @@ scripts. B1 stages that snapshot's resources and selected entry point into
 permits scratch cleanup; failures retain scratch. Future repo edits cannot change
 already queued jobs. No executable files or deployment bundles go under local data/.
 
+For the submitted replacement suite, the manifest is
+`/data/home/exy053/p2/MULTI/Dual/Transformer/dual-compare-260930-r1/jobs.tsv`.
+It is a tab-separated submission ledger with columns `role`, `variant`,
+`job_id`, `dependency`, and `source_revision`, not a metrics file or a complete
+training configuration. Reproduction needs the source revision/snapshot **and**
+the launch arguments (snapshot B4 script and job logs), saved effective model/run
+configuration, matching data and split IDs, and environment versions. A script
+filename or job ID alone is insufficient; seeds do not guarantee bitwise
+reproduction across different hardware/software.
+
+The `-test.py` filename does not impose a short run: the current dual runner
+defaults to a maximum of 450 epochs. The original smoke run explicitly used
+three epochs; this suite's preflight explicitly uses 64 pairs and one epoch per
+mode. A preflight is a small end-to-end rehearsal of loading, GPU execution,
+metrics, checkpointing and archive collection, not an accuracy comparison.
+`test_dual_contract.py` instead contains local synthetic regression checks; it
+does not launch research training or certify the scientific assumptions.
+
 The suite intentionally excludes `localization`: current activity weights are
 not the requested affine-departure detector. It includes all other variants
 listed above separately, not combinations. Source HPO artifacts are never edited.
@@ -62,6 +80,9 @@ settings, read `HANDOFFS.md` → **Collect and visualise this suite**. Keep note
 in `p2-DisorderML/code/`; saved runs alone belong in `data/`. The source-comparison
 plot uses explicit predicted-field evaluation tables when present, so a
 true-field-trained model is not inadvertently compared against itself.
+The same handoff's named task-routing table, validation review status and
+notebook backlog distinguish existing functionality from pending work and
+automated checks from the researcher's personal review.
 
 Fixed weights are normalised to mean one over each specimen's valid values.
 Late-frame raw weights are `1+(t-t_first)/(t_last-t_first)`, so on equally spaced
