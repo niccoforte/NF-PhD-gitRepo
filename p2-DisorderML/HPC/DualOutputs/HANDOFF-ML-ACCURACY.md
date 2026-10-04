@@ -39,15 +39,26 @@ a true-field-to-property HPC test for UT Strength/Ductility/WoF and FT K_JIC.
 ### Reconciliation from the Accuracy chat
 
 Read current PROJECT_STATUS before treating earlier job states below as live.
-Ten completed matched-suite archives (six original, recovery detach/winner_probe/
-curve_predicted/curve_true) have been downloaded with B3. Residual/ft_region/
-true_field were still running at the 4 October continuation check. Do not resubmit.
-Seven joint runs have identical 7137/793/881 IDs. Joint scores: baseline .863022,
+Eleven completed matched-suite archives (six original, recovery detach/winner_probe/
+curve_predicted/curve_true/ft_region) have been downloaded with B3. Residual/
+true_field were still running at 18:25 BST on 4 October. Do not resubmit.
+Eight joint runs have identical 7137/793/881 IDs. Joint scores: baseline .863022,
 crack_face .807569, local_graph .902120, partial .841817, private .827576,
-late_frame .865194, detach .866487. This is one-seed validation, not a final winner.
+late_frame .865194, detach .866487, ft_region .809125. This is one-seed validation,
+not a final winner. FT-region is a fixed geometric prior, not sudden-motion weighting.
 Fresh curve_true fit, true input: UT RMSE1.639/FT3039.064; curve_predicted fit,
 predicted input: UT4.360/FT6678.813. Source substitution degrades either fit.
 Two-curve fit selection scores must not be ranked with four-output joint scores.
+
+Property probe now submitted from immutable source47fabb9 through B1:
+preflight30367256 (64 pairs/one epoch/4h), full30367272 (450 maximum epochs,
+early-stop52,240h), afterok gate with kill-on-invalid-dep. Both PENDING at18:25 BST;
+GPU execution still unverified. Both use 1GPU/12CPU/90000MB, andrena/pilot_andrena.
+Home snapshot: /data/home/exy053/p2/MULTI/FieldToProperty/Transformer/field-property-261004/source.
+Archive: /data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/FieldToProperty/Transformer,
+labels field-property-preflight-261004 and field-property-261004. Inspect existing
+IDs before acting; no duplicate submissions. It trains on true fields, joins
+archived properties by unique specimen ID and leaves test targets unevaluated.
 
 User reiterates sudden sample-specific motion, not large displacement, as the
 weighting goal. Existing activity weights do not meet that distinction; keep
