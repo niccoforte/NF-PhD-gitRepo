@@ -1,0 +1,480 @@
+# Improve ML Accuracy — continuation brief
+
+Read this brief alongside your existing chat's unfinished work and the user's
+new annotations; reconcile overlaps rather than restarting or replacing them.
+Do not load the sibling handoffs or the full source conversation by default.
+Damage extraction, repository context optimisation, and surrogate design
+optimisation are separate tasks. This brief owns model accuracy, loss machinery,
+experiment review, regression-test examples and diagnostic notebooks.
+It has not been dispatched automatically. New submissions require explicit scope.
+
+## Start here: ownership and current state
+
+Continue the Dual Model work in this thread; do not reimplement completed work.
+Read repo AGENTS, applicable nested instructions and p2 PROJECT_STATUS first.
+Canonical checkout: `/Users/niccoloforte/Desktop/Code/NF-PhD-gitRepo`.
+The matched-suite implementation is `37350e9`; its batch bootstrap correction
+is `6a3aee1`, published to both Git hosts and deployed before submission.
+Consult PROJECT_STATUS for the latest verified scheduler state. Never
+change a staged study or checkpoint to match newly edited source.
+
+Preserve legacy DATA/MODEL/Transformer workflows and historical checkpoints.
+The dirty .gitignore, FieldOutputs/test_field_loss.py and three notebook changes
+pre-date the handoff: do not revert or commit them casually. Keep source notebooks
+in p2/code, artifacts in ignored data/, human examples in ignored p2/samples.
+Avoid duplicate trainers, loss implementations, notebook copies and classes.
+Architecture remains owned by resources/MLdual.py; field losses by MLfield.py;
+metrics/loaders by MLmetrics.py. This thread now coordinates their joint work.
+
+Current user decisions: leave both data/ and samples/ ignore policies unchanged;
+cross-computer data organisation is deferred. Soft-versus-soft peak-location
+supervision is agreed in principle, with hard location retained for reporting
+and the existing peak-height term retained. This documentation update does not
+implement that correction, alter submitted jobs or authorise extra submissions.
+
+### Validation review status
+
+The 28 checks in test_dual_contract.py are automated software regression tests,
+not 28 research models or a record of researcher sign-off. The user has reviewed
+and corrected samples, but there is no evidence that they personally audited
+every test assertion. Do not claim that approval or that passing tests prove
+the entire scientific formulation correct.
+
+Relevant assertions encode the corrected sample contract: UT800/FT788 nodes,
+nominal tip (120,95) not a node, 26 retained crack-face nodes, UT2319/FT2259
+initial struts, FT degree5 at (100,100), removal of its three downward links and
+retention of (120,90)-(120,100). Tests use self-contained fixtures, not the ignored
+sample generators. They also cover software-only behaviour such as gradients,
+checkpoint reload and HPO locks which a geometry illustration cannot validate.
+Owner: **Improve ML Accuracy**. Produce a human-readable, primarily visual guide
+in `p2-DisorderML/samples/` covering EACH test in `test_dual_contract.py`, including
+software checks, not just geometry assertions. Inventory the current tests by
+name; 28 is the previously verified count, not a permanent expected count.
+For every test show what it checks, why, how its inputs/manipulation/assertions
+work, expected versus observed outcomes/tolerances, what failure it detects and
+what it does NOT establish. Include small numerical examples where useful, but
+prioritise labelled diagrams/plots and concise explanations over raw tables/code.
+Examples: masked-node perturbation before/after; gradient paths that should be
+active/blocked; predictions before/after checkpoint reload; a timeline for lock
+and recovery tests. Related tests may share a figure, but each needs an explicit
+entry. Link scientific assertions to corrected samples/producer evidence and a
+deliberately broken counterexample that should fail. Reuse existing illustrations
+where accurate; do not create notebook copies in data/ or make automated tests
+depend on ignored samples. Request review of uncertain physical expectations,
+not approval inferred from successful execution. Existing INP evidence is one
+paired specimen, not an exhaustive archive audit. Preserve the documented
+pin-boundary tolerance caveat. This guide is requested, not already produced.
+
+## Authorised matched suite and continuation
+
+The existing runner now also implements late_frame, ft_region, winner_probe,
+curve_predicted and curve_true. B4_Dual-experiments.sh submits thirteen isolated
+variants through B1 from an immutable home snapshot, gated by its all-mode GPU
+preflight. See the adjacent README for exact CLI, source/selection semantics,
+weights and paths; PROJECT_STATUS is the submission record. Do not resubmit
+existing labels or confuse a dependency queue entry with completed training.
+
+Submitted suite: `dual-compare-260930-r1`, immutable source `6a3aee1`.
+Preflight **29601762 completed 0:0 in 9m11s**, with all thirteen tiny archives
+verified. Live audit on 4 October found no queued/running jobs: six full runs
+completed (baseline, partial, private, crack_face, local_graph, late_frame).
+Residual, ft_region, true_field, detach and winner_probe failed BEFORE Python
+on sbg10: "Unable to locate a modulefile for 'miniforge'". The two curve fits
+were cancelled through their dependency on winner_probe. Six successful archives
+contain model.json/model.mdl, predictions, metrics and logs. No full-run accuracy
+comparison was performed in that storage audit. Empty failed scratch is not
+scientific evidence against those variants. Diagnose/validate the environment
+before requesting scoped replacement submissions; never rerun successful jobs
+by blindly submitting the whole suite. No storage-cleanup task is assigned here.
+
+| Variant | Job | Isolated question |
+| --- | --- | --- |
+| baseline | 29601763 | Fresh matched fully shared reference |
+| partial | 29601764 | Private final field block |
+| private | 29601765 | All field encoder blocks private |
+| crack_face | 29601766 | Static crack-face input only |
+| local_graph | 29601767 | Shared local messages with task-specific initial graphs |
+| residual | 29601768 | Train-mean residuals and variation scaling |
+| late_frame | 29601769 | Fixed positive late-load emphasis |
+| ft_region | 29601770 | A-priori FT crack-tip neighbourhood emphasis |
+| true_field | 29601771 | Auxiliary true-field curve supervision in joint training |
+| detach | 29601772 | Stop curve gradients into field predictions |
+| winner_probe | 29601773 | Frozen HPO winner, field-input substitution only |
+| curve_predicted | 29601774 | Fresh curve stage trained on frozen predicted fields |
+| curve_true | 29601775 | Fresh curve stage trained on true fields |
+
+Preflight requests four hours; all thirteen dependents request 240 hours, one
+GPU, 12 CPUs and 90,000 MB on andrena/pilot_andrena. The first attempt
+`dual-compare-260930` failed before Python: module was absent in its batch
+environment (29598744), so dependents 29598745–29598757 cancelled automatically.
+The correction initialises site modules and exports HOSTNAME for their logging;
+it did not prevent the distinct miniforge-availability failures above.
+
+Use the HPO winner configuration (field THREE blocks, curve FOUR blocks), all
+paired data, seed42/split42, 450 maximum epochs/early stopping. Baseline, partial,
+private, crack-face, graph, residual, true-field auxiliary, detach, late-frame
+and FT-region runs are independently compared. Old activity localisation is
+excluded; its definition does not answer the user's local-anomaly question.
+Repeat promising variants across seeds before interpreting sharing/capacity.
+
+### Follow-up experiment priorities (not yet submitted)
+
+First inspect the already-submitted suite. Subsequent candidates, owned by
+Improve ML Accuracy and requiring explicit submission scope, are:
+
+1. Repeat baseline and promising variants over TRAINING seeds (initialisation,
+   minibatch shuffling, dropout), initially holding split seed42 and specimen IDs
+   fixed. Use the same seed set across variants and report dispersion. Changing
+   the dataset/split seed is a separate generalisation study, not this control.
+2. Matched curve-loss comparison: MSE; combined loss with peak-location weight
+   zero; combined loss with corrected soft/soft peak location. Keep other
+   combined-loss terms/configuration fixed when isolating the peak term, retain
+   peak-height supervision when enabled, and report hard location/height/work
+   errors as well as curve MSE. Existing CombinedCurveLoss already includes
+   PeakStressLoss via peak_weight. Distinguish the later optional field-source
+   true/predicted × loss comparison from the current source-only suite.
+   Improve ML Accuracy owns implementing and validating the agreed soft/soft
+   correction before that comparison. It remained pending because the recent
+   turns updated handoffs only, not because a new scientific decision is needed.
+   Check for concurrent implementation first, preserve historical checkpoint
+   semantics, and do not modify the submitted suite. Further HPC submissions
+   still need explicit scope.
+3. Local non-affine displacement weighting, ONLY after the affine/local-separation
+   examples and boundary/conditioning checks described below are validated.
+4. Curve-stage sharing controls with fixed field sources if the interface
+   results warrant them; do not change both stages simultaneously.
+5. Capacity-matched field-sharing comparisons to distinguish extra parameters
+   from the effect of sharing. This complements, not replaces, matched seeds.
+
+Damage supervision still requires validated strut labels. Temporal decoding and
+graph-relative attention biases remain deferred; no extra HPO or design search
+is implicitly requested by this list.
+
+winner_probe uses frozen winner weights with true-field substitution, no fit.
+The two curve_* runs instead train fresh identically seeded shared UT/FT curve
+networks, freezing the winner's field generator and switching only its source:
+predicted fields versus true fields. Select on two curve scores; four-output
+selection is unchanged elsewhere. Save both source evaluations for each curve
+checkpoint. True-field results are oracle diagnostics, not disorder-only
+deployment results. In-sample field predictions on training cases are not
+cross-fitted; validation remains held out. No curve-depth HPO is implied.
+
+Late-frame weights: raw 1+(t−first)/(last−first), then per-specimen valid-mean-one;
+same across tasks/components, no dynamic error feedback. FT region: raw2 inside,
+raw1 outside, UT1, same normalisation. Validated A1 dN=.2 reference box selects
+125 retained nodes (x96.6..173.6,y54..136 in producer cell-size10 units), not an
+Abaqus edge set. Global/inside/outside errors saved for every suite member.
+Component weighting is parked: present scale-adjusted errors do not justify a
+blanket U2 preference. This does not establish identical component difficulty.
+
+Proposed affine-departure weighting is NOT implemented in this suite. For each
+node/frame use task-specific initial neighbours and initial disordered edge
+vectors. Fit a local displacement gradient A to (Uj−Ui)/length against
+(xj−xi)/length, then calculate the RMS fit residual. Uniform translation and
+affine displacement fields have zero residual, unlike current activity weights.
+Validate neighbour rank/conditioning, masked targets and boundaries; at a node
+with too few independent neighbours the residual is not informative. Fit a
+robust positive residual scale on training data only, floor it, and use
+1+g*q/(1+q), g initially1, normalised over valid values, detached from gradients.
+This would weight the existing displacement error, not penalise true fracture
+gradients into smoothness. Elastic non-affinity can also trigger it: it is a
+kinematic localisation proxy, not a plasticity/damage label. Show affine and
+local-separation samples before implementation. Temporal slope-change weighting
+would be a different isolated test, not an implicit part of this proposal.
+This is an adaptation of local best-affine-residual reasoning, not a validated
+FCC damage classifier; background: Falk & Langer (1998),
+https://doi.org/10.1103/PhysRevE.57.7192.
+
+## Earlier implementation and evidence
+
+The existing HPC/DualOutputs/A0-HPC-Dual-test.py accepts --experiment:
+baseline, crack_face, local_graph, partial, private, true_field, detach, residual,
+localization. Its --base-model-json anchors fresh experiments to saved dual
+architecture/training/loss configuration, not saved weights. Use fixed split
+seed 42 independently of training seed; record parameter counts and split hash.
+All nine modes passed full-800-node synthetic train/save/diagnostic/reload checks;
+23 dual tests and 14 field-loss tests passed. This is not GPU/accuracy validation.
+
+- Baseline has shared field blocks and shared curve blocks, task embeddings,
+  masks and separate small output heads. Task streams do not attend across tasks.
+- Partial defaults to shared early field blocks and a private last field block.
+- Private separates ALL FIELD ENCODER BLOCKS, but not projections or curve stage.
+  It is not complete task independence. These tests isolate an intervention,
+  not the cause of every downstream curve error. At winner depth 3, field
+  parameters are 5.98M / 7.76M / 11.31M; capacity is a confound.
+- LocalFieldGraph is one shared message MLP consuming distinct UT/FT initial
+  edge lists and specimen-disordered edge vectors/lengths, before global
+  attention. No additional tokens, hard adjacency-only attention or evolving
+  fracture. Reuse reference_field_edges. Counts UT2319/FT2259; FT degree5 at
+  (100,100); three downward connections removed, (120,90)-(120,100) retained.
+- crack_face reuses the existing opt-in initial_crack_face feature: 26 retained
+  FT nodes, UT zero. Compare baseline/crack-only/graph-only separately first.
+- true_field adds supervision on true fields through the SAME curve network
+  (default auxiliary coefficient .5). detach independently blocks curve-to-field
+  gradients. Neither is a third model. Default joint gradients are unchanged.
+- residual is optional: each node/frame/component learns (U−training mean)/scale,
+  with per-location training variation floored at .1 times the original pooled
+  frame/component scale. One saved affine inverse reconstructs physical U, and
+  the curve input uses the same residual coordinates. No existing run was changed.
+- localization reuses current bounded target-activity displacement weighting,
+  with spatial/temporal penalty coefficients zero. See limitations below before
+  interpreting this as anomaly or crack-region weighting.
+- Legacy graph_semantics="fcc_initial_v1" explicitly opts into the corrected
+  FT cut/bidirectional graph; historical defaults/loading remain unchanged.
+  Corrected legacy GNN training requires native FT788 (unmasked legacy pooling),
+  while the dual graph handles masked canonical800. Transformers are unaffected.
+
+## Completed runs and what their evidence says
+
+All requested transfers finished through B3. Full HPO is local at
+data/MULTI/Dual/Transformer/HPO/dual-joint-hpo1, including DB and checkpoints.
+Job26375307 completed in 9d14h05m: 45 complete,10 pruned,1 waiting retry; NOT 200
+evaluations. Winner46, epoch58, fixed score .82661694 (earlier37: .83263056).
+Validation RMSE skill vs training mean: UTfield4.20%, FTfield16.55%, UTcurve4.06%,
+FTcurve12.14%. Better joint score does not mean all branches improved.
+Full archive/missing-older-HPO inventory: samples/hpc-archive-review.md.
+Shared ML-HPOpostProcess.ipynb supports dual; DualPostProcessing uses best/.
+
+Twelve completed independent/dual loss trials and three preflights are local.
+Names: loss-{UT|FT|DUAL}-{baseline|spatial|temporal|both}-260917, under their
+UT/FT Field/Transformer or MULTI/Dual/Transformer parents. Do not resubmit them.
+Independent field spatial RMSE is UT .96039 / FT .10852 versus final dual HPO
+1.03037 / .12308. Independent validation counts799/804 versus dual793 and
+different capacities/training mean this is not a controlled superiority claim.
+The independent routes remain viable fallbacks, not abandoned code.
+
+### Same-checkpoint true-field substitution already exists for four loss runs
+
+Physical curve RMSE, predicted-field input → true-field input, same793 specimens:
+
+| Run | UT | FT |
+|---|---:|---:|
+| baseline | 4.501 → 4.761 | 6672.490 → 7921.395 |
+| spatial | 4.412 → 4.689 | 7538.217 → 7674.865 |
+| temporal | 4.620 → 3.928 | 6493.434 → 8018.200 |
+| both | 4.362 → 4.098 | 7031.547 → 7719.865 |
+
+These are saved true_field_curves.npz, not newly trained oracles. FT worsens for
+all substitutions; UT improves for temporal/both. Distribution mismatch or
+co-adaptation is plausible, not proved. Do not infer that inaccurate fields are
+physically preferable or that field errors cannot cause curve errors.
+Trial1 still lacks this saved diagnostic. The authorised winner_probe generates
+the winner comparison with reconstructed original DUAL_DATA/context;
+its model.json stores reference features, not every sample's pin memberships.
+Do not silently replace sample-specific context with the reference flags.
+
+Review end-to-end curves, same-checkpoint substitutions, and true-field-trained
+curve baselines separately. Field sharing alone cannot locate curve-stage
+interference. Curve-only sharing controls with fixed field sources may be a
+subsequent experiment; avoid simultaneously changing both stages before these
+diagnostics. Keep matched samples/transforms and distinguish frozen versus
+retrained downstream networks explicitly.
+
+### Loss provenance: correct the user's understandable assumption
+
+Final HPO winner fields use MaskedFieldMSELoss; curves use MSELoss. Trial1 also
+uses MSE. HPO allowed curve mse OR CombinedCurveLoss; winner selected mse by the
+fixed selection score. The later custom spatial/temporal field losses were NOT
+in that HPO. They ran in separate loss trials. Do not claim the final HPO used
+all custom losses or that MSE is universally best; studies/seeds are limited.
+New architecture runs anchored to this winner inherit those loss choices.
+Explicitly state active loss classes and nonzero coefficients before future jobs.
+
+The saved study contains 34 completed MSE trials (best fixed score .82661694)
+and 11 completed combined-loss trials (best .86242156). This is not a matched
+loss ablation: architecture, coefficients and optimisation also vary. The fixed
+score rewards baseline-relative MSE, not peak/work/ranking quality. Combined loss
+also changes per-specimen scaling (target-range normalisation versus train-fitted
+task scaling), as well as adding derivative/feature objectives. Predicted-field
+error could interact with these objectives, but is not established as the cause.
+The submitted source tests do NOT isolate loss choice. A later matched
+true/predicted-source × MSE/corrected-combined comparison could do so.
+
+## Latest user clarifications and the next decisions
+
+1. **Weighting needs correction in interpretation, not a silent code change.**
+   Current q combines mean squared scaled neighbour displacement differences
+   and adjacent temporal first differences; then sqrt/component averaging,
+   bounded 1+gain*q/(1+q), and specimen-mean-one normalisation. It is not |U|,
+   but smooth affine loading has nonzero gradients and upper nodes can have
+   larger temporal increments. It is NOT sudden-change/acceleration or local-
+   anomaly detection. The user's concern is valid. Compare illustrations of
+   rigid translation, affine loading and local separation before proposing a
+   new weight. Consider deviations from a local affine motion fit/training-only
+   expected gradients, and changes in load-normalised temporal slope. A raw
+   neighbour mean is boundary-biased; avoid claiming it solves the issue.
+2. **Component and frame weights:** user wants evidence-led U2 and late-frame
+   emphasis. Final HPO physical U1/U2 RMSE: UT .7869/1.2264, FT .0639/.1619.
+   Divide each error by its saved training frame/component scale: UT .3871/.3363,
+   FT .0503/.0393. U2 has larger physical error but U1 larger standardised error.
+   These are pooled scale comparisons, not location-wise specimen-variation skill.
+   Standardised first→last frame RMSE grows UT .0898→.5381, FT .0257→.0716.
+   A modest late-frame experiment is justified; blanket U2 priority depends on
+   mechanical objectives, not raw magnitude alone. Quantify per-component/frame
+   baseline skill and curve sensitivity; retain positive weights and fixed
+   unweighted validation reporting. Late-frame weighting is now part of the
+   authorised suite above; component weighting is parked.
+3. **FT region prior:** user means an a-priori crack-tip neighbourhood, NOT the
+   actual realised crack path. This is a reasonable independent experiment.
+   FCC A1 CrRegMESH = [xCrE−2.1a,xCrE+5.6a,H/2−4.1a,H/2+4.1a], a=unitCellSize;
+   CrRegSTAT is a different smaller box. Meshing selects edges in the former.
+   Validate task units, xCrE vs nominal tip, initial/reference coordinates and
+   node/edge membership before reuse. Show a labelled mask; choose modest
+   FT-only positive regional weights and retain outside-region supervision.
+   The suite now implements that bounded prior with whole-field/inside/outside
+   and curve reporting; it does not classify damage.
+4. **Damage:** local graph gives useful endpoints/representations for a future
+   strut head, but does not itself predict damage. A head can read endpoint
+   embeddings plus edge geometry to predict strut histories without new
+   Transformer tokens. Handle endpoint-order invariance, masks/absent struts,
+   loss imbalance and valid frame alignment. Do not remove edges based on true
+   future damage during inference. Validated labels must come from the separate Damage variable processing task FIRST.
+5. **Residual model:** optional experiment, NOT a change to all predictions.
+   Mean is task-specific, node-specific, frame-specific, component-specific and
+   training-only. Compare physical-unit errors/diversity/curves; floor small
+   variation. Work through the numerical example in samples before running.
+6. **Design diagnostics are not HPO:** for a fixed model, ask whether predicted
+   good designs are actually good using held-out known FEA cases. Top10 recovery,
+   objective ranks/regret/false feasibility do not optimise hyperparameters,
+   generate designs or train the model. Selection rule remains unchanged.
+
+## Deferred ideas: retain explicitly, do not silently launch
+
+- Temporal/load-conditioned decoder: no need to average201 curve points to20
+  fields. First audit whether relevant events are observed; interpolation does
+  not recover missing event physics. Higher-frequency export needs approval.
+- Graph-relative attention bias: later comparison, separate from local messages;
+  keep long-range attention. No hard adjacency-only Transformer.
+- GNNExplainer: defer until graph benefit/model reliability are established;
+  no separate explainer handoff was sent.
+- NN derivatives/saliency: diagnostic first, not model-derived importance weights
+  that may reinforce current blind spots. No sensitivity-based weighting added.
+- Curve integrals: current UT diagnostic uses each curve's own postpeak1%
+  crossing and reports missing crossings. FT full-domain work is a proxy, not
+  fracture toughness or initiation work. Validate physical cutoff definition
+  before changing objectives. A weighted MOO sum needs fixed reference/train-
+  only normalisation and several trade-off weights while retaining both axes;
+  it is not equivalent to recovering an entire Pareto front.
+- Soft peak-location mismatch: current SoftPeakLocationLoss compares softmax-
+  weighted predicted x with hard target argmax x. Exact prediction may have
+  nonzero loss. Illustrative x=(0,1,2),y=(0,1,.99),beta20: hard1,soft1.450,
+  normalized squared penalty .05066. This is not curve smoothing. Consider an
+  explicitly versioned soft-versus-soft term (now agreed in principle) with the same scale/beta and
+  exact-match zero/finite-gradient tests; retain hard peak-position diagnostics
+  since soft centroid is not always the physical maximum. Disable only this
+  term in a new combined-loss trial if necessary; do not alter archived losses
+  or assume higher beta alone fixes consistency. Final winner MSE is unaffected.
+  Precisely: leave the prediction's soft centroid unchanged, replace only the
+  hard target argmax by the target's soft centroid using the SAME beta and
+  target amplitude scale. Equal curves then produce equal centroids/zero loss.
+  Keep all other combined-loss terms fixed in an isolated comparison; test
+  exact equality, shifted peaks, broad/double peaks and finite gradients.
+  No corrected peak-loss implementation or training is included in this suite.
+- Drop raw sum-of-element-failure maximisation, standalone direct-curve benchmark
+  and standalone Pareto-specimen search per the user's earlier cancellation.
+  Retain design-screening diagnostics here; curve/field-only design objectives belong to the separate Surrogate optimisation task.
+
+## Review material and continuation order
+
+### Collect and visualise this suite
+
+1. Read the home manifest and scheduler status before downloading. Launch and
+   logs: `/data/home/exy053/p2/MULTI/Dual/Transformer/dual-compare-260930-r1/`.
+   `jobs.tsv` is authoritative; `source/` is the immutable submission snapshot,
+   including the earlier test/trial/loss scripts. The maintained scripts remain
+   in the home Git checkout's `p2-DisorderML/HPC/` directories.
+2. B1 stages to `/gpfs/scratch/exy053/<job-id>`, writes `mlruns/`, copies outputs
+   and logs into archive `p2/MULTI/Dual/Transformer/<suite>-<variant>`, then
+   removes scratch only after success. Failed scratch is retained. Check exit
+   status AND archived model/results/logs; a queue entry alone is not a pass.
+3. Download each completed variant with the existing macOS script, from repo
+   root, for example:
+
+   ```bash
+   bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-compare-260930-r1-baseline
+   ```
+
+   This creates only artifacts under ignored `data/`. Do not copy notebooks or
+   processing scripts there. The preflight's thirteen tiny outputs have names
+   `<suite>-preflight-<variant>` and demonstrate execution, not predictive skill.
+4. In maintained `code/ML-DualOutputs.ipynb`, set `LOAD_RUN` to that local run,
+   `LOAD_MODEL=True`, `LOAD_DATA=False`, `RUN_HPO=False`, `RUN_TRAINING=False`.
+   This inspects a checkpoint without raw MLdata or accidental retraining.
+   Reconstructing source-conditioned predictions needs matching DUAL_DATA;
+   plotting existing saved arrays does not.
+5. In `code/ML-DualPostProcessing.ipynb`, change `RUN_DIR` to the same run and
+   rerun from the top. Both UT/FT curve and field dashboards, component/frame
+   errors, diversity, paired errors, live field viewers and log-loss plots
+   already consume the saved contract. Keep one maintained notebook in code/.
+6. Its source-comparison helper uses explicit `*_predicted_field_curve_sample_metrics.csv`
+   when available and `*_true_field_curve_sample_metrics.csv`, joined by ID.
+   For curve_true, standard curve outputs also use true fields: they must NOT
+   be labelled predicted-field inference. Missing explicit predicted tables in
+   this case raise an error. For ordinary runs, standard predictions are the
+   valid fallback. winner_probe preserves the source winner's history; it has
+   no NEW training epochs. Do not interpret that inherited loss plot as a refit.
+7. Read `results/design_diagnostics.md` for readable ranking/top10/regret
+   reports; the JSON is for cross-run aggregation. These are implemented in
+   MLmetrics and the experiment runner, not a dedicated existing notebook
+   dashboard or a retroactive addition to old runs. `ft_region_metrics.json`
+   provides inside/outside/global errors for the FT-region test. Interpret
+   these alongside the existing spatial viewer, not raw weighted loss alone.
+8. Compare fixed validation scores only within comparable training modes:
+   four-output joint fits versus baseline; two-curve fits against each other.
+   Compare physical per-task metrics and train-mean skill across all modes,
+   joined by identical sample IDs/splits. Inspect oracle/deployable sources,
+   epochs and parameter counts. Use ML-HPOpostProcess only for the original
+   Optuna study: this fixed ablation suite is NOT another HPO database.
+
+### Notebook backlog — owned by Improve ML Accuracy
+
+Existing DualPostProcessing supports saved UT/FT curve/field diagnostics, live
+field viewers, log-scale losses and same-checkpoint field-source comparisons.
+Shared ML-HPOpostProcess supports dual Optuna studies. These capabilities do NOT
+mean that every new experiment switch or diagnostic already has notebook UI.
+
+Pending targeted work, preserving current cells/user edits and familiar syntax:
+
+- Expose design ranking/top-recovery/false-elite/regret from the saved reports;
+  distinguish UT cutoff work from the FT full-domain work proxy.
+- Display dedicated FT inside/outside/global region comparisons from saved
+  ft_region_metrics.json, alongside the existing spatial viewer.
+- Expose fresh-run configuration for implemented sharing, graph/crack-face,
+  residual, interface and fixed-weight options in DualOutputs, through shared
+  framework methods rather than duplicate HPC subprocess/training logic.
+- Provide a matched suite-level comparison of all four outputs, source mode,
+  splits, seeds, parameter counts and epochs. Four-output joint selection scores
+  and two-curve fit scores are not interchangeable.
+
+Prefer existing notebooks for single-run controls/diagnostics. A small dedicated
+ablation-comparison notebook under p2/code may be justified for repeated multi-run
+review; propose it before creation, and do not create one notebook per variant
+or any notebooks in data/. Broad notebook rewrites require a scoped plan. Missing
+new artifacts must be clearly reported while older runs remain reviewable.
+All loss axes remain logarithmic; worked feature/weight calculations stay in
+samples/. This backlog is documented, not already implemented by this handoff.
+
+### Earlier visual explanations
+
+Generated on29Sep, ignored under p2/samples: dual-sharing-{baseline,partial,private}.png,
+dual-peak-loss-explanation.png, dual-field-difficulty.png,
+dual-clarification-evidence.md; reproducible via explain_dual_sharing.py.
+Existing dual-experiment-examples.md and hpc-archive-review.md remain useful.
+The user's reading-position question concerns Improve ML Accuracy, not this
+thread. Its latest annotation references the earlier implementation report
+beginning "The implementation and slides are complete for this phase". Resume
+conceptual reading with the subsequent response beginning "I checked the current
+code. No changes made. Two corrections to my earlier explanation are important";
+then the status response "All twelve trials completed successfully". Review the
+preceding implementation report too if only its job table has been read. Actual
+read status cannot be observed; these are verified message anchors only.
+The user will finish reading/annotating from the quoted correction response and
+then paste this handoff into Improve ML Accuracy. Await that user-led transfer;
+do not automatically dispatch it or treat the unread material as approved.
+
+Next address the recorded incomplete experiments and compare matched
+validation results. Keep baseline/crack-only/graph-only and encoder controls
+separate. Use the same home→scratch→archive workflow, complete diagnostics,
+source provenance and up-to-date Git. Keep locked test unused for development.
+Retain the full201 curve intermediary and separate-model fallback. Do not let
+this handoff expand into all deferred projects automatically.

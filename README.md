@@ -341,9 +341,10 @@ omit `--submit` to preview. It preserves an immutable home-side source snapshot
 and a job manifest. The suite includes positive mean-normalised late-frame/FT-box
 weights, frozen-winner substitution and two freshly trained true/predicted-field
 curve controls. See the guide for oracle limitations and two-curve selection.
-The [consolidated Improve ML Accuracy handoff](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md)
-records completed work, saved interface/loss evidence, weighting caveats and
-deferred decisions, including damage-on-struts export and field-only feasibility.
+The [task handoff index](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md) points to four
+separate briefs: Improve ML Accuracy, damage-variable processing, repository
+context optimisation, and surrogate optimisation (curve and field-only options).
+Give each chat only its own brief; do not load all four or the full prior chat.
 Readable sharing/peak-loss diagrams and the latest validation review are in
 `p2-DisorderML/samples/dual-clarification-evidence.md`; these do not change training defaults.
 

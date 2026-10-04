@@ -73,19 +73,45 @@ The suite intentionally excludes `localization`: current activity weights are
 not the requested affine-departure detector. It includes all other variants
 listed above separately, not combinations. Source HPO artifacts are never edited.
 
+### Verified suite status and storage cleanup — 4 October 2026
+
+No jobs remained queued/running. Full baseline, partial, private, crack_face,
+local_graph and late_frame completed 0:0; their archive checkpoints, predictions,
+metrics and logs exist. Five jobs failed before Python on sbg10 because the
+miniforge module was unavailable: residual 29601768, ft_region 29601770,
+true_field 29601771, detach 29601772 and winner_probe 29601773. The latter's
+dependent curve fits 29601774/29601775 were cancelled. These are environment
+failures, not model-accuracy results; diagnose before any authorised replacement.
+Successful preflight results do not prove every execution node's module setup.
+
+The original preflight 29598744 failed earlier with `module: command not found`.
+Its and the five later failure logs printed `Data saved under:` unconditionally
+from B1's EXIT handler, but rsync transferred an empty tree (total size 0).
+No corresponding failed-run result directories existed in the conventional
+MULTI/Dual/Transformer archive; no archive deletion was necessary.
+
+With explicit user approval, removed the five empty scratch job directories
+listed above (each contained only empty mlruns/) and their five home failure logs,
+plus original preflight log `dual-compare-260930-preflight.o29598744`.
+The user had already removed empty scratch 29598744. These log deletions were
+permanent; no backup copies were made. Preserved all home scripts/manifests/source
+snapshots, six successful full archives and thirteen successful preflight outputs.
+Only the hidden `.scratch-expiring-history` directory remains under user scratch;
+it was left untouched. No job was resubmitted and no environment/code fix made.
+Failure evidence is summarised here; raw failed logs are deliberately not retained.
+
 ### Weighting and frozen-source comparisons
 
 For submitted job IDs, download commands and the existing notebook review
-settings, read `HANDOFFS.md` → **Collect and visualise this suite**. Keep notebooks
+settings, read `HANDOFF-ML-ACCURACY.md` → **Collect and visualise this suite**. Keep notebooks
 in `p2-DisorderML/code/`; saved runs alone belong in `data/`. The source-comparison
 plot uses explicit predicted-field evaluation tables when present, so a
 true-field-trained model is not inadvertently compared against itself.
-The same handoff's named task-routing table, validation review status and
-notebook backlog distinguish existing functionality from pending work and
-automated checks from the researcher's personal review.
-Improve ML Accuracy owns the requested per-test visual guide under `samples/`
-and the agreed soft/soft peak correction. HANDOFFS also records the pending
-read-only failed-archive/scratch audit after reconnection; no cleanup is implied.
+The accuracy brief distinguishes existing functionality from pending notebook
+work and automated checks from researcher review. Accuracy owns the per-test
+visual guide under `samples/` and agreed soft/soft peak correction. `HANDOFFS.md`
+is now just an index to four separate task briefs, not required reading for all
+chats; damage, context and surrogate design optimisation have their own files.
 
 Fixed weights are normalised to mean one over each specimen's valid values.
 Late-frame raw weights are `1+(t-t_first)/(t_last-t_first)`, so on equally spaced
@@ -166,9 +192,9 @@ chosen physical threshold. Future physical FT cutoff/normalised multi-objective
 definitions remain an explicit scientific decision. Selection still uses the old
 fixed four-output score, not these newly added diagnostics.
 
-Worked arithmetic: `../../samples/dual-experiment-examples.md`. Consolidated
-continuation brief for Improve ML Accuracy, including the deferred damage and
-field-only work: [HANDOFFS.md](HANDOFFS.md). The latest explanatory diagrams and
+Worked arithmetic: `../../samples/dual-experiment-examples.md`. Accuracy
+continuation: [HANDOFF-ML-ACCURACY.md](HANDOFF-ML-ACCURACY.md); separate task
+briefs: [HANDOFFS.md](HANDOFFS.md). The latest explanatory diagrams and
 read-only evidence are `../../samples/dual-clarification-evidence.md` and the
 adjacent `dual-sharing-*.png`, `dual-peak-loss-explanation.png` and
 `dual-field-difficulty.png`. These do not activate new training choices.
