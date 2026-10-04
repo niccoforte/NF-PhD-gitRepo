@@ -52,7 +52,11 @@ Read only the section relevant to the task and confirm it against the actual scr
   preview-first suite submitter, not a replacement staging/training workflow.
   Explicit `--submit` snapshots the clean checkout under the conventional home
   launch directory and queues a 4-hour all-mode GPU preflight plus thirteen
-  240-hour B1 jobs with afterok/kill-on-invalid-dep. Keep each change
+  240-hour B1 jobs with afterok/kill-on-invalid-dep. Optional `--variants CSV`
+  selects only requested recovery jobs, with winner_probe required before either
+  curve fit. `--preflight-node NODE` tests an affected execution node without
+  changing full-job placement. Inspect preview and prior IDs before submitting;
+  do not repeat successful variants during recovery. Keep each change
   separate, use unique labels and fixed split seed, retain all result/motion/design
   diagnostics and gate production runs on an authorised GPU preflight. See its
   README; private encoders do not mean complete task independence.

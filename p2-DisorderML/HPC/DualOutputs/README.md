@@ -36,6 +36,21 @@ for a new suite. It submits one **4-hour preflight** and thirteen dependent
 `--kill-on-invalid-dep=yes` prevent full training after a failed preflight.
 The two fresh curve fits additionally depend on the full-data winner probe,
 which checks the original checkpoint/data contract before releasing those fits.
+For selective recovery, `--variants` accepts a comma-separated subset and keeps
+dependency order (curve fits require winner_probe in the same selection).
+`--preflight-node NODE` optionally tests the existing all-mode GPU preflight on
+the node involved in an environment failure; full jobs retain normal placement.
+For example, preview only the seven previously unsuccessful experiments:
+
+```bash
+bash DualOutputs/B4_Dual-experiments.sh dual-recovery-261004 \
+  --variants residual,ft_region,true_field,detach,winner_probe,curve_predicted,curve_true \
+  --preflight-node sbg10
+```
+
+Append `--submit` only after the environment fix is verified and Git deployed.
+The reduced selection changes neither hyperparameters nor the 240-hour resource
+requests, and never overwrites the earlier successful runs.
 The preflight exercises all thirteen modes on 64 pairs/one epoch, including
 checkpoints, true/predicted-source diagnostics and B1 archiving. Full experiments
 use all pairs, seed/split seed 42 and at most 450 epochs with early stopping.

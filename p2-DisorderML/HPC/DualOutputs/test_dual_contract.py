@@ -40,6 +40,32 @@ def _synthetic_split(rng, samples, nodes, field_features, curve_points, ft_node_
 
 
 class DualMLTest(unittest.TestCase):
+    def test_suite_preview_selects_only_requested_variants(self):
+        import shutil
+        import subprocess
+        bash = shutil.which("bash")
+        if not bash:
+            self.skipTest("Bash is required for the HPC launcher preview")
+        script = str(Path(__file__).with_name("B4_Dual-experiments.sh"))
+
+        def preview(*args):
+            return subprocess.run([bash, script, "preview-only", *args],
+                                  capture_output=True, text=True, timeout=10)
+
+        default = preview()
+        self.assertEqual(default.returncode, 0, default.stderr)
+        self.assertEqual(default.stdout.count("Variant: "), 13)
+        selected = preview("--variants", "curve_true,residual,winner_probe,curve_predicted",
+                           "--preflight-node", "sbg10")
+        self.assertEqual(selected.returncode, 0, selected.stderr)
+        variants = [line.split(": ", 1)[1] for line in selected.stdout.splitlines()
+                    if line.startswith("Variant: ")]
+        self.assertEqual(variants, ["residual", "winner_probe", "curve_predicted", "curve_true"])
+        self.assertIn("Preflight node: sbg10", selected.stdout)
+        for invalid in ("curve_true", "unknown", "residual,residual", "residual,", ",residual", "residual,,detach", "residual late_frame"):
+            with self.subTest(invalid=invalid):
+                self.assertNotEqual(preview("--variants", invalid).returncode, 0)
+
     def test_curve_source_comparison_uses_explicit_predicted_results(self):
         import matplotlib.pyplot as plt
         from resources.MLmetrics import plot_true_field_curve_comparison

@@ -86,6 +86,11 @@ comparison was performed in that storage audit. Empty failed scratch is not
 scientific evidence against those variants. Diagnose/validate the environment
 before requesting scoped replacement submissions; never rerun successful jobs
 by blindly submitting the whole suite. No storage-cleanup task is assigned here.
+On 4 October the user authorised fixing this failure and resubmitting exactly
+the five failed plus two cancelled experiments. B4 now has selective `--variants`
+and `--preflight-node` controls, but the SSH session broke before diagnosis;
+no replacement jobs have been submitted yet. Consult PROJECT_STATUS for progress
+before acting, to avoid concurrent or duplicate recovery submissions.
 
 | Variant | Job | Isolated question |
 | --- | --- | --- |
@@ -291,6 +296,28 @@ The submitted source tests do NOT isolate loss choice. A later matched
 true/predicted-source × MSE/corrected-combined comparison could do so.
 
 ## Latest user clarifications and the next decisions
+
+The earlier sample-review brief remains applicable: spatial/temporal supervision
+already exists, so do not present it as a new method. Crack-face-only is a small
+interpretable boundary-cue ablation, not a promised large gain: coordinates already
+encode much of the location. Do not bundle degree, orientation counts and incident
+length statistics into a new feature set; degree is only a possible later comparator.
+Architecture ownership has moved from Dual Model into this Accuracy continuation.
+Keep architectural and loss changes separate; inspect all four outputs, regional
+errors, signed displacement jumps, true/predicted-field curve behaviour and seed
+stability on validation, not repeated locked-test inspection.
+
+Review the controlled input gallery in samples/: show actual perturbed coordinates
+and offsets, label the deliberately moved node, and zoom the relevant pin boundary.
+Keep reference coordinates invariant across specimens; displayed sample geometry
+must not conceal the perturbation. Define/test a scale-aware circle-boundary
+tolerance against the producer's intended inclusion rule, using inside, exactly
+on-boundary and outside cases under rescaling/translation. Do not use a tolerance
+large enough to erase genuine disorder-induced pin-membership changes. This issue
+is documented, not already fixed. Damage and strain targets need separate explicit
+data contracts; do not relabel initial crack-face membership as evolving damage or
+perform additional Abaqus exports through this brief. The old draft's "no new
+jobs" sentence is superseded only by explicitly authorised submissions.
 
 1. **Weighting needs correction in interpretation, not a silent code change.**
    Current q combines mean squared scaled neighbour displacement differences
