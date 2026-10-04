@@ -39,16 +39,17 @@ which checks the original checkpoint/data contract before releasing those fits.
 For selective recovery, `--variants` accepts a comma-separated subset and keeps
 dependency order (curve fits require winner_probe in the same selection).
 `--preflight-node NODE` optionally tests the existing all-mode GPU preflight on
-the node involved in an environment failure; full jobs retain normal placement.
+an available node involved in an environment failure; full jobs retain normal
+placement. Never target or bypass an administratively drained node.
 For example, preview only the seven previously unsuccessful experiments:
 
 ```bash
 bash DualOutputs/B4_Dual-experiments.sh dual-recovery-261004 \
-  --variants residual,ft_region,true_field,detach,winner_probe,curve_predicted,curve_true \
-  --preflight-node sbg10
+  --variants residual,ft_region,true_field,detach,winner_probe,curve_predicted,curve_true
 ```
 
-Append `--submit` only after the environment fix is verified and Git deployed.
+Append `--submit` only after environment diagnosis and Git deployment; full
+training remains gated by successful GPU preflight and archiving.
 The reduced selection changes neither hyperparameters nor the 240-hour resource
 requests, and never overwrites the earlier successful runs.
 The preflight exercises all thirteen modes on 64 pairs/one epoch, including
@@ -90,7 +91,7 @@ listed above separately, not combinations. Source HPO artifacts are never edited
 
 ### Verified suite status and storage cleanup — 4 October 2026
 
-No jobs remained queued/running. Full baseline, partial, private, crack_face,
+Before recovery, no jobs remained queued/running. Full baseline, partial, private, crack_face,
 local_graph and late_frame completed 0:0; their archive checkpoints, predictions,
 metrics and logs exist. Five jobs failed before Python on sbg10 because the
 miniforge module was unavailable: residual 29601768, ft_region 29601770,
@@ -111,9 +112,43 @@ plus original preflight log `dual-compare-260930-preflight.o29598744`.
 The user had already removed empty scratch 29598744. These log deletions were
 permanent; no backup copies were made. Preserved all home scripts/manifests/source
 snapshots, six successful full archives and thirteen successful preflight outputs.
-Only the hidden `.scratch-expiring-history` directory remains under user scratch;
-it was left untouched. No job was resubmitted and no environment/code fix made.
+After that cleanup only the hidden `.scratch-expiring-history` directory remained
+under user scratch; it was left untouched. That cleanup did not resubmit jobs.
 Failure evidence is summarised here; raw failed logs are deliberately not retained.
+
+### Selective recovery — 4 October 2026
+
+The renewed connection showed sbg10 administratively `IDLE+DRAIN`, reason
+`modules`. The current B1 bootstrap loads the site's Miniforge and nf-ml-gpu
+successfully on login-01; there is no evidence requiring a model-code change or
+an alternative installation. Respect the drain and let Slurm select an available
+node. This avoids the known failed node without claiming its configuration is
+repaired or guaranteeing the environment on every other node.
+
+Submitted `dual-recovery-261004` from immutable source `0b9215e` after synchronising
+the clean HPC checkout. Home manifest:
+`/data/home/exy053/p2/MULTI/Dual/Transformer/dual-recovery-261004/jobs.tsv`.
+
+| Role / variant | Replacement job | Required successful jobs |
+| --- | --- | --- |
+| all-mode preflight | 30326583 | none |
+| residual | 30326584 | 30326583 |
+| ft_region | 30326585 | 30326583 |
+| true_field | 30326586 | 30326583 |
+| detach | 30326587 | 30326583 |
+| winner_probe | 30326588 | 30326583 |
+| curve_predicted | 30326589 | 30326583 and 30326588 |
+| curve_true | 30326590 | 30326583 and 30326588 |
+
+Preflight was confirmed RUNNING on sbg23 at 14:19 BST. Completion and archive
+checks remain unverified: the SSH master subsequently stalled; reconnection was
+requested. Do not infer failure or resubmit from lost SSH access. The seven
+full jobs request 240 hours each, one GPU, 12 CPUs and 90,000 MB on
+andrena/pilot_andrena. The six successful original runs are not repeated.
+Archive labels are `dual-recovery-261004-<variant>` in the conventional dual
+tree above; compare these with the six `dual-compare-260930-r1-<variant>` runs,
+not with their preflight counterparts. Hyperparameters, seeds, model code and
+metric collection are unchanged. Do not submit duplicates.
 
 ### Weighting and frozen-source comparisons
 

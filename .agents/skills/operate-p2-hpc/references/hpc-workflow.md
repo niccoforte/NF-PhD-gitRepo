@@ -54,8 +54,10 @@ Read only the section relevant to the task and confirm it against the actual scr
   launch directory and queues a 4-hour all-mode GPU preflight plus thirteen
   240-hour B1 jobs with afterok/kill-on-invalid-dep. Optional `--variants CSV`
   selects only requested recovery jobs, with winner_probe required before either
-  curve fit. `--preflight-node NODE` tests an affected execution node without
-  changing full-job placement. Inspect preview and prior IDs before submitting;
+  curve fit. `--preflight-node NODE` tests an available affected execution node
+  without changing full-job placement. Inspect node state/reason first; never
+  bypass an administrative drain. A successful gate elsewhere does not prove
+  that node is repaired. Inspect preview and prior IDs before submitting;
   do not repeat successful variants during recovery. Keep each change
   separate, use unique labels and fixed split seed, retain all result/motion/design
   diagnostics and gate production runs on an authorised GPU preflight. See its

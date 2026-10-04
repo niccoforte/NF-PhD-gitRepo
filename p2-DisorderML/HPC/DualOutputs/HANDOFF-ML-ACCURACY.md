@@ -87,10 +87,17 @@ scientific evidence against those variants. Diagnose/validate the environment
 before requesting scoped replacement submissions; never rerun successful jobs
 by blindly submitting the whole suite. No storage-cleanup task is assigned here.
 On 4 October the user authorised fixing this failure and resubmitting exactly
-the five failed plus two cancelled experiments. B4 now has selective `--variants`
-and `--preflight-node` controls, but the SSH session broke before diagnosis;
-no replacement jobs have been submitted yet. Consult PROJECT_STATUS for progress
-before acting, to avoid concurrent or duplicate recovery submissions.
+the five failed plus two cancelled experiments. Recovery is now submitted as
+`dual-recovery-261004`, immutable source `0b9215e`: preflight 30326583;
+residual 30326584, ft_region 30326585, true_field 30326586, detach 30326587,
+winner_probe 30326588, curve_predicted 30326589 and curve_true 30326590.
+All depend on the preflight; both curve fits also depend on winner_probe.
+sbg10 is administratively drained with reason `modules`; the site bootstrap
+works on login-01 and the new GPU preflight started on sbg23 (verified 14:19 BST).
+SSH subsequently stalled; reconnection was requested. Completion and archive
+checks remain unverified, not failed. No model/loss change was needed for this
+node-specific failure. The adjacent README owns recovery IDs, paths and evidence;
+consult PROJECT_STATUS before acting. Inspect existing jobs, do not resubmit.
 
 | Variant | Job | Isolated question |
 | --- | --- | --- |
