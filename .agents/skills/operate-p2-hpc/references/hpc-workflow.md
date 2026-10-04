@@ -20,6 +20,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Submit, scratch, and archive contract
 
+- Reuse the user's SSH control socket for commands/transfers and leave its master running. `ssh -O check` does not prove the remote transport is alive. `ControlPersist` is an idle-lifetime setting, not a network guarantee; optional `ServerAliveInterval=60` and `ServerAliveCountMax=5` belong on the user's next master-start command, not individual multiplexed clients. They detect stale transport but cannot survive Mac sleep/network loss. Do not restart a healthy master or change SSH config without permission.
 - Submit `B1_ML-new.sh` from the intended task/output/model directory; it resolves `ML_SCRIPT` from an HPC filename, HPC-relative path, repository-relative path, or absolute path.
 - B1 initialises `/etc/profile.d/modules.sh` when `module` is absent and exports Bash's `HOSTNAME` for site module logging. Verify this bootstrap for non-interactive SSH; do not assume login-shell functions reach Slurm.
 - `DATA_ROOT` is the parent containing `MLdata`, not the `MLdata` directory itself.

@@ -140,15 +140,25 @@ the clean HPC checkout. Home manifest:
 | curve_predicted | 30326589 | 30326583 and 30326588 |
 | curve_true | 30326590 | 30326583 and 30326588 |
 
-Preflight was confirmed RUNNING on sbg23 at 14:19 BST. Completion and archive
-checks remain unverified: the SSH master subsequently stalled; reconnection was
-requested. Do not infer failure or resubmit from lost SSH access. The seven
+After SSH reconnection, preflight 30326583 was verified COMPLETED 0:0 in 9m05s
+on sbg23; all thirteen archives contain checkpoint, predictions, metrics and
+job log. Winner probe 30326588 completed 0:0 in 2m43s, with both field-source
+diagnostics archived. At approximately 15:47 BST all six remaining training
+jobs were RUNNING, with advancing epochs. No accuracy conclusions yet. The seven
 full jobs request 240 hours each, one GPU, 12 CPUs and 90,000 MB on
 andrena/pilot_andrena. The six successful original runs are not repeated.
 Archive labels are `dual-recovery-261004-<variant>` in the conventional dual
 tree above; compare these with the six `dual-compare-260930-r1-<variant>` runs,
 not with their preflight counterparts. Hyperparameters, seeds, model code and
 metric collection are unchanged. Do not submit duplicates.
+
+SSH access reuses the user's persistent master and must leave it running after
+commands/transfers. The observed `Broken pipe` did not identify its underlying
+network cause. `ControlPersist=12h` controls idle lifetime; it cannot guarantee
+network continuity. Optional `-o ServerAliveInterval=60 -o ServerAliveCountMax=5`
+on the next master-start command detects unresponsive transport; it cannot
+prevent disconnects during Mac sleep or network changes. No SSH settings were
+changed and the reconnected master was verified alive across multiple commands.
 
 ### Weighting and frozen-source comparisons
 

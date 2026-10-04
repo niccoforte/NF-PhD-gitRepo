@@ -93,9 +93,11 @@ residual 30326584, ft_region 30326585, true_field 30326586, detach 30326587,
 winner_probe 30326588, curve_predicted 30326589 and curve_true 30326590.
 All depend on the preflight; both curve fits also depend on winner_probe.
 sbg10 is administratively drained with reason `modules`; the site bootstrap
-works on login-01 and the new GPU preflight started on sbg23 (verified 14:19 BST).
-SSH subsequently stalled; reconnection was requested. Completion and archive
-checks remain unverified, not failed. No model/loss change was needed for this
+works on login-01 and sbg23: after reconnection, preflight 30326583 was verified
+COMPLETED 0:0 in 9m05s with all thirteen archives, and winner_probe 30326588
+COMPLETED 0:0 in 2m43s with its field-source diagnostics. At approximately
+15:47 BST the six training jobs were RUNNING with advancing epochs. No accuracy
+comparison performed. No model/loss change was needed for this
 node-specific failure. The adjacent README owns recovery IDs, paths and evidence;
 consult PROJECT_STATUS before acting. Inspect existing jobs, do not resubmit.
 
