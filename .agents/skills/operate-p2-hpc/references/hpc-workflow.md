@@ -73,6 +73,14 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Field-to-curve entry points
 
+- `FieldToCurve/A0-HPC_FieldToProperty-test.py` is an oracle property diagnostic,
+  not a curve runner. It reuses the existing encoder/trainer and writes
+  `MULTI/FieldToProperty/Transformer/<label>`. B1 discovers its `.mdl` for log
+  collection; B3 supports its relative path. Preserve explicit split/config
+  anchors, unique-ID property joins, train-only normalization and validation-only
+  selection. A 64-pair one-epoch preflight gates any authorised full run; neither
+  scheduler acceptance nor a preflight establishes predictive accuracy.
+
 - `FieldToCurve/A0-HPC_FieldToCurve-test.py`: Transformer-first UT/FT single run with node-token inputs and mean pooling.
 - `FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py`: GCN/GAT/Transformer comparison; MULTI is not implemented.
 - Runs use field inputs and curve targets but save under `FieldToCurve`. Keep this token aligned across model metadata, HPO resolution, diagnostics, and transfer.

@@ -30,7 +30,51 @@ Current user decisions: leave both data/ and samples/ ignore policies unchanged;
 cross-computer data organisation is deferred. Soft-versus-soft peak-location
 supervision is agreed in principle, with hard location retained for reporting
 and the existing peak-height term retained. This documentation update does not
-implement that correction, alter submitted jobs or authorise extra submissions.
+alter submitted jobs. Accuracy has now implemented explicit `peak_target_mode="soft"`
+in CombinedCurveLoss / `target_mode="soft"` in SoftPeakLocationLoss, with saved
+serialization and tests. Historical missing/default modes remain hard-target.
+No corrected-loss experiment has been submitted. The user separately authorised
+a true-field-to-property HPC test for UT Strength/Ductility/WoF and FT K_JIC.
+
+### Reconciliation from the Accuracy chat
+
+Read current PROJECT_STATUS before treating earlier job states below as live.
+Ten completed matched-suite archives (six original, recovery detach/winner_probe/
+curve_predicted/curve_true) have been downloaded with B3. Residual/ft_region/
+true_field were still running at the 4 October continuation check. Do not resubmit.
+Seven joint runs have identical 7137/793/881 IDs. Joint scores: baseline .863022,
+crack_face .807569, local_graph .902120, partial .841817, private .827576,
+late_frame .865194, detach .866487. This is one-seed validation, not a final winner.
+Fresh curve_true fit, true input: UT RMSE1.639/FT3039.064; curve_predicted fit,
+predicted input: UT4.360/FT6678.813. Source substitution degrades either fit.
+Two-curve fit selection scores must not be ranked with four-output joint scores.
+
+User reiterates sudden sample-specific motion, not large displacement, as the
+weighting goal. Existing activity weights do not meet that distinction; keep
+them excluded. No CNN, strain targets, damage extraction or PINN term added.
+Keep stage two without an explicit disorder/latent bypass; such a bypass would
+change the interpretability of the field bottleneck and requires a separate test.
+Fixed Ti/FCC/BC channels and per-DOF boundary flags remain unnecessary.
+
+Bounded thickness audit found a batch difference requiring a decision before
+feature/data changes: five early FT INPs are .411631–.412188 mm versus five later
+FT INPs at .401906 mm; UT is about .4019 in both. Archived producer assignments
+also differ (unconditional estimate versus `if thickness is None`). Do not claim
+constant thickness across the whole dataset or regenerate records. Evidence and
+plots: samples/accuracy-continuation/README.md. Proposal: bounded provenance audit
+joined to ML sample IDs before adding a per-specimen thickness feature.
+
+Tokenisation handoff was reconciled in code/TOKENIZATION_NEXT_STEPS.md with actual
+correlation-weighted PCA/KMeans code and read-only vault notes. Other handoff
+briefs were NOT loaded or changed, as the latest user explicitly instructed.
+For later dedicated-task reconciliation, retain: damage is edge-specific, actual
+element-to-strut membership, any failed constituent marks a broken strut, absent
+FT edges separate from later breakage, missing deleted outputs not "intact",
+irreversibility and visual validation. Nodal broken-fraction is only a summary;
+shared displacement/damage heads do not enforce consistency. Optimisation should
+retain curves initially, investigate field localisation/progressive-participation
+proxies and direct properties, validate against real mechanical objectives, and
+avoid force/energy reconstruction. No extra exports or optimisation code here.
 
 ### Validation review status
 
@@ -46,7 +90,11 @@ initial struts, FT degree5 at (100,100), removal of its three downward links and
 retention of (120,90)-(120,100). Tests use self-contained fixtures, not the ignored
 sample generators. They also cover software-only behaviour such as gradients,
 checkpoint reload and HPO locks which a geometry illustration cannot validate.
-Owner: **Improve ML Accuracy**. Produce a human-readable, primarily visual guide
+Owner: **Improve ML Accuracy**. The current guide is now in
+`samples/accuracy-continuation/test-guide.md`, covering all 31 current tests,
+with measured mask/gradient counterexamples and linked physical examples.
+All 31 passed locally. Preserve the following maintenance requirements for that
+human-readable guide
 in `p2-DisorderML/samples/` covering EACH test in `test_dual_contract.py`, including
 software checks, not just geometry assertions. Inventory the current tests by
 name; 28 is the previously verified count, not a permanent expected count.
@@ -63,7 +111,8 @@ where accurate; do not create notebook copies in data/ or make automated tests
 depend on ignored samples. Request review of uncertain physical expectations,
 not approval inferred from successful execution. Existing INP evidence is one
 paired specimen, not an exhaustive archive audit. Preserve the documented
-pin-boundary tolerance caveat. This guide is requested, not already produced.
+pin-boundary tolerance caveat. Keep it synchronized when tests change; it is not
+an exhaustive archive or interactive-browser validation.
 
 ## Authorised matched suite and continuation
 
@@ -147,12 +196,10 @@ Improve ML Accuracy and requiring explicit submission scope, are:
    errors as well as curve MSE. Existing CombinedCurveLoss already includes
    PeakStressLoss via peak_weight. Distinguish the later optional field-source
    true/predicted × loss comparison from the current source-only suite.
-   Improve ML Accuracy owns implementing and validating the agreed soft/soft
-   correction before that comparison. It remained pending because the recent
-   turns updated handoffs only, not because a new scientific decision is needed.
-   Check for concurrent implementation first, preserve historical checkpoint
-   semantics, and do not modify the submitted suite. Further HPC submissions
-   still need explicit scope.
+   The explicit soft/soft correction is now implemented and regression-tested;
+   select its saved option for this comparison. Preserve historical checkpoint
+   semantics and do not modify the submitted suite. This matched loss study still
+   needs explicit submission scope.
 3. Local non-affine displacement weighting, ONLY after the affine/local-separation
    examples and boundary/conditioning checks described below are validated.
 4. Curve-stage sharing controls with fixed field sources if the interface

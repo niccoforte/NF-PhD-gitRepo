@@ -2261,6 +2261,7 @@ def _model_loss_to_config(lossf):
             "derivative_order": getattr(lossf, "derivative_order", 1),
             "normalization_eps": getattr(lossf, "normalization_eps", 1e-8),
             "SoftPeak_beta": getattr(lossf, "SoftPeak_beta", 20.0),
+            "peak_target_mode": getattr(lossf, "peak_target_mode", "hard"),
         }
         return {"class": class_name, "params": params}
 
@@ -2313,6 +2314,7 @@ def _model_loss_to_config(lossf):
 
     if class_name == "SoftPeakLocationLoss":
         params = {
+            "target_mode": getattr(lossf, "target_mode", "hard"),
             "x_values": _model_tensor_values(getattr(lossf, "x_values", None)),
             "beta": getattr(lossf, "beta", 20.0),
             "reduction": getattr(lossf, "reduction", "mean"),

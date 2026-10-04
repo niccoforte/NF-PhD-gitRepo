@@ -329,6 +329,32 @@ The `FIELD_LOSS` dictionary in the Field/Dual Outputs notebooks enables these lo
 
 ### Joint dual-output surrogate details
 
+For a new corrected curve-loss comparison, explicitly use
+`CombinedCurveLoss(peak_target_mode="soft")` (or standalone
+`SoftPeakLocationLoss(target_mode="soft")`). The saved setting compares soft
+locations on both sides, so exact matches have zero location error. Historical
+defaults/checkpoints remain `hard`; peak height and hard-argmax metrics are
+unchanged. Existing HPO and frozen suite jobs have not been migrated.
+
+The true-field **property** diagnostic is
+`HPC/FieldToCurve/A0-HPC_FieldToProperty-test.py`, using the existing dual encoder
+and legacy trainer without a new model framework. It predicts archived UT
+Strength/Ductility/WoF and FT K_JIC directly from true field histories, with no
+disorder or physical-context inputs. Pass `--base-model-json` (architecture only)
+and `--split-reference` (frozen `model_data.json`), then run through B1 after a
+one-epoch/64-pair preflight. Full defaults are 450 epochs, patience52, fixed split42
+and validation-only selection. Results use `MULTI/FieldToProperty/Transformer/`:
+`property_model.json`, `model.mdl`, physical `predictions.npz`, per-property
+`metrics.json`, an agreement figure and logarithmic loss plot. B3 accepts that
+relative path unchanged. These are property results, not loadable curve results;
+the probe is not a deployable disorder-only surrogate or an optimisation loop.
+
+Current worked comparisons and the bounded thickness-provenance finding are in
+`p2-DisorderML/samples/accuracy-continuation/README.md`. Tokenisation has its own
+updated `code/TOKENIZATION_NEXT_STEPS.md`: current code is correlation-weighted
+PCA/KMeans, not the older proposed PLS pipeline. No tokenisation code or vault
+research decisions were changed by that reconciliation.
+
 Opt-in architecture/interface experiments reuse the existing dual runner: baseline,
 crack-face-only, local graph, partial/private field encoders, true-field curve
 supervision, stopped interface gradients, residual fields and localisation weights.

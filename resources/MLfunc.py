@@ -656,6 +656,7 @@ class CombinedCurveLoss(nn.Module):
         derivative_order=1,
         normalization_eps=1e-8,
         SoftPeak_beta=20.0,
+        peak_target_mode="hard",
     ):
         super().__init__()
         reduction = reduction.lower()
@@ -672,6 +673,7 @@ class CombinedCurveLoss(nn.Module):
         self.derivative_order = int(derivative_order)
         self.normalization_eps = float(normalization_eps)
         self.SoftPeak_beta = float(SoftPeak_beta)
+        self.peak_target_mode = peak_target_mode
 
         self.weighted_mse = WeightedCurveMSELoss(
             zone_boundaries=curve_default_zone_boundaries() if zone_boundaries is None else zone_boundaries,
@@ -696,6 +698,7 @@ class CombinedCurveLoss(nn.Module):
         self.peak_location = SoftPeakLocationLoss(
             x_values=x_values,
             beta=SoftPeak_beta,
+            target_mode=peak_target_mode,
             reduction=reduction,
             normalize=True,
             eps=normalization_eps,
@@ -1161,10 +1164,15 @@ class StrainEnergyLoss(nn.Module):
 
 class SoftPeakLocationLoss(nn.Module):
     """
-    Differentiable strain-at-peak loss using soft-argmax for predictions.
+    Differentiable peak location. Select target_mode="soft" for symmetric
+    supervision; "hard" preserves historical experiments/checkpoints.
     """
-    def __init__(self, x_values=None, beta=20.0, reduction="mean", normalize=False, eps=1e-8):
+    def __init__(self, x_values=None, beta=20.0, reduction="mean", normalize=False, eps=1e-8,
+                 target_mode="hard"):
         super().__init__()
+        if target_mode not in ("hard", "soft"):
+            raise ValueError("target_mode must be 'hard' or 'soft'.")
+        self.target_mode = target_mode
         self.beta = float(beta)
         self.reduction = reduction.lower()
         self.normalize = bool(normalize)
@@ -1198,7 +1206,11 @@ class SoftPeakLocationLoss(nn.Module):
         y_scale = torch.where(y_scale > self.eps, y_scale, fallback).unsqueeze(1)
         pred_weights = torch.softmax(self.beta * y_pred / y_scale, dim=1)
         pred_peak_x = (pred_weights * x.unsqueeze(0)).sum(dim=1)
-        true_peak_x = x[y_true.argmax(dim=1)]
+        if self.target_mode == "soft":
+            true_weights = torch.softmax(self.beta * y_true / y_scale, dim=1)
+            true_peak_x = (true_weights * x.unsqueeze(0)).sum(dim=1)
+        else:
+            true_peak_x = x[y_true.argmax(dim=1)]
         err = pred_peak_x - true_peak_x
         if self.normalize:
             x_scale = (x.max() - x.min()).clamp_min(self.eps)

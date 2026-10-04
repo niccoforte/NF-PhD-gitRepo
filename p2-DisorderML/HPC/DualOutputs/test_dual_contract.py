@@ -40,6 +40,56 @@ def _synthetic_split(rng, samples, nodes, field_features, curve_points, ft_node_
 
 
 class DualMLTest(unittest.TestCase):
+    def test_field_property_oracle_uses_archived_ids(self):
+        runner = runpy.run_path(str(Path(__file__).parents[1] / "FieldToCurve/A0-HPC_FieldToProperty-test.py"))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "MLdata").mkdir()
+            # Deliberately reverse CSV order: row positions must never be the join key.
+            ids = list(range(10))[::-1]
+            pd.DataFrame({name: np.asarray(ids) + j + 1. for j, name in enumerate(runner["PROPERTIES"])},
+                         index=ids).to_csv(root / "MLdata/MULTI-disNodes-allProps.csv")
+            reference = root / "split.json"
+            reference.write_text(json.dumps({"sample_ids": self.data.sample_ids}))
+            anchor = root / "anchor.json"
+            anchor.write_text(json.dumps({"model_config": self.model.get_config(),
+                "training": {"lr": .001, "opt": ["adamw", 0.]}}))
+            with patch.object(DUAL_DATA, "from_files", return_value=self.data):
+                folder = runner["main"](["--data-path", str(root), "--run-root", str(root),
+                    "--run-label", "unit-properties", "--base-model-json", str(anchor),
+                    "--split-reference", str(reference), "--epochs", "1", "--allow-cpu"])
+            with np.load(folder / "predictions.npz") as saved:
+                np.testing.assert_allclose(saved["truth"][:, 0], [7., 8.])
+                self.assertEqual(saved["prediction"].shape, (2, 4))
+            descriptor = json.loads((folder / "property_model.json").read_text())
+            self.assertEqual(descriptor["config"]["context_size"], 0)
+            self.assertEqual(descriptor["status"], "complete")
+            checkpoint = torch.load(folder / "model.mdl", map_location="cpu", weights_only=False)
+            restored = runner["FieldPropertyTransformer"](checkpoint["config"], checkpoint["node_masks"])
+            restored.load_state_dict(checkpoint["state_dict"], strict=True)
+
+    def test_soft_peak_target_and_historical_reload(self):
+        from resources.MLfunc import CombinedCurveLoss, SoftPeakLocationLoss
+        from resources.MLmodels import _model_build_loss_from_config, _model_loss_to_config
+        # Includes a plateau and a constant curve: identical targets must cost zero.
+        truth = torch.tensor([[0., 1., 1., .9, .8], [2., 2., 2., 2., 2.]])
+        soft = SoftPeakLocationLoss(beta=2., normalize=True, target_mode="soft")
+        self.assertEqual(float(soft(truth, truth)), 0.)
+        self.assertGreater(float(SoftPeakLocationLoss(beta=2.)(truth, truth)), 0.)
+        pred = truth.flip(1).clone().requires_grad_()
+        soft(pred, truth).backward()
+        self.assertTrue(torch.isfinite(pred.grad).all())
+        self.assertGreater(float(pred.grad.abs().sum()), 0.)
+        for loss in (soft, CombinedCurveLoss(peak_target_mode="soft", zone_boundaries=(2, 4))):
+            clone = _model_build_loss_from_config(_model_loss_to_config(loss))
+            torch.testing.assert_close(loss(pred, truth), clone(pred, truth))
+        for name in ("SoftPeakLocationLoss", "CombinedCurveLoss"):
+            old = _model_build_loss_from_config({"class": name, "params": {}})
+            peak = old.peak_location if name == "CombinedCurveLoss" else old
+            self.assertEqual(peak.target_mode, "hard")
+        with self.assertRaises(ValueError):
+            SoftPeakLocationLoss(target_mode="unknown")
+
     def test_suite_preview_selects_only_requested_variants(self):
         import shutil
         import subprocess
