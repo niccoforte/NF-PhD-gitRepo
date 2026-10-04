@@ -350,7 +350,13 @@ relative path unchanged. These are property results, not loadable curve results;
 the probe is not a deployable disorder-only surrogate or an optimisation loop.
 
 Current worked comparisons and the bounded thickness-provenance finding are in
-`p2-DisorderML/samples/accuracy-continuation/README.md`. Tokenisation has its own
+`p2-DisorderML/samples/accuracy-continuation/README.md`. Its linked
+`thickness-provenance.md` maps 33 paired ML specimens to 66 original INPs across
+11 batches: earlier sampled FT struts are thicker than UT; later sampled batches
+reuse one UT/FT thickness per batch. Geometry/ID agreement is verified, but merged
+export paths and a mismatched archived launcher limit exact response provenance.
+Do not infer an exact dataset-wide boundary, density or error effect from this
+bounded audit; no feature/filtering or simulation change was made. Tokenisation has its own
 updated `code/TOKENIZATION_NEXT_STEPS.md`: current code is correlation-weighted
 PCA/KMeans, not the older proposed PLS pipeline. No tokenisation code or vault
 research decisions were changed by that reconciliation.

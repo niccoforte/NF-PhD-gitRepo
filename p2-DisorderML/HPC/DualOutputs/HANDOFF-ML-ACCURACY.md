@@ -67,13 +67,17 @@ Keep stage two without an explicit disorder/latent bypass; such a bypass would
 change the interpretability of the field bottleneck and requires a separate test.
 Fixed Ti/FCC/BC channels and per-DOF boundary flags remain unnecessary.
 
-Bounded thickness audit found a batch difference requiring a decision before
-feature/data changes: five early FT INPs are .411631–.412188 mm versus five later
-FT INPs at .401906 mm; UT is about .4019 in both. Archived producer assignments
-also differ (unconditional estimate versus `if thickness is None`). Do not claim
-constant thickness across the whole dataset or regenerate records. Evidence and
-plots: samples/accuracy-continuation/README.md. Proposal: bounded provenance audit
-joined to ML sample IDs before adding a per-specimen thickness feature.
+The user-authorised bounded thickness provenance follow-up is complete: 33 paired
+ML specimens, 66 INPs, 11 batches. All input coordinates match exactly and field
+initial coordinates match within 5e-7 mm, with matching stems/source basenames.
+Early sampled batches6538720/6538745 vary thickness per specimen/task; all nine
+later sampled batches share a single UT/FT thickness across their three inspected
+specimens. Sampled1000/1001 straddle the contrast. Archived conditional assignment
+is consistent with first-UT thickness reuse, but batch6892743's B1 initial1901
+disagrees with its INPs1001–1100. Merged Windows field paths cannot establish exact
+response ODB provenance. Do not extrapolate to all IDs, infer density/error effects,
+add features or regenerate records. No data/model/job changes authorised here.
+Evidence: samples/accuracy-continuation/thickness-provenance.md and hashed JSON.
 
 Tokenisation handoff was reconciled in code/TOKENIZATION_NEXT_STEPS.md with actual
 correlation-weighted PCA/KMeans code and read-only vault notes. Other handoff

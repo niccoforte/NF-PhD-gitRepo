@@ -64,6 +64,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 - Joint end-to-end training uses one forward pass, one four-term scalar loss, one backward pass, and one optimizer. Field supervision acts after stage one; curve supervision acts after stage two and propagates through both stages.
 - Initial dual runs use full ordered curves. PCA remains a possible later ablation but is not the default dual target.
 - Default physical context is the checked `fcc_ti` profile, documented with worked examples in `samples/`. Keep optional degree and graph-attention additions separate until the user agrees to that ablation. Do not silently replace coupling membership with per-node fixity.
+- Do not assume uniform strut thickness or exact per-specimen relative density across historical ML data. The bounded provenance audit found differing sampled generation regimes. Actual INP sections and coordinate/ID matches are authoritative for inspected specimens; archived launchers can disagree with their INP IDs, and merged field-source paths do not establish exact ODB provenance. Do not extrapolate sampled thicknesses to uninspected IDs or change features/filtering automatically. See samples/accuracy-continuation/thickness-provenance.md.
 - Current evidence, loss choices, unresolved weighting, data-access blockers, and next implementation work belong in `PROJECT_STATUS.md`.
 
 ## Saved Artifacts
