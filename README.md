@@ -336,6 +336,15 @@ locations on both sides, so exact matches have zero location error. Historical
 defaults/checkpoints remain `hard`; peak height and hard-argmax metrics are
 unchanged. Existing HPO and frozen suite jobs have not been migrated.
 
+The dual runner now exposes `--curve-loss-ablation mse|combined_no_location|combined_soft`
+for fresh `baseline`, `curve_true` or `curve_predicted` experiments. This explicitly
+overrides the anchor's curve loss; architecture, splits and fixed validation
+ranking remain anchored. Compare the two combined variants to isolate the location
+term; comparison against MSE also changes the other loss terms/normalization.
+`A0-HPC-Dual-preflight.py --curve-loss-suite` checks a small baseline plus all four
+true/predicted-source combined fits. It does not submit jobs. Keep the established
+MSE source controls and use fresh labels for the four new full runs.
+
 The true-field **property** diagnostic is
 `HPC/FieldToCurve/A0-HPC_FieldToProperty-test.py`, using the existing dual encoder
 and legacy trainer without a new model framework. It predicts archived UT
@@ -373,10 +382,10 @@ omit `--submit` to preview. It preserves an immutable home-side source snapshot
 and a job manifest. The suite includes positive mean-normalised late-frame/FT-box
 weights, frozen-winner substitution and two freshly trained true/predicted-field
 curve controls. See the guide for oracle limitations and two-curve selection.
-The [task handoff index](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md) points to four
-separate briefs: Improve ML Accuracy, damage-variable processing, repository
-context optimisation, and surrogate optimisation (curve and field-only options).
-Give each chat only its own brief; do not load all four or the full prior chat.
+The [task handoff index](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md) routes accuracy,
+damage-variable processing, repository context, surrogate optimisation, and the
+proposed physics/strain feasibility task; it also links the existing tokenisation
+brief. Give each chat only its own brief, not all briefs or the full prior chat.
 Readable sharing/peak-loss diagrams and the latest validation review are in
 `p2-DisorderML/samples/dual-clarification-evidence.md`; these do not change training defaults.
 

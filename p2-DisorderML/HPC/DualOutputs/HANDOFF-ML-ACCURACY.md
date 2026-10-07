@@ -36,6 +36,19 @@ serialization and tests. Historical missing/default modes remain hard-target.
 No corrected-loss experiment has been submitted. The user separately authorised
 a true-field-to-property HPC test for UT Strength/Ductility/WoF and FT K_JIC.
 
+7 October update: the user reports all remaining jobs completed and authorises
+verification/download/review, thickness-property correlation checks and justified
+follow-up submissions. SSH returned Broken pipe/authentication failure; reconnect
+before verifying30367256/30367272 and30326584/30326586. Do not repeat those jobs.
+The corrected-loss follow-up is now prepared through `--curve-loss-ablation` and
+the five-case `--curve-loss-suite` preflight. Four full fits cross frozen true/
+predicted fields with combined_no_location/combined_soft, retaining the existing
+matched MSE controls after exact config/split checks. No new jobs submitted yet.
+Keep240h full requests and B1 archive gates; record actual IDs in PROJECT_STATUS.
+The user's latest annotations explicitly permit reconciling Tokenisation, Damage
+and Optimisation briefs; these have been updated. Physics/strain has a separate
+feasibility brief. No chat dispatched or physics/damage model implemented.
+
 ### Reconciliation from the Accuracy chat
 
 Read current PROJECT_STATUS before treating earlier job states below as live.
@@ -76,12 +89,16 @@ specimens. Sampled1000/1001 straddle the contrast. Archived conditional assignme
 is consistent with first-UT thickness reuse, but batch6892743's B1 initial1901
 disagrees with its INPs1001–1100. Merged Windows field paths cannot establish exact
 response ODB provenance. Do not extrapolate to all IDs, infer density/error effects,
-add features or regenerate records. No data/model/job changes authorised here.
+add features or regenerate records. Thickness/property association checks are now
+authorised; use the verified INP-to-ID rows and training/validation properties,
+report batch confounding and limited power. A nonsignificant trend does not
+establish irrelevance. No thickness feature, filtering or FEA change is authorised.
 Evidence: samples/accuracy-continuation/thickness-provenance.md and hashed JSON.
 
 Tokenisation handoff was reconciled in code/TOKENIZATION_NEXT_STEPS.md with actual
 correlation-weighted PCA/KMeans code and read-only vault notes. Other handoff
-briefs were NOT loaded or changed, as the latest user explicitly instructed.
+briefs were not loaded during that original reconciliation; the newly authorised
+follow-up now adds the retained concepts below to their dedicated briefs.
 For later dedicated-task reconciliation, retain: damage is edge-specific, actual
 element-to-strut membership, any failed constituent marks a broken strut, absent
 FT edges separate from later breakage, missing deleted outputs not "intact",
@@ -213,8 +230,8 @@ Improve ML Accuracy and requiring explicit submission scope, are:
    true/predicted × loss comparison from the current source-only suite.
    The explicit soft/soft correction is now implemented and regression-tested;
    select its saved option for this comparison. Preserve historical checkpoint
-   semantics and do not modify the submitted suite. This matched loss study still
-   needs explicit submission scope.
+   semantics and do not modify the original suite. The user has now authorised
+   this follow-up; entry points are prepared, submission awaits SSH reconnection.
 3. Local non-affine displacement weighting, ONLY after the affine/local-separation
    examples and boundary/conditioning checks described below are validated.
 4. Curve-stage sharing controls with fixed field sources if the interface

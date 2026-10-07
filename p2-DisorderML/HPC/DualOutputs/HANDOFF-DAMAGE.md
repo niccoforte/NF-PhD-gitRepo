@@ -58,6 +58,12 @@ true future damage must never determine inference-time edges. Do not independent
 edit architecture/loss modules. Reuse validated reference_field_edges as an initial
 topology reference; the original INP owns FE-element-to-strut provenance.
 
+A node's fraction of incident struts broken is an optional summary, never a
+replacement for edge histories. Shared displacement/damage representations can
+still produce inconsistent heads: first test auxiliary supervision without
+feeding predicted damage back into displacement or removing predicted edges.
+Avoid feedback until the labels/head are independently validated.
+
 Completed work goes into the appropriate producer documentation/progress notes;
 keep this brief current until its actions have migrated. No bulk export, new FEA
 or damage training is authorised merely by reading this file.

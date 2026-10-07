@@ -12,6 +12,12 @@ submissions, bulk processing, optimisation searches or material cleanup."
 | New Damage variable processing | [HANDOFF-DAMAGE.md](HANDOFF-DAMAGE.md) | Element-to-strut damage export, labels and validation samples; not model integration |
 | New Repo context optimisation | [HANDOFF-CONTEXT.md](HANDOFF-CONTEXT.md) | Lossless instruction/reference/status consolidation plan; no ML behaviour/storage changes |
 | New Surrogate optimisation | [HANDOFF-SURROGATE-OPTIMISATION.md](HANDOFF-SURROGATE-OPTIMISATION.md) | Curve AND field-only design objectives, constraints and validated search plan; not HPO |
+| Proposed Physics/strain feasibility | [HANDOFF-PHYSICS-STRAIN.md](HANDOFF-PHYSICS-STRAIN.md) | True-field strain/coupling audits before any new physics loss; no bulk exports |
+
+The existing Tokenisation chat uses `../../code/TOKENIZATION_NEXT_STEPS.md`.
+It owns motif discovery, not the predictive local-graph ablation or field-loss
+implementation. Physics/strain work warrants a separate iterative task; no chat
+has been created or messaged by writing its brief.
 
 All files are beside this index in:
 /Users/niccoloforte/Desktop/Code/NF-PhD-gitRepo/p2-DisorderML/HPC/DualOutputs/

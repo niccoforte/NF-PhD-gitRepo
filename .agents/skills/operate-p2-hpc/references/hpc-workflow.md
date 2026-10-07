@@ -73,6 +73,17 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Field-to-curve entry points
 
+- Corrected dual curve-loss comparisons reuse `DualOutputs/A0-HPC-Dual-test.py`
+  with `--experiment curve_true|curve_predicted` and explicit
+  `--curve-loss-ablation combined_no_location|combined_soft`. Use the same frozen
+  source/configuration anchor and split as the existing MSE controls; do not
+  repeat them without a reason. Gate the four full fits with
+  `A0-HPC-Dual-preflight.py --curve-loss-suite` through B1 (five one-epoch cases).
+  B4's default thirteen-mode suite is unchanged and does not submit this new
+  comparison. Record explicit arguments, dependencies and revision for each
+  new label. Combined-versus-MSE changes more than the peak term; only the two
+  combined variants isolate its contribution. Keep hard peak reporting.
+
 - `FieldToCurve/A0-HPC_FieldToProperty-test.py` is an oracle property diagnostic,
   not a curve runner. It reuses the existing encoder/trainer and writes
   `MULTI/FieldToProperty/Transformer/<label>`. B1 discovers its `.mdl` for log

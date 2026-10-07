@@ -155,17 +155,28 @@ class DualMLTest(unittest.TestCase):
         runner=runpy.run_path(str(Path(__file__).with_name("A0-HPC-Dual-test.py")))["main"]
         with tempfile.TemporaryDirectory() as directory, patch.object(DUAL_DATA,"from_files",return_value=data):
             source=None
-            for variant in ("baseline","late_frame","ft_region","winner_probe","curve_predicted","curve_true"):
+            cases = [(v, None) for v in ("baseline","late_frame","ft_region","winner_probe","curve_predicted","curve_true")]
+            cases += [("curve_true", "combined_no_location"), ("curve_true", "combined_soft"),
+                      ("curve_predicted", "combined_soft"), ("baseline", "mse")]
+            for variant, ablation in cases:
                 args=["--allow-cpu","--epochs","1","--batch","2","--run-root",directory,
-                      "--run-label",variant,"--experiment",variant,"--loss","mse",
+                      "--run-label",variant + ("-" + ablation if ablation else ""),"--experiment",variant,"--loss","mse",
                       "--field-d-model","8","--field-n-heads","2","--field-n-layers","1",
                       "--curve-d-model","8","--curve-n-heads","2","--curve-n-layers","1"]
                 if source:
                     args += ["--base-model-json",source]
                 if variant in ("winner_probe","curve_predicted","curve_true"):
                     args += ["--source-model-json",source]
+                if ablation:
+                    args += ["--curve-loss-ablation", ablation]
                 model=runner(args)
-                if variant=="baseline": source=str(Path(model.model_file).with_suffix(".json"))
+                if variant=="baseline" and not ablation: source=str(Path(model.model_file).with_suffix(".json"))
+                if ablation and ablation.startswith("combined"):
+                    for loss in model.lossf.curve_losses.values():
+                        self.assertEqual(loss.peak_location.target_mode, "soft")
+                        self.assertEqual(loss.peak_location_weight, .02 if ablation == "combined_soft" else 0.)
+                    saved = json.loads(Path(model.model_file).with_suffix(".json").read_text())
+                    self.assertEqual(saved["loss_config"]["curve_losses"]["UT"]["params"]["peak_target_mode"], "soft")
                 results=Path(model.results_dir)
                 self.assertTrue((results/"ft_region_metrics.json").is_file())
                 if variant.startswith("curve_"):

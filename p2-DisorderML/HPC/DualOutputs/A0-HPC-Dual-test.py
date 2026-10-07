@@ -59,6 +59,8 @@ def parse_args(argv=None):
     parser.add_argument("--curve-pool", choices=["cls", "mean"], default="cls")
     parser.add_argument("--curve-cls-token", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--loss", choices=["mse", "combined"], default="combined", help="Curve loss; field loss defaults to masked MSE.")
+    parser.add_argument("--curve-loss-ablation", choices=["mse", "combined_no_location", "combined_soft"],
+                        help="Explicit fresh baseline/curve-source loss override; keeps fixed validation ranking.")
     parser.add_argument("--field-loss-variant", choices=["baseline", "spatial", "temporal", "both", "weighted"])
     parser.add_argument("--spatial-weight", type=float, default=0.1)
     parser.add_argument("--temporal-weight", type=float, default=0.1)
@@ -114,6 +116,14 @@ def parse_args(argv=None):
         # Loss modules themselves are restored below; their full definitions are not guessed from CLI names.
         parser.set_defaults(**defaults)
     args = parser.parse_args(argv)
+    if args.curve_loss_ablation:
+        if args.experiment not in ("baseline", "curve_true", "curve_predicted"):
+            parser.error("Curve-loss ablations require baseline, curve_true or curve_predicted; isolate other changes.")
+        args.loss = "mse" if args.curve_loss_ablation == "mse" else "combined"
+        if args.curve_loss_ablation == "combined_no_location":
+            args.peak_location_weight = 0.
+        elif args.curve_loss_ablation == "combined_soft" and args.peak_location_weight <= 0:
+            parser.error("combined_soft requires a positive peak-location-weight.")
     if args.base_model_json and not args.experiment:
         parser.error("--base-model-json is for fresh --experiment runs, not resume.")
     needs_source = args.experiment in ("winner_probe", "curve_true", "curve_predicted")
@@ -272,6 +282,7 @@ def main(argv=None, preset=None):
                 zone_boundaries=curve_default_zone_boundaries(mode), zone_weights=curve_default_zone_weights(),
                 x_values=data.metadata["curve_x_values"][mode], derivative_order=args.derivative_order,
                 SoftPeak_beta=args.soft_peak_beta, normalization_eps=args.loss_eps,
+                peak_target_mode="soft" if args.curve_loss_ablation else "hard",
             ) for mode in ("UT", "FT")
         }
     field_losses = None
@@ -288,11 +299,14 @@ def main(argv=None, preset=None):
     if args.base_model_json:
         from resources.MLmodels import _model_build_loss_from_config
         saved_loss = json.loads(Path(args.base_model_json).read_text())["loss_config"]
+        physical_curves = (args.loss == "combined" if args.curve_loss_ablation
+                           else saved_loss.get("curve_normalizers") is not None)
         objective = DualLoss(
             field_loss={m: _model_build_loss_from_config(v) for m,v in saved_loss["field_losses"].items()},
-            curve_loss={m: _model_build_loss_from_config(v) for m,v in saved_loss["curve_losses"].items()},
+            curve_loss=curve_losses if args.curve_loss_ablation else
+                       {m: _model_build_loss_from_config(v) for m,v in saved_loss["curve_losses"].items()},
             weights=weights, scales=saved_loss["scales"],
-            curve_normalizers=data.normalizers["curve"] if saved_loss.get("curve_normalizers") is not None else None)
+            curve_normalizers=data.normalizers["curve"] if physical_curves else None)
         if any(getattr(v, "structured_field", False) for v in objective.field_losses.values()):
             raise ValueError("Architecture comparisons require an MSE field-loss anchor, not a fitted structured-loss checkpoint.")
         metadata["anchor_sha256"] = hashlib.sha256(Path(args.base_model_json).read_bytes()).hexdigest()

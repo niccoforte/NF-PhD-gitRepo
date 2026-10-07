@@ -2,6 +2,31 @@
 
 ## Controlled architecture and interface experiments
 
+### Corrected peak-loss follow-up
+
+For fresh source-controlled fits, add
+`--curve-loss-ablation combined_no_location` or `--curve-loss-ablation combined_soft`
+to `--experiment curve_true` / `--experiment curve_predicted`. Pass the same
+`--base-model-json` and frozen `--source-model-json` as the existing MSE controls.
+The explicit switch replaces the anchor's curve loss, not its field loss,
+architecture, task weights or fixed validation ranking. `mse` is also available
+as an explicit control. Historical/default loss behavior remains unchanged.
+
+Both combined variants retain MSE, zone, derivative, peak-height and energy
+terms; only soft-location weight differs (0 versus default 0.02, beta20).
+Both use the same soft target definition. Report hard peak position/height,
+curve RMSE and work errors; soft centroids alone are not peak accuracy.
+Combined-versus-MSE is a broader objective change, including normalization.
+
+The proposed comparison is four full fits (two field sources × two combined
+losses), reusing the already-completed matched MSE controls after config/split
+verification. Run `A0-HPC-Dual-preflight.py --curve-loss-suite` first through B1:
+64 pairs/one epoch for a baseline plus those four modes. Use a 4-hour gate and
+240-hour dependent full jobs, 450 maximum epochs and the anchor's early stopping,
+with ordinary home → scratch → archive collection. B4's default suite is
+unchanged. These are ready entry points, not proof of submission; PROJECT_STATUS
+records the live-access blocker and must be updated with actual job IDs.
+
 The existing `A0-HPC-Dual-test.py` accepts `--experiment`; no extra trainer is
 introduced. All switches are opt-in. The first comparison is baseline vs
 crack-face-only vs local-graph-only; do not combine changes before measuring them.

@@ -82,6 +82,18 @@ of optimisation benefit; these are later approval gates, not automatic launches.
 Field motion/gradients are not damage; actual strut labels belong to the separate
 Damage variable processing task and must be validated before use.
 
+Accuracy has submitted the true-field-to-property oracle probe for archived
+UT Strength/Ductility/WoF and FT K_JIC, joined by specimen ID. Consult current
+PROJECT_STATUS for completion/results rather than assuming predictive success.
+It is not a disorder-only surrogate: predicted-field inference is a separate
+distribution and requires evaluation before design use. Candidate field objectives
+include delayed strong localization, broad participation before localization and
+limits on abrupt crack opening at comparable applied loading. Surviving the
+recorded window is right-censored evidence, not unlimited ductility. Retain
+mass/density/manufacturing constraints and test proxy exploitation; actual
+historical thickness/density should not be assumed uniform (see provenance audit).
+Force/energy reconstruction remains deprioritized; do not revive it automatically.
+
 Deliver readable samples under p2-DisorderML/samples/, a curve-versus-field decision,
 objective/constraint definitions, validation criteria and a staged implementation
 plan reusing existing code. Keep maintained notebooks under p2-DisorderML/code/;

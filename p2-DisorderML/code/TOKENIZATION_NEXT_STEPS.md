@@ -65,6 +65,10 @@ before global attention. It uses task-specific initial graphs: UT2319/FT2259
 edges. It neither clusters motifs nor learns a discrete codebook; no CNN exists.
 Its first matched single-seed run did not improve the joint validation score.
 That does not decide whether graph embeddings are useful for motif discovery.
+The completed comparison was baseline score .863022 versus local_graph .902120
+(lower is better): FT-field RMSE improved about 1%, but UT-field/curve errors
+worsened, especially FT curves. These predictive results do not invalidate the
+separate motif-discovery hypothesis and must not be presented as motif evidence.
 
 Potential comparisons for the Tokenisation task, not simultaneous commitments:
 
@@ -80,6 +84,16 @@ local increments. Label these as **mechanism analysis**: they require a response
 and cannot serve as geometry-only descriptors at design time. Do not substitute
 predicted responses and call them observed fracture labels. Damage belongs to
 its dedicated task.
+For response-informed motifs, consider both changes of temporal displacement
+increments and departure from locally affine motion. These capture abrupt/local
+activity more specifically than absolute U magnitude. Keep these outputs out of
+geometry-only design-time inputs, and keep irregular frame spacing/missingness,
+noise and smooth nonlinear deformation as confounders. Use observed histories
+only for retrospective mechanism analysis until predictive utility is tested.
+Thickness/generation regime is an additional possible confounder: use verified
+provenance (samples/accuracy-continuation/thickness-provenance.md), not batch-ID
+labels as an inferred physical input. Do not declare a high-performing motif
+causal if its enrichment only reflects a generation batch.
 
 ## First evidence to collect
 
