@@ -24,8 +24,37 @@ verification. Run `A0-HPC-Dual-preflight.py --curve-loss-suite` first through B1
 64 pairs/one epoch for a baseline plus those four modes. Use a 4-hour gate and
 240-hour dependent full jobs, 450 maximum epochs and the anchor's early stopping,
 with ordinary home → scratch → archive collection. B4's default suite is
-unchanged. These are ready entry points, not proof of submission; PROJECT_STATUS
-records the live-access blocker and must be updated with actual job IDs.
+unchanged. Submission records follow; PROJECT_STATUS owns the latest verified
+scheduler state. Prepared entry points alone are not execution evidence.
+
+Submitted on 8 October as `dual-peak-261008`, immutable source `c29d77f`.
+Preflight **30813256** checks five modes; full jobs require its successful exit
+and archive collection (`afterok`, `kill-on-invalid-dep=yes`):
+
+| Field source | Combined without location | Combined soft/soft location |
+|---|---:|---:|
+| True | 30813257 | 30813258 |
+| Frozen predicted | 30813259 | 30813260 |
+
+Every full job requests 240 hours, one GPU, 12 CPUs and 90,000 MB on
+andrena/pilot_andrena. Preflight requests 4 hours. All use seed/split seed42,
+450 maximum epochs and anchor early stopping52. The original MSE source controls
+have matching anchor hashes/configurations and specimen splits and are not repeated.
+Home manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/dual-peak-261008/jobs.tsv`.
+Archive: `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/dual-peak-261008-<curve_true|curve_predicted>-<combined_no_location|combined_soft>`.
+Scheduler resource/test-only checks passed; at submission the gate was waiting
+for resources and full jobs for their dependency. Do not claim GPU success yet.
+
+The four previously outstanding jobs (30367256/30367272,30326584,30326586) were
+verified COMPLETED 0:0 and downloaded with B3 on 8 October, including checkpoints,
+metrics, predictions and logs. A checksum dry-run found no differing files.
+Property archive: `MULTI/FieldToProperty/Transformer/field-property-261004`
+(and `field-property-preflight-261004`). Joint archives:
+`MULTI/Dual/Transformer/dual-recovery-261004-residual` and
+`dual-recovery-261004-true_field`. Both are relative to the same p2 archive root
+and local repo-root `data/`. Read `samples/accuracy-continuation/README.md` for
+the ten-run comparison and property/thickness reports; the debug gate is not an
+accuracy result. `true_field` adds auxiliary supervision, not oracle inference.
 
 The existing `A0-HPC-Dual-test.py` accepts `--experiment`; no extra trainer is
 introduced. All switches are opt-in. The first comparison is baseline vs

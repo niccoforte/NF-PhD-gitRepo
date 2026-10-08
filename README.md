@@ -360,6 +360,14 @@ the probe is not a deployable disorder-only surrogate or an optimisation loop.
 
 Current worked comparisons and the bounded thickness-provenance finding are in
 `p2-DisorderML/samples/accuracy-continuation/README.md`. Its linked
+`field-to-property.md` reviews the completed true-field oracle on 793 validation
+specimens; `thickness-properties.md` reviews 29 provenance-verified training/
+validation specimens, excluding the locked test set. Neither establishes
+predicted-field optimisation accuracy or a causal thickness effect. The ten-run
+joint comparison retains per-task trade-offs, not just the aggregate score.
+The corrected peak-loss follow-up is queued as `dual-peak-261008`; exact jobs and
+archive paths are in the dual experiment guide.
+The linked
 `thickness-provenance.md` maps 33 paired ML specimens to 66 original INPs across
 11 batches: earlier sampled FT struts are thicker than UT; later sampled batches
 reuse one UT/FT thickness per batch. Geometry/ID agreement is verified, but merged

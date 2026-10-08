@@ -36,15 +36,21 @@ serialization and tests. Historical missing/default modes remain hard-target.
 No corrected-loss experiment has been submitted. The user separately authorised
 a true-field-to-property HPC test for UT Strength/Ductility/WoF and FT K_JIC.
 
-7 October update: the user reports all remaining jobs completed and authorises
-verification/download/review, thickness-property correlation checks and justified
-follow-up submissions. SSH returned Broken pipe/authentication failure; reconnect
-before verifying30367256/30367272 and30326584/30326586. Do not repeat those jobs.
-The corrected-loss follow-up is now prepared through `--curve-loss-ablation` and
-the five-case `--curve-loss-suite` preflight. Four full fits cross frozen true/
-predicted fields with combined_no_location/combined_soft, retaining the existing
-matched MSE controls after exact config/split checks. No new jobs submitted yet.
-Keep240h full requests and B1 archive gates; record actual IDs in PROJECT_STATUS.
+8 October update: remaining property30367256/30367272 and joint30326584/30326586
+verified COMPLETED 0:0, downloaded with B3 and checksum-checked. Do not repeat.
+The ten-run comparison now includes residual (.837071) and true-field auxiliary
+(.796952); neither improves every output. Property oracle R² values are .566/.760/
+.963/.930 for strength/ductility/WoF/K_JIC on793 validation specimens, not predicted
+fields. Reports/plots are in samples/accuracy-continuation/.
+Corrected-loss follow-up submitted from c29d77f: gate30813256; full30813257–30813260,
+two frozen sources × combined_no_location/combined_soft. Existing MSE controls
+have matching source/configuration hashes and splits and were not repeated.
+Full requests240h/oneGPU/12CPU/90GB; afterok gate preserves B1 archive workflow.
+Last check: gate waiting for resources, full jobs for dependency. Inspect these
+before any further submission. No new GPU success or corrected-loss accuracy yet.
+Bounded thickness association uses29 train/validation specimens, no locked test:
+weak simple correlations but broad batch-bootstrap intervals and batch confounding.
+Do not dismiss variation, infer causation, alter features or regenerate data.
 The user's latest annotations explicitly permit reconciling Tokenisation, Damage
 and Optimisation briefs; these have been updated. Physics/strain has a separate
 feasibility brief. No chat dispatched or physics/damage model implemented.
@@ -231,7 +237,7 @@ Improve ML Accuracy and requiring explicit submission scope, are:
    The explicit soft/soft correction is now implemented and regression-tested;
    select its saved option for this comparison. Preserve historical checkpoint
    semantics and do not modify the original suite. The user has now authorised
-   this follow-up; entry points are prepared, submission awaits SSH reconnection.
+   this follow-up; jobs30813256–30813260 are submitted. Inspect before resubmitting.
 3. Local non-affine displacement weighting, ONLY after the affine/local-separation
    examples and boundary/conditioning checks described below are validated.
 4. Curve-stage sharing controls with fixed field sources if the interface
