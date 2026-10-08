@@ -368,6 +368,23 @@ specimens; `thickness-properties.md` reviews 29 provenance-verified training/
 validation specimens, excluding the locked test set. Neither establishes
 predicted-field optimisation accuracy or a causal thickness effect. The ten-run
 joint comparison retains per-task trade-offs, not just the aggregate score.
+Error-summary helpers now lead with **percentage RMSE reduction versus the training
+mean predictor**, evaluated on the same validation specimens. Physical RMSE remains
+available; missing/validation-derived baselines are not silently substituted.
+New motion reports also include local-jump and temporal NRMSE as percentages of
+RMS true motion on the same valid events, with counts. These are kinematic events,
+not confirmed broken-strut regions. Historical archived metrics and HPO scores
+are unchanged; notebook helper views update when rerun, not in saved cell outputs.
+
+The sudden-motion weighting experiment is separately opt-in:
+`HPC/DualOutputs/B4_Dual-experiments.sh SUITE_NAME --variants baseline,sudden`
+previews a two-case GPU gate and two dependent full runs; only `--submit` submits.
+It uses changes in increments plus local non-affine increment residuals, actual
+initial specimen coordinates, capped target-only weights and unchanged whole-field
+supervision. See the experiment guide for the algorithm and limitations. This
+extends the existing loss and DUAL trainer, not the default single-mode trainer.
+Prepared code and CPU tests do not establish improved accuracy or GPU success.
+
 The corrected peak-loss follow-up is queued as `dual-peak-261008`; exact jobs and
 archive paths are in the dual experiment guide.
 The linked

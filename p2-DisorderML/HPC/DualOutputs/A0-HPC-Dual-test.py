@@ -24,7 +24,7 @@ def parse_args(argv=None):
     parser.add_argument("--range-split", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--split-seed", type=int, default=None, help="Experiments default to fixed split 42 independently of training seed.")
-    parser.add_argument("--experiment", choices=["baseline", "crack_face", "local_graph", "partial", "private", "true_field", "detach", "residual", "localization", "late_frame", "ft_region", "winner_probe", "curve_true", "curve_predicted"],
+    parser.add_argument("--experiment", choices=["baseline", "crack_face", "local_graph", "partial", "private", "true_field", "detach", "residual", "localization", "sudden", "late_frame", "ft_region", "winner_probe", "curve_true", "curve_predicted"],
                         help="One opt-in change relative to baseline; never mutates an HPO study.")
     parser.add_argument("--base-model-json", help="Reuse saved dual architecture/loss/training settings, not weights; CLI overrides still apply.")
     parser.add_argument("--source-model-json", help="Frozen checkpoint for winner_probe or fresh curve_true/curve_predicted comparisons; data must match exactly.")
@@ -138,6 +138,8 @@ def parse_args(argv=None):
             parser.error("Partial sharing requires 0 < private-layers < field-n-layers.")
         if args.experiment == "localization" and args.localization_gain < 0:
             parser.error("Localization gain cannot be negative.")
+        if args.experiment == "sudden" and args.localization_gain <= 0:
+            parser.error("Sudden weighting requires an explicit positive --localization-gain.")
         if args.experiment == "residual" and not 0 < args.residual_scale_floor <= 1:
             parser.error("Residual scale floor must lie in (0,1].")
     try:
@@ -310,12 +312,18 @@ def main(argv=None, preset=None):
         if any(getattr(v, "structured_field", False) for v in objective.field_losses.values()):
             raise ValueError("Architecture comparisons require an MSE field-loss anchor, not a fitted structured-loss checkpoint.")
         metadata["anchor_sha256"] = hashlib.sha256(Path(args.base_model_json).read_bytes()).hexdigest()
-    if args.experiment == "localization":
+    if args.experiment in ("localization", "sudden"):
         from resources.MLfield import field_loss_from_data
         gain = args.localization_gain or 1.0
         # Isolate target-dependent displacement weighting; do not silently add spatial/temporal penalties.
         objective.field_losses = nn.ModuleDict({m: field_loss_from_data(data, m, spatial_weight=0., temporal_weight=0.,
-                                                                       localization_gain=gain) for m in ("UT", "FT")})
+                                                                       localization_gain=gain,
+                                                                       localization_mode="sudden" if args.experiment == "sudden" else "activity") for m in ("UT", "FT")})
+        metadata["weighting"] = {"mode": args.experiment, "gain": gain,
+            "definition": "temporal change of increment plus local non-affine increment residual" if args.experiment == "sudden" else "historical target activity",
+            "geometry": "reference edges; sample-specific initial disordered coordinates",
+            "normalization": "train-only jump scales; capped raw weights; valid specimen mean one",
+            "interpretation": "recorded-frame kinematic proxy, not confirmed damage or physical acceleration"}
     if args.experiment in ("late_frame", "ft_region"):
         from resources.MLfield import field_loss_from_data, fcc_initial_crack_region
         fixed = {}

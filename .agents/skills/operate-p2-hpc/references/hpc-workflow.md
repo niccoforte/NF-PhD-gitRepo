@@ -65,6 +65,13 @@ Read only the section relevant to the task and confirm it against the actual scr
   diagnostics and gate production runs on an authorised GPU preflight. See its
   README; private encoders do not mean complete task independence.
 
+  For the isolated sudden-motion experiment use `--variants baseline,sudden`:
+  B4 selects the two-case `--sudden-suite` gate, then two 240-hour runs. Gain1,
+  fixed split42 and the same anchor isolate weighting from derivative penalties.
+  This is not part of the default thirteen cases. Check the prepared CPU tests,
+  source revision and existing job manifest before submission; do not infer GPU
+  execution or improved accuracy from preparation alone.
+
 - `FieldOutputs/A0-HPC_Field-test.py`: production-default single run for GCN, GAT, GNN, or Transformer.
 - `FieldOutputs/A0-HPC_Field-CrossModelHPO.py`: cross-model GCN/GAT/Transformer HPO.
 - Field models use node-level output and `MaskedFieldMSELoss`; MLP is not compatible with this contract.

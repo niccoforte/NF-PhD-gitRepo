@@ -53,7 +53,15 @@ weak simple correlations but broad batch-bootstrap intervals and batch confoundi
 The user now parks further thickness auditing: retain provenance, but do not infer
 no effect, alter features or regenerate data. The ten-run leader is provisional;
 no configuration has been promoted to a default. Sudden/non-affine weighting is
-still unimplemented. Recheck peak jobs after SSH is restored, without duplicates.
+now opt-in in StructuredFieldLoss and wired into DUAL; CPU-tested, not GPU-run or
+accuracy-validated. The isolated B4 `--variants baseline,sudden` pair preserves
+the anchor and fixed selection, with no derivative penalties. Do not repeat the
+old magnitude/activity weighting as a substitute. See the runner README for the
+formula, scope and proposed matched three-seed DUAL-versus-independent decision.
+That independent control is not implemented/submitted; a proposed 2% field margin
+awaits the user's decision. Core reports now lead with training-mean-relative
+RMSE skill and new local-motion NRMSE; archived scores stay unchanged.
+Recheck peak jobs after SSH is restored, without duplicates.
 The user's latest annotations explicitly permit reconciling Tokenisation, Damage
 and Optimisation briefs; these have been updated. Physics/strain has a separate
 feasibility brief. No chat dispatched or physics/damage model implemented.

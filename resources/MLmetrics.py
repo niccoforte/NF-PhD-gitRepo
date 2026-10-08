@@ -464,11 +464,31 @@ def _fmt_metric(value, digits=4):
         return "n/a"
     return f"{value:.{digits}g}"
 
+def relative_error_summary(summary, kind):
+    """Display-only percentages against a verified training-mean predictor.
+
+    Never substitute the validation mean or change archived selection scores.
+    100% retained error equals the baseline; positive skill means improvement.
+    """
+    if kind not in ("field", "curve"):
+        raise ValueError("kind must be field or curve.")
+    source = summary.get(f"mean_{kind}_baseline_source")
+    baseline = summary.get(f"mean_{kind}_baseline_rmse", np.nan)
+    rmse = summary.get("rmse", np.nan)
+    ratio = np.nan
+    if source == f"train_mean_{kind}" and baseline is not None and rmse is not None:
+        if np.isfinite(baseline) and baseline > 1e-12 and np.isfinite(rmse):
+            ratio = 100*rmse/baseline
+    return {"RMSE / training-mean error (%)": ratio,
+            "RMSE reduction vs training mean (%)": 100-ratio}
+
+
 def print_curve_diagnostics(diagnostics, label="Curve"):
     summary = diagnostics["summary"] if isinstance(diagnostics, dict) else diagnostics
     label = str(label).upper()
     print(
         f"{label} prediction diagnostics | "
+        f"RMSE reduction vs training mean: {_fmt_metric(relative_error_summary(summary, 'curve')['RMSE reduction vs training mean (%)'])}% | "
         f"collapse ratio: {_fmt_metric(summary.get('collapse_ratio'), 3)} | "
         f"RMSE: {_fmt_metric(summary.get('rmse'))} | "
         f"mean-curve RMSE: {_fmt_metric(summary.get('mean_curve_baseline_rmse'))} | "
@@ -972,6 +992,7 @@ def postprocess_build_active_curve_diagnostics(
 def curve_summary_table(diagnostics, metrics=None):
     if diagnostics is None:
         return pd.DataFrame(columns=["metric", "value"])
+    use_relative = metrics is None
     metrics = metrics or [
         "rmse",
         "mae",
@@ -989,7 +1010,8 @@ def curve_summary_table(diagnostics, metrics=None):
         "n_points",
     ]
     summary = diagnostics.get("summary", {})
-    return pd.DataFrame([(key, summary.get(key)) for key in metrics if key in summary], columns=["metric", "value"])
+    relative = list(relative_error_summary(summary, "curve").items()) if use_relative else []
+    return pd.DataFrame(relative + [(key, summary.get(key)) for key in metrics if key in summary], columns=["metric", "value"])
 
 def _curve_out_df(data, mode):
     return getattr(data, f"{str(mode).upper()}_OUT_df", None) if data is not None else None
@@ -1713,6 +1735,10 @@ def field_motion_diagnostics(prediction, truth, coords, mode, components=("U1", 
              "local_jump_rmse":float(np.sqrt(np.mean((dp-dy)[event]**2))) if event.any() else np.nan,
              "local_jump_count":int(event.sum()),
              "activity_node_jaccard":float((true_nodes&pred_nodes).sum()/union) if union else np.nan}
+        for name, target_values in (("local_jump",dy[event]),("temporal",ty[tv])):
+            denominator = float(np.sqrt(np.mean(target_values**2))) if target_values.size else np.nan
+            row[name+"_target_rms"] = denominator
+            row[name+"_nrmse_percent"] = 100*row[name+"_rmse"]/denominator if denominator > 1e-12 else np.nan
         if "U2" in components:
             u=components.index("U2");v=tv[:,:,u];true=ty[:,:,u];pred=tp[:,:,u]
             q=np.quantile(np.abs(true[v]),event_quantile) if v.any() else np.inf
@@ -1773,6 +1799,8 @@ def save_field_motion_diagnostics(results_dir, data, mode, split="val"):
         "spatial_rmse":"Signed edge-error MSE averaged over incident valid edges per node, then nodes/frames/components; square root.",
         "temporal_rmse":"Signed adjacent retained-frame increment error; not velocity.",
         "local_jump_rmse":"Edge errors where target relative-motion magnitude is in the specimen's top decile and nonzero.",
+        "local_jump_nrmse_percent":"100 times local_jump_rmse divided by RMS target edge-displacement components on the SAME events; not confirmed fracture regions. NaN for zero/absent denominator; report counts.",
+        "temporal_nrmse_percent":"100 times temporal_rmse divided by RMS target components over the SAME valid adjacent-frame increments. NaN for zero/absent denominator.",
         "activity_node_jaccard":"Overlap of target/predicted top-decile nodal relative-motion activity; a kinematic proxy, not broken-strut truth.",
         "u2_jump_sign_accuracy":"Correct sign for nonzero top-decile absolute target U2 temporal increments; inspect event counts.",
         "jump_interval_mae":"Strongest temporal-increment index error. Keep unique peaks (1% tie tolerance) >2x median absolute increment, then top decile of eligible peak sizes. Report event counts. Units: retained-frame intervals, not confirmed fracture times.",
@@ -1793,6 +1821,9 @@ def plot_field_motion_results(results_dir, split="val", modes=("UT","FT")):
         return None
     columns=["field_rmse","spatial_rmse","temporal_rmse","local_jump_rmse","activity_node_jaccard","u2_jump_sign_accuracy",
              "tip_u2_sign_accuracy","jump_interval_mae","activity_axis_error_deg"]
+    for old, new in (("temporal_rmse","temporal_nrmse_percent"),("local_jump_rmse","local_jump_nrmse_percent")):
+        if all(new in table for table in tables.values()):
+            columns[columns.index(old)] = new
     fig,axes=plt.subplots(3,3,figsize=(15,11))
     for ax,col in zip(axes.flat,columns):
         for mode,t in tables.items():
@@ -1801,9 +1832,9 @@ def plot_field_motion_results(results_dir, split="val", modes=("UT","FT")):
         if ax.get_legend_handles_labels()[0]: ax.legend()
         else: ax.text(.5,.5,'No eligible events',ha='center',transform=ax.transAxes)
     for mode,t in tables.items():
-        counts=[c for c in ('u2_jump_count','tip_u2_event_count','jump_timing_event_count') if c in t]
+        counts=[c for c in ('local_jump_count','u2_jump_count','tip_u2_event_count','jump_timing_event_count') if c in t]
         print(f'{mode}: median event counts ' + ', '.join(f'{c}={t[c].median():g}' for c in counts))
-    fig.suptitle('Field motion: errors in physical units; overlap/sign scores in [0, 1]')
+    fig.suptitle('Field motion: NRMSE in % of target motion; RMSE in physical units; overlap/sign in [0, 1]')
     fig.tight_layout()
     return fig
 
@@ -1856,6 +1887,7 @@ def print_field_diagnostics(diagnostics, label="Field"):
     summary = diagnostics.get("summary", diagnostics)
     print(
         f"{label} prediction diagnostics | "
+        f"RMSE reduction vs training mean: {_fmt_metric(relative_error_summary(summary, 'field')['RMSE reduction vs training mean (%)'])}% | "
         f"RMSE: {_fmt_metric(summary.get('rmse'))} | "
         f"MAE: {_fmt_metric(summary.get('mae'))} | "
         f"mean-field RMSE: {_fmt_metric(summary.get('mean_field_baseline_rmse'))} | "
@@ -1921,6 +1953,7 @@ def plot_field_diagnostics(diagnostics, figsize=(15, 9)):
     ax = axes[5]
     ax.axis("off")
     lines = [
+        f"RMSE reduction vs training mean: {_fmt_metric(relative_error_summary(summary, 'field')['RMSE reduction vs training mean (%)'])}%",
         f"RMSE: {_fmt_metric(summary.get('rmse'))}",
         f"MAE: {_fmt_metric(summary.get('mae'))}",
         f"Bias: {_fmt_metric(summary.get('bias'))}",
@@ -3966,6 +3999,7 @@ def postprocess_build_active_field_diagnostics(
 def field_summary_table(diagnostics, metrics=None):
     if diagnostics is None:
         return pd.DataFrame(columns=["metric", "value"])
+    use_relative = metrics is None
     metrics = metrics or [
         "rmse",
         "mae",
@@ -3981,7 +4015,8 @@ def field_summary_table(diagnostics, metrics=None):
         "n_components",
     ]
     summary = diagnostics.get("summary", {})
-    return pd.DataFrame([(key, summary.get(key)) for key in metrics if key in summary], columns=["metric", "value"])
+    relative = list(relative_error_summary(summary, "field").items()) if use_relative else []
+    return pd.DataFrame(relative + [(key, summary.get(key)) for key in metrics if key in summary], columns=["metric", "value"])
 
 def display_field_sample_error_summary(
     diagnostics,

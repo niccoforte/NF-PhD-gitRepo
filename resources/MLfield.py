@@ -90,11 +90,17 @@ class StructuredFieldLoss(nn.Module):
 
     def __init__(self, edges, n_nodes, n_components=2, mean=0., scale=1.,
                  spatial_scale=1., temporal_scale=1., spatial_weight=0.1,
-                 temporal_weight=0.1, localization_gain=0., eps=1e-8, fixed_weights=None):
+                 temporal_weight=0.1, localization_gain=0., eps=1e-8, fixed_weights=None,
+                 localization_mode="activity"):
         super().__init__()
         self.n_nodes, self.n_components = int(n_nodes), int(n_components)
         self.spatial_weight, self.temporal_weight = float(spatial_weight), float(temporal_weight)
         self.localization_gain, self.eps = float(localization_gain), float(eps)
+        if localization_mode not in ("activity", "sudden"):
+            raise ValueError("localization_mode must be activity or sudden.")
+        if localization_mode == "sudden" and (self.n_components != 2 or localization_gain <= 0 or fixed_weights is not None):
+            raise ValueError("Sudden weighting requires U1/U2, positive gain and no fixed regional weights.")
+        self.localization_mode = localization_mode
         edge = np.asarray(edges, dtype=int).reshape(-1, 2)
         if len(edge) == 0 or edge.min() < 0 or edge.max() >= n_nodes or np.any(edge[:, 0] == edge[:, 1]):
             raise ValueError("Require nonempty valid, non-self edges.")
@@ -120,7 +126,7 @@ class StructuredFieldLoss(nn.Module):
     def get_config(self):
         return {"fixed_weights": None if self.fixed_weights is None else self.fixed_weights.cpu().tolist(),
                 **{k: getattr(self, k) for k in ("n_nodes", "n_components", "spatial_weight",
-                "temporal_weight", "localization_gain", "eps")},
+                "temporal_weight", "localization_gain", "localization_mode", "eps")},
                 **{k: getattr(self, k).detach().cpu().tolist() for k in
                    ("edges", "mean", "scale", "spatial_scale", "temporal_scale")}}
 
@@ -150,7 +156,83 @@ class StructuredFieldLoss(nn.Module):
     def _mean(values, valid):
         return torch.where(valid, values, 0.).sum() / valid.sum().clamp_min(1)
 
-    def component_losses(self, pred, target, mask=None):
+    def _sudden_activity(self, physical, valid, initial_coords):
+        """Target-only abruptness and non-affine *increment* activity, not damage.
+
+        Topology is initial/reference; affine fits use each specimen's actual
+        initial disordered coordinates. Missing frames are never bridged.
+        Underconstrained patches contribute no spatial score, not guessed fits.
+        """
+        if initial_coords is None:
+            raise ValueError("Sudden weighting requires sample-specific initial coordinates.")
+        xy = torch.as_tensor(initial_coords, dtype=physical.dtype, device=physical.device)
+        if xy.shape != (*physical.shape[:2], 2) or not torch.isfinite(xy).all():
+            raise ValueError("initial_coords must be finite [batch,node,2].")
+        if physical.shape[2] < 3:
+            raise ValueError("Sudden weighting requires at least three recorded frames.")
+        increments = torch.diff(physical, dim=2)
+        interval_valid = valid[:, :, 1:].all(-1) & valid[:, :, :-1].all(-1)
+        increment_change = torch.diff(increments, dim=2)/self.temporal_scale
+        triple_valid = interval_valid[:, :, 1:] & interval_valid[:, :, :-1]
+        temporal = physical.new_zeros(physical.shape[:-1])
+        temporal[:, :, 1:-1] = torch.where(triple_valid, increment_change.square().mean(-1), 0.)
+
+        src = torch.cat([self.edges[:, 0], self.edges[:, 1]])
+        dst = torch.cat([self.edges[:, 1], self.edges[:, 0]])
+        r = xy[:, src]-xy[:, dst]
+        # Conditioning only; uniform coordinate scaling does not change the fit.
+        span = (xy.amax(1)-xy.amin(1)).amax(-1).clamp_min(self.eps)
+        r = r/span[:, None, None]
+        du = increments[:, src]-increments[:, dst]
+        ok = interval_valid[:, src] & interval_valid[:, dst]
+        b, n, t = interval_valid.shape
+        gram = physical.new_zeros(b,n,t,2,2).index_add(1,dst,
+            (r[:,:,:,None]*r[:,:,None,:])[:,:,None]*ok[:,:,:,None,None])
+        rhs = physical.new_zeros(b,n,t,2,2).index_add(1,dst,
+            r[:,:,None,:,None]*torch.where(ok[:,:,:,None],du,0.)[:,:,:,None,:])
+        degree = physical.new_zeros(b,n,t).index_add(1,dst,ok.to(physical.dtype))
+        eigenvalues = torch.linalg.eigvalsh(gram)
+        identifiable = (degree >= 3) & (eigenvalues[...,0] > 1e-6*eigenvalues[...,1].clamp_min(self.eps))
+        affine = torch.linalg.pinv(gram, hermitian=True, rtol=1e-6) @ rhs
+        residual = (du-torch.einsum('bed,betdc->betc',r,affine[:,dst]))/self.spatial_scale
+        squared = torch.where(ok & identifiable[:,dst], residual.square().mean(-1), 0.)
+        local = physical.new_zeros(b,n,t).index_add(1,dst,squared)/degree.clamp_min(1)
+        spatial = physical.new_zeros(physical.shape[:-1])
+        spatial[:,:,1:] += .5*local
+        spatial[:,:,:-1] += .5*local
+        # Equal dimensionless contributions; train-only first-difference scales.
+        return torch.sqrt((.5*(temporal+spatial)).clamp_min(0)).unsqueeze(-1)
+
+    def localization_weights(self, target, mask=None, initial_coords=None):
+        """Inspect the exact detached loss weights; not a model input or output."""
+        _, _, _, physical, valid = self._prepare(target, target, mask)
+        return self._target_weights(physical, valid, initial_coords)
+
+    @torch.no_grad()
+    def _target_weights(self, yu, valid, initial_coords=None):
+        weights = torch.ones_like(yu)
+        if self.localization_gain:
+            if self.localization_mode == "sudden":
+                q = self._sudden_activity(yu, valid, initial_coords)
+            else:
+                i,j = self.edges.T
+                dy = (yu[:,j]-yu[:,i])/self.spatial_scale
+                activity, _ = self._node_average(dy.square(),valid[:,j]&valid[:,i])
+                increments = torch.where(valid[:,:,1:] & valid[:,:,:-1],
+                                         (torch.diff(yu,dim=2)/self.temporal_scale).square(),0.)
+                temporal_activity = torch.zeros_like(yu)
+                temporal_activity[:,:,1:] += increments
+                temporal_activity[:,:,:-1] += increments
+                q = torch.sqrt((activity+temporal_activity).mean(dim=-1,keepdim=True).clamp_min(0))
+            weights = (1+self.localization_gain*q/(1+q)).expand_as(yu)
+        if self.fixed_weights is not None:
+            weights = weights*self.fixed_weights
+        count = valid.sum(dim=(1,2,3),keepdim=True)
+        average = torch.where(valid,weights,0.).sum(dim=(1,2,3),keepdim=True)/count.clamp_min(1)
+        average = torch.where(count > 0, average, 1.)
+        return weights/average.clamp_min(self.eps)
+
+    def component_losses(self, pred, target, mask=None, initial_coords=None):
         p, y, pu, yu, valid = self._prepare(pred, target, mask)
         i, j = self.edges.T
         edge_valid = valid[:, i] & valid[:, j]
@@ -160,22 +242,7 @@ class StructuredFieldLoss(nn.Module):
         temporal_valid = valid[:, :, 1:] & valid[:, :, :-1]
         tp = torch.diff(pu, dim=2)/self.temporal_scale
         ty = torch.diff(yu, dim=2)/self.temporal_scale
-        weights = torch.ones_like(yu)
-        if self.localization_gain:
-            with torch.no_grad():
-                activity, _ = self._node_average(dy.square(), edge_valid)
-                increments = torch.where(temporal_valid, ty.square(), 0.)
-                temporal_activity = torch.zeros_like(yu)
-                temporal_activity[:, :, 1:] += increments
-                temporal_activity[:, :, :-1] += increments
-                q = torch.sqrt((activity+temporal_activity).mean(dim=-1, keepdim=True).clamp_min(0))
-                weights = (1+self.localization_gain*q/(1+q)).expand_as(yu)
-        if self.fixed_weights is not None:
-            weights = weights * self.fixed_weights
-        if self.localization_gain or self.fixed_weights is not None:
-            count = valid.sum(dim=(1,2,3), keepdim=True).clamp_min(1)
-            avg = torch.where(valid, weights, 0.).sum(dim=(1,2,3), keepdim=True)/count
-            weights = weights/avg.clamp_min(self.eps)
+        weights = self._target_weights(yu, valid, initial_coords)
         components = {
             "displacement": self._mean((p-y).reshape_as(yu).square()*weights, valid),
             "spatial": self._mean(node_spatial, node_valid),
@@ -184,8 +251,8 @@ class StructuredFieldLoss(nn.Module):
         self.last_components = {k: v.detach() for k,v in components.items()}
         return components
 
-    def forward(self, pred, target, mask=None):
-        c = self.component_losses(pred, target, mask)
+    def forward(self, pred, target, mask=None, initial_coords=None):
+        c = self.component_losses(pred, target, mask, initial_coords)
         return c["displacement"]+self.spatial_weight*c["spatial"]+self.temporal_weight*c["temporal"]
 
 

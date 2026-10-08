@@ -2,6 +2,78 @@
 
 ## Controlled architecture and interface experiments
 
+### Sudden-motion weighting: isolated next experiment
+
+Prepared, not submitted or accuracy-validated. The existing loss now has an
+explicit `localization_mode="sudden"`; old `activity` and all model defaults stay
+unchanged. `A0-HPC-Dual-test.py --experiment sudden --localization-gain 1` changes
+only displacement-loss weights. The signed spatial/temporal loss coefficients
+remain zero, so this first comparison isolates weighting from derivative losses.
+
+For each specimen, after reconstructing physical displacements:
+
+1. Compute each recorded-frame displacement increment, then its change between
+   adjacent intervals. Steady translation or steady affine deformation gives
+   zero temporal score; large displacement alone is not rewarded.
+2. On the validated initial task graph, fit a local linear map from initial
+   neighbour offsets to differences in displacement increments. Use the actual
+   initial **disordered** coordinates for this fit, not the periodic positions
+   used to reconstruct connectivity. The unexplained residual is the spatial
+   score. Require at least three valid neighbours and rank two; skip an
+   underdetermined spatial patch rather than inventing a deformation estimate.
+3. Normalize each contribution with the existing task/component training-only
+   jump RMS scales. Combine their squared scores equally and take the square
+   root, giving nonnegative activity `q`. Distribute interval spatial activity
+   to its two endpoint frames; assign temporal change to the middle frame.
+4. Form raw weights `1 + gain*q/(1+q)`, then divide by their mean across that
+   specimen's valid node/frame/component entries. Gain1 gives a maximum 2:1
+   ratio between any two raw weights, with normalized weights between 0.5 and2.
+   Retain whole-field supervision and detach weights from the gradient graph.
+
+Weights are computed from each training target, not stored as permanent weights
+for particular node IDs. Validation targets can define the same diagnostic loss;
+checkpoint selection remains the unchanged unweighted four-task score. At
+inference no targets, weights or extra inputs are needed. No fixed crack-region
+prior is added. Loading transients or other nonlinear events can also activate
+the rule: it is a kinematic proxy, not a fracture classifier or physical
+acceleration. Missing frames are not bridged. No strain/damage exports needed.
+
+Preview from the HPC directory, using a fresh suite label:
+
+```bash
+bash DualOutputs/B4_Dual-experiments.sh dual-sudden-261008 --variants baseline,sudden
+```
+
+Only add `--submit` after checking the source, anchor and existing manifests.
+This selects a two-case 64-pair/one-epoch GPU gate, then two dependent full runs
+through B1: 240 hours, one GPU, 12 CPUs, 90,000 MB, max450 epochs, anchor patience52,
+seed/split42. Baseline and weighting use the same data and architecture. The
+default thirteen-case suite is unchanged. CPU contracts (including a synthetic
+800-node runner/save check) are in `test_sudden_weighting.py`; GPU execution and
+scientific benefit remain unverified. This runner wires sample coordinates into
+DUAL; single-mode/GNN trainers are not yet wired for this new weighting mode.
+
+### Decision experiment: shared versus fully independent
+
+Proposed, not submitted: three training seeds on one frozen paired split, comparing
+the established shared DUAL model with two fully independent serial UT/FT models.
+Both independent stages, projections and optimizers must be separate; the
+existing `private` variant does NOT satisfy this control. Match field/curve
+information, target masks, losses, normalization, per-task capacity, stopping
+rules and training budget; report the independent pair's larger total parameter
+count and runtime. Use predicted fields for end-to-end curve comparisons and
+true fields only as a separately labelled oracle. Existing HPO populations differ
+and cannot settle this comparison without matched retraining/evaluation.
+
+Primary decision: both field RMSEs, plus local-jump and curve accuracy safeguards;
+not the aggregate score alone. A 2% field non-inferiority margin has been proposed
+to the user, not accepted. Report per-seed results and paired specimen uncertainty,
+not individual nodes/frames as independent replicates. Freeze acceptance criteria
+before final locked-test evaluation. If DUAL consistently sacrifices a field
+without a worthwhile practical benefit, retain independent models; this is a
+decision for this dataset/budget, not a universal claim about multitask learning.
+No new independent two-stage runner is implemented by this preparation.
+
 ### Corrected peak-loss follow-up
 
 For fresh source-controlled fits, add

@@ -1242,7 +1242,7 @@ class DualLoss(nn.Module):
                 resolved[kind] = {mode: float(kind_value) for mode in DUAL_MODES}
         return resolved
 
-    def forward(self, predictions, targets, field_masks=None):
+    def forward(self, predictions, targets, field_masks=None, initial_coords=None):
         raw = {"field": {}, "curve": {}}
         weighted = {"field": {}, "curve": {}}
         total = None
@@ -1251,7 +1251,9 @@ class DualLoss(nn.Module):
             field_prediction = predictions["field"][mode]
             field_target = targets["field"][mode]
             field_loss = self.field_losses[mode]
-            if isinstance(field_loss, MaskedFieldMSELoss) or getattr(field_loss, "structured_field", False):
+            if getattr(field_loss, "localization_mode", None) == "sudden":
+                raw_field = field_loss(field_prediction, field_target, mask=mask, initial_coords=initial_coords)
+            elif isinstance(field_loss, MaskedFieldMSELoss) or getattr(field_loss, "structured_field", False):
                 raw_field = field_loss(field_prediction, field_target, mask=mask)
             else:
                 valid = torch.isfinite(field_target) & torch.isfinite(field_prediction)
@@ -1400,10 +1402,19 @@ class DUAL_MODEL:
                     self.optimizer.zero_grad(set_to_none=True)
                 predictions = self._predict_batch(batch)
                 targets = {"field": batch["field"], "curve": batch["curve"]}
+                initial_coords = None
+                if any(getattr(v, "localization_mode", None) == "sudden" for v in self.lossf.field_losses.values()):
+                    if self.data is None:
+                        raise ValueError("Sudden weighting needs DUAL_DATA geometry provenance.")
+                    geometry = self.data.normalizers["geometry"]
+                    as_tensor = lambda x: torch.as_tensor(x, device=self.device, dtype=batch["geometry"].dtype)
+                    initial_coords = (as_tensor(self.data.metadata["canonical_coords"])
+                        + batch["geometry"]*as_tensor(geometry["scale"])+as_tensor(geometry["mean"]))
                 loss, details = self.lossf(
                     predictions,
                     targets,
                     field_masks=batch["field_mask"],
+                    initial_coords=initial_coords,
                 )
                 if self.true_curve_weight:
                     true_curves = self.model.curve_model(batch["field"], batch["task_features"], batch["node_mask"])

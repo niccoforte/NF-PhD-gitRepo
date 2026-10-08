@@ -42,7 +42,7 @@ if [ -n "$selected" ]; then
     IFS=',' read -r -a requested <<< "$selected"
     seen=' '
     for variant in "${requested[@]}"; do
-        if [[ ! "$variant" =~ ^[a-z_]+$ || " ${all_variants[*]} " != *" $variant "* || "$seen" = *" $variant "* ]]; then
+        if [[ ! "$variant" =~ ^[a-z_]+$ || " ${all_variants[*]} sudden " != *" $variant "* || "$seen" = *" $variant "* ]]; then
             echo "Unknown or repeated variant: $variant"; exit 2
         fi
         seen+="$variant "
@@ -54,13 +54,20 @@ if [ -n "$selected" ]; then
     fi
     variants=()
     # Preserve dependency order even when the user's CSV order differs.
-    for variant in "${all_variants[@]}"; do
+    for variant in "${all_variants[@]}" sudden; do
         if [[ "$seen" = *" $variant "* ]]; then variants+=("$variant"); fi
     done
 fi
+gate_args=()
+if [[ " ${variants[*]} " = *' sudden '* ]]; then
+    if [[ "${variants[*]}" != 'baseline sudden' ]]; then
+        echo "Sudden weighting requires the isolated --variants baseline,sudden pair."; exit 2
+    fi
+    gate_args=(--sudden-suite)
+fi
 echo "Submit directory: $submit_dir"
 echo "Anchor: $anchor"
-echo "One all-mode 4-hour preflight; ${#variants[@]} dependent 240-hour, one-GPU B1 jobs."
+echo "One 4-hour suite preflight; ${#variants[@]} dependent 240-hour, one-GPU B1 jobs."
 if [ -n "$preflight_node" ]; then echo "Preflight node: $preflight_node"; fi
 printf 'Variant: %s\n' "${variants[@]}"
 if [ "$submit" != true ]; then exit 0; fi
@@ -87,11 +94,12 @@ printf 'role\tvariant\tjob_id\tdependency\tsource_revision\n' > jobs.tsv
 preflight_options=()
 if [ -n "$preflight_node" ]; then preflight_options+=(--nodelist="$preflight_node"); fi
 preflight=$(/opt/slurm/bin/sbatch --parsable -J "$suite-preflight" -t 4:0:0 "${preflight_options[@]}" B1_ML-new.sh \
-    DualOutputs/A0-HPC-Dual-preflight.py --run-label "$suite-preflight" --base-model-json "$anchor")
+    DualOutputs/A0-HPC-Dual-preflight.py --run-label "$suite-preflight" --base-model-json "$anchor" "${gate_args[@]}")
 preflight=${preflight%%;*}
 printf 'preflight\tall\t%s\t-\t%s\n' "$preflight" "$ML_SOURCE_REVISION" >> jobs.tsv
 for variant in "${variants[@]}"; do
     args=(--experiment "$variant" --base-model-json "$anchor" --seed 42 --split-seed 42 --epochs 450)
+    if [[ "$variant" = sudden ]]; then args+=(--localization-gain 1); fi
     dependency=$preflight
     if [[ "$variant" = winner_probe || "$variant" = curve_true || "$variant" = curve_predicted ]]; then
         args+=(--source-model-json "$anchor")

@@ -67,6 +67,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 - Default physical context is the checked `fcc_ti` profile, documented with worked examples in `samples/`. Keep optional degree and graph-attention additions separate until the user agrees to that ablation. Do not silently replace coupling membership with per-node fixity.
 - Do not assume uniform strut thickness or exact per-specimen relative density across historical ML data. The bounded provenance audit found differing sampled generation regimes. Actual INP sections and coordinate/ID matches are authoritative for inspected specimens; archived launchers can disagree with their INP IDs, and merged field-source paths do not establish exact ODB provenance. Do not extrapolate sampled thicknesses to uninspected IDs or change features/filtering automatically. See samples/accuracy-continuation/thickness-provenance.md.
 - Current evidence, loss choices, unresolved weighting, data-access blockers, and next implementation work belong in `PROJECT_STATUS.md`.
+- Human error reports should lead with training-mean-relative RMSE skill (%) and include physical units as secondary context. Regional motion error should state the target-motion denominator and valid event counts; maximum-displacement normalization alone can hide fracture errors. Compare methods on identical specimens, task masks and field sources. Do not promote single-seed aggregate winners or compare true-field curve oracles as if they were disorder-only predictions.
 
 ## Saved Artifacts
 
