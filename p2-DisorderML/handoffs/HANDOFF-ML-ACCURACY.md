@@ -10,6 +10,29 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Start here: ownership and current state
 
+**Reconciled ownership (8 October):** Improve ML Accuracy has now read the full
+available user/answer history of Dual Model and this brief, reconciling them
+with current code and the user's later decisions. Dual Model can be archived;
+do not replay its commands. Keep this file until its detailed pending checks
+and incoming references are consolidated elsewhere. PROJECT_STATUS's current
+entries supersede the historical scheduler states and older proposals below.
+In particular, the recovery/property runs are completed and reviewed, soft/soft
+peak loss is implemented with comparison jobs submitted, and sudden/non-affine
+weighting is implemented and CPU-tested but not yet GPU-tested/submitted.
+None of those changes establishes a final accuracy winner.
+
+Retained checks beyond the experiment queue: notebook controls and saved-report
+dashboards listed below; controlled perturbed-input/pin-boundary illustrations
+and scale-aware boundary-tolerance validation against the producer; keeping the
+human test guide aligned with newly added tests. The historical task-embedding
+diagnostic also remains a proposal: inspect gradients/updates and compare zeroed
+or swapped embeddings with fixed checkpoint weights and validation IDs. Low
+sensitivity alone is not a bug because task context and heads also identify the
+task. These checks are not newly executed or authorised as extra HPC jobs by
+this reconciliation. Newer user decisions retain priority; cancelled raw-damage
+maximisation/direct-curve/Pareto-search proposals remain cancelled. Sibling
+briefs were not loaded during this retirement audit.
+
 Continue the Dual Model work in this thread; do not reimplement completed work.
 Read repo AGENTS, applicable nested instructions and p2 PROJECT_STATUS first.
 Canonical checkout: `/Users/niccoloforte/Desktop/Code/NF-PhD-gitRepo`.
