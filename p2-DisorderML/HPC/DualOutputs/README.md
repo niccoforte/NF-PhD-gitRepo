@@ -217,15 +217,16 @@ changed and the reconnected master was verified alive across multiple commands.
 ### Weighting and frozen-source comparisons
 
 For submitted job IDs, download commands and the existing notebook review
-settings, read `HANDOFF-ML-ACCURACY.md` → **Collect and visualise this suite**. Keep notebooks
+settings, read `../../handoffs/HANDOFF-ML-ACCURACY.md` → **Collect and visualise this suite**. Keep notebooks
 in `p2-DisorderML/code/`; saved runs alone belong in `data/`. The source-comparison
 plot uses explicit predicted-field evaluation tables when present, so a
 true-field-trained model is not inadvertently compared against itself.
 The accuracy brief distinguishes existing functionality from pending notebook
 work and automated checks from researcher review. Accuracy owns the per-test
-visual guide under `samples/` and agreed soft/soft peak correction. `HANDOFFS.md`
-is now just an index to four separate task briefs, not required reading for all
-chats; damage, context and surrogate design optimisation have their own files.
+visual guide under `samples/` and agreed soft/soft peak correction. `../../handoffs/HANDOFFS.md`
+is an index to the separate task briefs, not required reading for all chats;
+damage, context, surrogate optimisation, tokenisation and physics/strain each
+have their own brief in that directory.
 
 Fixed weights are normalised to mean one over each specimen's valid values.
 Late-frame raw weights are `1+(t-t_first)/(t_last-t_first)`, so on equally spaced
@@ -307,8 +308,8 @@ definitions remain an explicit scientific decision. Selection still uses the old
 fixed four-output score, not these newly added diagnostics.
 
 Worked arithmetic: `../../samples/dual-experiment-examples.md`. Accuracy
-continuation: [HANDOFF-ML-ACCURACY.md](HANDOFF-ML-ACCURACY.md); separate task
-briefs: [HANDOFFS.md](HANDOFFS.md). The latest explanatory diagrams and
+continuation: [HANDOFF-ML-ACCURACY.md](../../handoffs/HANDOFF-ML-ACCURACY.md); separate task
+briefs: [HANDOFFS.md](../../handoffs/HANDOFFS.md). The latest explanatory diagrams and
 read-only evidence are `../../samples/dual-clarification-evidence.md` and the
 adjacent `dual-sharing-*.png`, `dual-peak-loss-explanation.png` and
 `dual-field-difficulty.png`. These do not activate new training choices.

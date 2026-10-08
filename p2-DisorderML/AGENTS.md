@@ -8,6 +8,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 
 - `p2-DisorderML/code/` contains notebooks for local exploration, training, HPO post-processing, saved-run diagnostics, tokenization, and optimization.
 - `p2-DisorderML/HPC/` contains Slurm/bash submit helpers and run-specific Python entry points for cluster training and HPO.
+- `p2-DisorderML/handoffs/` contains all task briefs and their index. Read only the relevant brief; moving a brief does not move its implementation or activate historical commands.
 - `resources/` is the shared package used by this folder. Prefer changing shared behavior there only when the change belongs to the reusable framework, not when it is just a notebook-specific adjustment.
 - `p1-DisorderLatticeProperties/` owns most Abaqus simulation and ML-ready data generation logic. Treat p2 data files as outputs of that upstream FEA/data-processing workflow unless the task explicitly asks to change data generation.
 - `p3-DisorderIcingMitigation/` is a separate paper folder. Do not pull p3 conventions into p2 unless the user explicitly asks.
@@ -54,7 +55,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 
 ## Target Dual-Output Architecture
 
-- The following describes the unchanged default. Optional controlled experiments in the existing runner may separate field encoder blocks, add one local graph message block, change the field residual coordinates, or diagnose the serial gradient interface. The curve stage/default checkpoints and legacy MODEL routes remain intact. `private` is explicitly encoder-only separation, not complete independence of UT and FT. Keep each first comparison isolated; see HPC/DualOutputs README and HANDOFFS.md.
+- The following describes the unchanged default. Optional controlled experiments in the existing runner may separate field encoder blocks, add one local graph message block, change the field residual coordinates, or diagnose the serial gradient interface. The curve stage/default checkpoints and legacy MODEL routes remain intact. `private` is explicitly encoder-only separation, not complete independence of UT and FT. Keep each first comparison isolated; see HPC/DualOutputs/README.md and handoffs/HANDOFFS.md.
 
 - The unified surrogate has exactly two Transformer stages in series: one dual-output geometry-to-field stage and one dual-output field-to-curve stage.
 - Within each stage, UT and FT are task-conditioned parallel streams through one shared Transformer encoder and two small output heads. They are stacked along the batch dimension for one encoder call; they are not independent task Transformers.

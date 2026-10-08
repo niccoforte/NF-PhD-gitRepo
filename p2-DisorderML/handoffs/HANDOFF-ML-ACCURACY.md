@@ -33,7 +33,7 @@ and the existing peak-height term retained. This documentation update does not
 alter submitted jobs. Accuracy has now implemented explicit `peak_target_mode="soft"`
 in CombinedCurveLoss / `target_mode="soft"` in SoftPeakLocationLoss, with saved
 serialization and tests. Historical missing/default modes remain hard-target.
-No corrected-loss experiment has been submitted. The user separately authorised
+Corrected-loss submission evidence is recorded below. The user separately authorised
 a true-field-to-property HPC test for UT Strength/Ductility/WoF and FT K_JIC.
 
 8 October update: remaining property30367256/30367272 and joint30326584/30326586
@@ -50,7 +50,10 @@ Last check: gate waiting for resources, full jobs for dependency. Inspect these
 before any further submission. No new GPU success or corrected-loss accuracy yet.
 Bounded thickness association uses29 train/validation specimens, no locked test:
 weak simple correlations but broad batch-bootstrap intervals and batch confounding.
-Do not dismiss variation, infer causation, alter features or regenerate data.
+The user now parks further thickness auditing: retain provenance, but do not infer
+no effect, alter features or regenerate data. The ten-run leader is provisional;
+no configuration has been promoted to a default. Sudden/non-affine weighting is
+still unimplemented. Recheck peak jobs after SSH is restored, without duplicates.
 The user's latest annotations explicitly permit reconciling Tokenisation, Damage
 and Optimisation briefs; these have been updated. Physics/strain has a separate
 feasibility brief. No chat dispatched or physics/damage model implemented.
@@ -101,7 +104,7 @@ report batch confounding and limited power. A nonsignificant trend does not
 establish irrelevance. No thickness feature, filtering or FEA change is authorised.
 Evidence: samples/accuracy-continuation/thickness-provenance.md and hashed JSON.
 
-Tokenisation handoff was reconciled in code/TOKENIZATION_NEXT_STEPS.md with actual
+Tokenisation handoff was reconciled in handoffs/TOKENIZATION_NEXT_STEPS.md with actual
 correlation-weighted PCA/KMeans code and read-only vault notes. Other handoff
 briefs were not loaded during that original reconciliation; the newly authorised
 follow-up now adds the retained concepts below to their dedicated briefs.
@@ -157,7 +160,7 @@ an exhaustive archive or interactive-browser validation.
 The existing runner now also implements late_frame, ft_region, winner_probe,
 curve_predicted and curve_true. B4_Dual-experiments.sh submits thirteen isolated
 variants through B1 from an immutable home snapshot, gated by its all-mode GPU
-preflight. See the adjacent README for exact CLI, source/selection semantics,
+preflight. See ../HPC/DualOutputs/README.md for exact CLI, source/selection semantics,
 weights and paths; PROJECT_STATUS is the submission record. Do not resubmit
 existing labels or confuse a dependency queue entry with completed training.
 
@@ -185,7 +188,7 @@ COMPLETED 0:0 in 9m05s with all thirteen archives, and winner_probe 30326588
 COMPLETED 0:0 in 2m43s with its field-source diagnostics. At approximately
 15:47 BST the six training jobs were RUNNING with advancing epochs. No accuracy
 comparison performed. No model/loss change was needed for this
-node-specific failure. The adjacent README owns recovery IDs, paths and evidence;
+node-specific failure. ../HPC/DualOutputs/README.md owns recovery IDs, paths and evidence;
 consult PROJECT_STATUS before acting. Inspect existing jobs, do not resubmit.
 
 | Variant | Job | Isolated question |

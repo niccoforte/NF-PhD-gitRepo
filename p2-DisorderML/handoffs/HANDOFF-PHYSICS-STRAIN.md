@@ -1,5 +1,7 @@
 # Physics and strain supervision — feasibility task
 
+Location: p2-DisorderML/handoffs/. Source paths below retain their repository/p2 scope.
+
 This is a proposed dedicated continuation, not a dispatched chat or permission
 for bulk exports, new FEA or model changes. Read applicable repository guidance
 and current PROJECT_STATUS. Reconcile existing code before acting. Accuracy owns

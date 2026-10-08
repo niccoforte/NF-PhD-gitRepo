@@ -46,7 +46,7 @@ Deliver the proposed map and verification checklist first, then implement the
 approved consolidation. No new tasks or edits elsewhere have been dispatched by
 writing this brief.
 
-The four task briefs are now separate siblings of the small HANDOFFS.md index.
+All task briefs are now separate siblings of the small handoffs/HANDOFFS.md index.
 Do not recreate a combined prompt that every chat must read. Keep each fact in
 one authoritative home, using minimal interface summaries between task owners.
 Retire a brief only after its decisions/actions have migrated and inbound links

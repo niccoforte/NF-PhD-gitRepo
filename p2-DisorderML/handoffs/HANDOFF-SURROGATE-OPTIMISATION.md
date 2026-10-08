@@ -1,5 +1,7 @@
 # Surrogate optimisation — curve and field-only task brief
 
+Location: p2-DisorderML/handoffs/. Source paths below retain their repository/p2 scope.
+
 This separate task owns FCC disorder DESIGN optimisation using UT/FT surrogates,
 not model HPO, architecture or training-loss development. It includes both curve
 objectives and field-only alternatives; do not send it back to Improve ML Accuracy.

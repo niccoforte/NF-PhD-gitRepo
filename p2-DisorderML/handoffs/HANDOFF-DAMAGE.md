@@ -1,5 +1,7 @@
 # Damage variable processing — task brief
 
+Location: p2-DisorderML/handoffs/. Source paths below are repository-relative unless stated otherwise.
+
 This is a separate task, not the Improve ML Accuracy continuation. Read applicable
 repo/p1 simulation and p2 samples instructions plus relevant progress notes first.
 Do not load the other handoff files or full previous chat by default. Start by

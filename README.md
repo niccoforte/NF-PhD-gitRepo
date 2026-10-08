@@ -146,6 +146,10 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 +-- p2-DisorderML/
 |   +-- AGENTS.md
 |   +-- PROJECT_STATUS.md
+|   +-- handoffs/
+|   |   +-- HANDOFFS.md
+|   |   +-- HANDOFF-*.md
+|   |   +-- TOKENIZATION_NEXT_STEPS.md
 |   +-- code/
 |   |   +-- AGENTS.md
 |   |   +-- ML-CurveOutputs.ipynb
@@ -155,7 +159,6 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 |   |   +-- ML-FieldPostProcessing.ipynb
 |   |   +-- ML-HPOpostProcess.ipynb
 |   |   +-- Tokenization.ipynb
-|   |   +-- TOKENIZATION_NEXT_STEPS.md
 |   |   +-- exploratory/prototype notebooks
 |   +-- HPC/
 |       +-- AGENTS.md
@@ -290,7 +293,7 @@ This folder is the local notebook workspace for model development and post-proce
 | `ML-FieldPostProcessing.ipynb` | Diagnostics and visualization for one saved field run. |
 | `ML-HPOpostProcess.ipynb` | Shared curve/field/dual HPO study comparison and best-run inspection; dual winners show all four outputs. |
 | `Tokenization.ipynb` | Output-informed tokenization prototype for recurring disorder motifs. |
-| `TOKENIZATION_NEXT_STEPS.md` | Current planning notes for the tokenization workflow. |
+| `../handoffs/TOKENIZATION_NEXT_STEPS.md` | Current planning notes for the tokenization workflow; not a notebook. |
 | `DimensionalityReduction.ipynb`, `GPR.ipynb`, `ML-DisorderDistribution.ipynb`, `Optimization.ipynb`, `AK-ML-StressStrain.ipynb` | Exploratory/prototype notebooks and research history. |
 
 Curve-output models predict macroscopic stress-strain or force-displacement curves. Field-output models predict per-node displacement fields over Abaqus frames. Field-to-curve models then learn the second, serial mapping from displacement histories to the corresponding global curve. Field data is normally stored as final ML-ready `allFIELD.npz` products after raw `FIELDu-...npz` files have been stacked and saved.
@@ -374,7 +377,7 @@ reuse one UT/FT thickness per batch. Geometry/ID agreement is verified, but merg
 export paths and a mismatched archived launcher limit exact response provenance.
 Do not infer an exact dataset-wide boundary, density or error effect from this
 bounded audit; no feature/filtering or simulation change was made. Tokenisation has its own
-updated `code/TOKENIZATION_NEXT_STEPS.md`: current code is correlation-weighted
+updated `handoffs/TOKENIZATION_NEXT_STEPS.md`: current code is correlation-weighted
 PCA/KMeans, not the older proposed PLS pipeline. No tokenisation code or vault
 research decisions were changed by that reconciliation.
 
@@ -390,7 +393,7 @@ omit `--submit` to preview. It preserves an immutable home-side source snapshot
 and a job manifest. The suite includes positive mean-normalised late-frame/FT-box
 weights, frozen-winner substitution and two freshly trained true/predicted-field
 curve controls. See the guide for oracle limitations and two-curve selection.
-The [task handoff index](p2-DisorderML/HPC/DualOutputs/HANDOFFS.md) routes accuracy,
+The [task handoff index](p2-DisorderML/handoffs/HANDOFFS.md) routes accuracy,
 damage-variable processing, repository context, surrogate optimisation, and the
 proposed physics/strain feasibility task; it also links the existing tokenisation
 brief. Give each chat only its own brief, not all briefs or the full prior chat.

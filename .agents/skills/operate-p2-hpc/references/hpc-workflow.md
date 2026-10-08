@@ -4,6 +4,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Directory roles
 
+- Task briefs live in `p2-DisorderML/handoffs/`, outside executable HPC directories. Read only the selected brief; `HANDOFFS.md` is the routing index. Moving a brief never moves an entry point, archive or immutable job snapshot.
 - `B0_ML-env-setup.sh`: creates or refreshes the `nf-ml-gpu` environment.
 - `B1_ML-new.sh`: stages `resources/` plus a selected Python entry point to scratch, runs it, and archives outputs.
 - `B2_ML-resumeHPO.sh`: resumes archived cross-model Optuna studies; use `--dry-run` before launch.

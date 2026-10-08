@@ -1,5 +1,7 @@
 # Tokenisation continuation
 
+The maintained notebook remains in p2-DisorderML/code/; only this brief moved to handoffs/.
+
 ## Purpose and authority
 
 Find recurring local **disorder patterns** associated with high/low UT and C(T)
