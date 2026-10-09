@@ -10,6 +10,87 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Start here: ownership and current state
 
+### Current decision suite and imported deferred ideas (9 October)
+
+This remains the active detailed checklist, not a completed/disposable brief.
+Performance takes priority over sharing. The user accepted the proposed 2% field
+RMSE non-inferiority margin on BOTH tasks, with local-motion and curve safeguards;
+their numerical tolerances still need specifying before final model selection.
+The expanded suite is a design for user confirmation, not implemented/submitted:
+
+| Case | Separate training groups | Gradient boundary |
+| --- | --- | --- |
+| 1 / 3(ii) | UT field, FT field, UT curve, FT curve (four) | Each trains only on its own target; frozen fields feed the curve fits |
+| 2 | UT field, FT field, dual curve (three) | Independent field fits; UT/FT share only the downstream curve fit |
+| 3(i) | UT field→curve and FT field→curve (two) | Field+curve losses propagate within each stream, never across mechanical modes |
+| 4 | Current joint DUAL (one) | Shared field and curve stages, all four losses jointly trained |
+| Suggested extra | Dual field, then dual curve (two) | UT/FT sharing retained but curve gradients cannot update the frozen field stage |
+
+Cases 1 and 3(ii) are identical if field sources/training schedules match; do not
+submit duplicate jobs under different labels. Distinguish true-field-trained
+curve oracles from predicted-source fits as source controls, not a fictitious
+architectural difference. Proposed main staged fits use training-only out-of-fold
+predictions; common independent field checkpoints/predictions can be reused by
+cases 1 and 2. Evaluate deployable curves on predicted fields in every case.
+Use one complete-pair split, identical feature information/masks/train-only scales,
+three training seeds, matched per-task block capacity and training opportunities;
+report total parameters/runtime and source mismatch. Fully independent means no
+shared trainable projections, embeddings, normalisation parameters or optimizers,
+not merely private encoder tails. Log gradient norms/cosines where gradients are
+shared to investigate interference; mixed errors alone do not prove that cause.
+Compare on validation; leave locked test untouched until selection is frozen.
+
+After this comparison, isolate independent-model follow-ups: initial crack-face
+feature; FT-only A1 fine-mesh-box weighting; taskwise residual fields; local graph
+block; spatial/temporal/both losses; corrected curve loss; auxiliary true-field
+curve supervision; and the new sudden/non-affine weighting. Existing independent
+loss trials are completed evidence, not experiments never tried. New runs must
+use the matched population/configuration. Detachment is covered by staged versus
+end-to-end controls; an online stop-gradient fit is optional only if scheduling
+needs separating from gradient effects. Do not combine all changes at once.
+
+Correction to the earlier verdict: fixed FT crack-tip-box weighting is a valid,
+user-approved physical region priority, not leakage/cheating or a rejected idea.
+Keep outside-region supervision and whole-field/inside/outside reporting. Dynamic
+sample-specific weighting is a separate comparison, not a compulsory replacement.
+Gaussian frame weights are newly requested, not implemented: propose positive
+1 + a*exp(-0.5*((q-0.5)/sigma)^2), mean-normalised over valid entries, with q the
+verified normalised loading coordinate. Start widths sigma .15/.25 and amplitudes
+a 1/3 against uniform weighting. Check training-side event timing before claiming
+the midpoint is typical; retain positive tail weights and per-frame reporting.
+Do not mix Gaussian/regional/sudden weights in the first comparisons.
+
+Field correction remains after the independence verdict: a small residual
+field-to-field model, initially separate by task, trained on held-out-fold field
+predictions paired by specimen ID with true fields. Freeze the upstream model;
+use field supervision first and assess both a fixed curve readout and subsequent
+curve adaptation separately. Out-of-fold generators/scalers must not train on
+their held-out specimens; final validation/test are never corrector training data.
+No guarantee that missing fracture information can be reconstructed.
+
+The user-supplied retirement briefs from **Assess unified ML model feasibility**,
+**Summarize GNN chat changes**, and **Review cleanup folder** are incorporated;
+those chats may be archived for the transferred scope. This does not certify a
+separate audit of their full histories. No old code/notebooks need resurrecting.
+Retain only these conditional alternatives, with no implementation/job authority:
+
+- Separate field and true-field-curve pretraining followed by supervised joint
+  fine-tuning; a true→predicted field curriculum is distinct from the existing
+  auxiliary true-field loss, detached gradients and frozen-source fits. Consider
+  only if the current interface evidence warrants it. Prefer source sampling
+  over silently treating interpolated fields as physical states.
+- Relative-distance/edge attention bias is already deferred. LocalFieldGraph
+  supplies initial edge geometry before FIELD attention, not attention-logit bias
+  and not curve-stage graph processing. An attention-specific comparison must
+  add evidence beyond that control; no bundled GraphGPS/edge-token/damage redesign
+  and no use of true future damage in disorder-only inference.
+- Output compression only for a demonstrated cost/capacity need: train-only PCA
+  first, held-out physical-curve reconstruction including peaks, ductility/work
+  and worst cases. Legacy PCA helpers exist; this is not a verified dual reducer
+  contract. Full curves and the field intermediary remain baseline. No input PCA
+  before node tokenisation; motif discovery is separate. Consider an autoencoder
+  only if PCA is insufficient, after verifying fit/inverse/checkpoint support.
+
 **Reconciled ownership (8 October):** Improve ML Accuracy has now read the full
 available user/answer history of Dual Model and this brief, reconciling them
 with current code and the user's later decisions. Dual Model can be archived;
@@ -81,8 +162,8 @@ accuracy-validated. The isolated B4 `--variants baseline,sudden` pair preserves
 the anchor and fixed selection, with no derivative penalties. Do not repeat the
 old magnitude/activity weighting as a substitute. See the runner README for the
 formula, scope and proposed matched three-seed DUAL-versus-independent decision.
-That independent control is not implemented/submitted; a proposed 2% field margin
-awaits the user's decision. Core reports now lead with training-mean-relative
+That independent control is not implemented/submitted; the user has now accepted
+the 2% field margin and expanded the suite as specified above. Core reports lead with training-mean-relative
 RMSE skill and new local-motion NRMSE; archived scores stay unchanged.
 Recheck peak jobs after SSH is restored, without duplicates.
 The user's latest annotations explicitly permit reconciling Tokenisation, Damage

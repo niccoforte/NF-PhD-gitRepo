@@ -55,10 +55,17 @@ DUAL; single-mode/GNN trainers are not yet wired for this new weighting mode.
 
 ### Decision experiment: shared versus fully independent
 
-Proposed, not submitted: three training seeds on one frozen paired split, comparing
-the established shared DUAL model with two fully independent serial UT/FT models.
-Both independent stages, projections and optimizers must be separate; the
-existing `private` variant does NOT satisfy this control. Match field/curve
+Design awaiting diagram confirmation, not implemented/submitted: three training
+seeds on one frozen paired split. Compare four separate fits; independent fields
+feeding a dual curve fit; independent end-to-end UT/FT streams; current joint
+DUAL; and, as a suggested extra, separately trained dual field and curve stages.
+Four separate fits and stage-separated UT/FT streams are the same configuration
+when their curve input source/schedule match: do not duplicate them. Detailed
+training boundaries and deferred follow-ups are in the accuracy brief's current
+decision suite. True-field curve oracles remain separate source controls.
+Independence across UT/FT includes all stages, projections and optimizers; an
+end-to-end stream may use one optimizer for its own two stages. The existing
+`private` encoder-tail variant does NOT satisfy this control. Match field/curve
 information, target masks, losses, normalization, per-task capacity, stopping
 rules and training budget; report the independent pair's larger total parameter
 count and runtime. Use predicted fields for end-to-end curve comparisons and
@@ -66,8 +73,9 @@ true fields only as a separately labelled oracle. Existing HPO populations diffe
 and cannot settle this comparison without matched retraining/evaluation.
 
 Primary decision: both field RMSEs, plus local-jump and curve accuracy safeguards;
-not the aggregate score alone. A 2% field non-inferiority margin has been proposed
-to the user, not accepted. Report per-seed results and paired specimen uncertainty,
+not the aggregate score alone. The user accepted a 2% field non-inferiority margin
+on both tasks; numerical local-motion/curve safeguards remain to be specified.
+Report per-seed results and paired specimen uncertainty,
 not individual nodes/frames as independent replicates. Freeze acceptance criteria
 before final locked-test evaluation. If DUAL consistently sacrifices a field
 without a worthwhile practical benefit, retain independent models; this is a
