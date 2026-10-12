@@ -1,5 +1,123 @@
 # Joint UT/FT runs
 
+## Eight-case independence comparison (12 October)
+
+Prepared locally; **not submitted or GPU-validated**. User will reopen SSH when
+ready. These names supersede the older case numbering in historical notes.
+`F` means geometry→field; `C` means field→curve; `(i)` freezes the completed field
+fit before curve training; `(ii)` retains end-to-end field+curve supervision.
+
+| Case | Field networks | Curve networks | Independent training groups |
+| --- | --- | --- | --- |
+| 1(i) | UT, FT separate | UT, FT separate | 4 |
+| 1(ii) | UT, FT separate | UT, FT separate | 2: one end-to-end stream per mode |
+| 2a(i) | UT, FT separate | shared dual | 3 |
+| 2a(ii) | UT, FT separate | shared dual | 1 |
+| 2b(i) | shared dual | UT, FT separate | 3 |
+| 2b(ii) | shared dual | UT, FT separate | 1 |
+| 3(i) | shared dual | shared dual | 2: F then C |
+| 3(ii) | shared dual | shared dual | 1: current joint architecture |
+
+Independent stages share **no** tokenizer, context projection, position/task
+embedding, encoder, normalization parameters or output head. Every independent
+training group gets its own optimizer, scheduler, selection score, stopping and
+checkpoint. Group losses contain only that group's targets. A common saved-run
+container does not mean shared training. Case 1(ii) has no UT↔FT gradient path.
+
+Main cases have `p` suffix: deployable inference always uses predicted fields.
+For `(i)`, training curve inputs are three-fold out-of-fold (OOF) predictions from
+outer TRAIN specimens only. Each fold fits scalers and fields on its own fit IDs,
+selects on separate inner-validation IDs, and predicts untouched heldout TRAIN IDs.
+Predictions are converted through physical units into the outer train-fitted
+field normalization. Final generators train on the complete outer training set
+and supply outer-validation inputs. Cache provenance includes all fold IDs,
+data/configuration fingerprints and seed checks. Cases 1(i)/2a(i) reuse the exact
+same independent field bank; 2b(i)/3(i) reuse the same shared field bank.
+
+OOF is more than withholding the final validation/test set: a downstream learner
+must not train on unrealistically accurate in-sample predictions from its upstream
+learner. Outer test targets are never evaluated. Fold-internal `test` datasets are
+explicitly labelled heldout OUTER TRAIN IDs, not the project's locked test set.
+
+Do not double the suite into misleading `t` variants: true-only curve inputs cut
+the curve→field gradient, eliminating the defining property of `(ii)`. Every fit
+saves true-field **substitution** diagnostics; these are not trained true-field
+oracles. Existing oracle studies remain separate source evidence. Auxiliary
+true-field supervision and a residual field corrector are deferred until after
+the architecture decision, as are all feature/loss ablations.
+
+### Fixed comparison configuration
+
+Use the archived `HPO/dual-joint-hpo1/best/model.json` architecture/training anchor,
+not its weights or unequal four-task HPO loss weights. Full runs verify the
+anchor's exact paired split IDs. All eight cases use identical normalized masked
+field MSE and curve MSE, coefficient 1 per active output; no custom losses, graph,
+crack-face addition, residualization, localization or auxiliary supervision.
+
+| Setting | Field stage | Curve stage |
+| --- | --- | --- |
+| Width / heads / layers | 384 / 8 / 3 | 96 / 4 / 4 |
+| Feed-forward multiplier | 4 | 6 |
+| Activation / position | ReLU / sinusoidal | GELU / learned |
+| Pooling | per-node output | masked mean, no CLS |
+| Encoder dropout | 0.0423943 | 0.0168863 |
+| Attention dropout | 0.1046886 | 0.2288386 |
+| Head dropout / hidden multiplier | 0.2959779 / 2 | 0.0724220 / 0 |
+
+AdamW; field LR 0.0002707084; curve LR factor 0.2979038; weight decay
+0.000327321; batch 2; plateau factor 0.627342/patience14/threshold0.0001;
+early-stop patience 52 from the anchor, delta 0.00001; maximum 450
+epochs per fit. Seeds 42/43/44; split seed 42. Effective settings and anchor hash
+are saved. Curve initialization is independently seeded so changing field-stage
+sharing does not incidentally change its initial weights. Per-task block capacity
+is matched, **not total parameter count**; record capacity and computational cost.
+This is a controlled configuration comparison, not architecture-specific HPO or
+proof that any architecture is globally optimal. If near-tied, tune the finalists
+under equal search budgets before a definitive research claim.
+
+Selection uses fixed physical MSE relative to a training-mean predictor, restricted
+to the currently trained group's outputs. Final comparison reports all four
+outputs, seed variability, local-motion/event metrics, FT inside/outside-region
+errors and curve peak/work metrics. Keep RMSE/relative skill for comparability;
+log training losses separately (log plots), never compare unequal custom objectives
+as if they measured the same error. Accepted field non-inferiority margin is 2%
+on BOTH tasks. Numerical curve/local-motion safeguards still require agreement
+before declaring a winner. Gradient-norm/alignment logging is explicitly deferred.
+
+### Preparation and submission
+
+`resources/MLindependence.py` orchestrates the existing trainer; it does not
+duplicate its optimization loop. The existing test runner accepts
+`--independence-case 1i|1ii|2ai|2aii|2bi|2bii|3i|3ii` with `--experiment baseline`.
+Bank preparation additionally uses `--prepare-field-bank` (1i or 3i); staged fits
+require `--field-bank <archived-bank-directory>`. Group checkpoints and histories
+are retained under `groups/`; each OOF fit under `folds/`. The final assembled
+checkpoint reloads using the maintained dual loader and standard postprocessing.
+Bank-only runs explicitly omit curve results because that stage is untrained.
+Grouped history plots label independent fits and retain log scales.
+
+```bash
+# Non-submitting preview; run from the clean HPC checkout when authorised.
+bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh independence-261012
+# Once authorised and synchronized:
+bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh independence-261012 --submit
+```
+
+One 8h GPU gate exercises two small banks and all eight cases, including checkpoint
+reload. Six reusable full-data banks and 24 case fits follow across three seeds.
+Every full job requests 240h; B1 retains its existing one-GPU/12CPU/90,000MB policy
+and home→scratch→archive collection. No extra CPU-per-task override is added.
+Bank consumers require successful bank archiving; all jobs depend directly or
+indirectly on the gate. Source is an immutable clean-Git snapshot; unique labels
+are mandatory. Archive: `MULTI/Dual/Transformer/<suite>-<case>p-s<seed>` or
+`<suite>-bank-{1i|3i}-s<seed>`. No exact mid-fit resume is claimed; failed jobs
+retain B1 scratch and existing artifacts for inspection, not blind overwriting.
+
+The active `test_independence.py` checks parameter/gradient isolation, frozen
+field invariance, group counts, fold-only scalers/IDs, all eight CPU fits, checkpoint
+round trips and non-submitting launcher behavior. GPU success and scientific
+accuracy remain to be established on HPC.
+
 ## Controlled architecture and interface experiments
 
 ### Sudden-motion weighting: isolated next experiment

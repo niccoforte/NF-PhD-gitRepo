@@ -10,39 +10,46 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Start here: ownership and current state
 
-### Current decision suite and imported deferred ideas (9 October)
+### Current decision suite and imported deferred ideas (12 October)
 
 This remains the active detailed checklist, not a completed/disposable brief.
 Performance takes priority over sharing. The user accepted the proposed 2% field
 RMSE non-inferiority margin on BOTH tasks, with local-motion and curve safeguards;
 their numerical tolerances still need specifying before final model selection.
-The expanded suite is a design for user confirmation, not implemented/submitted:
+The user confirmed the following revised numbering. Local implementation is now
+in `resources/MLindependence.py`, the existing dual runner/preflight and
+`HPC/DualOutputs/B4_Dual-independence.sh`. It is not submitted or GPU-validated.
+The adjacent run README owns exact settings, bank provenance and invocation:
 
 | Case | Separate training groups | Gradient boundary |
 | --- | --- | --- |
-| 1 / 3(ii) | UT field, FT field, UT curve, FT curve (four) | Each trains only on its own target; frozen fields feed the curve fits |
-| 2 | UT field, FT field, dual curve (three) | Independent field fits; UT/FT share only the downstream curve fit |
-| 3(i) | UT field→curve and FT field→curve (two) | Field+curve losses propagate within each stream, never across mechanical modes |
-| 4 | Current joint DUAL (one) | Shared field and curve stages, all four losses jointly trained |
-| Suggested extra | Dual field, then dual curve (two) | UT/FT sharing retained but curve gradients cannot update the frozen field stage |
+| 1(i) | UT field, FT field, UT curve, FT curve (four) | Frozen fields feed independent curve fits |
+| 1(ii) | UT field→curve, FT field→curve (two) | End-to-end within each mode, never between modes |
+| 2a(i) | UT field, FT field, dual curve (three) | Frozen independent fields |
+| 2a(ii) | Independent fields→dual curve (one) | End-to-end, shared curve stage |
+| 2b(i) | Dual field, UT curve, FT curve (three) | Frozen shared field stage |
+| 2b(ii) | Dual field→independent curves (one) | End-to-end, shared field stage |
+| 3(i) | Dual field, dual curve (two) | Frozen field stage |
+| 3(ii) | Current joint DUAL (one) | Both stages shared and jointly trained |
 
-Cases 1 and 3(ii) are identical if field sources/training schedules match; do not
-submit duplicate jobs under different labels. Distinguish true-field-trained
-curve oracles from predicted-source fits as source controls, not a fictitious
-architectural difference. Proposed main staged fits use training-only out-of-fold
-predictions; common independent field checkpoints/predictions can be reused by
-cases 1 and 2. Evaluate deployable curves on predicted fields in every case.
+Main eight cases use suffix p. True-only curve input removes curve→field gradients,
+so do not label it connected training or mechanically double all cases into t/p.
+Saved true-field substitution is diagnostic, not a trained true-field oracle.
+Staged fits use three-fold training-only out-of-fold predictions, with fold-local
+scalers and separate inner selection IDs. Reuse independent banks in1(i)/2a(i),
+shared banks in2b(i)/3(i). Evaluate deployable curves on predicted fields throughout.
 Use one complete-pair split, identical feature information/masks/train-only scales,
 three training seeds, matched per-task block capacity and training opportunities;
 report total parameters/runtime and source mismatch. Fully independent means no
 shared trainable projections, embeddings, normalisation parameters or optimizers,
-not merely private encoder tails. Log gradient norms/cosines where gradients are
-shared to investigate interference; mixed errors alone do not prove that cause.
+not merely private encoder tails. The user now explicitly defers gradient
+norm/cosine logging: compare performance first; mixed errors do not prove interference.
 Compare on validation; leave locked test untouched until selection is frozen.
 
-After this comparison, isolate independent-model follow-ups: initial crack-face
+After this comparison, isolate WINNING-architecture follow-ups: initial crack-face
 feature; FT-only A1 fine-mesh-box weighting; taskwise residual fields; local graph
-block; spatial/temporal/both losses; corrected curve loss; auxiliary true-field
+block (then gated residual graph or attention-specific bias if justified);
+spatial/temporal/both losses; corrected curve loss; auxiliary true-field
 curve supervision; and the new sudden/non-affine weighting. Existing independent
 loss trials are completed evidence, not experiments never tried. New runs must
 use the matched population/configuration. Detachment is covered by staged versus
@@ -71,7 +78,10 @@ No guarantee that missing fracture information can be reconstructed.
 The user-supplied retirement briefs from **Assess unified ML model feasibility**,
 **Summarize GNN chat changes**, and **Review cleanup folder** are incorporated;
 those chats may be archived for the transferred scope. This does not certify a
-separate audit of their full histories. No old code/notebooks need resurrecting.
+separate audit of their full histories. A full-history review was requested on
+12 October: none of the three titles is in accessible active/archived listings or
+shared handoff exports; the QM task database is unavailable. Asked the user for
+IDs/links/exports. Do not claim this requested review complete. No old code/notebooks need resurrecting.
 Retain only these conditional alternatives, with no implementation/job authority:
 
 - Separate field and true-field-curve pretraining followed by supervised joint
@@ -90,6 +100,15 @@ Retain only these conditional alternatives, with no implementation/job authority
   contract. Full curves and the field intermediary remain baseline. No input PCA
   before node tokenisation; motif discovery is separate. Consider an autoencoder
   only if PCA is insufficient, after verifying fit/inverse/checkpoint support.
+
+Real dynamic-weight illustration now uses specimen8701's saved validation fields,
+both original downloaded INPs (same retained initial coordinates verified), current
+reference edges and saved train-only jump scales. See
+`samples/accuracy-continuation/dynamic-weights-8701/README.md`:40 individual node/frame
+maps plus UT/FT overviews, dynamic weights only, per-frame means in titles. This is
+retrospective algorithm evaluation, not learned weights or an accuracy experiment.
+Centred temporal abruptness has no endpoint contribution; spatial scores still
+apply. Full winner-based dynamic training remains deferred with the other ablations.
 
 **Reconciled ownership (8 October):** Improve ML Accuracy has now read the full
 available user/answer history of Dual Model and this brief, reconciling them

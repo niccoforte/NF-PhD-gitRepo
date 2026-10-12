@@ -1,5 +1,6 @@
 # Sample review pack
 
+- `plot-dynamic-weight-sample.py` generates `accuracy-continuation/dynamic-weights-8701/`: real saved validation targets, initial disordered coordinates verified against both downloaded INPs, saved training-only jump scales and current connectivity. It displays only dynamic weights for each of20 frames/task and labels per-frame valid-node mean. No model is trained, no accuracy improvement is implied, and centred temporal scores have endpoint limitations. Keep this generator/results in samples, not data or source notebooks.
 These are deliberately small, human-readable calculation examples requested by the user. Markdown and labelled scientific plots are the primary reading surface; a compact NPZ supports notebook replay.
 
 - `build_examples.py` constructs labelled illustrations from the existing FCC producer rules and the actual dual feature functions. It performs no training, remote access or Abaqus export.

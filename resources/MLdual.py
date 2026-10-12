@@ -879,8 +879,12 @@ class DualTaskTransformer(nn.Module):
         head_hidden_mult=0,
         private_layers=0,
         local_graph=None,
+        modes=DUAL_MODES,
     ):
         super().__init__()
+        self.modes = tuple(modes)
+        if not self.modes or len(set(self.modes)) != len(self.modes) or any(m not in DUAL_MODES for m in self.modes):
+            raise ValueError("modes must be a nonempty unique subset of UT/FT.")
         self.in_sizes = _mode_sizes(in_size, "in_size")
         self.out_sizes = _mode_sizes(out_size, "out_size")
         self.seq_len = int(seq_len)
@@ -927,13 +931,13 @@ class DualTaskTransformer(nn.Module):
             self.tokenizer = nn.ModuleDict(
                 {
                     mode: nn.Linear(self.in_sizes[mode], self.d_model, bias=self.bias)
-                    for mode in DUAL_MODES
+                    for mode in self.modes
                 }
             )
         self.context_projection = (
             nn.Linear(self.context_size, self.d_model, bias=False) if self.context_size else None
         )
-        self.task_embedding = nn.Embedding(len(DUAL_MODES), self.d_model)
+        self.task_embedding = nn.Embedding(len(self.modes), self.d_model)
         self.cls_token = nn.Parameter(torch.zeros(1, 1, self.d_model)) if self.use_cls_token else None
 
         total_len = self.seq_len + int(self.use_cls_token)
@@ -962,7 +966,7 @@ class DualTaskTransformer(nn.Module):
         self.encoder = nn.TransformerEncoder(encoder_layer, num_layers=shared_layers) if shared_layers else None
         self.task_encoders = nn.ModuleDict({
             mode: nn.TransformerEncoder(encoder_layer, num_layers=self.private_layers)
-            for mode in DUAL_MODES
+            for mode in self.modes
         }) if self.private_layers else None
         self.heads = nn.ModuleDict(
             {
@@ -974,7 +978,7 @@ class DualTaskTransformer(nn.Module):
                       if self.head_hidden_mult else []),
                     nn.Linear(self.d_model * max(1, self.head_hidden_mult), self.out_sizes[mode], bias=self.bias),
                 )
-                for mode in DUAL_MODES
+                for mode in self.modes
             }
         )
         nn.init.normal_(self.task_embedding.weight, mean=0.0, std=0.02)
@@ -1019,7 +1023,7 @@ class DualTaskTransformer(nn.Module):
     def forward(self, inputs, task_features=None, node_masks=None):
         tokens, masks = [], []
         batch_size = None
-        for task_index, mode in enumerate(DUAL_MODES):
+        for task_index, mode in enumerate(self.modes):
             values = _mode_value(inputs, mode, "inputs") if isinstance(inputs, Mapping) else inputs
             if values.ndim != 3:
                 raise ValueError(f"{mode} input must have shape [batch, nodes, features].")
@@ -1068,13 +1072,13 @@ class DualTaskTransformer(nn.Module):
         stacked_tokens = torch.cat(tokens, dim=0)
         stacked_mask = torch.cat(masks, dim=0)
         encoded = self.encoder(stacked_tokens, src_key_padding_mask=~stacked_mask) if self.encoder is not None else stacked_tokens
-        encoded_by_task = dict(zip(DUAL_MODES, encoded.split(batch_size, dim=0)))
+        encoded_by_task = dict(zip(self.modes, encoded.split(batch_size, dim=0)))
         if self.task_encoders is not None:
             encoded_by_task = {mode: self.task_encoders[mode](encoded_by_task[mode], src_key_padding_mask=~mask)
-                               for mode, mask in zip(DUAL_MODES, masks)}
+                               for mode, mask in zip(self.modes, masks)}
 
         outputs = {}
-        for mode, task_encoded, mask in zip(DUAL_MODES, encoded_by_task.values(), masks):
+        for mode, task_encoded, mask in zip(self.modes, encoded_by_task.values(), masks):
             node_mask = mask[:, 1:] if self.use_cls_token else mask
             if self.pool == "node":
                 representation = task_encoded[:, 1:, :] if self.use_cls_token else task_encoded
@@ -1093,6 +1097,7 @@ class DualTaskTransformer(nn.Module):
     def get_config(self):
         return {
             "in_size": self.in_sizes,
+            "modes": self.modes,
             "out_size": self.out_sizes,
             "seq_len": self.seq_len,
             "context_size": self.context_size,
@@ -1113,6 +1118,31 @@ class DualTaskTransformer(nn.Module):
             "private_layers": self.private_layers,
             "local_graph": self.local_graph.config if self.local_graph is not None else None,
         }
+
+
+class IndependentTaskTransformers(nn.Module):
+    """Two wholly separate stages, including their projections and embeddings."""
+
+    def __init__(self, **config):
+        super().__init__()
+        config.pop("modes", None)
+        self.tasks = nn.ModuleDict({m: DualTaskTransformer(**config, modes=(m,)) for m in DUAL_MODES})
+        for key in ("pool", "seq_len", "in_sizes", "out_sizes"):
+            setattr(self, key, getattr(self.tasks["UT"], key))
+
+    def forward(self, inputs, task_features=None, node_masks=None):
+        return {m: stage(inputs, task_features, node_masks)[m] for m, stage in self.tasks.items()}
+
+    def get_config(self):
+        config = self.tasks["UT"].get_config()
+        config.pop("modes")
+        return dict(config, independent_tasks=True)
+
+
+def _task_stage(config):
+    config = dict(config)
+    independent = config.pop("independent_tasks", False)
+    return (IndependentTaskTransformers if independent else DualTaskTransformer)(**config)
 
 
 class DualStageTransformer(nn.Module):
@@ -1142,7 +1172,9 @@ class DualStageTransformer(nn.Module):
             field_kwargs["local_graph"] = dict(coords=coords, edges={
                 mode: reference_field_edges(coords, mode, data.node_masks[mode]) for mode in DUAL_MODES
             }, geometry_mean=data.normalizers["geometry"]["mean"], geometry_scale=data.normalizers["geometry"]["scale"])
-        field_model = DualTaskTransformer(
+        field_class = IndependentTaskTransformers if field_kwargs.pop("independent_tasks", False) else DualTaskTransformer
+        curve_class = IndependentTaskTransformers if curve_kwargs.pop("independent_tasks", False) else DualTaskTransformer
+        field_model = field_class(
             in_size=data.geometry_feature_size,
             out_size=data.field_feature_sizes,
             seq_len=data.n_nodes,
@@ -1150,7 +1182,7 @@ class DualStageTransformer(nn.Module):
             pool="node",
             **field_kwargs,
         )
-        curve_model = DualTaskTransformer(
+        curve_model = curve_class(
             in_size=data.field_feature_sizes,
             out_size=data.curve_sizes,
             seq_len=data.n_nodes,
@@ -1183,8 +1215,8 @@ class DualStageTransformer(nn.Module):
     @classmethod
     def from_config(cls, config):
         return cls(
-            DualTaskTransformer(**dict(config["field_model"])),
-            DualTaskTransformer(**dict(config["curve_model"])),
+            _task_stage(config["field_model"]),
+            _task_stage(config["curve_model"]),
             detach_fields=config.get("detach_fields", False),
         )
 
@@ -1390,6 +1422,8 @@ class DUAL_MODEL:
 
     def _run_loader(self, loader, training):
         self.model.train(training)
+        for module in getattr(self, "frozen_modules", ()):
+            module.eval()
         if self.curve_only_source is not None:
             self.model.field_model.eval()  # frozen dropout must not change the input distribution
         totals = {}
@@ -1504,7 +1538,7 @@ class DUAL_MODEL:
             return self.model(batch["geometry"], batch["task_features"], batch["node_mask"])
         with torch.no_grad():
             fields = self.model.field_model(batch["geometry"], batch["task_features"], batch["node_mask"])
-        inputs = batch["field"] if self.curve_only_source == "true" else fields
+        inputs = batch["field"] if self.curve_only_source == "true" else batch.get("curve_input", fields)
         curves = self.model.curve_model(inputs, batch["task_features"], batch["node_mask"])
         # Field artifacts always remain the frozen field stage's predictions,
         # never a misleading perfect-field score for the true-input oracle.

@@ -13,10 +13,35 @@ def main():
     parser.add_argument("--curve-loss-suite", action="store_true",
                         help="Gate only baseline plus the four frozen-source corrected-loss fits.")
     parser.add_argument("--sudden-suite", action="store_true", help="Gate baseline and specimen-specific sudden weighting only.")
+    parser.add_argument("--independence-suite", action="store_true", help="Gate two OOF field banks and all eight sharing cases.")
     args = parser.parse_args()
-    if args.sudden_suite and args.curve_loss_suite:
+    if sum((args.sudden_suite, args.curve_loss_suite, args.independence_suite)) > 1:
         parser.error("Choose one isolated suite.")
     runner = runpy.run_path(str(Path(__file__).with_name("A0-HPC-Dual-test.py")))["main"]
+    if args.independence_suite:
+        from resources.MLindependence import CASES
+        banks = {}
+        common = ["--experiment", "baseline", "--base-model-json", args.base_model_json,
+                  "--nsims", "64", "--no-range-split", "--epochs", "1", "--seed", "42", "--split-seed", "42"]
+        for case in ("1i", "3i"):
+            model = runner(common + ["--independence-case", case, "--prepare-field-bank",
+                                    "--run-label", f"{args.run_label}-bank-{case}"])
+            banks[case] = str(Path(model.model_file).parent)
+            del model
+            gc.collect()
+            import torch
+            torch.cuda.empty_cache()
+        for case, (independent, _, joint) in CASES.items():
+            options = [] if joint else ["--field-bank", banks["1i" if independent else "3i"]]
+            model = runner(common + ["--independence-case", case, "--run-label", f"{args.run_label}-{case}p"] + options)
+            # The saved descriptor must reload through the maintained review path.
+            from resources.MLmetrics import postprocess_load_dual_run
+            loaded = postprocess_load_dual_run(Path(model.model_file).parent, load_model=True,
+                                               data=model.data, device="cpu")
+            del loaded, model
+            gc.collect(); torch.cuda.empty_cache()
+        print("Eight-case GPU gate passed; successful B1 archiving is still required.", flush=True)
+        return
     variants = ("baseline", "partial", "private", "crack_face", "local_graph", "residual",
                 "late_frame", "ft_region", "true_field", "detach",
                 "winner_probe", "curve_predicted", "curve_true")

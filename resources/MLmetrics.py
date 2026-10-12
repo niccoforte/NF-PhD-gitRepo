@@ -4583,11 +4583,14 @@ def plot_dual_loss_history(history, kind=None, best_epoch=None, weighted=True):
     group = "weighted" if weighted else "raw"
     for ax, term in zip(axes[0], [None] + terms):
         suffix = "loss" if term is None else f"{group}_{term[0]}_{term[1]}"
-        for split in ("train", "val"):
-            column = f"{split}_{suffix}"
-            if column in history:
-                ax.plot(history["epoch"], history[column].where(history[column] > 0), label=split)
-        ax.set(title="Joint objective" if term is None else f"{term[1]} {term[0]} ({group})",
+        histories = history.groupby("training_group", sort=False) if "training_group" in history else [(None, history)]
+        for training_group, rows in histories:
+            for split in ("train", "val"):
+                column = f"{split}_{suffix}"
+                if column in rows:
+                    ax.plot(rows["epoch"], rows[column].where(rows[column] > 0),
+                            label=f"{training_group}: {split}" if training_group else split)
+        ax.set(title=("Per-fit objective" if "training_group" in history else "Joint objective") if term is None else f"{term[1]} {term[0]} ({group})",
                xlabel="Epoch", ylabel="Loss", yscale="log")
         if best_epoch is not None:
             ax.axvline(best_epoch, color="grey", ls="--", label="Saved best epoch")

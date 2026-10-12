@@ -17,6 +17,10 @@ def parse_args(argv=None):
     parser.add_argument("--task", default="MULTI", choices=["MULTI"])
     parser.add_argument("--model-type", default="TR", choices=["TR", "Transformer"])
     parser.add_argument("--run-label", default="")
+    parser.add_argument("--independence-case", choices=["1i", "1ii", "2ai", "2aii", "2bi", "2bii", "3i", "3ii"])
+    parser.add_argument("--prepare-field-bank", action="store_true", help="Cross-fit training fields and fit final field generators; no curve accuracy claim.")
+    parser.add_argument("--field-bank", help="Archived field-bank directory, required for stage-separated cases.")
+    parser.add_argument("--oof-folds", type=int, default=3)
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
     parser.add_argument("--run-root", default=os.environ.get("ML_RUN_ROOT"), help="Override the output root; B1 sets ML_RUN_ROOT.")
     parser.add_argument("--nsims", default="all", help="Full paired data by default; an integer limits debug runs.")
@@ -93,7 +97,7 @@ def parse_args(argv=None):
         defaults = {}
         for stage in ("field", "curve"):
             cfg = descriptor["model_config"][f"{stage}_model"]
-            if cfg.get("private_layers", 0) or cfg.get("local_graph"):
+            if cfg.get("private_layers", 0) or cfg.get("local_graph") or cfg.get("independent_tasks"):
                 parser.error("The experiment anchor must be a fully shared, non-graph baseline.")
             for key in ("d_model", "n_heads", "n_layers", "ff_mult", "dropout", "head_dropout", "attention_dropout", "head_hidden_mult", "activation", "norm_first"):
                 if key in cfg: defaults[f"{stage}_{key}"] = cfg[key]
@@ -116,6 +120,22 @@ def parse_args(argv=None):
         # Loss modules themselves are restored below; their full definitions are not guessed from CLI names.
         parser.set_defaults(**defaults)
     args = parser.parse_args(argv)
+    if args.independence_case:
+        if args.experiment != "baseline" or args.eval_split != "val" or args.curve_loss_ablation or args.field_loss_variant:
+            parser.error("Independence comparison requires --experiment baseline and validation; isolate all loss/feature changes.")
+        staged = args.independence_case in ("1i", "2ai", "2bi", "3i")
+        if args.prepare_field_bank and args.independence_case not in ("1i", "3i"):
+            parser.error("Prepare one independent (1i) or shared (3i) field bank per seed.")
+        if bool(args.field_bank) != (staged and not args.prepare_field_bank):
+            parser.error("Only stage-separated case fits require --field-bank; joint cases/bank creation do not.")
+        if args.oof_folds < 2:
+            parser.error("Cross-fitting requires at least two folds.")
+        args.loss = "mse"
+        for kind in ("field", "curve"):
+            for mode in ("ut", "ft"):
+                setattr(args, f"{kind}_{mode}_weight", 1.)
+    elif args.prepare_field_bank or args.field_bank:
+        parser.error("Field banks require --independence-case.")
     if args.curve_loss_ablation:
         if args.experiment not in ("baseline", "curve_true", "curve_predicted"):
             parser.error("Curve-loss ablations require baseline, curve_true or curve_predicted; isolate other changes.")
@@ -220,6 +240,8 @@ def main(argv=None, preset=None):
         },
     }
     metadata_path = run_dir / "run_metadata.json"
+    if args.base_model_json:
+        metadata["anchor_sha256"] = hashlib.sha256(Path(args.base_model_json).read_bytes()).hexdigest()
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     if os.environ.get("ML_RUN_METADATA"):
         external = Path(os.environ["ML_RUN_METADATA"])
@@ -239,6 +261,10 @@ def main(argv=None, preset=None):
         },
     )
     split_sizes = {split: len(ds) for split, ds in data.datasets.items()}
+    if args.independence_case and args.base_model_json and args.nsims is None:
+        anchor_data = json.loads(Path(args.base_model_json).read_text())["data"]
+        if {s: list(map(str, v)) for s, v in data.sample_ids.items()} != anchor_data["sample_ids"]:
+            raise ValueError("Full independence suite must retain the anchor's exact specimen split.")
     if any(size == 0 for size in split_sizes.values()):
         raise ValueError(f"All paired splits must be nonempty: {split_sizes}. Increase --nsims or use --no-range-split for a debug subset.")
     data.to_json(run_dir / "model_data.json")
@@ -257,11 +283,23 @@ def main(argv=None, preset=None):
         for stage in ("field", "curve")
     }
     stage_config["curve"].update(pool=args.curve_pool, use_cls_token=args.curve_cls_token)
+    if args.independence_case:
+        from resources.MLindependence import CASES
+        independent_field, independent_curve, _ = CASES[args.independence_case]
+        stage_config["field"]["independent_tasks"] = independent_field
+        stage_config["curve"]["independent_tasks"] = independent_curve
     stage_config["field"].update(private_layers=args.field_n_layers if args.experiment == "private" else
                                   args.private_layers if args.experiment == "partial" else 0,
                                   local_graph=args.experiment == "local_graph")
     network = DualStageTransformer.from_data(data, field_kwargs=stage_config["field"], curve_kwargs=stage_config["curve"],
                                              detach_fields=args.experiment == "detach")
+    if args.independence_case:
+        from resources.MLdual import _task_stage
+        # Curve initialization must not depend on whether one or two field
+        # encoders happened to consume random numbers before its construction.
+        with torch.random.fork_rng():
+            torch.manual_seed(args.seed + 1000)
+            network.curve_model = _task_stage(network.curve_model.get_config())
     source_model = None
     if args.source_model_json:
         from resources.MLmetrics import postprocess_load_dual_run
@@ -298,7 +336,7 @@ def main(argv=None, preset=None):
         curve_loss=curve_losses, weights=weights,
         curve_normalizers=data.normalizers["curve"] if args.loss == "combined" else None,
     )
-    if args.base_model_json:
+    if args.base_model_json and not args.independence_case:
         from resources.MLmodels import _model_build_loss_from_config
         saved_loss = json.loads(Path(args.base_model_json).read_text())["loss_config"]
         physical_curves = (args.loss == "combined" if args.curve_loss_ablation
@@ -363,7 +401,11 @@ def main(argv=None, preset=None):
                                                if args.experiment != "winner_probe" else 0 for s in ("field", "curve")}
     print(f"Parameters: {sum(p.numel() for p in network.parameters()):,}; active loss weights: {model.lossf.weights}", flush=True)
     started = time.monotonic()
-    if args.experiment == "winner_probe":
+    if args.independence_case:
+        from resources.MLindependence import prepare_bank, train_case
+        operation = prepare_bank if args.prepare_field_bank else train_case
+        operation(model, args.independence_case, args, run_dir, metadata)
+    elif args.experiment == "winner_probe":
         model.best_epoch, model.best_loss = source_model.best_epoch, source_model.best_loss
         model.history = source_model.history
     else:
@@ -373,6 +415,11 @@ def main(argv=None, preset=None):
         )
     metadata["training_seconds"] = time.monotonic() - started
     checkpoint = model.save(run_dir, metadata=metadata)
+    if args.prepare_field_bank:
+        metadata.update(status="complete", checkpoint=checkpoint, results_dir=None,
+                        note="Field bank only; curve stage is untrained. No curve results exported.")
+        metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+        return model
     results = model.save_results(eval_split=args.eval_split, run_config=vars(args), metadata=metadata)
     if args.field_loss_variant or args.experiment:
         from resources.MLmetrics import save_field_motion_diagnostics
