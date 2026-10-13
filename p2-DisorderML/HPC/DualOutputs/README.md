@@ -2,8 +2,13 @@
 
 ## Eight-case independence comparison (12 October)
 
-Prepared locally; **not submitted or GPU-validated**. User will reopen SSH when
-ready. These names supersede the older case numbering in historical notes.
+Submitted on13 October as `independence-261013`, immutable source `ec9189d`.
+GPU gate **31417279** started on `sbg16`; six banks and24 case fits **31417280–31417309**
+are dependency-gated. Submission is not GPU validation or accuracy evidence.
+Manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013/jobs.tsv`.
+Archives will be under `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/`
+with labels `independence-261013-<case>p-s<seed>` and matching `bank-1i|3i` labels.
+These names supersede the older case numbering in historical notes.
 `F` means geometry→field; `C` means field→curve; `(i)` freezes the completed field
 fit before curve training; `(ii)` retains end-to-end field+curve supervision.
 
@@ -45,6 +50,13 @@ saves true-field **substitution** diagnostics; these are not trained true-field
 oracles. Existing oracle studies remain separate source evidence. Auxiliary
 true-field supervision and a residual field corrector are deferred until after
 the architecture decision, as are all feature/loss ablations.
+
+High-priority follow-ups after the sharing decision: compare custom field/curve
+losses against MSE, and curve training on predicted-only, true-only and both field
+sources. Evaluate ALL source variants on predicted fields; additional true-field
+diagnostics are not deployment results. True-only training does not propagate
+curve gradients into the field generator. MSE here is a common control, not a
+conclusion that custom losses are inferior.
 
 ### Fixed comparison configuration
 
@@ -98,9 +110,9 @@ Grouped history plots label independent fits and retain log scales.
 
 ```bash
 # Non-submitting preview; run from the clean HPC checkout when authorised.
-bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh independence-261012
+bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh NEW-UNUSED-LABEL
 # Once authorised and synchronized:
-bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh independence-261012 --submit
+bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh NEW-UNUSED-LABEL --submit
 ```
 
 One 8h GPU gate exercises two small banks and all eight cases, including checkpoint

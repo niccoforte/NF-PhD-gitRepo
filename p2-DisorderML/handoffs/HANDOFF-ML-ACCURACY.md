@@ -18,7 +18,8 @@ RMSE non-inferiority margin on BOTH tasks, with local-motion and curve safeguard
 their numerical tolerances still need specifying before final model selection.
 The user confirmed the following revised numbering. Local implementation is now
 in `resources/MLindependence.py`, the existing dual runner/preflight and
-`HPC/DualOutputs/B4_Dual-independence.sh`. It is not submitted or GPU-validated.
+`HPC/DualOutputs/B4_Dual-independence.sh`. Submitted13 October: gate31417279,
+banks/cases31417280–31417309, sourceec9189d; GPU validation remains pending.
 The adjacent run README owns exact settings, bank provenance and invocation:
 
 | Case | Separate training groups | Gradient boundary |
@@ -87,13 +88,19 @@ curve adaptation separately. Out-of-fold generators/scalers must not train on
 their held-out specimens; final validation/test are never corrector training data.
 No guarantee that missing fracture information can be reconstructed.
 
-The user-supplied retirement briefs from **Assess unified ML model feasibility**,
-**Summarize GNN chat changes**, and **Review cleanup folder** are incorporated;
-those chats may be archived for the transferred scope. This does not certify a
-separate audit of their full histories. A full-history review was requested on
-12 October: none of the three titles is in accessible active/archived listings or
-shared handoff exports; the QM task database is unavailable. Asked the user for
-IDs/links/exports. Do not claim this requested review complete. No old code/notebooks need resurrecting.
+Full available user/assistant histories of **Assess unified ML model feasibility**
+(`019efa77-a47f-7693-9e6e-f606f5fc784f`), **Summarize GNN chat changes**
+(`019daade-2de6-7391-abc3-3595077a4296`) and **Review cleanup folder**
+(`019e22ce-8242-7570-a6ed-0a77fef97948`) were read on13 October through the
+reconnected PC. All three may now be archived; nothing was automatically archived.
+No additional experiment is needed from those histories: staged pretraining,
+curriculum, topology attention and conditional output compression are covered below.
+Load-conditioned decoding is already deferred later in this brief. The existing
+CurveOutputs “Cleanup Ideas To Preserve” section retains uncertainty, Deep Ritz
+and generative ideas; do not duplicate or activate them. The old RNN/GraphGPS/AE
+notebook plans and obsolete wiring fixes do not become new work. Current DATA's
+autoencoder reducer still returns None; no integrated reducer support is claimed.
+No old code/notebooks need resurrecting.
 Retain only these conditional alternatives, with no implementation/job authority:
 
 - Separate field and true-field-curve pretraining followed by supervised joint
