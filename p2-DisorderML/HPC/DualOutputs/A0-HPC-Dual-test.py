@@ -263,7 +263,9 @@ def main(argv=None, preset=None):
     split_sizes = {split: len(ds) for split, ds in data.datasets.items()}
     if args.independence_case and args.base_model_json and args.nsims is None:
         anchor_data = json.loads(Path(args.base_model_json).read_text())["data"]
-        if {s: list(map(str, v)) for s, v in data.sample_ids.items()} != anchor_data["sample_ids"]:
+        if {s: list(map(str, v)) for s, v in data.sample_ids.items()} != {
+            s: list(map(str, v)) for s, v in anchor_data["sample_ids"].items()
+        }:
             raise ValueError("Full independence suite must retain the anchor's exact specimen split.")
     if any(size == 0 for size in split_sizes.values()):
         raise ValueError(f"All paired splits must be nonempty: {split_sizes}. Increase --nsims or use --no-range-split for a debug subset.")

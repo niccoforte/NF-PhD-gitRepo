@@ -20,6 +20,15 @@ def main():
     runner = runpy.run_path(str(Path(__file__).with_name("A0-HPC-Dual-test.py")))["main"]
     if args.independence_suite:
         from resources.MLindependence import CASES
+        # The subset gate cannot exercise full-population split validation.
+        model = runner(["--experiment", "baseline", "--base-model-json", args.base_model_json,
+                        "--independence-case", "3ii", "--epochs", "1",
+                        "--seed", "42", "--split-seed", "42",
+                        "--run-label", f"{args.run_label}-full-split"])
+        del model
+        gc.collect()
+        import torch
+        torch.cuda.empty_cache()
         banks = {}
         common = ["--experiment", "baseline", "--base-model-json", args.base_model_json,
                   "--nsims", "64", "--no-range-split", "--epochs", "1", "--seed", "42", "--split-seed", "42"]

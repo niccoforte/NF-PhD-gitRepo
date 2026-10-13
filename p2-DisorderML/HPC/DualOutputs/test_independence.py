@@ -1,5 +1,6 @@
 """CPU isolation, cross-fitting and checkpoint contracts for the eight cases."""
 import json
+import ast
 from pathlib import Path
 import runpy
 import tempfile
@@ -49,6 +50,21 @@ def arguments():
 
 
 class IndependenceTests(unittest.TestCase):
+    def test_full_split_check_normalizes_both_sides_without_ignoring_order(self):
+        # Exercise the actual production guard without loading the full dataset.
+        tree = ast.parse(Path(__file__).with_name("A0-HPC-Dual-test.py").read_text())
+        guard = next(node for node in ast.walk(tree) if isinstance(node, ast.If)
+                     and "anchor_data['sample_ids']" in ast.unparse(node.test))
+        code = compile(ast.Expression(guard.test), "split_guard", "eval")
+        anchor = {"train": [1, 2], "val": [3], "test": [4]}
+        def mismatch(ids):
+            return eval(code, {"data": SimpleNamespace(sample_ids=ids),
+                               "anchor_data": {"sample_ids": anchor}})
+        self.assertFalse(mismatch({s: list(map(str, v)) for s, v in anchor.items()}))
+        self.assertTrue(mismatch(dict(anchor, train=[2, 1])))
+        self.assertTrue(mismatch(dict(anchor, val=[5])))
+        self.assertTrue(mismatch(dict(anchor, train=[1])))
+
     @classmethod
     def setUpClass(cls):
         torch.set_num_threads(1)

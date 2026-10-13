@@ -2,6 +2,16 @@
 
 ## Eight-case independence comparison (12 October)
 
+Recovery: the original gate31417279 completed, but18 full jobs failed before
+training because the split guard compared string IDs with integer IDs. The
+remaining12 staged jobs never started. The guard now normalizes both sides while
+preserving exact membership and order. A regression test covers representation,
+ordering and membership; the GPU gate now also runs one full-data epoch before
+its subset cases, exercising the formerly skipped production check. User approved
+cleanup of the failed scratch copies, metadata-only archives and home logs;
+successful preflight artifacts and the original source/manifest remain evidence.
+The replacement suite uses a fresh label `independence-261013-r1`.
+
 Submitted on13 October as `independence-261013`, immutable source `ec9189d`.
 GPU gate **31417279** started on `sbg16`; six banks and24 case fits **31417280–31417309**
 are dependency-gated. Submission is not GPU validation or accuracy evidence.
