@@ -56,6 +56,18 @@ use the matched population/configuration. Detachment is covered by staged versus
 end-to-end controls; an online stop-gradient fit is optional only if scheduling
 needs separating from gradient effects. Do not combine all changes at once.
 
+**13 October priority clarification:** equal normalized MSE is an architecture
+control, not a verdict against custom losses. After selecting the sharing setup,
+prioritise matched MSE versus spatial/temporal field and corrected curve-loss
+comparisons, reporting local-motion and peak/work metrics alongside global error.
+Also prioritise three curve-training sources: predicted only, true only, and both.
+All three must be evaluated on predicted fields for the deployment comparison;
+true-field evaluation is an additional oracle diagnostic only. Use training-only
+cross-fitted predictions where a frozen upstream model supplies training inputs.
+True-only curve training cannot send gradients to the field generator; explicitly
+separate that source comparison from claims about end-to-end architecture.
+These follow-ups are deferred until the sharing verdict, not added to this suite.
+
 Correction to the earlier verdict: fixed FT crack-tip-box weighting is a valid,
 user-approved physical region priority, not leakage/cheating or a rejected idea.
 Keep outside-region supervision and whole-field/inside/outside reporting. Dynamic
