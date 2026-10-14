@@ -14,6 +14,16 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 
 ## Durable Guardrails
 
+- Preflights are disposable execution tests: B1 recognizes `preflight` in the
+  script/job/run label, skips archive copies and retains only the successful home
+  log; successful scratch is deleted. Never use these test outputs as production
+  dependencies. Full-data field banks are production artifacts, not preflights.
+- Failed scratch/logs are temporary troubleshooting evidence. Once diagnosis is
+  recorded and correction is in place, cleanup is HIGH PRIORITY: confirm terminal
+  jobs and exact paths, preserve useful resumable production results, then remove
+  failed scratch, home logs and useless failed archive outputs. Never delete active
+  jobs or unidentified data. Keep successful home preflight logs, not archive copies.
+
 - Active entry points are production-oriented: full data and realistic training budgets by default. Small datasets, short epochs/trials, and CPU execution must be explicit debug overrides.
 - Do not change Slurm partition, account, license, CPU, memory, or time policy without the user's target cluster policy.
 - Preserve explicit scratch cleanup guards and verify every archive, resume, transfer, or cleanup target before use.

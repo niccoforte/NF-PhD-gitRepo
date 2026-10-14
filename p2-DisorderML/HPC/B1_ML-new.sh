@@ -117,6 +117,12 @@ ARCHIVE_JOB_NAME=${SLURM_JOB_NAME:-$RUN_LABEL}
 ARCHIVE_ROOT=${ARCHIVE_ROOT%/}
 ML_JOB_NAME=${ML_JOB_NAME:-$ARCHIVE_JOB_NAME}
 
+# Preflights validate execution, not predictive accuracy: retain only the home log.
+preflight=false
+case "$ML_SCRIPT $ML_JOB_NAME $RUN_LABEL" in
+    *preflight*) preflight=true ;;
+esac
+
 if [[ "$ML_SCRIPT" = /* ]]; then
     SCRIPT_SRC=$ML_SCRIPT
 elif [[ "$ML_SCRIPT" == */* ]]; then
@@ -217,6 +223,9 @@ finish() {
     local status=$?
     set +e
 
+    if [ "$preflight" = true ]; then
+        /bin/echo "Preflight finished with status $status at: $(date); no archive outputs. Home log is the execution record."
+    else
     /bin/echo "Archiving outputs at: $(date)"
     if ! sync_run_outputs; then
         /bin/echo "ERROR: Archive copy failed; preserving scratch."
@@ -233,6 +242,7 @@ finish() {
     if ! sync_job_log_to_archive_roots; then
         /bin/echo "ERROR: Log copy failed; preserving scratch."
         status=1
+    fi
     fi
 
     if [ "$status" -eq 0 ] && [ "$delete_scratch" = true ]; then

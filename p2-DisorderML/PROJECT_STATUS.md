@@ -4,6 +4,13 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- 14 October retention cleanup: all56 preflight archive directories from nine
+  COMPLETED0:0 jobs removed permanently; successful home logs retained. Failed
+  original independence scratch/archive/home logs were already removed (54 paths).
+  Replacement gate31448215 passed; full jobs are running/queued, not deleted or
+  resubmitted. B1 now skips preflight archiving and removes successful scratch;
+  failed evidence cleanup after correction is a high-priority HPC instruction.
+
 - Recovery13 October: original gate31417279 COMPLETED0:0; all18 started full jobs
   FAILED1:0 before training at the string-versus-integer split-ID comparison.
   Twelve dependent staged jobs never started; queue empty before cleanup.
@@ -12,7 +19,10 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   User-authorized cleanup removed18 failed scratch directories,18 metadata-only
   archives and18 home logs (54 paths); no checkpoints/predictions existed there.
   Raw failed files are permanently removed; successful preflight, source/manifest
-  and concise failure evidence remain. Fresh replacement label independence-261013-r1.
+  and concise failure evidence remain. Replacement independence-261013-r1 submitted
+  from6b0db82: gate31448215; six banks/24 cases31448216–31448245 dependency-gated.
+  Full requests remain240h/1GPU/12CPU/90000MB. Eight focused tests passed;
+  base-ref changed validation10 non-failing/zero failed. GPU gate not yet passed.
 
 - 13 October: submitted the eight-case suite `independence-261013` from immutable `ec9189d` after clean HPC fast-forward, both Git-host pushes and Slurm resource dry-run. Gate31417279 requests8h and is RUNNING on sbg16; six OOF banks and24 case fits31417280–31417309 each request240h, 1GPU/12CPU/90000MB on andrena/pilot_andrena and remain PENDING Dependency. Python has launched; this is not a passed GPU gate or accuracy evidence. Home manifest `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013/jobs.tsv`; archives under `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/` with the suite prefix. Do not resubmit. Temporary transport bundle removed after verified deployment; source/history remain in Git and immutable job snapshot. Shared SSH master remains open; no model/scientific changes in this deployment.
 - Verification for the independence preparation: 48 dual regression tests passed (including seven isolation/OOF/checkpoint/launcher tests); changed-surface22 and contract76 non-failing/zero failed. Existing notebook, `.gitignore` and field-test edits remain untouched. Names1(i),1(ii),2a(i),2a(ii),2b(i),2b(ii),3(i),3(ii) use predicted-field deployment, seeds42/43/44, matched configuration and equal normalized MSE. Staged cases reuse three-fold training-only OOF banks with inner selection and fold-only normalization. High-priority AFTER sharing selection: matched custom-loss comparisons and predicted-only/true-only/mixed curve training, ALL evaluated on predicted fields. True-only training removes the curve-to-field gradient. Gradient logging, other features/weights and correction remain deferred. The2% field margin is accepted; numerical curve/local safeguards remain to agree before final selection.

@@ -1,5 +1,16 @@
 # Joint UT/FT runs
 
+## Preflight retention
+
+Preflights retain only successful logs in the home submission directory. B1
+recognizes `preflight` in script/job/run labels, skips archive copies, and removes
+scratch on success. They still test training, saving and reload within scratch.
+Failure preserves scratch temporarily for diagnosis; cleanup of failed logs,
+scratch and useless archives is high priority once corrected. Production banks,
+trained checkpoints and active jobs must not be mistaken for disposable tests.
+On14 October56 preflight archive directories from nine completed jobs were removed;
+their successful home logs remain. Existing immutable submissions are not edited.
+
 ## Eight-case independence comparison (12 October)
 
 Recovery: the original gate31417279 completed, but18 full jobs failed before
@@ -10,11 +21,14 @@ ordering and membership; the GPU gate now also runs one full-data epoch before
 its subset cases, exercising the formerly skipped production check. User approved
 cleanup of the failed scratch copies, metadata-only archives and home logs;
 successful preflight artifacts and the original source/manifest remain evidence.
-The replacement suite uses a fresh label `independence-261013-r1`.
+Replacement `independence-261013-r1` submitted from `6b0db82`: gate31448215,
+six banks and24 cases31448216–31448245, all full jobs240h and dependency-gated.
+Manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013-r1/jobs.tsv`.
+Eight focused tests pass; replacement GPU gate remains unconfirmed.
 
 Submitted on13 October as `independence-261013`, immutable source `ec9189d`.
-GPU gate **31417279** started on `sbg16`; six banks and24 case fits **31417280–31417309**
-are dependency-gated. Submission is not GPU validation or accuracy evidence.
+Original GPU gate **31417279** completed on `sbg16`; the full jobs failed as
+described above. Use the replacement manifest, not these historical IDs.
 Manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013/jobs.tsv`.
 Archives will be under `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/`
 with labels `independence-261013-<case>p-s<seed>` and matching `bank-1i|3i` labels.
