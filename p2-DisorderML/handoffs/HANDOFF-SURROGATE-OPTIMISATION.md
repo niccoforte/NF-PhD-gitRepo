@@ -17,6 +17,11 @@ branches; FT has absent-node masks. Preserve the working independent DATA/MODEL
 fallback. Existing checkpoints and the four-output training contract are not to
 be changed by this task. Optimisation should consume a frozen, validated model.
 
+The eight-case independent-versus-shared comparison is now running; no architecture
+has been selected. Do not assume DUAL will remain the deployment model. Objective
+and known-FEA validation work can proceed now; consume the selected architecture
+through its saved prediction contract later, without requiring shared encoders.
+
 Accuracy is not yet established for design search: the final dual HPO winner46
 improved validation RMSE over the train-mean predictor by about 4.20% UT field,
 16.55% FT field, 4.06% UT curve and 12.14% FT curve. These are reconstruction
@@ -84,9 +89,11 @@ of optimisation benefit; these are later approval gates, not automatic launches.
 Field motion/gradients are not damage; actual strut labels belong to the separate
 Damage variable processing task and must be validated before use.
 
-Accuracy has submitted the true-field-to-property oracle probe for archived
-UT Strength/Ductility/WoF and FT K_JIC, joined by specimen ID. Consult current
-PROJECT_STATUS for completion/results rather than assuming predictive success.
+The true-field-to-property oracle probe completed on793 validation specimens.
+RMSE reductions versus the training-mean predictor were34.16% UT Strength,
+51.09% Ductility,80.64% WoF and73.49% FT K_JIC. Evidence and figures:
+`samples/accuracy-continuation/field-to-property.md`. These are single-run
+true-field diagnostics, not a validated predicted-field property model.
 It is not a disorder-only surrogate: predicted-field inference is a separate
 distribution and requires evaluation before design use. Candidate field objectives
 include delayed strong localization, broad participation before localization and

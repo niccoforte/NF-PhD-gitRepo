@@ -18,9 +18,14 @@ label any target-derived loss a PINN merely because it uses derivatives.
 
 Current spatial and temporal losses match signed displacement differences to
 truth after differentiable inverse normalization. They remain active options.
-The proposed sudden-motion weights combine changes in temporal increments and
+The opt-in, CPU-tested sudden-motion weights combine changes in temporal increments and
 local non-affine motion, not displacement magnitude or an assumed crack path.
 They are kinematic proxies, not verified damage labels. Do not duplicate that work.
+They have not established a real-data accuracy improvement. Worked real-field
+maps are in `samples/accuracy-continuation/dynamic-weights-8701/README.md`;
+these are target-derived illustrations, not trained-model results. Accuracy owns
+winner-based loss trials after the ongoing sharing comparison. This task can
+audit true-field mechanics now without modifying those experiments.
 
 ## First test: displacement-derived finite strain
 

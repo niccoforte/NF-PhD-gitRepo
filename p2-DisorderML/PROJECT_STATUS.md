@@ -4,6 +4,11 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Handoff freshness review: optimisation now records the completed property-oracle
+  evidence and architecture-neutral boundary while sharing selection is pending;
+  physics/strain distinguishes implemented CPU-tested sudden weights from unproven
+  accuracy benefit. Damage and Tokenisation need no additional scope or changes.
+
 - 14 October retention cleanup: all56 preflight archive directories from nine
   COMPLETED0:0 jobs removed permanently; successful home logs retained. Failed
   original independence scratch/archive/home logs were already removed (54 paths).
