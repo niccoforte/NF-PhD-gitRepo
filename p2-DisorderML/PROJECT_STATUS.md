@@ -14,21 +14,28 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   fixed curve readouts and source substitutions diagnose adaptation separately.
   Both use the existing trainer/runner, matched splits/seeds42/43/44, max450 epochs,
   early-stop52, disposable8h preflights and240h full resource requests. Preview-first
-  `HPC/DualOutputs/B4_Independent-followups.sh`; no new jobs submitted yet.
+  `HPC/DualOutputs/B4_Independent-followups.sh`; input submission now authorised,
+  custom-loss submission ON HOLD until input-study review. True-trained curves
+  also export held-out true-field evaluations; the gate now checks that artifact.
   **HIGH PRIORITY manual task:** researcher personally reviews HPC home, scratch
   and archive ordering/names/conventions; recorded under Cleanup in the active
   accuracy checklist. This manual review is not marked completed by agent checks.
-  Seven new CPU follow-up tests pass, including complete nested-source fits,
+  Eight CPU follow-up tests pass, including platform-specific notebook paths,
+  true-trained/true-field export agreement, complete nested-source fits,
   frozen-generator equality, saved correction reload, loss serialization and
   mocked15/30-job dependencies. Eight prior independence,14 field-loss and10 sudden
   tests pass. Changed-surface19 and contract80 checks non-failing/zero failed.
   The broader31-test dual suite has one skipped
   test and one Windows SQLite temporary-file cleanup error in the unchanged HPO
   test (its training/resume assertions pass); no HPO implementation changed.
+  Windows raw runs have been relocated by the researcher to `Z:/p2`; the three
+  dual/HPO notebook configurations and operational guidance now use that root.
+  The fresh Outputs build/train/save/HPO-call regression passes. General visual
+  report guidance is in root AGENTS/README; existing reports stay in ignored samples.
 
 - Independence review: gate31448215 and all30 production jobs31448216–31448245
   COMPLETED0:0. All24 case fits/six banks downloaded to ignored
-  `Z:/00-PhD-gitRepo/data/MULTI/Dual/Transformer/`;591 JSON/NPZ/checkpoint/history
+  `Z:/p2/MULTI/Dual/Transformer/` after researcher relocation;591 JSON/NPZ/checkpoint/history
   files match remote SHA-256. Human report/figures: `samples/independence-review/`.
   All1356 files match remote sizes. All24 prediction arrays pass ID, train-scaler,
   mask/truth identity and independently recomputed physical-RMSE checks; frozen
@@ -164,7 +171,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Deployment on 10 September 2026
 
-- Full-data Trial 1, Slurm **26267130**, `dual-MULTI-trial1-260910`, completed successfully in 3 h 37 min. Downloaded to repo-root `data/`; the user renamed its local folder to `dual-MULTI-trial1`. Remote metadata retains the original dated name.
+- Full-data Trial 1, Slurm **26267130**, `dual-MULTI-trial1-260910`, completed successfully in 3 h 37 min. Mac download used ignored repo-root `data/`; the user renamed its local folder to `dual-MULTI-trial1`. Windows artifacts now belong in `Z:/p2/`. Remote metadata retains the original dated name.
 - Training implementation: Git `7da7e72`. Splits: 7,137 train / 793 validation / 881 locked test; 149 epochs logged, best checkpoint 74. Validation RMSE improvements over the training mean: UT field +5.47%, FT field -23.58%, UT curve +3.42%, FT curve +14.53%. See the dual HPC README for numerical context and limitations; raw weighted-loss sizes alone do not identify the weakest task.
 - Nine dual contract tests passed at deployment. Repository contract validation finished with 64 non-failing checks and zero failures. Both saved-run review notebooks executed successfully; generated figures remain in the downloaded smoke run's `results/postProcessing/` directory.
 

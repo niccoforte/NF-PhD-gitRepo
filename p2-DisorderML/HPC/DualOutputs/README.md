@@ -39,6 +39,12 @@ They do not interpolate physical histories or double updates. Curve checkpoints
 select using deployment-source validation RMSE. True-field evaluation of that
 checkpoint is diagnostic, not an independently true-validation-selected oracle.
 All actual deployment paths start from disorder and predicted fields.
+The true-trained curve fit is also evaluated on held-out TRUE fields, saved in
+`results/true_field_curves.npz` and per-task sample metric CSVs. This same-checkpoint
+diagnostic measures source mismatch; selection remains predicted-field validation,
+so it is not a separately true-validation-selected oracle. The preflight verifies
+that this export exists. The custom-loss study is prepared but on hold until the
+user reviews the input study; do not submit both together.
 
 Each seed first fits a correction bank. The two independent residual Transformers
 have width96/4heads/2layers, FF4, GELU, sinusoidal positions and dropout.05; output
@@ -122,7 +128,7 @@ six banks and24 cases31448216–31448245, all full jobs240h and dependency-gated
 Manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013-r1/jobs.tsv`.
 Gate31448215 and all30 production jobs31448216–31448245 are verified
 COMPLETED0:0. The24 case fits and six reusable field banks are downloaded under
-`Z:/00-PhD-gitRepo/data/MULTI/Dual/Transformer/`, retaining the archive labels.
+`Z:/p2/MULTI/Dual/Transformer/`, retaining the archive labels after user relocation.
 The human review is `../../samples/independence-review/README.md` relative to this
 directory. Generated data and samples remain ignored; source notebooks stay in code.
 
@@ -397,7 +403,7 @@ Property archive: `MULTI/FieldToProperty/Transformer/field-property-261004`
 (and `field-property-preflight-261004`). Joint archives:
 `MULTI/Dual/Transformer/dual-recovery-261004-residual` and
 `dual-recovery-261004-true_field`. Both are relative to the same p2 archive root
-and local repo-root `data/`. Read `samples/accuracy-continuation/README.md` for
+and Windows `Z:/p2/` (Mac may use ignored repo-root `data/`). Read `samples/accuracy-continuation/README.md` for
 the ten-run comparison and property/thickness reports; the debug gate is not an
 accuracy result. `true_field` adds auxiliary supervision, not oracle inference.
 

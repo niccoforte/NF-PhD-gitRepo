@@ -579,7 +579,7 @@ class DualMLTest(unittest.TestCase):
                     if code.startswith("%"):
                         continue
                     if index == 5:
-                        code = code.replace('RUN_ROOT = REPO / "data"', f'RUN_ROOT = Path({directory!r})')
+                        code = code.replace('RUN_ROOT = Path("Z:/p2") if os.name == "nt" else REPO / "data"', f'RUN_ROOT = Path({directory!r})')
                         code = code.replace('LOAD_MODEL = True', 'LOAD_MODEL = False').replace('LOAD_DATA = False', 'LOAD_DATA = True')
                         code = code.replace('DATA_ROOT = None', 'DATA_ROOT = Path("fixture")')
                     if index == 10:

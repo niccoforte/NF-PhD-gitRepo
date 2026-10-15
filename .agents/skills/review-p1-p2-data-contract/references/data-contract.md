@@ -67,6 +67,8 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 
 ## Saved-run boundary
 
+- Windows local RUN_ROOT is `Z:/p2`, not checkout `data/`; archive-relative paths and saved scientific metadata are unchanged. Mac retains its ignored checkout `data/` default. Update notebook configuration and operational report links after relocation; never bulk-rewrite original source provenance inside checkpoints.
+
 - Case1(i) follow-ups retain standard prediction keys. Version1 `correction_bank.json/npz` records nested TRAIN-only IDs, data/scaler fingerprint, seed and source-bank hash. `FieldCorrectionStage` saves `base_stage` plus `correction_stage` configs and reloads through `_task_stage`; old configs omit them. Standard results use raw/corrected predicted deployment fields; separate physical `*_source_curves`/`fixed_readout_curves` probes never replace them. Field-bank manifests additionally record active loss variant/coefficients; absent fields preserve old MSE banks. No p1/export/filter contract changes.
 - Frozen-source dual curve experiments record `training.curve_only_source` and
   restore it through the dual loader. Standard field arrays are still frozen

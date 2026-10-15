@@ -36,7 +36,7 @@ Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it re
 ## Data And Run Paths
 
 - Local ML-ready data used by current notebooks is generally under `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata`.
-- Local saved ML runs are generally under `Z:/p2`.
+- Windows saved ML runs are under `Z:/p2`, not the Git checkout's `data/`; preserve the archive-relative tree. Human comparison reports stay under ignored `samples/<suite>/`, following the root analysis-deliverable rule.
 - On the cluster, ML data and archives are currently routed through `/data/SEMS-TaoLab/Niccolo-Forte/p2`.
 - `DATA(path=1, ...)` resolves to the local Ti/FCC data tree. `DATA(path="HPC", ...)` resolves to the cluster p2 data root.
 - When passing a data override into post-processing, an `MLdata` folder path is normalized to its parent because `DATA` appends `MLdata`.

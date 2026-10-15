@@ -2,7 +2,7 @@
 
 This directory is the local notebook layer for p2 training, diagnostics, tokenization, and exploration. Read the called `resources/` helper before changing notebook behavior. For active priorities, target runs, evidence, and the next handoff task, read `../PROJECT_STATUS.md`.
 
-Dual notebooks default to the user's locally renamed `data/MULTI/Dual/Transformer/dual-MULTI-trial1`; retain the archived identity in metadata. Training/HPO are opt-in; saved results are not training data. Follow the root no-copy/data-folder rule. Never depend on ignored `samples/` code for execution or tests.
+Dual/HPO notebooks use `Z:/p2` on Windows and ignored repo-root `data/` on Mac. The dual default retains the user's local `MULTI/Dual/Transformer/dual-MULTI-trial1` label and archived identity in metadata. Training/HPO are opt-in; saved results are not training data. Follow the root no-copy rule; never depend on ignored `samples/` code for execution or tests.
 
 ## Notebook Roles
 

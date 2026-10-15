@@ -23,7 +23,7 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 ## Data And Path Conventions
 
 - Local p1 data is commonly rooted at `Z:/p1/data/Ti/...`.
-- Local p2 saved runs are commonly rooted at `Z:/p2`.
+- Windows p2 saved runs belong under `Z:/p2`, outside Git; preserve the archive-relative tree. Do not recreate repo-root `data/` on Windows. Mac `data/` remains an ignored, explicit local override.
 - QMUL HPC archive paths commonly use `/data/SEMS-TaoLab/Niccolo-Forte/...`; scratch paths may use `/gpfs/scratch/...`.
 - Generated Abaqus files, transfer CSVs/NPZs, MLdata products, model checkpoints, HPO databases, Slurm logs, and notebook output bulk are research artifacts. Do not delete, rename, or commit them unless the task explicitly asks for that.
 - `AGENTS.md` files and repo skills under `.agents/skills/` are tracked project infrastructure. Keep them synchronized with the implementation.
@@ -67,6 +67,10 @@ Use `validate-repo-change` to select proportionate checks, `review-p1-p2-data-co
 `.github/workflows/guidance-integrity.yml` runs the changed-surface validator on GitHub.com pushes and pull requests. Its job is skipped before runner allocation on the QMUL Enterprise mirror, whose runner-backed jobs are currently cancelled. Keep local validation authoritative when remote Actions are unavailable.
 
 Checkout and Python setup use Node 24-based v7 actions to avoid deprecated action runtimes.
+
+## Analysis Deliverables
+
+Default to one human-readable visual report per study/comparison under the paper's ignored `samples/<suite>/README.md`, with labelled figures, supporting tables and provenance alongside it. Lead with conclusions, controls, relative errors, uncertainty and limitations; explain each variant plainly. Link the report in chat. Keep raw runs in their data store and executable analysis in maintained code, not copied notebooks. This applies beyond HPC.
 
 ## Cleanup Constraint
 

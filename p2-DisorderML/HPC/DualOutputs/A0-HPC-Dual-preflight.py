@@ -29,6 +29,10 @@ def main():
             path = Path(model.model_file).parent
             from resources.MLmetrics import postprocess_load_dual_run
             postprocess_load_dual_run(path, load_model=True, data=model.data, device="cpu")
+            if "--prepare-field-bank" not in options:
+                true_curves = Path(model.results_dir)/"true_field_curves.npz"
+                if not true_curves.is_file():
+                    raise FileNotFoundError(f"Missing held-out true-field evaluation: {true_curves}")
             del model
             gc.collect()
             import torch

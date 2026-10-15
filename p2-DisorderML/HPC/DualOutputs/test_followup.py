@@ -8,6 +8,8 @@ import tempfile
 import unittest
 import os
 import subprocess
+import ast
+from types import SimpleNamespace
 
 import numpy as np
 import torch
@@ -38,6 +40,19 @@ class FollowupTests(unittest.TestCase):
         values=[float(ds[i%len(ds)]['curve_input']['UT'][0,0]) for i in range(100)]
         self.assertEqual(set(values),{0.,1.})
         self.assertTrue(30<sum(values)<70)
+
+    def test_notebook_artifact_roots_are_platform_specific(self):
+        notebooks=Path(__file__).resolve().parents[2]/'code'
+        for name in ('ML-DualOutputs.ipynb','ML-DualPostProcessing.ipynb','ML-HPOpostProcess.ipynb'):
+            nb=json.loads((notebooks/name).read_text(encoding='utf-8'))
+            code='\n'.join(''.join(c['source']) for c in nb['cells'] if c['cell_type']=='code')
+            tree=ast.parse('\n'.join(line for line in code.splitlines() if not line.startswith('%')))
+            node=next(n for n in tree.body if isinstance(n,ast.Assign) and any(
+                isinstance(t,ast.Name) and t.id=='RUN_ROOT' for t in n.targets))
+            expression=compile(ast.Expression(node.value),name,'eval')
+            for platform,expected in (('nt',Path('Z:/p2')),('posix',Path('fixture/data'))):
+                value=eval(expression,{'os':SimpleNamespace(name=platform),'Path':Path,'REPO':Path('fixture')})
+                self.assertEqual(value,expected)
 
     def test_identity_masks_independence_and_reload(self):
         data=fixture();a=self.args();model=model_for(data,'1i')
@@ -92,6 +107,20 @@ class FollowupTests(unittest.TestCase):
                 clone.load_state_dict(fit.model.state_dict(),strict=True)
                 self.assertTrue(Path(saved).exists())
                 self.assertTrue(np.isfinite(fit.predict('val')['prediction']['curve']['UT']).all())
+                if source=='true':
+                    # True-trained checkpoint: main results still deploy P;
+                    # the additional T evaluation bypasses the field generator.
+                    results=Path(fit.save_results(eval_split='val'))
+                    fit.save_true_field_curves(results,'val')
+                    with np.load(results/'true_field_curves.npz',allow_pickle=False) as exported:
+                        self.assertEqual(list(exported['sample_ids']),data.sample_ids['val'])
+                        fit.model.eval()
+                        batch=next(iter(fit.dataloaders['val']))
+                        with torch.no_grad():
+                            direct=fit.model.curve_model(batch['field'],batch['task_features'],batch['node_mask'])
+                        for mode in ('UT','FT'):
+                            expected=data.inverse_curve(mode,direct[mode].numpy())
+                            np.testing.assert_allclose(exported[mode+'_outputs'],expected,rtol=1e-6,atol=1e-6)
                 field=fit.model.field_model.base if source.startswith('corrected') else fit.model.field_model
                 raw=torch.load(bank/'model.mdl',weights_only=False)['model_state_dict']
                 for key,value in field.state_dict().items():

@@ -594,13 +594,34 @@ Common local paths:
 
 - p1 local data: `Z:/p1/data/Ti/...`
 - p2 local saved runs: `Z:/p2`
-- Current Windows independence-review artifacts use `Z:/00-PhD-gitRepo/data/`
-  with the remote relative tree preserved; readable figures/report are in
-  `p2-DisorderML/samples/independence-review/README.md`. Both remain ignored and
-  can be merged with the incoming Mac artifacts. PuTTY sharing transfers use
-  PSCP; the existing Windows B3 script retains its OpenSSH route/default.
+- Windows artifacts, including the relocated independence runs, use `Z:/p2/`
+  with the remote relative tree preserved, outside Git. Do not recreate the
+  checkout's `data/` there. Mac may retain its ignored repo-root `data/`.
+  Readable figures/report remain in ignored
+  `p2-DisorderML/samples/independence-review/README.md`. Merge incoming Mac
+  artifacts without overwriting unrelated content. PuTTY sharing transfers use
+  PSCP; Windows B3 already defaults to `Z:/p2` via its OpenSSH route.
 - p1 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`
 - p2 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p2`
+
+### Human-readable analysis reports
+
+For analyses, comparisons and performance reviews—not only HPC—deliver one
+compiled visual report under `<paper>/samples/<suite>/README.md`. Keep its
+figures, supporting tables and provenance together and provide one report link.
+Explain what each variant changes, controls/populations/input sources, relative
+errors and meaningful baselines, seed variability, conclusions and limitations.
+Use labelled, readable figures rather than large unexplained metric dumps.
+For prediction reviews include truth/prediction/error fields (full UT, FT crack-tip
+zoom), curves with translucent error bars, and log-scale loss histories where
+available. Keep raw downloaded runs in their data store; maintained executable
+analysis stays in code/resources, not copied notebooks in artifacts or samples.
+
+`Z:/p2/diagnostics/` holds derived cross-run exploratory artifacts, not trained
+models. Its existing `FieldToCurve-node-variance/` contains across-specimen nodal
+displacement-variance maps/tables; those scores are not learned attention or
+verified fracture labels. Do not delete or move it merely because it is separate
+from a saved run.
 
 Important file families:
 
