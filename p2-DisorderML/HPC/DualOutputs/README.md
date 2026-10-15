@@ -74,9 +74,18 @@ deployment source. `correction_bank.json/npz` is a versioned, fingerprinted cach
 the checkpoint includes base+correction field stages and loads via the existing
 dual review loader. All specimen, scale, mask and bank provenance checks apply.
 
-### Custom-loss study (30 full jobs plus gate)
+### Custom-loss study — wait for the input-policy winner
 
-Reuse normalized masked-MSE field and MSE-curve controls. Test field changes
+Select the best deployable input-study policy first and hold that policy fixed
+across the loss comparisons. This includes true-only/mixed curve training or a
+field corrector if selected; deployment still uses predicted or corrected fields,
+never unavailable true fields. The current `losses` launcher is a raw-P draft
+(30 full jobs plus gate), NOT ready for winner-policy submission unchanged.
+Reconcile its inputs, reference checkpoints, gate and job count after selection.
+A changed field generator needs newly fitted training-only correction banks if
+correction wins; do not blindly reuse its old corrector on a new error distribution.
+
+Reuse normalized masked-MSE field and MSE-curve controls under that policy. Test field changes
 separately, with independently retrained OOF banks and final generators:
 
 - Spatial signed relative-displacement supervision, coefficient0.1.
@@ -86,21 +95,35 @@ separately, with independently retrained OOF banks and final generators:
   This is the existing capped temporal-change/non-affine rule, not displacement
   magnitude weighting. It uses training targets only and needs no inference weights.
 
-Each variant then trains fresh independent MSE curve models on its own OOF fields.
-Also evaluate the ORIGINAL frozen curve readout on the new fields; this separates
+Each variant then fits independent MSE curve models using the selected source
+policy and its appropriate OOF/true/corrected fields. Also evaluate the winning
+baseline's frozen curve readout on the new fields; this separates
 field improvement from downstream adaptation. Fit structured-loss jump scales and
 normalizers inside each fold. Selection remains the unchanged physical RMSE ratio,
 restricted to the active independent task. Field and curve custom losses are not
 combined in these initial comparisons.
 
-Separately, on the unchanged baseline fields, compare `CombinedCurveLoss` with
+Separately, freeze the selected baseline field pipeline and compare `CombinedCurveLoss` with
 peak-location weight0 versus corrected soft/soft weight0.02 (beta20); both retain
-other existing curve terms/weights. The original MSE run is the third control.
+other existing curve terms/weights. The matched source-policy MSE run is the third
+control. "Unchanged baseline fields" means identical upstream model/correction
+weights and field arrays within this curve-loss comparison, not necessarily raw P.
+
+The current runner's explicit curve-test preset is MSE1, zone-MSE0.5,
+derivative0.05, peak-height0.25, work0.10 and peak-location0/0.02; soft beta20 and
+first differences. Zone weights remain1/5/0.2 over UT slices0:65/65:130/130:end
+and FT0:85/85:160/160:end. These override the class constructor defaults. Field
+coefficients0.1 preserve the earlier controlled-loss setting; sudden gain1 gives
+raw weights1 to below2, then specimen-valid mean-one normalization. These are
+fixed starting presets, NOT HPO-selected optima or equal gradient contributions.
+The inspected `f2cUTfull-fHPO`/`f2cFTfull-fHPO` best_params select MSE, not a custom
+coefficient set. Log raw/weighted components and judge against the fixed metrics;
+poor results at one setting do not rule out a loss family.
 Report hard peak height/location, work, field motion/local errors, mean-relative
 RMSE skill, seed variation and log-scale histories. No improvement is assumed.
 Gaussian/frame, fixed FT-region, residual and graph changes remain later isolated
-tests. The source study can inform subsequent combinations; these first loss fits
-retain P inputs so source and loss changes stay distinguishable.
+tests. Carry forward the winning input policy, then vary losses alone so their
+effects remain distinguishable. No loss jobs are authorised before this review.
 
 ## Preflight retention
 

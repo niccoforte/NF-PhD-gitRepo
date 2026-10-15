@@ -29,6 +29,13 @@ do not resubmit it. Custom-loss submission is ON HOLD until
 after that study. Include held-out true-field evaluation of the true-trained
 curve checkpoint as well as predicted-field deployment. Windows runs now live in
 `Z:/p2` (user relocation), not checkout `data/`; reports remain in p2 `samples/`.
+Use the selected deployable input policy for the loss study, not automatically
+raw predicted-only training. The current30-job loss launcher is a raw-P draft;
+integrate the winner and recheck reference weights, preflight and job counts
+before submission. If a corrector wins, refit it for changed field generators
+using nested TRAIN-only inputs. True-field oracle evaluation cannot supply
+unavailable deployment inputs. Loss coefficients remain provisional fixed presets,
+not established optima; the run README records their exact values and provenance.
 
 ### Current decision suite and imported deferred ideas (12 October)
 

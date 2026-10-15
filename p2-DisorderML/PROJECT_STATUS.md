@@ -8,7 +8,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
   mixture), every deployment path using predicted fields. Three nested correction
   banks/four new curve fits per seed give15 full jobs; existing predicted controls
-  are reused. Custom-loss study prepares30 full jobs: spatial/temporal/both/sudden
+  are reused. Custom-loss raw-P draft comprises30 full jobs: spatial/temporal/both/sudden
   banks and adapted curves, plus combined-curve fits without location and with
   soft/soft peak location per seed. Original
   fixed curve readouts and source substitutions diagnose adaptation separately.
@@ -19,7 +19,11 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   jobs31869464–31869478. Last check: gate PENDING/Priority; full jobs dependency-held.
   Full resources verified240h/1GPU/12CPU/90000MB. Home manifest:
   `/data/home/exy053/p2/MULTI/Dual/Transformer/independent-inputs-261015/jobs.tsv`.
-  Custom-loss submission ON HOLD until input-study review. True-trained curves
+  Custom-loss submission ON HOLD: first select the input-policy winner, then
+  integrate it into the loss launcher/reference/gate and re-evaluate job counts.
+  Do not assume raw P; changed generators require new corrector fits if selected.
+  Current coefficients are fixed starting presets, not HPO-selected optima.
+  True-trained curves
   also export held-out true-field evaluations; the gate now checks that artifact.
   **HIGH PRIORITY manual task:** researcher personally reviews HPC home, scratch
   and archive ordering/names/conventions; recorded under Cleanup in the active
