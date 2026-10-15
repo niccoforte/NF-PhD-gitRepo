@@ -429,8 +429,14 @@ maximum reported section/parent severity is an explicit partial rule, not averag
 degradation. Only bottom/top beam section points are stored in these ODBs.
 UT excludes grips. These products do not change node-displacement arrays or ML
 architecture. Samples remain ignored; implementation and guidance are tracked.
-The tracked [damage runbook](p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
-defines the full algorithm, NPZ keys, commands and validated scope.
+The tracked [damage quick start](p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
+gives commands first, with the algorithm/NPZ specification as optional technical
+reference. The pipeline is implemented in maintained source; no DATA/MODEL loader
+or damage prediction head consumes it yet. The visual report includes red D=1
+on its numeric legend and explains grey active surface damage awaiting a scalar
+reduction separately from missing observations.
+Maximum-mode plots use black outlines for STATUS-confirmed failure, separately
+from the scalar severity colour.
 
 Run from the repository root in the existing environments, with explicit paths
 and the researcher-selected partial rule (`failure-only` or `max`):

@@ -6,6 +6,58 @@ in `Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`, stems `Ductile-FCC-20-per-1` and
 `Fracture-FCC-20-per-1`. Periodic simulation ID is 0. No recursive discovery,
 ODB upgrade, FEA or job submission is involved.
 
+## Start here
+
+The algorithm is implemented in maintained repository code. `samples/` holds
+the generated results and visual report, not the executable implementation.
+
+| File | Use |
+| --- | --- |
+| `p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py` | Read one explicit ODB/INP pair and write damage arrays plus provenance. Requires Abaqus Python. |
+| `resources/damage.py` | Shared element-to-strut mapping, reduction and array validation. |
+| `p2-DisorderML/code/review_damage.py` | Read saved arrays and rebuild the human-readable report and figures. Uses standard Python. |
+
+There is no damage loader in `DATA`, training target/head in `MODEL`, or automatic
+HPC launch integration. This is a working export-and-review route; connecting it
+to ML is a separate task. Only the checked periodic FCC profile is supported.
+
+To rebuild the report from the two existing saved products, use the existing
+environment below. It does not open an ODB. `Push-Location`/`Pop-Location` keep
+the chat project's working directory unchanged:
+
+```powershell
+Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
+.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut p2-DisorderML/samples/damage-audit/UT-periodic-damage.npz --ft p2-DisorderML/samples/damage-audit/FT-periodic-damage.npz --output-dir p2-DisorderML/samples/damage-audit
+Pop-Location
+```
+
+Read `p2-DisorderML/samples/damage-audit/README.md` for the visual results. The
+technical reference below records how labels and files are defined; routine use
+does not require reading it.
+
+Only if re-extraction is needed, this example regenerates the selected periodic
+UT product. It explicitly overwrites that derived NPZ and its adjacent JSON;
+the original INP/ODB are read only. Use `--task FT`, the `Fracture-FCC-20-per-1`
+source stem and `FT-periodic-damage.npz` for the selected FT product.
+
+```powershell
+Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
+& 'C:\SIMULIA\Commands\abaqus.bat' python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" `
+  --odb 'Z:/p1/data/Ti/disNodes/0.2/FCC/sims/Ductile-FCC-20-per-1.odb' `
+  --inp 'Z:/p1/data/Ti/disNodes/0.2/FCC/sims/Ductile-FCC-20-per-1.inp' `
+  --task UT --output 'p2-DisorderML/samples/damage-audit/UT-periodic-damage.npz' `
+  --partial-rule failure-only --overwrite
+Pop-Location
+```
+
+The current policy is `failure-only`: verified failed parents have D=1, fully
+observed undamaged active parents have D=0, and active parents with observed
+damage retain raw SDEG but have no assigned scalar D. Researcher approval is
+still needed before replacing this policy with `--partial-rule max`.
+
+<details>
+<summary>Optional technical reference: algorithm, saved arrays and validation</summary>
+
 ## Full algorithm
 
 1. Parse original inline B21 INP meshes, preserving instance-scoped node/element
@@ -123,3 +175,5 @@ Disordered/bulk processing and model integration remain separate decisions.
 The independent live-ODB test compared all 296,079 saved STATUS values and all
 parent failure states at every frame directly with the ODBs, plus 140,990 raw
 section SDEG values at five selected frames/task. All comparisons passed.
+
+</details>

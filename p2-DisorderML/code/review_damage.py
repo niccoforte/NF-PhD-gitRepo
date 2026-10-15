@@ -8,9 +8,22 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
-from matplotlib.colors import Normalize
+from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, ListedColormap, Normalize
+from matplotlib.lines import Line2D
 import numpy as np
 from resources.damage import require, validate_damage_arrays
+
+
+FAILED_COLOR = "#d62728"
+PENDING_COLOR = "0.6"
+
+
+def damage_scale(mode):
+    """The numeric legend includes the same red used for D=1 on the mesh."""
+    if mode == "failure-only":
+        return ListedColormap(["#440154", FAILED_COLOR]), BoundaryNorm([-.5, .5, 1.5], 2)
+    return LinearSegmentedColormap.from_list(
+        "damage", ["#440154", "#31688e", "#35b779", "#fde725", FAILED_COLOR]), Normalize(0, 1)
 
 
 def load(path, task):
@@ -44,14 +57,14 @@ def select_examples(a):
     tip = np.flatnonzero((a["canonical_endpoint"] == [381,422]).all(axis=1))
     intact = int(tip[0]) if len(tip) else 0
     records = [parent_record(a, intact, 0, "intact")]
-    partial = np.argwhere(a["strut_valid"] & ~failed & (damage > 0) & (damage < 1))
+    partial = np.argwhere(a["strut_valid"] & ~failed & (damage > 0))
     if len(partial):
         frame,parent = min(partial, key=lambda item:abs(damage[tuple(item)]-.5))
         records.append(parent_record(a,int(parent),int(frame),"partial"))
     elif str(a["partial_rule"]) == "failure-only":
         point_parent=a["parent_strut_index"][a["point_element_index"]]
         active=~failed[:,point_parent] & a["strut_failure_known"][:,point_parent]
-        candidates=np.argwhere(active & (a["sdeg"]>0) & (a["sdeg"]<1))
+        candidates=np.argwhere(active & (a["sdeg"]>0))
         if len(candidates):
             frame,point=candidates[0]
             records.append(parent_record(a,int(point_parent[point]),int(frame),"partial"))
@@ -63,13 +76,13 @@ def select_examples(a):
 
 
 def observed_partial(a):
-    """Any reported partial SDEG in an all-active parent; no scalar reduction."""
+    """Positive reported SDEG in an all-active parent, including a surface at 1."""
     result=np.zeros(a['strut_failed'].shape,bool)
     point_parent=a['parent_strut_index'][a['point_element_index']]
     for parent in range(result.shape[1]):
         raw=a['sdeg'][:,point_parent==parent]
         complete=a['element_sdeg_complete'][:,a['parent_strut_index']==parent].all(axis=1)
-        result[:,parent]=((raw>0) & (raw<1)).any(axis=1) & complete & a['strut_failure_known'][:,parent] & ~a['strut_failed'][:,parent]
+        result[:,parent]=(raw>0).any(axis=1) & complete & a['strut_failure_known'][:,parent] & ~a['strut_failed'][:,parent]
     return result
 
 
@@ -83,13 +96,19 @@ def segments(a, elements, frame=None):
 def draw_parent(ax, a, parent, frame, annotate=True):
     members = np.flatnonzero(a["parent_strut_index"] == parent)
     xy = segments(a, members, frame)
-    collection = LineCollection(xy, cmap="viridis", norm=Normalize(0,1), linewidths=4)
+    cmap, norm = damage_scale(str(a["partial_rule"]))
+    collection = LineCollection(xy, cmap=cmap, norm=norm, linewidths=4)
     collection.set_array(np.ma.masked_invalid(a["element_damage"][frame,members]))
-    ax.add_collection(LineCollection(xy,colors='0.65',linewidths=4))
+    unassigned = ~np.isfinite(a["element_damage"][frame,members])
+    pending = unassigned & a["element_sdeg_complete"][frame,members] & (a["status"][frame,members] == 1)
+    ax.add_collection(LineCollection(xy[pending],colors=PENDING_COLOR,linewidths=4))
+    ax.add_collection(LineCollection(xy[unassigned & ~pending],colors='black',linestyles='dashed',linewidths=4))
     ax.add_collection(collection)
     broken=a['element_failed'][frame,members]
     if broken.any():
-        ax.add_collection(LineCollection(xy[broken],colors='red',linewidths=4.5))
+        if str(a["partial_rule"]) == "max":
+            ax.add_collection(LineCollection(xy[broken],colors='black',linewidths=7))
+        ax.add_collection(LineCollection(xy[broken],colors=FAILED_COLOR,linewidths=4.5))
     for i,index in enumerate(members):
         ax.scatter(xy[i,:,0],xy[i,:,1],s=14,c="0.3",zorder=3)
         if annotate:
@@ -110,25 +129,54 @@ def draw_parent(ax, a, parent, frame, annotate=True):
 
 def maps(cases, output):
     fig,axes=plt.subplots(2,3,figsize=(14,9),constrained_layout=True)
+    modes = {str(case[0]["partial_rule"]) for case in cases.values()}
+    require(len(modes) == 1, "Use matching partial rules for a shared map legend")
+    mode = next(iter(modes))
+    cmap, norm = damage_scale(mode)
+    has_pending = has_missing = False
     for row,(task,(a,m,_)) in enumerate(cases.items()):
+        partial = observed_partial(a)
         first=np.flatnonzero(a["strut_failed"].any(axis=1))
         selected=[0,int(first[0]) if len(first) else len(a["frame_time"])//2,len(a["frame_time"])-1]
         for ax,frame in zip(axes[row],selected):
-            ax.add_collection(LineCollection(a['endpoint_xy0'],colors='0.8',linewidths=.7))
-            collection=LineCollection(a["endpoint_xy0"],cmap="viridis",norm=Normalize(0,1),linewidths=1)
+            unassigned = ~a["strut_valid"][frame]
+            pending = unassigned & partial[frame]
+            missing = unassigned & ~pending
+            has_pending |= bool(pending.any())
+            has_missing |= bool(missing.any())
+            ax.add_collection(LineCollection(a["endpoint_xy0"][pending],colors=PENDING_COLOR,linewidths=1))
+            ax.add_collection(LineCollection(a["endpoint_xy0"][missing],colors="black",linestyles="dashed",linewidths=1))
+            collection=LineCollection(a["endpoint_xy0"],cmap=cmap,norm=norm,linewidths=1)
             collection.set_array(np.ma.masked_invalid(a["strut_damage"][frame]))
             ax.add_collection(collection)
             broken=a["strut_failed"][frame]
             if broken.any():
-                ax.add_collection(LineCollection(a["endpoint_xy0"][broken],colors="red",linewidths=1.8))
+                if mode == "max":
+                    ax.add_collection(LineCollection(a["endpoint_xy0"][broken],colors="black",linewidths=3.3))
+                ax.add_collection(LineCollection(a["endpoint_xy0"][broken],colors=FAILED_COLOR,linewidths=1.8))
             ax.autoscale_view()
             ax.set_aspect("equal")
             value=a["global_loading"][frame]
             loading=f'nominal strain {value:.4f}' if task=="UT" else f'load-point U2 {value:.3f} mm'
             ax.set(title=f'{task}: frame {frame}, t={a["frame_time"][frame]:.5f} s\n{loading}; failed {broken.sum()}',xlabel="initial x [mm]",ylabel="initial y [mm]")
-    fig.colorbar(collection,ax=axes.ravel().tolist(),label="Strut D (red overlay = STATUS-confirmed failed parent)",shrink=.75)
-    mode=str(next(iter(cases.values()))[0]['partial_rule'])
-    fig.suptitle(f"Real periodic ODB damage: rule {mode}; grey = partial/unavailable numeric D\nUT main body only; initial coordinates",fontsize=13)
+    bar_label = "Assigned strut D; red D=1 = verified failure" if mode == "failure-only" else "Strut D: maximum reported severity (red at 1)"
+    bar = fig.colorbar(collection,ax=axes.ravel().tolist(),label=bar_label,shrink=.75)
+    if mode == "failure-only":
+        bar.set_ticks([0, 1], labels=["0: no reported damage", "1: verified failed"])
+    legend = []
+    if mode == "max":
+        legend.append(Line2D([], [], color="black", linewidth=4,
+            label="Black outline: STATUS-confirmed failure (severity alone does not establish failure)"))
+    if has_pending:
+        legend.append(Line2D([], [], color=PENDING_COLOR, linewidth=3,
+            label="Active with surface damage; strut D awaiting reduction rule"))
+    if has_missing:
+        legend.append(Line2D([], [], color="black", linestyle="--", linewidth=2,
+            label="Missing observations; strut D unknown"))
+    if legend:
+        fig.legend(handles=legend,loc="outside lower center",fontsize=10)
+    state_note = "grey is active surface damage awaiting scalar reduction" if mode == "failure-only" else "colour is severity; black outline confirms failure"
+    fig.suptitle(f"Periodic UT/FT: initial geometry, recorded damage states ({mode})\nUT main body only; {state_note}",fontsize=13)
     fig.savefig(output/"damage-overview.png",dpi=160)
     plt.close(fig)
 
@@ -151,7 +199,8 @@ def examples_figure(cases, records, output):
             arithmetic=("max("+", ".join(f"{v:.3g}" for v in values)+f') = {r["damage"]:.3g}') if all(v is not None for v in values) else ('1: verified failed member' if r['damage']==1 else 'partial aggregation pending')
             endpoints=" -> ".join(f'n{n} {tuple(xy)}' for n,xy in zip(r["endpoint_labels"],r["endpoint_coordinates"]))
             ax.set_title(f'{task} {kind.replace("_"," ")}: strut {r["strut_id"]}, frame {r["frame"]}\nD: {arithmetic}\nInitial endpoints {endpoints}',fontsize=9)
-    fig.suptitle("Real element values: raw bottom/top SDEG; S=whole-element STATUS (0 = failure)\nDeformed geometry at true scale; red = failed member; grey = unassigned partial D",fontsize=13)
+    state_note = "red = failed member; grey = active surface damage awaiting scalar rule" if str(next(iter(cases.values()))[0]['partial_rule']) == 'failure-only' else "colour = severity; black outline = verified failed member"
+    fig.suptitle("Real element values: raw bottom/top SDEG; S=whole-element STATUS (0 = failure)\nTrue-scale deformation; " + state_note,fontsize=13)
     fig.savefig(output/"damage-examples.png",dpi=150)
     plt.close(fig)
 
@@ -233,136 +282,131 @@ def write_report(cases,records,output):
                 partial=partial_mask[j]
                 writer.writerow([j,time,a["global_loading"][j],a["reaction_force"][j],a["strut_failed"][j].sum(),partial.sum(),a["strut_valid"][j].sum()])
     modes={str(v[0]['partial_rule']) for v in cases.values()}
+    policy = ("**Current choice: failure-only.** Grey struts are active and have observed surface "
+              "damage, but their single numeric D awaits a reduction rule. Their data is present. "
+              "The implemented maximum rule has not been adopted.") if modes == {'failure-only'} else (
+              "**Saved choice: " + ', '.join(sorted(modes)) + ".** Maximum mode summarises the "
+              "largest reported surface/element degradation; whole-element failure remains a separate flag.")
+    ut, ft = cases['UT'][2], cases['FT'][2]
+    appearance = ("| Purple, D=0 | No reported surface damage; all member elements are active. |\n"
+        "| Grey, no scalar D | Surface damage is observed, but every member is active; scalar reduction awaits a choice. |\n"
+        "| Red, D=1 | A member has STATUS=0; the parent is classified failed. |") if modes == {'failure-only'} else (
+        "| Continuous colour, D=0..1 | Maximum reported local severity, not average strut degradation. |\n"
+        "| Black outline | A member has STATUS=0; the parent is classified failed. Colour alone does not establish failure. |")
+    example = next((r for r in records if r['task'] == 'UT' and r['kind'] == 'partial'), None)
+    if example:
+        damaged = next(e for e in example['elements'] if any(p['value'] > 0 for p in e['sdeg']))
+        raw = ', '.join(f"section {p['section']}: {p['value']:.10g}" for p in damaged['sdeg'])
+        severity = max(p['value'] for e in example['elements'] for p in e['sdeg'])
+        assigned = ('**unassigned (NaN)** pending the scalar reduction choice' if example['damage'] is None
+                    else f"**{example['damage']:.10g}** under the saved maximum rule")
+        example_text = (f"A real UT example is **strut {example['strut_id']}, frame {example['frame']}**. "
+            f"Element **{damaged['label']}** reports {raw} and STATUS **{damaged['status']:g} (active)**.\n\n"
+            f"Its failure state is known: **not failed**. Its current scalar D is {assigned}. "
+            f"The maximum of all reported surface/element values is **{severity:.10g}**; "
+            "using that rule preserves **failed=False**. It measures worst reported local damage, "
+            "not average strut stiffness loss. Exact constituent values appear below and in examples.json.")
+    else:
+        example_text = 'No active surface-damage example was observed for UT at the recorded frames.'
+    raw_values = np.unique(np.concatenate([case[0]['sdeg'][case[0]['sdeg_valid']] for case in cases.values()]))
+    raw_text = 'Stored SDEG values: ' + ', '.join(f'{v:.16g}' for v in raw_values) + '.' if len(raw_values) <= 8 else 'Raw section histories are retained in the NPZs.'
     report='''# Periodic element-to-strut damage results
 
-Exported partial-rule mode: **'''+', '.join(sorted(modes))+'''**. In failure-only
-mode, partial numeric element/strut D stays unassigned (NaN) pending researcher
-approval. Raw partial SDEG observations and verified failure remain fully available.
-The maximum rule is implemented and synthetically tested, not silently adopted.
+**The exporter works on the two authorised periodic ODBs.** At the final recorded
+frame, UT has **'''+str(ut['final_failed_struts'])+''' verified failed struts** and FT **'''+str(ft['final_failed_struts'])+'''**.
+Active struts with observed surface damage: UT **'''+str(ut['final_partial_struts'])+'''**, FT **'''+str(ft['final_partial_struts'])+'''**.
 
-Real Abaqus 2024 Python reads of **only the two authorised periodic samples**.
-Both have 21 actual recorded frames, including frame 0. UT uses only BodySet;
-grips are excluded. All source SHA-256 fingerprints are unchanged before/after
-read-only access. Each original INP and ODB agrees in all mesh node/element IDs,
-initial coordinates and connectivity; source identity beyond this agreement is
-not independently established by an archived run manifest.
+'''+policy+'''
+
+![Full-body damage states with red D=1 on the legend](damage-overview.png)
+
+| Appearance | Meaning under the saved rule |
+| --- | --- |
+'''+appearance+'''
+| Black dashed, if present | Observations missing; scalar D unknown. |
+
+The numeric scale includes **red at D=1**. Grey, when present, has a separate
+state key because it is not a numeric damage value. In maximum mode, colour is
+severity and a **black outline** independently identifies STATUS-confirmed failure.
+
+## What the real data shows
 
 | Task | Struts | Elements | Reported SDEG points/frame | Final failed parents | Final active partial parents | First failure frame |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 '''+"\n".join(rows)+'''
 
-## Exact algorithm
+Recorded frames including frame 0: UT **'''+str(ut['frames'])+'''**, FT **'''+str(ft['frames'])+'''**.
+UT uses BodySet only; grips are excluded. Subdivision counts are measured,
+not assumed: UT '''+', '.join(ut['subdivision_histogram'])+'''; FT '''+', '.join(ft['subdivision_histogram'])+'''.
+Missing expected STATUS/SDEG records: UT '''+str(ut['missing_status'])+'/'+str(ut['missing_sdeg'])+''';
+FT '''+str(ft['missing_status'])+'/'+str(ft['missing_sdeg'])+'''. STATUS reactivations:
+UT '''+str(ut['status_reactivations'])+''', FT '''+str(ft['status_reactivations'])+'''. Failure is resolved only on the recorded frame grid.
 
-1. Parse the original inline B21 INP mesh and named sets with instance-scoped
-   node/element labels. Recognise only the checked periodic FCC profile;
-   disordered original-joint identity requires separate validated metadata.
-2. Identify original geometric joints, then traverse actual beam connectivity
-   from joint to joint. Require unique element coverage, degree-two interior
-   nodes, straight monotonic chains and unique unordered endpoint pairs. Measure
-   subdivisions; never use consecutive labels or a fixed element count.
-3. Match the INP against the ODB mesh and selection. Open with readOnly=True.
-   Preserve exact step/frame/increment/time and raw SDEG, DUCTCRT and STATUS.
-   Requested DMICRT appears as DUCTCRT; it is initiation, not degradation.
-4. These ODBs store SDEG at integration point 1, section points **1 and 5**
-   (bottom/top). The available maximum partial rule uses the explicitly selected maximum of
-   those **reported** values. This is a severity summary, not cross-section
-   average degradation or proof that unreported interior points were observed.
-5. Whole-element STATUS=0 establishes a failed element and sets its derived
-   D to 1. STATUS=1 is active. SDEG reaches about 0.99999 in these samples;
-   exact SDEG==1 would miss failures. Point damage alone never establishes whole
-   element failure. Raw values remain unchanged.
-6. Set parent D=1 if any member is verified failed; with the maximum rule use maximum member
-   severity when complete. In failure-only mode, partial D remains unassigned.
-   Missing STATUS/section observations remain unknown,
-   and incomplete parents are invalid unless failure is already established.
-   This is not a sum or an average; subdivision count does not multiply D.
-7. Store observed failure, validity/coverage and first-failure brackets separately.
-   No failure carry-forward was enabled for these tests. All observed statuses
-   are non-reactivating; deleted elements remain represented by STATUS=0.
-8. Write one versioned, non-pickled NPZ per task. Reopen with allow_pickle=False
-   and independently recompute the derived arrays from saved raw observations.
+### Why observed surface damage is not whole-element failure
 
-## Loading and time
+'''+example_text+'''
 
-All stored SDEG values in these two ODBs are 0 or 0.9999899864196777. Active
-partially damaged elements can have one degraded surface and one undamaged
-surface. No intermediate softening ramp is resolved at the recorded frames;
-the examples retain those actual values, without inventing smooth damage curves.
+'''+raw_text+''' **STATUS=0 identifies whole-element failure.**
+Never use exact SDEG=1 as a failure test; the original verification checks failure
+against STATUS independently. In these samples, failed elements store SDEG below 1.
 
-The tracked [full algorithm and contract](../../../p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
-contains execution commands and scope/validation rules. The STATUS/SDEG meanings
-are supported by the accessible
-[Abaqus documentation](https://docs.software.vt.edu/abaqusv2025/English/SIMACAEMATRefMap/simamat-c-damageevolductile.htm);
-the actual ODB execution here used Abaqus 2024.
+![Real intact, active damaged, and one-failed-element examples](damage-examples.png)
 
-UT plots use actual field-frame mean SET-TOP U2 divided by initial body height
-H=190 mm, matching the legacy nominal loading convention. Additional body_strain
-stores (mean SET-TOPBODY U2 - mean SET-BOTTOMBODY U2)/H. FT plots use actual LOAD
-reference-point U2 in mm. FT U2 is not labelled material strain. Reaction force
-is summed RF2 at the corresponding loading set. Original U2/RF2 history times and
-values are retained separately; no history interpolation, ordinal joins,
-zero-fill or invented uniform frame grid is used.
+If a task has no active surface-damage example at a recorded frame, the figure
+states that absence explicitly. [Raw examples](examples.json) retain
+original endpoints, element labels/connectivity, exact section values and STATUS.
 
-## Examples and figures
+## Evolution under loading
 
-Each example in examples.json lists original endpoints/coordinates, exact raw
-section SDEG and STATUS per element, reduction arithmetic and resulting parent D.
-Partial observations, intact and one-failed-element states are selected from actual records;
-missing states would be reported, never fabricated.
+![Recorded damage/failure versus loading](damage-histories.png)
 
-![Parent damage snapshots](damage-overview.png)
+UT horizontal axis: actual field-frame mean SET-TOP U2 / initial body height
+**190 mm** (nominal strain). The NPZ also stores relative body strain from the
+top/bottom body interfaces. FT horizontal axis: actual LOAD reference-point
+**U2 in mm**, not material strain. Markers are recorded observations; the
+intermediate softening path is unresolved.
 
-![Selected raw element examples](damage-examples.png)
+![FT crack-adjacent parent and constituent histories](damage-tip-history.png)
 
-![Damage versus explicitly defined loading](damage-histories.png)
+## Use the implementation
 
-![Crack-adjacent parent over several frames](damage-tip-history.png)
+Reusable code is tracked outside samples: p1 `A2_DamageOUTpostProcess.py` reads
+one explicit ODB/INP pair, `resources/damage.py` maps/reduces/validates it, and p2
+`code/review_damage.py` builds this report from saved NPZs. The
+[quick start and optional technical reference](../../../p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
+contains runnable commands. There is **no DATA/MODEL loader or damage head yet**;
+model integration, disordered processing and bulk extraction remain out of scope.
 
-## NPZ contract and limits
+## Validation and provenance
 
-schema_version=strut_damage_v1. Native task struts are the entity axis; canonical
-endpoint indices refer to this audit's periodic (y,x)-sorted 800-node grid, not
-existing saved ML array order. canonical_node_present records initial FT absence;
-native present struts have strut_present=True. Missing initial FT struts are not
-failed struts. No node damage labels, damage head, changing inference edges or
-training integration were added.
+The two original INP/ODB meshes agree in node/element identities, coordinates and
+connectivity. Source SHA-256 fingerprints are unchanged by the Abaqus 2024
+read-only exports. Independent live-ODB verification matched **296,079 STATUS
+values**, all-frame parent failure flags, and **140,990 section-SDEG checks**;
+see [UT verification](UT-periodic-damage.verification.json) and
+[FT verification](FT-periodic-damage.verification.json).
 
-The NPZ stores instance-scoped element/endpoint labels, original connectivity,
-parent membership/order, initial coordinates, reported section/IP identities,
-raw SDEG/DUCTCRT/STATUS and validity, field-frame nodal displacements, actual
-loading/time, raw history records, derived element/strut values, coverage, failure
-and onset brackets, explicit reduction rules, and JSON provenance/code hashes.
-First failure is observed on the field-output grid; its exact onset between
-frames is unresolved. The successful tests apply to these two periodic Ti B21
-files, not all archived/disordered cases. No source artifact was modified.
+Supporting products: [summary and fingerprints](results-summary.json),
+[UT frame table](UT-frame-summary.csv), [FT frame table](FT-frame-summary.csv),
+[ODB field/history inventory](odb-inventory.json), UT/FT-periodic-damage.npz and
+adjacent provenance JSON. NPZs retain raw section/IP SDEG, DUCTCRT initiation,
+whole-element STATUS, actual loading/time and histories, source/code hashes,
+connectivity, failure/observation/label masks and onset brackets. Missing output
+is never zero-filled. No failure carry-forward was enabled.
 
-Raw-data coverage and numeric-label coverage are separate. In failure-only mode,
-all expected raw observations may be present while a partial numeric label is
-unassigned by policy. strut_observation_coverage records raw availability;
-strut_coverage records assigned member D coverage.
+`strut_damage_v1` uses native struts; its audit-canonical endpoint order is not
+existing ML node order. Initial absent FT struts are not failed struts. These two
+periodic Ti B21 files do not validate arbitrary disordered/archived cases. There
+is no independent archived run manifest proving source identity beyond the
+mesh agreement. Inputs and existing displacement/training artifacts are unchanged.
 
-The independent live-ODB verification files UT-periodic-damage.verification.json
-and FT-periodic-damage.verification.json record exact matches for all 296,079
-STATUS values/all-frame parent failures and 140,990 section SDEG spot checks.
-
-## Supporting evidence
-
-The retained initial INP-only topology stage is separate from the current ODB
-results: [UT parent map](UT-periodic-strut-map.csv),
-[FT parent map](FT-periodic-strut-map.csv), [initial summary](topology-summary.json),
-[initial examples](topology-examples.json) and [labelled topology](topology-examples.png).
-The initial summary's odb_opened=false describes that earlier text-only pass;
-current ODB evidence is in the periodic damage NPZ/JSONs and results-summary.json.
-[ODB inventory](odb-inventory.json) records actual field/history names and probes.
-
-Current products: UT-periodic-damage.npz/.json, FT-periodic-damage.npz/.json,
-UT-frame-summary.csv, FT-frame-summary.csv, examples.json, results-summary.json
-and the four figures above. Producer/review code is tracked outside samples;
-generated research artifacts remain ignored under the existing repository policy.
-
-Researcher selection context (not processed here): D denotes highest UT ductility,
-K initial FT fracture toughness, and B a same-disorder UT/FT pair maximising the
-UT-FT property Pareto front. Keep these meanings distinct from damage D.
+Earlier INP-only evidence remains separate: [UT map](UT-periodic-strut-map.csv),
+[FT map](FT-periodic-strut-map.csv), [topology summary](topology-summary.json),
+[topology examples](topology-examples.json) and [topology figure](topology-examples.png).
+The earlier summary's `odb_opened=false` describes that earlier text-only stage.
+Generated research products stay ignored; their executable producers are tracked.
+D (highest UT ductility), K (initial FT toughness) and B (same-disorder UT/FT
+property-Pareto pair) identify other researcher-selected specimens, not processed here.
 '''
     (output/'README.md').write_text(report)
     (output/'examples.json').write_text(json.dumps(records,indent=2)+'\n')

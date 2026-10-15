@@ -84,7 +84,10 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   files were processed here. Independent live-ODB checks matched all 296,079
   STATUS records/all-frame parent failures and 140,990 section SDEG spot checks.
   Implementation/guidance are tracked; generated research artifacts remain
-  ignored under the existing samples policy.
+  ignored under the existing samples policy. Report now leads with conclusions
+  and figures; red D=1 is included in the numeric legend, grey explicitly means
+  observed active surface damage awaiting scalar reduction. The tracked runbook
+  starts with usage commands; the full specification is optional reference.
 
 - 14 October retention cleanup: all56 preflight archive directories from nine
   COMPLETED0:0 jobs removed permanently; successful home logs retained. Failed
