@@ -6,6 +6,7 @@ Dual notebooks default to the user's locally renamed `data/MULTI/Dual/Transforme
 
 ## Notebook Roles
 
+- `review_damage.py` is a standalone saved-NPZ review script for the bounded periodic damage audit. It validates explicit UT/FT `strut_damage_v1` products, generates readable raw-value examples and actual-frame damage figures under a supplied samples directory, and performs no ODB access or training. Its audit-canonical endpoints are not existing saved ML node order; keep damage products separate from node displacement loaders.
 - `ML-CurveOutputs.ipynb` and `ML-FieldOutputs.ipynb` are the main local curve- and field-output training/HPO notebooks.
 - `ML-FieldToCurveOutputs.ipynb` is the exploratory field-input to curve-output notebook and should stay aligned with the HPC framework.
 - `ML-DualOutputs.ipynb`: imports → Task → ML Model Name → DATA → HPO → MODEL → train/save/predict. Use direct `DUAL_DATA.from_files`, `DUAL_MODEL` and `run_dual_hpo` calls, not HPC subprocesses. `postprocess_load_dual_run` loads saved checkpoints; raw data loading is separate. Match the independent Outputs syntax; leave detailed plots to post-processing.

@@ -4,19 +4,29 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- Active research objective and phase: `To be confirmed`.
-- No active p1 task is established by the current repository state.
+- Current bounded implementation: read-only periodic Ti FCC UT/FT element-to-strut
+  damage processing for Damage Modeling. No new FEA or archive-wide extraction.
+- Broader p1 research objective and phase remain `To be confirmed`.
 
 ## Authoritative Working Surfaces
 
 - Abaqus generation and export: `SIMscripts/A1_FractureToughness-Ductility.py` and the active `SIMscripts/A2_*.py` exporters.
+- Opt-in damage route: `SIMscripts/A2_DamageOUTpostProcess.py`,
+  `resources/damage.py` and p2 `code/review_damage.py`; readable products under
+  `p2-DisorderML/samples/damage-audit/`.
 - ML-ready processing: `code/DataProcessing.ipynb`, `code/InputsOutputs.ipynb`, `resources/data_processing.py`, and `resources/MLdata.py`.
 - Validation and mechanics notebooks are identified in `code/AGENTS.md`; which one is current is `To be confirmed`.
 
 ## Last Verified State
 
 - Repository structure and static guidance were reviewed on 2026-08-09.
-- The Abaqus, `Z:`-data, transfer, and HPC workflows have not been re-executed as part of that review.
+- The original August review did not execute Abaqus/data workflows. The current
+  damage pass opened only the two selected periodic ODBs in Abaqus 2024 Python:
+  21 recorded frames each, original mesh/connectivity agreement, unchanged source
+  SHA-256 hashes, zero missing expected SDEG/STATUS records. Final observed failed
+  body parents: UT 83/2319, FT 7/2259. Twelve synthetic damage tests passed; full
+  contract validation passed (78 non-failing, zero failed). This does not validate
+  the complete archive, unreported beam section points or any new FEA.
 
 ## External Requirements
 
@@ -26,5 +36,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Decisions And Next Task
 
-- `Decision required`: identify the current p1 objective and the authoritative dataset or simulation batch.
-- Next reviewable task: `To be confirmed` after the objective, required data, and execution environment are supplied.
+- Periodic sample scope is authorised. Partial severity reduction is explicitly
+  configurable; researcher selection of the reported-section/parent maximum is
+  separate from verified whole-element STATUS failure. No scaling or model
+  integration is authorised by this test.

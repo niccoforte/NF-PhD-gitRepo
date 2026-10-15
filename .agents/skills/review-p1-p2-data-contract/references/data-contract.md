@@ -46,6 +46,14 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 - UT body-node filtering removes grip nodes to match input-node conventions; FT does not automatically use that crop.
 - Trace field changes through the A2 field exporter, `create_fieldNPZ`, MLdata save/load helpers, field/field-to-curve entry points, saved metadata, and diagnostics.
 
+## Separate strut-damage boundary
+
+- Producer: p1 `SIMscripts/A2_DamageOUTpostProcess.py`; pure mapping/reduction/validation: `resources/damage.py`; review consumer: p2 `code/review_damage.py`. No existing DATA/MODEL loader consumes this schema.
+- One explicit periodic specimen/task per `strut_damage_v1` NPZ, periodic simulation ID 0. Native struts use instance-scoped original element/endpoint identities and actual INP connectivity; canonical endpoints are the audit's sorted periodic coordinates, not saved ML order. UT BodySet excludes grips; initial FT absence is not failure.
+- Retain raw section/IP SDEG, DUCTCRT initiation and whole-element STATUS, actual recorded frames including frame 0, raw nodal load histories/time, source/code fingerprints, source-match evidence, masks and reduction rules. Never broadcast strut labels to nodes or silently stack unlike frame/load grids.
+- STATUS=0 establishes element failure; a verified failed member overrides the parent to D=1. Maximum reported section then constituent damage is an explicit severity rule, not average degradation. Preserve incomplete observations as unknown, with independent failure-known/coverage masks. Optional irreversible carry has a separate mask and rejects reactivation; it is disabled in the initial periodic tests.
+- Run the dedicated synthetic damage tests and real Abaqus read-only periodic validation separately. Existing synthetic CSV/field fixtures do not establish damage correctness. Disordered/bulk extraction and model integration require further scope approval.
+
 ## Dual serial consumer boundary
 
 - `DUAL_DATA` consumes one existing unscaled, unreduced `DATA(input_kind="field", output_kind="curve", mechMode="MULTI")` object; it does not introduce a new p1 file family.

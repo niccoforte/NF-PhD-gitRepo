@@ -9,6 +9,17 @@ inspecting existing producer/export code and proposing a bounded sample audit;
 confirm remote access and scope before ODB processing or job submissions.
 Preserve the existing displacement/curve pipeline and its artifacts.
 
+Current implementation: p1 `SIMscripts/A2_DamageOUTpostProcess.py` and shared
+`resources/damage.py`; review consumer p2 `code/review_damage.py`. See
+`p2-DisorderML/samples/damage-audit/README.md` and the damage status entry.
+The researcher authorised the local periodic UT/FT ODB pair. Both have 21 actual
+frames, stored bottom/top section SDEG and whole-element STATUS; input meshes
+match and hashes remain unchanged. STATUS=0 establishes failure even though stored
+SDEG reaches only 0.99999. Separate `strut_damage_v1` products retain raw data,
+body-only UT membership and masks. Maximum partial severity remains an explicit
+researcher choice; failure-only mode leaves partial D unassigned. No new model,
+bulk export, disordered processing or job is authorised by these periodic tests.
+
 ## Damage export: element → strut → loading history
 
 Continue p1 damage processing for the paired FCC UT/FT simulations in the p1 HPC

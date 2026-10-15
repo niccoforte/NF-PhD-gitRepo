@@ -9,6 +9,28 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   physics/strain distinguishes implemented CPU-tested sudden weights from unproven
   accuracy benefit. Damage and Tokenisation need no additional scope or changes.
 
+- Damage Modeling: authorised periodic UT/FT ODBs read in Abaqus 2024 Python.
+  Separate exporter `SIMscripts/A2_DamageOUTpostProcess.py` under p1 composes
+  `resources/damage.py`; p2 `code/review_damage.py` reviews versioned saved NPZs.
+  Original mesh IDs/connectivity/coordinates match; source SHA-256 hashes are
+  unchanged. UT BodySet: 2,319 struts/10,075 elements (4/5 per strut), excluding 830
+  grip elements. FT: 2,259/4,024 (1/2/4/5). Both initial endpoint sets exactly match
+  `reference_field_edges`. Each has 21 recorded frames, zero missing expected
+  SDEG/STATUS records, section points 1/5 (bottom/top), and no STATUS reactivation.
+  Final verified failed parents UT 83, FT 7 (one failed element per affected parent).
+  Stored SDEG reaches only 0.99999; whole-element STATUS=0 establishes failure. Maximum
+  reported-section then parent severity is implemented but requires the pending
+  researcher choice; failure-only exports leave partial D unassigned and preserve
+  raw observations. Twelve focused tests and 78 contract checks passed, zero
+  failures. Readable report/raw examples/figures/NPZs: `samples/damage-audit/`.
+  No architecture, source data or jobs changed. No disordered/bulk processing or
+  model integration authorised. User clarified D=highest UT ductility,
+  K=initial FT toughness, B=same-disorder UT/FT property-Pareto pair; only per
+  files were processed here. Independent live-ODB checks matched all 296,079
+  STATUS records/all-frame parent failures and 140,990 section SDEG spot checks.
+  Implementation/guidance are tracked; generated research artifacts remain
+  ignored under the existing samples policy.
+
 - 14 October retention cleanup: all56 preflight archive directories from nine
   COMPLETED0:0 jobs removed permanently; successful home logs retained. Failed
   original independence scratch/archive/home logs were already removed (54 paths).

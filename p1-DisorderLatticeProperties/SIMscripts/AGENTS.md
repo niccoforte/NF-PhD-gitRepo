@@ -8,6 +8,7 @@ This directory contains the active Abaqus model-generation, post-processing, and
 - `A2_INpostProcess.py` parses generated `.inp` files and exports input-side transfer files for nodes, struts, and frequency-disorder parameters.
 - `A2_OUTpostProcess.py` parses Abaqus `.odb` history outputs and exports curve-side `OUT-Ductile...csv` and `OUT-Fracture...csv` files.
 - `A2_FieldOUTpostProcess.py` parses Abaqus `.odb` field outputs and exports per-simulation `FIELDu-...npz` files using matching `.inp` node labels.
+- `A2_DamageOUTpostProcess.py` is the separate opt-in, single-file strut-damage exporter. Its explicit named arguments are separate from the legacy positional A1/A2 contract. Use Abaqus Python, matching periodic Ti FCC B21 ODB/INP paths, an explicit partial rule and output NPZ. It never discovers/upgrades ODBs or submits jobs. `resources/damage.py` validates original element chains and reduces reported section SDEG; whole-element STATUS=0 establishes failure. UT selects BodySet, excluding grips. Unknown observations are not zero-filled; failure carry is opt-in and stored separately. Preserve raw section/IP values and SHA-256/source-match evidence. Disordered mapping requires separately validated original joint identities; the periodic profile must reject it.
 - `A3_ContinuumPP.py` is an older continuum/displacement post-processing helper that exports `frame*.csv` and `NodesElems.csv` style outputs.
 - `B1_ABAQUS-new.sh` is the main Slurm submit wrapper. It stages code/resources to scratch, runs A1 and A2 scripts, then archives logs, inputs, outputs, resources, and transfer files.
 - `B1_ABAQUS-inp-rerun.sh` runs existing `.inp` files from the current directory and can post-process them in place.
@@ -51,6 +52,7 @@ Important meanings:
 - Node-disorder input exports use `IN-n...csv`; strut-disorder exports use `IN-s...csv`; frequency parameters use `IN-f...csv`.
 - Curve outputs use `OUT-Ductile...csv` or `OUT-Fracture...csv`.
 - Field outputs use `FIELDu-{job_stem}.npz` and must have a matching `.inp` so node labels and coordinates can be recovered.
+- Damage outputs use the separate `strut_damage_v1` NPZ contract, not FIELDu/allFIELD or node targets. Retain the initial frame and actual step/frame/time, native task struts, original instance/element membership, explicit audit-canonical endpoint order and masks. In the checked ODBs, only section points 1/5 are reported; their maximum is a severity summary, not average cross-section degradation. A point SDEG=1 does not itself prove whole-element failure; use the validated STATUS convention. No near-one threshold defines failure.
 - `A2_FieldOUTpostProcess.py` should preserve the node labels read from the matching `.inp` node block. Do not apply the old fracture-only deletion of two nodes in the ML field pipeline unless the `.inp` node block itself again contains reference points.
 - The p1 notebooks expect these names; do not change them casually.
 - Current local raw transfer storage is separated by case: periodic/reference files go to `Z:/p1/data/Ti/per/{LAT}/transfer`, while disordered files go to paths such as `Z:/p1/data/Ti/disNodes/{fac}/{LAT}/transfer` or `Z:/p1/data/Ti/disNodes/{PATH_EXTRA}/{fac}/{LAT}/transfer`.
@@ -75,6 +77,7 @@ Important meanings:
 
 - Use Abaqus Python for real execution of scripts that touch `mdb`, `session`, or `openOdb`.
 - Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` from the repository root. Its Python result is syntax-only for Abaqus-dependent files and does not prove Abaqus API behavior.
+- Damage checks: run `test_damage_contract.py` through standard unittest discovery for synthetic identity/missingness/failure rules; run `test_damage_odb.py --npz PATH` in Abaqus Python for direct raw STATUS/SDEG and parent-state comparisons against one explicit periodic source. `DAMAGE.md` owns the commands and schema. General syntax validation is not a substitute for this live read-only check.
 - If changing A1/A2 names or output contracts, use `review-p1-p2-data-contract` to inspect every affected producer and consumer.
 - If changing ODB parsing, verify expected step counts (`Hout + 1` in current launchers) and whether missing history data should be zero-filled or extrapolated.
 - If changing field output, use the field schema and impact map in the data-contract skill reference.
