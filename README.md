@@ -615,7 +615,7 @@ Use labelled, readable figures rather than large unexplained metric dumps.
 For prediction reviews include truth/prediction/error fields (full UT, FT crack-tip
 zoom), curves with translucent error bars, and log-scale loss histories where
 available. Keep raw downloaded runs in their data store; maintained executable
-analysis stays in code/resources, not copied notebooks in artifacts or samples.
+reusable analysis stays in code/resources, not copied notebooks in artifacts or samples.
 
 `Z:/p2/diagnostics/` holds derived cross-run exploratory artifacts, not trained
 models. Its existing `FieldToCurve-node-variance/` contains across-specimen nodal

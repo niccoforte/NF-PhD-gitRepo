@@ -70,7 +70,7 @@ Checkout and Python setup use Node 24-based v7 actions to avoid deprecated actio
 
 ## Analysis Deliverables
 
-Default to one human-readable visual report per study/comparison under the paper's ignored `samples/<suite>/README.md`, with labelled figures, supporting tables and provenance alongside it. Lead with conclusions, controls, relative errors, uncertainty and limitations; explain each variant plainly. Link the report in chat. Keep raw runs in their data store and executable analysis in maintained code, not copied notebooks. This applies beyond HPC.
+Default to one human-readable visual report per study/comparison under the paper's ignored `samples/<suite>/README.md`, with labelled figures, supporting tables and provenance alongside it. Lead with conclusions, controls, relative errors, uncertainty and limitations; explain each variant plainly. Link the report in chat. Keep raw runs in their data store and reusable executable analysis in maintained code, not copied notebooks. This applies beyond HPC.
 
 ## Cleanup Constraint
 

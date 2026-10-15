@@ -14,8 +14,12 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   fixed curve readouts and source substitutions diagnose adaptation separately.
   Both use the existing trainer/runner, matched splits/seeds42/43/44, max450 epochs,
   early-stop52, disposable8h preflights and240h full resource requests. Preview-first
-  `HPC/DualOutputs/B4_Independent-followups.sh`; input submission now authorised,
-  custom-loss submission ON HOLD until input-study review. True-trained curves
+  `HPC/DualOutputs/B4_Independent-followups.sh`. Input suite
+  `independent-inputs-261015` submitted from c0ab41a: gate31869463 and15 production
+  jobs31869464–31869478. Last check: gate PENDING/Priority; full jobs dependency-held.
+  Full resources verified240h/1GPU/12CPU/90000MB. Home manifest:
+  `/data/home/exy053/p2/MULTI/Dual/Transformer/independent-inputs-261015/jobs.tsv`.
+  Custom-loss submission ON HOLD until input-study review. True-trained curves
   also export held-out true-field evaluations; the gate now checks that artifact.
   **HIGH PRIORITY manual task:** researcher personally reviews HPC home, scratch
   and archive ordering/names/conventions; recorded under Cleanup in the active
@@ -24,7 +28,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   true-trained/true-field export agreement, complete nested-source fits,
   frozen-generator equality, saved correction reload, loss serialization and
   mocked15/30-job dependencies. Eight prior independence,14 field-loss and10 sudden
-  tests pass. Changed-surface19 and contract80 checks non-failing/zero failed.
+  tests pass. Current path/evaluation change: changed-surface13 and contract80
+  checks non-failing/zero failed.
   The broader31-test dual suite has one skipped
   test and one Windows SQLite temporary-file cleanup error in the unchanged HPO
   test (its training/resume assertions pass); no HPO implementation changed.

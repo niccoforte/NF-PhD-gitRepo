@@ -24,7 +24,8 @@ training sources, then isolated spatial/temporal/both field and soft-peak curve
 loss comparisons. Reuse the completed baseline and its frozen banks. All
 deployment results use predicted fields; correctors require nested training-only
 cross-fitting for downstream corrected-field training. Keep this checklist active.
-Input study submission is authorised; custom-loss submission is ON HOLD until
+Input suite `independent-inputs-261015` is submitted (see PROJECT_STATUS for IDs);
+do not resubmit it. Custom-loss submission is ON HOLD until
 after that study. Include held-out true-field evaluation of the true-trained
 curve checkpoint as well as predicted-field deployment. Windows runs now live in
 `Z:/p2` (user relocation), not checkout `data/`; reports remain in p2 `samples/`.
