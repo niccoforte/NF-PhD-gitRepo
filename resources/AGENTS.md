@@ -4,6 +4,7 @@
 
 ## Module Map
 
+- `MLfollowup.py` prepares Case1(i) source/correction and isolated loss studies through the existing independent fit groups. `FieldCorrectionStage` in MLdual composes a frozen generator with independent residual refiners. Corrected curve-training fields require nested TRAIN-only cross-fitting; source mixtures sample complete fields 50/50 without extra optimizer updates. Standard results use predicted deployment inputs; true/corrected/raw substitutions are separate probes. See the DualOutputs README and preserve old configs/defaults.
 - `MLindependence.py` orchestrates the eight approved sharing/stage-training cases using `DUAL_MODEL`, not a copied training loop. Independent task stages include all projections/embeddings/heads. Each training group owns optimizer/stopping/checkpoint selection; staged curve inputs use training-only OOF banks with fold-local scalers and inner validation. Preserve bank fingerprints, frozen-source reuse, outer-test exclusion and case names in the DualOutputs README. Keep follow-up losses/features separate until the architecture decision.
 - `imports.py` is a convenience import bundle used by older notebooks. Prefer explicit imports in new code.
 - `lattices.py` owns `Geometry`, lattice dimensions, relative-density thickness, node counts, connectivity, effective properties, stiffness matrices, isotropy, and anisotropy helpers.

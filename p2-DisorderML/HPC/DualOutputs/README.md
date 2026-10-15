@@ -1,5 +1,101 @@
 # Joint UT/FT runs
 
+## Case 1(i): input and custom-loss studies
+
+The next studies retain fully independent UT/FT models and separately trained
+field/curve stages. They reuse the completed `independence-261013-r1` banks and
+Case1(i) controls, the same 7,137/793/881 specimen split, seeds42/43/44, HPO-derived
+per-stage capacity and optimizer settings, max450 epochs and stopping patience52.
+Locked test is untouched. There is no architecture HPO or change to legacy defaults.
+
+```bash
+# Preview only. Run inputs first; explicit --submit queues through B1.
+bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-inputs-NEW inputs
+bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-losses-NEW losses
+```
+
+Every full job requests240h/1GPU/12CPU/90000MB. Each study has one disposable8h
+GPU/data/save/reload preflight. Home submission/source/manifest and archive paths
+retain the existing `MULTI/Dual/Transformer/<label>` contract, although the models
+are independent. Preflights keep only successful home logs; they produce no archive
+dependency. No jobs are submitted by a preview or by this documentation.
+
+### Input study (15 full jobs plus gate)
+
+P = out-of-fold predicted training fields, final-generator validation fields.
+T = true fields; C = independently corrected predicted fields. Five curve fits
+per seed are represented; the existing P control is reused, four are new:
+
+| Curve training | Main deployment input | Additional saved evaluations |
+| --- | --- | --- |
+| P (existing control) | P | T already saved; C from correction-bank fixed readout |
+| T | P | T and C |
+| 50/50 P or T | P | T and C |
+| C | C | T and P |
+| 50/50 C or T | C | T and P |
+
+Mixtures sample one complete source per specimen/update with a private seeded RNG.
+They do not interpolate physical histories or double updates. Curve checkpoints
+select using deployment-source validation RMSE. True-field evaluation of that
+checkpoint is diagnostic, not an independently true-validation-selected oracle.
+All actual deployment paths start from disorder and predicted fields.
+
+Each seed first fits a correction bank. The two independent residual Transformers
+have width96/4heads/2layers, FF4, GELU, sinusoidal positions and dropout.05; output
+residuals start at zero. They consume fields plus existing physical context,
+retain FT masking, supervise corrected fields directly and freeze the generators.
+They do not receive true fields at deployment or curve gradients during fitting.
+
+Corrected training fields need **nested** cross-fitting. For each original outer
+TRAIN fold, the original fit/selection IDs exclude its holdout. Inner3-fold field
+banks generate OOF corrector-training inputs within those fit IDs; a corrector
+selects using the separate inner-selection specimens, then corrects the untouched
+outer holdout. Convert through physical units to the outer training normalization.
+A final corrector fits the full original OOF training bank and supplies validation
+predictions. This avoids indirect target leakage through first-stage generators.
+It adds twelve inner/final field fits per seed and independent corrector fits;
+each field-fit set contains separate UT and FT fits. This is substantially more
+expensive than source sampling alone. The10-day request
+is a ceiling, not an ETA or exact mid-fit-resume guarantee. Nested provenance and
+checkpoints are retained as production evidence.
+
+Correction-bank standard results use the original frozen Case1(i) curve readout,
+isolating correction alone. New C-source fits then measure curve adaptation.
+Extra probes save `corrected_source_curves*`, `uncorrected_source_curves*` and/or
+`fixed_readout_curves*` beside the run root, with IDs, physical curves, sample
+metrics and train-mean baseline summaries. Standard results always use the declared
+deployment source. `correction_bank.json/npz` is a versioned, fingerprinted cache;
+the checkpoint includes base+correction field stages and loads via the existing
+dual review loader. All specimen, scale, mask and bank provenance checks apply.
+
+### Custom-loss study (30 full jobs plus gate)
+
+Reuse normalized masked-MSE field and MSE-curve controls. Test field changes
+separately, with independently retrained OOF banks and final generators:
+
+- Spatial signed relative-displacement supervision, coefficient0.1.
+- Temporal recorded-frame increment supervision, coefficient0.1.
+- Both terms, each0.1.
+- Sudden-motion specimen/node/frame weighting, gain1, no derivative penalties.
+  This is the existing capped temporal-change/non-affine rule, not displacement
+  magnitude weighting. It uses training targets only and needs no inference weights.
+
+Each variant then trains fresh independent MSE curve models on its own OOF fields.
+Also evaluate the ORIGINAL frozen curve readout on the new fields; this separates
+field improvement from downstream adaptation. Fit structured-loss jump scales and
+normalizers inside each fold. Selection remains the unchanged physical RMSE ratio,
+restricted to the active independent task. Field and curve custom losses are not
+combined in these initial comparisons.
+
+Separately, on the unchanged baseline fields, compare `CombinedCurveLoss` with
+peak-location weight0 versus corrected soft/soft weight0.02 (beta20); both retain
+other existing curve terms/weights. The original MSE run is the third control.
+Report hard peak height/location, work, field motion/local errors, mean-relative
+RMSE skill, seed variation and log-scale histories. No improvement is assumed.
+Gaussian/frame, fixed FT-region, residual and graph changes remain later isolated
+tests. The source study can inform subsequent combinations; these first loss fits
+retain P inputs so source and loss changes stay distinguishable.
+
 ## Preflight retention
 
 Preflights retain only successful logs in the home submission directory. B1

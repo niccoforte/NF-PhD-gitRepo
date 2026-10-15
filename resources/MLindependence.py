@@ -48,17 +48,22 @@ def fingerprint(data):
 
 
 class _CurveInputs(Dataset):
-    def __init__(self, base, inputs):
-        self.base, self.inputs = base, inputs
+    def __init__(self, base, inputs, secondary=None, key="curve_input", seed=42):
+        self.base, self.inputs, self.secondary, self.key = base, inputs, secondary, key
+        self.generator = torch.Generator().manual_seed(seed)
 
     def __len__(self):
         return len(self.base)
 
     def __getitem__(self, i):
-        return dict(self.base[i], curve_input={m: torch.as_tensor(a[i]) for m, a in self.inputs.items()})
+        # One input per specimen/optimizer update; balanced source sampling does
+        # not double training steps or interpolate nonphysical field histories.
+        source = self.secondary if self.secondary is not None and torch.rand((), generator=self.generator) < .5 else self.inputs
+        return dict(self.base[i], **{self.key: {m: torch.as_tensor(a[i]) for m, a in source.items()}})
 
 
-def _fit_groups(network, data, groups, args, path, metadata, cached=None):
+def _fit_groups(network, data, groups, args, path, metadata, cached=None,
+                objective=None, secondary=None, cached_key="curve_input"):
     reports, histories = [], []
     score = DualValidationScore(data)
     for group in groups:
@@ -81,10 +86,13 @@ def _fit_groups(network, data, groups, args, path, metadata, cached=None):
         curve_only = all(k == "curve" for k, _ in group)
         loaders = None
         if cached is not None:
-            loaders = {s: DataLoader(_CurveInputs(data.datasets[s], cached[s]), batch_size=args.batch,
+            loaders = {s: DataLoader(_CurveInputs(data.datasets[s], cached[s],
+                                    secondary if s == "train" else None, cached_key, args.seed), batch_size=args.batch,
                                     shuffle=s == "train", num_workers=args.num_workers)
                        for s in ("train", "val")}
-        trainer = DUAL_MODEL(network, DualLoss(weights=weights), data=data,
+        loss = copy.deepcopy(objective) if objective is not None else DualLoss()
+        loss.weights = weights
+        trainer = DUAL_MODEL(network, loss, data=data,
             opt=(args.optimizer, args.weight_decay), batch=args.batch, lr=args.lr,
             curve_lr_factor=args.curve_lr_factor, grad_clip=args.grad_clip,
             device="cuda" if torch.cuda.is_available() else "cpu", num_workers=args.num_workers,
@@ -132,7 +140,7 @@ def _field_predictions(network, data, split, args):
     return {m: np.concatenate(v) for m, v in chunks.items()}
 
 
-def prepare_bank(model, case, args, path, metadata):
+def prepare_bank(model, case, args, path, metadata, loss_factory=None):
     """Cross-fitting is a training-only preparation, not locked-test evaluation."""
     data, network = model.data, model.model
     initial = copy.deepcopy(network.state_dict())
@@ -153,7 +161,8 @@ def prepare_bank(model, case, args, path, metadata):
         provenance = {"fold": number, "fit_ids": folded.sample_ids["train"],
                       "selection_ids": folded.sample_ids["val"], "heldout_train_ids": folded.sample_ids["test"]}
         _fit_groups(net, folded, training_groups(case, "field"), args, Path(path)/"folds"/str(number),
-                    dict(metadata, crossfit=provenance))
+                    dict(metadata, crossfit=provenance),
+                    objective=loss_factory(folded) if loss_factory else None)
         prediction = _field_predictions(net, folded, "test", args)
         for m in train_inputs:
             physical = folded.inverse_field(m, prediction[m])
@@ -165,12 +174,16 @@ def prepare_bank(model, case, args, path, metadata):
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
     network.load_state_dict(initial)
-    reports, histories = _fit_groups(network, data, training_groups(case, "field"), args, path, metadata)
+    reports, histories = _fit_groups(network, data, training_groups(case, "field"), args, path, metadata,
+                                    objective=loss_factory(data) if loss_factory else None)
     val_inputs = _field_predictions(network, data, "val", args)
     config = {k: getattr(args, k) for k in ("seed", "epochs", "batch", "lr", "weight_decay", "optimizer",
               "scheduler_factor", "scheduler_patience", "scheduler_threshold", "early_stop_patience", "early_stop_delta", "oof_folds")}
     manifest = dict(data_fingerprint=fingerprint(data), sample_ids=data.sample_ids, folds=manifests,
                     field_config=network.field_model.get_config(), training=config, groups=reports,
+                    field_loss_variant=getattr(args, "field_loss_variant", None),
+                    loss_parameters={k: getattr(args, k) for k in ("spatial_weight", "temporal_weight")}
+                        if loss_factory else None,
                     note="OOF test-labelled fold is OUTER TRAIN only. No locked test targets used.")
     Path(path, "field_bank.json").write_text(json.dumps(_json_safe(manifest), indent=2))
     np.savez(Path(path, "field_bank.npz"), **{f"{s}_{m}": a for s, values in
@@ -181,31 +194,41 @@ def prepare_bank(model, case, args, path, metadata):
     return reports
 
 
+def load_bank(network, data, args, bank):
+    """Verify and attach a frozen bank; shared by original and follow-up fits."""
+    bank = Path(bank)
+    manifest = json.loads((bank/"field_bank.json").read_text())
+    if manifest["data_fingerprint"] != fingerprint(data):
+        raise ValueError("Field bank data/splits/normalizers differ from this run.")
+    if manifest["field_config"] != _json_safe(network.field_model.get_config()):
+        raise ValueError("Field-bank architecture does not match this case.")
+    if manifest.get("field_loss_variant") != getattr(args, "field_loss_variant", None):
+        raise ValueError("Field-bank loss variant differs from this run.")
+    if manifest.get("loss_parameters") and any(getattr(args,k) != v for k,v in manifest["loss_parameters"].items()):
+        raise ValueError("Field-bank loss coefficients differ from this run.")
+    for key, value in manifest["training"].items():
+        if getattr(args, key) != value:
+            raise ValueError(f"Field bank training configuration differs: {key}.")
+    saved = torch.load(bank/"model.mdl", map_location="cpu", weights_only=False)
+    prefix = "field_model."
+    network.field_model.load_state_dict({k[len(prefix):]: v for k, v in saved["model_state_dict"].items() if k.startswith(prefix)})
+    with np.load(bank/"field_bank.npz", allow_pickle=False) as arrays:
+        cached = {s: {m: arrays[f"{s}_{m}"] for m in ("UT", "FT")} for s in ("train", "val")}
+    for s in cached:
+        for m, a in cached[s].items():
+            if a.shape != data.splits[s]["field"][m].shape or not np.isfinite(a).all():
+                raise ValueError("Invalid cached field inputs.")
+    return cached, manifest
+
+
 def train_case(model, case, args, path, metadata):
     data, network = model.data, model.model
     _, _, joint = CASES[case]
     cached = None
     if not joint:
-        bank = Path(args.field_bank)
-        manifest = json.loads((bank/"field_bank.json").read_text())
-        if manifest["data_fingerprint"] != fingerprint(data):
-            raise ValueError("Field bank data/splits/normalizers differ from this run.")
-        if manifest["field_config"] != _json_safe(network.field_model.get_config()):
-            raise ValueError("Field-bank architecture does not match this case.")
-        for key, value in manifest["training"].items():
-            if getattr(args, key) != value:
-                raise ValueError(f"Field bank training configuration differs: {key}.")
-        saved = torch.load(bank/"model.mdl", map_location="cpu", weights_only=False)
-        prefix = "field_model."
-        network.field_model.load_state_dict({k[len(prefix):]: v for k, v in saved["model_state_dict"].items() if k.startswith(prefix)})
-        with np.load(bank/"field_bank.npz", allow_pickle=False) as arrays:
-            cached = {s: {m: arrays[f"{s}_{m}"] for m in ("UT", "FT")} for s in ("train", "val")}
-        for s in cached:
-            for m, a in cached[s].items():
-                if a.shape != data.splits[s]["field"][m].shape or not np.isfinite(a).all():
-                    raise ValueError("Invalid cached field inputs.")
-        metadata["field_bank"] = str(bank)
-        metadata["field_bank_sha256"] = hashlib.sha256((bank/"field_bank.npz").read_bytes()).hexdigest()
+        cached, _ = load_bank(network, data, args, args.field_bank)
+        metadata["field_bank"] = str(args.field_bank)
+        metadata["field_bank_sha256"] = hashlib.sha256((Path(args.field_bank)/"field_bank.npz").read_bytes()).hexdigest()
     groups = training_groups(case) if joint else training_groups(case, "curve")
     reports, histories = _fit_groups(network, data, groups, args, path, metadata, cached)
     model.history = histories

@@ -37,6 +37,11 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 
 ## Agent Guidance And Repo Skills
 
+The independent-model accuracy follow-ups are documented in
+[the p2 run guide](p2-DisorderML/HPC/DualOutputs/README.md#case-1i-input-and-custom-loss-studies).
+They compare field-input sources (including residual correction) and custom
+losses on Case1(i), reuse completed controls, and preview without submitting.
+
 Repository guidance is tracked with the code so a fresh checkout carries the same working agreements:
 
 - Start with the root `AGENTS.md`, then read the closest nested `AGENTS.md` before working in a paper folder, notebook folder, HPC folder, or `resources/`.

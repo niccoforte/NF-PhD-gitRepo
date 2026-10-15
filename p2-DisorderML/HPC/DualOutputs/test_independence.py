@@ -17,11 +17,11 @@ from resources.MLdual import DUAL_DATA, DUAL_MODEL, DualLoss, DualStageTransform
 from resources.MLindependence import CASES, training_groups, prepare_bank, train_case, fold_data, _fit_groups
 
 
-def fixture():
+def fixture(ntrain=12):
     rng = np.random.default_rng(7)
     masks = {"UT": np.ones(6, bool), "FT": np.array([1, 0, 1, 1, 1, 1], bool)}
     raw, ids = {}, {}
-    for s, n in (("train", 12), ("val", 4), ("test", 3)):
+    for s, n in (("train", ntrain), ("val", 4), ("test", 3)):
         raw[s] = {"geometry": rng.normal(size=(n, 6, 2)),
                   "field": {m: rng.normal(size=(n, 6, 6)) for m in masks},
                   "field_mask": {m: np.broadcast_to(v[None, :, None], (n, 6, 6)).copy() for m, v in masks.items()},

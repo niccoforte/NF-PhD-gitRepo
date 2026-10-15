@@ -21,6 +21,14 @@ def parse_args(argv=None):
     parser.add_argument("--prepare-field-bank", action="store_true", help="Cross-fit training fields and fit final field generators; no curve accuracy claim.")
     parser.add_argument("--field-bank", help="Archived field-bank directory, required for stage-separated cases.")
     parser.add_argument("--oof-folds", type=int, default=3)
+    parser.add_argument("--followup-study", choices=["inputs", "losses"], help="Case1(i) only; keeps the historical eight-case control unchanged.")
+    parser.add_argument("--curve-training-source", choices=["predicted", "true", "mixed", "corrected", "corrected_mixed"], default="predicted")
+    parser.add_argument("--prepare-correction-bank", action="store_true")
+    parser.add_argument("--correction-bank")
+    parser.add_argument("--reference-model-json", help="Matching Case1(i) baseline for fixed-curve correction diagnostics.")
+    parser.add_argument("--corrector-d-model", type=int, default=96)
+    parser.add_argument("--corrector-n-heads", type=int, default=4)
+    parser.add_argument("--corrector-n-layers", type=int, default=2)
     parser.add_argument("--data-path", default=os.environ.get("ML_DATA_ROOT", "HPC"))
     parser.add_argument("--run-root", default=os.environ.get("ML_RUN_ROOT"), help="Override the output root; B1 sets ML_RUN_ROOT.")
     parser.add_argument("--nsims", default="all", help="Full paired data by default; an integer limits debug runs.")
@@ -65,7 +73,7 @@ def parse_args(argv=None):
     parser.add_argument("--loss", choices=["mse", "combined"], default="combined", help="Curve loss; field loss defaults to masked MSE.")
     parser.add_argument("--curve-loss-ablation", choices=["mse", "combined_no_location", "combined_soft"],
                         help="Explicit fresh baseline/curve-source loss override; keeps fixed validation ranking.")
-    parser.add_argument("--field-loss-variant", choices=["baseline", "spatial", "temporal", "both", "weighted"])
+    parser.add_argument("--field-loss-variant", choices=["baseline", "spatial", "temporal", "both", "weighted", "sudden"])
     parser.add_argument("--spatial-weight", type=float, default=0.1)
     parser.add_argument("--temporal-weight", type=float, default=0.1)
     parser.add_argument("--localization-gain", type=float, default=0.)
@@ -121,7 +129,7 @@ def parse_args(argv=None):
         parser.set_defaults(**defaults)
     args = parser.parse_args(argv)
     if args.independence_case:
-        if args.experiment != "baseline" or args.eval_split != "val" or args.curve_loss_ablation or args.field_loss_variant:
+        if args.experiment != "baseline" or args.eval_split != "val" or (not args.followup_study and (args.curve_loss_ablation or args.field_loss_variant)):
             parser.error("Independence comparison requires --experiment baseline and validation; isolate all loss/feature changes.")
         staged = args.independence_case in ("1i", "2ai", "2bi", "3i")
         if args.prepare_field_bank and args.independence_case not in ("1i", "3i"):
@@ -136,6 +144,28 @@ def parse_args(argv=None):
                 setattr(args, f"{kind}_{mode}_weight", 1.)
     elif args.prepare_field_bank or args.field_bank:
         parser.error("Field banks require --independence-case.")
+    if args.followup_study:
+        if args.independence_case != "1i":
+            parser.error("Follow-ups require the fully independent Case1(i).")
+        if args.followup_study == "inputs" and (args.field_loss_variant or args.curve_loss_ablation):
+            parser.error("Input study keeps MSE losses fixed.")
+        if args.followup_study == "losses" and (args.curve_training_source != "predicted" or args.prepare_correction_bank or args.correction_bank):
+            parser.error("Loss study keeps raw predicted-field inputs fixed.")
+        if args.field_loss_variant == "weighted":
+            parser.error("Localisation weighting is a separate later ablation.")
+        if args.field_loss_variant and args.curve_loss_ablation:
+            parser.error("Isolate field and curve loss changes in the first comparisons.")
+        if args.prepare_correction_bank and (args.prepare_field_bank or not args.reference_model_json):
+            parser.error("Corrector creation requires a frozen field bank and reference baseline.")
+        if args.prepare_correction_bank and (args.correction_bank or args.curve_training_source != "predicted"):
+            parser.error("Corrector bank preparation must precede corrected-source curve fits.")
+        if args.curve_training_source.startswith("corrected") and not args.correction_bank:
+            parser.error("Corrected-source training requires --correction-bank.")
+        if (args.corrector_n_heads < 1 or args.corrector_d_model < 1 or args.corrector_n_layers < 1
+                or args.corrector_d_model % args.corrector_n_heads):
+            parser.error("Corrector width must divide by heads and layers must be positive.")
+    elif args.prepare_correction_bank or args.correction_bank or args.reference_model_json or args.curve_training_source != "predicted" or args.field_loss_variant == "sudden":
+        parser.error("Source/correction switches require --followup-study inputs.")
     if args.curve_loss_ablation:
         if args.experiment not in ("baseline", "curve_true", "curve_predicted"):
             parser.error("Curve-loss ablations require baseline, curve_true or curve_predicted; isolate other changes.")
@@ -153,7 +183,7 @@ def parse_args(argv=None):
         args.fixed_selection_score = True
         if args.eval_split != "val": parser.error("Development experiments must use validation, not locked test.")
         if args.split_seed is None: args.split_seed = 42
-        if args.field_loss_variant: parser.error("Do not combine experiment and independent loss-ablation switches.")
+        if args.field_loss_variant and not args.followup_study: parser.error("Do not combine experiment and independent loss-ablation switches.")
         if args.experiment == "partial" and not 0 < args.private_layers < args.field_n_layers:
             parser.error("Partial sharing requires 0 < private-layers < field-n-layers.")
         if args.experiment == "localization" and args.localization_gain < 0:
@@ -240,6 +270,13 @@ def main(argv=None, preset=None):
         },
     }
     metadata_path = run_dir / "run_metadata.json"
+    if args.followup_study:
+        import resources.MLfollowup as followup_module
+        import resources.MLindependence as independence_module
+        import resources.MLfield as field_module
+        for module in (followup_module, independence_module, field_module):
+            source_path = Path(module.__file__)
+            metadata["source_hashes"][source_path.name] = hashlib.sha256(source_path.read_bytes()).hexdigest()
     if args.base_model_json:
         metadata["anchor_sha256"] = hashlib.sha256(Path(args.base_model_json).read_bytes()).hexdigest()
     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
@@ -328,7 +365,7 @@ def main(argv=None, preset=None):
             ) for mode in ("UT", "FT")
         }
     field_losses = None
-    if args.field_loss_variant:
+    if args.field_loss_variant and args.field_loss_variant != "sudden":
         from resources.MLfield import field_loss_from_data, field_loss_weights
         field_losses = {mode:field_loss_from_data(data, mode, **field_loss_weights(
             args.field_loss_variant, args.spatial_weight, args.temporal_weight, args.localization_gain))
@@ -338,6 +375,9 @@ def main(argv=None, preset=None):
         curve_loss=curve_losses, weights=weights,
         curve_normalizers=data.normalizers["curve"] if args.loss == "combined" else None,
     )
+    if args.field_loss_variant == "sudden":
+        from resources.MLfollowup import field_objective
+        objective = field_objective(data, args)
     if args.base_model_json and not args.independence_case:
         from resources.MLmodels import _model_build_loss_from_config
         saved_loss = json.loads(Path(args.base_model_json).read_text())["loss_config"]
@@ -403,7 +443,20 @@ def main(argv=None, preset=None):
                                                if args.experiment != "winner_probe" else 0 for s in ("field", "curve")}
     print(f"Parameters: {sum(p.numel() for p in network.parameters()):,}; active loss weights: {model.lossf.weights}", flush=True)
     started = time.monotonic()
-    if args.independence_case:
+    if args.followup_study:
+        from resources.MLfollowup import prepare_correction_bank, train_followup, field_objective
+        from resources.MLindependence import prepare_bank
+        metadata["training_mode"] = ("independent_field_correction" if args.prepare_correction_bank
+                                     else "independent_field_bank" if args.prepare_field_bank
+                                     else "independent_curve_fits")
+        if args.prepare_correction_bank:
+            prepare_correction_bank(model, args, run_dir, metadata)
+        elif args.prepare_field_bank:
+            prepare_bank(model, "1i", args, run_dir, metadata,
+                         loss_factory=(lambda d: field_objective(d, args)) if args.field_loss_variant else None)
+        else:
+            train_followup(model, args, run_dir, metadata)
+    elif args.independence_case:
         from resources.MLindependence import prepare_bank, train_case
         operation = prepare_bank if args.prepare_field_bank else train_case
         operation(model, args.independence_case, args, run_dir, metadata)
@@ -416,6 +469,7 @@ def main(argv=None, preset=None):
             early_stop_delta=args.early_stop_delta, checkpoint_path=run_dir, metadata=metadata,
         )
     metadata["training_seconds"] = time.monotonic() - started
+    metadata["parameter_counts"] = {s: sum(p.numel() for p in getattr(model.model, f"{s}_model").parameters()) for s in ("field", "curve")}
     checkpoint = model.save(run_dir, metadata=metadata)
     if args.prepare_field_bank:
         metadata.update(status="complete", checkpoint=checkpoint, results_dir=None,

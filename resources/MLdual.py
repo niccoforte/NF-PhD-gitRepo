@@ -1141,8 +1141,46 @@ class IndependentTaskTransformers(nn.Module):
 
 def _task_stage(config):
     config = dict(config)
+    if "correction_stage" in config:
+        return FieldCorrectionStage(
+            _task_stage(config["correction_stage"]),
+            _task_stage(config["base_stage"]) if config.get("base_stage") else None)
     independent = config.pop("independent_tasks", False)
     return (IndependentTaskTransformers if independent else DualTaskTransformer)(**config)
+
+
+class FieldCorrectionStage(nn.Module):
+    """Frozen geometry generator followed by independent residual field refiners.
+
+    With no base, inputs are fields (used while fitting the corrector). With a
+    base, inputs are geometry (the saved deployment path). No true-field bypass.
+    """
+    def __init__(self, correction, base=None):
+        super().__init__()
+        self.correction, self.base = correction, base
+        self.pool, self.seq_len = "node", correction.seq_len
+        self.in_sizes = base.in_sizes if base is not None else correction.in_sizes
+        self.out_sizes = correction.out_sizes
+        if correction.pool != "node" or correction.in_sizes != correction.out_sizes:
+            raise ValueError("Correction must preserve each task's field shape.")
+        if base is not None and (base.seq_len != correction.seq_len or base.out_sizes != correction.in_sizes):
+            raise ValueError("Base generator and correction field shapes differ.")
+
+    @property
+    def tasks(self):
+        # Independent fitting must enable only the selected refiner, never base.
+        return self.correction.tasks
+
+    def forward(self, inputs, task_features=None, node_masks=None):
+        fields = self.base(inputs, task_features, node_masks) if self.base is not None else inputs
+        residual = self.correction(fields, task_features, node_masks)
+        return {m: (fields[m] + residual[m]).masked_fill(
+            ~torch.as_tensor(node_masks[m], device=fields[m].device, dtype=torch.bool).unsqueeze(-1), 0.)
+            for m in DUAL_MODES}
+
+    def get_config(self):
+        return {"correction_stage": self.correction.get_config(),
+                "base_stage": self.base.get_config() if self.base is not None else None}
 
 
 class DualStageTransformer(nn.Module):
@@ -1467,7 +1505,7 @@ class DUAL_MODEL:
                     if self.grad_clip is not None:
                         torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.grad_clip, error_if_nonfinite=True)
                     self.optimizer.step()
-                batch_size = int(batch["geometry"].shape[0])
+                batch_size = int(batch["field"][DUAL_MODES[0]].shape[0])
                 values = {"loss": float(loss.detach().item()), **self._flatten_components(details)}
                 if not training and self.selection_metric is not None:
                     values.update(self.selection_metric(predictions, targets, batch["field_mask"]))

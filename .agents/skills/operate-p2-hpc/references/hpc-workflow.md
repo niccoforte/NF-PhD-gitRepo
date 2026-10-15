@@ -14,6 +14,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Production and debug policy
 
+- `DualOutputs/B4_Independent-followups.sh SUITE inputs|losses` previews Case1(i) follow-ups; only `--submit` queues them. Use `A0-HPC-Dual-preflight.py --followup-suite` for their disposable gate. Source study15 jobs, loss study30; full240h/1GPU/12CPU/90000MB, immutable snapshot, afterok dependencies and existing baseline banks. The adjacent run README owns nesting, sources, losses and output interpretation.
 - The approved eight-case comparison uses `DualOutputs/B4_Dual-independence.sh`, preview-only unless `--submit`. Preserve one8h all-case GPU gate, six training-only OOF field banks and24 240h case fits, with immutable source and afterok dependencies. It extends existing B1/test/preflight paths, not Slurm policy. Staged fits must verify bank IDs, scalers, architecture and seed; joint cases must not consume true-only fields. Full details and names are in `DualOutputs/README.md`.
 - Active entry points default to full data (`--nsims all`) and production-scale epochs, scheduler patience, and early stopping.
 - Reduced samples, epochs, trials, or CPU execution are opt-in CLI overrides such as `--nsims 64`, `--epochs 3`, `--n-trials-per-typ 2`, or `--allow-cpu`.

@@ -14,10 +14,43 @@ def main():
                         help="Gate only baseline plus the four frozen-source corrected-loss fits.")
     parser.add_argument("--sudden-suite", action="store_true", help="Gate baseline and specimen-specific sudden weighting only.")
     parser.add_argument("--independence-suite", action="store_true", help="Gate two OOF field banks and all eight sharing cases.")
+    parser.add_argument("--followup-suite", choices=["inputs", "losses"], help="Case1(i) source/corrector or custom-loss gate.")
     args = parser.parse_args()
-    if sum((args.sudden_suite, args.curve_loss_suite, args.independence_suite)) > 1:
+    if sum((args.sudden_suite, args.curve_loss_suite, args.independence_suite, bool(args.followup_suite))) > 1:
         parser.error("Choose one isolated suite.")
     runner = runpy.run_path(str(Path(__file__).with_name("A0-HPC-Dual-test.py")))["main"]
+    if args.followup_suite:
+        common = ["--experiment", "baseline", "--base-model-json", args.base_model_json,
+                  "--independence-case", "1i", "--followup-study", args.followup_suite,
+                  "--nsims", "64", "--no-range-split", "--epochs", "1", "--batch", "2",
+                  "--seed", "42", "--split-seed", "42"]
+        def fit(label, options):
+            model = runner(common + ["--run-label", args.run_label + "-" + label] + options)
+            path = Path(model.model_file).parent
+            from resources.MLmetrics import postprocess_load_dual_run
+            postprocess_load_dual_run(path, load_model=True, data=model.data, device="cpu")
+            del model
+            gc.collect()
+            import torch
+            torch.cuda.empty_cache()
+            return str(path)
+        bank = fit("bank", ["--prepare-field-bank"])
+        baseline = fit("predicted", ["--field-bank", bank])
+        if args.followup_suite == "inputs":
+            correction = fit("correction", ["--field-bank", bank, "--prepare-correction-bank",
+                                             "--reference-model-json", baseline + "/model.json"])
+            for source in ("true", "mixed", "corrected", "corrected_mixed"):
+                fit(source, ["--field-bank", bank, "--curve-training-source", source,
+                             "--correction-bank", correction])
+        else:
+            for variant in ("spatial", "temporal", "both", "sudden"):
+                custom = ["--field-loss-variant", variant]
+                loss_bank = fit("bank-" + variant, ["--prepare-field-bank"] + custom)
+                fit(variant, ["--field-bank", loss_bank, "--reference-model-json", baseline + "/model.json"] + custom)
+            for loss in ("combined_no_location", "combined_soft"):
+                fit(loss, ["--field-bank", bank, "--curve-loss-ablation", loss])
+        print("Case1(i) follow-up GPU/data/save/reload gate passed.", flush=True)
+        return
     if args.independence_suite:
         from resources.MLindependence import CASES
         # The subset gate cannot exercise full-population split validation.

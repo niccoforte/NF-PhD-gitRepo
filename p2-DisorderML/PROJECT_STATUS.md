@@ -4,6 +4,28 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Case1(i) is selected for the next two studies. Input variation is prepared first:
+  five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
+  mixture), every deployment path using predicted fields. Three nested correction
+  banks/four new curve fits per seed give15 full jobs; existing predicted controls
+  are reused. Custom-loss study prepares30 full jobs: spatial/temporal/both/sudden
+  banks and adapted curves, plus combined-curve fits without location and with
+  soft/soft peak location per seed. Original
+  fixed curve readouts and source substitutions diagnose adaptation separately.
+  Both use the existing trainer/runner, matched splits/seeds42/43/44, max450 epochs,
+  early-stop52, disposable8h preflights and240h full resource requests. Preview-first
+  `HPC/DualOutputs/B4_Independent-followups.sh`; no new jobs submitted yet.
+  **HIGH PRIORITY manual task:** researcher personally reviews HPC home, scratch
+  and archive ordering/names/conventions; recorded under Cleanup in the active
+  accuracy checklist. This manual review is not marked completed by agent checks.
+  Seven new CPU follow-up tests pass, including complete nested-source fits,
+  frozen-generator equality, saved correction reload, loss serialization and
+  mocked15/30-job dependencies. Eight prior independence,14 field-loss and10 sudden
+  tests pass. Changed-surface19 and contract80 checks non-failing/zero failed.
+  The broader31-test dual suite has one skipped
+  test and one Windows SQLite temporary-file cleanup error in the unchanged HPO
+  test (its training/resume assertions pass); no HPO implementation changed.
+
 - Independence review: gate31448215 and all30 production jobs31448216–31448245
   COMPLETED0:0. All24 case fits/six banks downloaded to ignored
   `Z:/00-PhD-gitRepo/data/MULTI/Dual/Transformer/`;591 JSON/NPZ/checkpoint/history
@@ -22,8 +44,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   frozen fields do not improve mean accuracy. This is not proof of gradient
   interference or globally optimal architecture. Keep locked test untouched and
   agreed2% field margin; curve/local acceptance tolerances remain unagreed.
-  Follow-ups remain the approved matched loss and curve-source comparisons,
-  conditional on the user's review; no defaults or jobs changed during processing.
+  The user has selected Case1(i); follow-up preparations are described above.
+  No legacy defaults or historical jobs/checkpoints were changed by this selection.
 
 - Handoff freshness review: optimisation now records the completed property-oracle
   evidence and architecture-neutral boundary while sharing selection is pending;

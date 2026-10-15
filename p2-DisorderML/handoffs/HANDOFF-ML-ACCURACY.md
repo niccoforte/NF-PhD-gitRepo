@@ -8,7 +8,22 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
-## Start here: ownership and current state
+## Cleanup
+
+- [ ] **HIGH PRIORITY — researcher manual review:** personally inspect remote
+  home `/data/home/exy053`, scratch `/gpfs/scratch/exy053`, and archive
+  `/data/SEMS-TaoLab/Niccolo-Forte/p2`. Check that folders, retained runs, names,
+  source snapshots and logs follow your intended ordering and conventions.
+  This is your manual sign-off task; automated checks do not complete it.
+
+## Case 1(i) follow-ups
+
+The user selected Case1(i) for the next source and custom-loss studies. Prepare
+the input study first, with predicted/true/mixed and corrected/mixed-corrected
+training sources, then isolated spatial/temporal/both field and soft-peak curve
+loss comparisons. Reuse the completed baseline and its frozen banks. All
+deployment results use predicted fields; correctors require nested training-only
+cross-fitting for downstream corrected-field training. Keep this checklist active.
 
 ### Current decision suite and imported deferred ideas (12 October)
 
@@ -78,7 +93,8 @@ true-field evaluation is an additional oracle diagnostic only. Use training-only
 cross-fitted predictions where a frozen upstream model supplies training inputs.
 True-only curve training cannot send gradients to the field generator; explicitly
 separate that source comparison from claims about end-to-end architecture.
-These follow-ups are deferred until the sharing verdict, not added to this suite.
+The sharing verdict now selects Case1(i); the source/loss follow-ups are prepared
+through `HPC/DualOutputs/B4_Independent-followups.sh`, separate from the old suite.
 
 Correction to the earlier verdict: fixed FT crack-tip-box weighting is a valid,
 user-approved physical region priority, not leakage/cheating or a rejected idea.
@@ -91,13 +107,15 @@ a 1/3 against uniform weighting. Check training-side event timing before claimin
 the midpoint is typical; retain positive tail weights and per-frame reporting.
 Do not mix Gaussian/regional/sudden weights in the first comparisons.
 
-Field correction remains after the independence verdict: a small residual
+Field correction is now prepared after the independence verdict: a small residual
 field-to-field model, initially separate by task, trained on held-out-fold field
 predictions paired by specimen ID with true fields. Freeze the upstream model;
 use field supervision first and assess both a fixed curve readout and subsequent
 curve adaptation separately. Out-of-fold generators/scalers must not train on
 their held-out specimens; final validation/test are never corrector training data.
-No guarantee that missing fracture information can be reconstructed.
+Nested OOF correction, fixed-curve diagnostics and corrected-source adaptation
+are implemented; GPU/accuracy validation remains pending. No guarantee that missing
+fracture information can be reconstructed.
 
 Full available user/assistant histories of **Assess unified ML model feasibility**
 (`019efa77-a47f-7693-9e6e-f606f5fc784f`), **Summarize GNN chat changes**
