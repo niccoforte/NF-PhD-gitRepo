@@ -425,30 +425,35 @@ The [damage-label audit](p2-DisorderML/samples/damage-audit/README.md) uses two
 authorised periodic Ti FCC ODB/INP samples. `resources/damage.py` owns checked
 INP-chain mapping, missing-aware reduction and the separate `strut_damage_v1`
 contract; `code/review_damage.py` produces labelled raw-value examples and
-actual-frame damage/loading figures. Whole-element STATUS=0 establishes failure;
-maximum reported section/parent severity is an explicit partial rule, not average
-degradation. Only bottom/top beam section points are stored in these ODBs.
+actual-frame fracture/loading figures. The target is binary fracture:
+`D_fracture=1` if any constituent element has STATUS=0, `D_fracture=0` if all
+constituent statuses are known and active, and unknown otherwise. It uses the
+existing `strut_failed` and `strut_failure_known` arrays, not SDEG thresholds.
+SDEG is retained as a local material-damage diagnostic; only bottom/top beam
+section points are stored in these ODBs.
 UT excludes grips. These products do not change node-displacement arrays or ML
 architecture. Samples remain ignored; implementation and guidance are tracked.
 The tracked [damage quick start](p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
 gives commands first, with the algorithm/NPZ specification as optional technical
 reference. The pipeline is implemented in maintained source; no DATA/MODEL loader
-or damage prediction head consumes it yet. The visual report includes red D=1
-on its numeric legend and explains grey active surface damage awaiting a scalar
-reduction separately from missing observations.
-Maximum-mode plots use black outlines for STATUS-confirmed failure, separately
-from the scalar severity colour.
+or fracture prediction head consumes it yet. Full-body and example plots use
+purple for active/unfractured (`D_fracture=0`), red for fractured (`1`), and
+black dashes for unknown status. Surface damage does not introduce a third
+fracture state or change an active strut's binary label.
 
 Run from the repository root in the existing environments, with explicit paths
-and the researcher-selected partial rule (`failure-only` or `max`):
+and `failure-only` to preserve the current raw diagnostic products:
 
 ```powershell
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" --odb ODB_PATH --inp INP_PATH --task UT --output OUTPUT.npz --partial-rule failure-only
 python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir p2-DisorderML/samples/damage-audit
 ```
 
-The review honours the saved rule: failure-only NPZs show raw partial observations
-without assigning partial numeric D; maximum-rule NPZs show the selected severity.
+The review derives binary fracture directly from the saved failure masks, without
+re-extraction or a schema change. Existing failure-only `strut_damage` arrays
+retain NaNs for active surface-damaged struts; those historical scalar-severity
+NaNs do not mean the binary fracture state is unknown. Maximum SDEG reduction
+remains implemented but unselected and is unnecessary for the binary target.
 The exporter refuses an existing output unless `--overwrite` is supplied. It does
 not discover files, upgrade ODBs, launch simulations or submit jobs. Automatic
 original-joint inference is restricted to the checked periodic profile;

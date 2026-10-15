@@ -16,9 +16,14 @@ The researcher authorised the local periodic UT/FT ODB pair. Both have 21 actual
 frames, stored bottom/top section SDEG and whole-element STATUS; input meshes
 match and hashes remain unchanged. STATUS=0 establishes failure even though stored
 SDEG reaches only 0.99999. Separate `strut_damage_v1` products retain raw data,
-body-only UT membership and masks. Maximum partial severity remains an explicit
-researcher choice; failure-only mode leaves partial D unassigned. No new model,
-bulk export, disordered processing or job is authorised by these periodic tests.
+body-only UT membership and masks. The researcher has clarified the target as
+binary fracture from STATUS: any failed member gives `D_fracture=1`, all known
+active members give 0, otherwise unknown. Use existing `strut_failed` under
+`strut_failure_known`; no re-extraction or schema change is needed. SDEG remains
+an optional raw diagnostic. Maximum partial severity is unselected and no longer
+blocks this binary target; the saved failure-only numeric-severity arrays still
+leave active surface damage as NaN. No new model, bulk export, disordered
+processing or job is authorised by these periodic tests.
 
 ## Damage export: element → strut → loading history
 
@@ -36,21 +41,25 @@ consecutive labels or an assumed fixed number of elements as the mapping rule.
 The researcher expects five or ten elements per strut, but the prior audit found
 variable subdivision counts: measure and report them instead of assuming either.
 
-At each recorded frame, if any constituent element has verified failure D=1,
-assign D=1 to its whole parent strut as requested. For partial damage, propose
-and obtain approval for the aggregation rule (e.g. maximum), while retaining the
-underlying element values for audit. Handle deleted elements/missing output:
-missing does not automatically mean undamaged or failed. Identify failure through
+At each recorded frame, if any constituent element has verified STATUS=0,
+assign binary fracture 1 to its whole parent strut. If all constituent statuses
+are known and active, assign 0 regardless of SDEG. Keep raw SDEG for audit;
+continuous severity aggregation is optional and would require an explicit
+researcher choice, but is unnecessary for this target. Handle deleted elements
+and missing output: missing does not automatically mean undamaged or failed. Identify failure through
 the validated damage/status convention and retain absorbing failure only when
 the simulation definition supports it. Distinguish first failure from average
 strut degradation. Do not maximise a raw sum of element failures.
 
 Produce small, labelled examples under the existing `p2-DisorderML/samples/`:
-an intact strut, a partially damaged strut, and a strut with one failed element;
-show endpoints, strut identity, constituent element labels, raw values, aggregation
-arithmetic and the resulting strut value. Include a crack-adjacent FT example and
-different subdivision counts. Plot a highlighted parent strut and its elements
-at several frames, and D against explicitly defined global loading/strain.
+an intact strut, an active surface-damaged strut, and a strut with one failed
+element; show endpoints, strut identity, constituent element labels, raw values, aggregation
+arithmetic and the resulting binary fracture value. Full-body and example maps
+use purple 0/red 1, with black-dashed unknown observations and no grey active
+state. Keep local SDEG diagnostics distinct. Include a crack-adjacent FT example
+and different subdivision counts. Plot a highlighted parent strut and its
+elements at several frames, and binary fracture against explicitly defined
+global loading/strain.
 Ask for researcher confirmation before scaling up.
 
 Propose a versioned edge/strut NPZ contract with stable specimen IDs, endpoint

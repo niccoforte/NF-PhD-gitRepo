@@ -50,10 +50,27 @@ Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
 Pop-Location
 ```
 
-The current policy is `failure-only`: verified failed parents have D=1, fully
-observed undamaged active parents have D=0, and active parents with observed
-damage retain raw SDEG but have no assigned scalar D. Researcher approval is
-still needed before replacing this policy with `--partial-rule max`.
+The requested target is **binary fracture**, derived directly from STATUS:
+
+- `D_fracture=1`: any constituent element has verified STATUS=0.
+- `D_fracture=0`: every constituent element has known STATUS=1, including
+  elements with positive SDEG that remain active.
+- Unknown: no verified failed member, and at least one constituent STATUS is
+  missing. Missing does not mean active or failed.
+
+The existing `strut_failed` and `strut_failure_known` arrays already provide
+this target. A consumer can use
+`np.where(a['strut_failure_known'], a['strut_failed'].astype(float), np.nan)`.
+No ODB re-extraction, new schema or maximum-SDEG aggregation is needed. The
+visual review uses purple for 0, red for 1 and black dashes for unknown status.
+
+The saved export mode remains `failure-only`. Its older numeric-severity arrays
+`element_damage`/`strut_damage` leave active surface damage as NaN, while keeping
+the raw SDEG and independently known active/failure state. Those scalar-severity
+NaNs do not make the binary fracture label unknown. `--partial-rule max` remains
+an available, unselected diagnostic policy; approval of it is no longer a blocker
+for the binary fracture target. SDEG describes local material degradation and
+does not define the target.
 
 <details>
 <summary>Optional technical reference: algorithm, saved arrays and validation</summary>
@@ -83,13 +100,17 @@ still needed before replacing this policy with `--partial-rule max`.
    observations by instance, element, output position, integration and section.
 6. STATUS=0 establishes whole-element failure and sets derived element D=1;
    STATUS=1 means active. Never infer failure by rounding/thresholding SDEG, or
-   from a single fully damaged material point. Retain the independent masks.
-7. Partial rules are explicit. `failure-only` assigns D=0 only for fully observed
-   undamaged active elements and leaves partial numeric D as NaN. `max` uses
+   from a single fully damaged material point. Derive binary parent fracture
+   from `strut_failed` under `strut_failure_known`: any failed member gives 1;
+   all known active members give 0; otherwise unknown. Retain the masks.
+7. Optional scalar-severity rules are explicit. `failure-only` assigns D=0 only
+   for fully observed undamaged active elements and leaves partial numeric D as NaN. `max` uses
    maximum reported section/IP SDEG when coverage and STATUS are known. Here
    only bottom/top section points 1 and 5 at integration point 1 are stored.
    That maximum is severity, not average cross-section degradation or proof of
-   unreported interior values. It needs an explicit researcher policy choice.
+   unreported interior values. Maximum severity needs an explicit researcher
+   policy choice only if that separate diagnostic is wanted; it is not needed
+   for binary fracture.
 8. For a parent, any verified failed member sets parent D=1 even if another
    member is unknown. Otherwise maximum-rule parent D is the maximum of complete
    member values. Incomplete observations/unselected partial reduction remain
@@ -108,8 +129,9 @@ still needed before replacing this policy with `--partial-rule max`.
     reopen with `allow_pickle=False`. Validate identities/shapes/masks and exact
     re-derivation from saved raw observations. Write adjacent provenance JSON.
 12. Generate actual raw-value examples, several-frame parent/element maps and
-    damage/loading plots. Confirm the label policy and sample before scaling
-    or model integration. Initial FT absence is not evolving failure.
+    binary fracture/loading plots. Keep raw SDEG diagnostics separate from the
+    purple/red fracture map. Confirm new sample scope before scaling or model
+    integration. Initial FT absence is not evolving failure.
 
 The STATUS/SDEG definitions are supported by the accessible
 [Abaqus damage documentation](https://docs.software.vt.edu/abaqusv2025/English/SIMACAEMATRefMap/simamat-c-damageevolductile.htm).
@@ -143,6 +165,7 @@ to change inference edges. Always retain failure masks: a reported maximum near
 `strut_coverage` is the fraction of constituent numeric D labels assigned;
 `strut_observation_coverage` is raw STATUS plus expected reported-point coverage.
 They differ in failure-only mode because observed partial values remain unassigned.
+Neither is the binary-fracture validity mask: use `strut_failure_known` for that.
 
 ## Run and validate
 
@@ -155,8 +178,9 @@ python -m unittest discover -s p1-DisorderLatticeProperties/SIMscripts -p test_d
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/test_damage_odb.py', run_name='__main__')" --npz OUTPUT.npz
 ```
 
-`--partial-rule max` selects the reported-section/parent maximum; failure
-detection remains independent. Existing outputs require `--overwrite`.
+`--partial-rule max` selects an optional reported-section/parent severity maximum;
+binary failure detection remains independent. It is not selected for these
+products. Existing outputs require `--overwrite`.
 
 Actual periodic results: 21 frames/task; UT body 2,319 struts/10,075 elements,
 excluding 830 grip elements; FT 2,259/4,024. Final failed parents/elements:
@@ -164,8 +188,17 @@ UT 83/83 and FT 7/7. No expected SDEG/STATUS records were missing, no STATUS
 reactivation occurred, and original hashes were unchanged. Every stored SDEG
 value was either 0 or 0.9999899864196777; the field grid does not resolve a smooth
 intermediate softening ramp. Active partially damaged beams can have one stored
-surface value near 1 and the other 0. Do not fabricate intermediate histories or
-reinterpret that state as whole-element failure.
+surface value near 1 and the other 0. Both reported surfaces can also reach the
+stored near-one value while STATUS remains 1; unreported interior section values
+are not available in these products. Do not fabricate intermediate histories or
+reinterpret reported surface degradation as whole-element failure.
+
+Across the recorded UT frames, 109 struts are observed all-active with positive
+reported SDEG; 33 later acquire a failed member and 76 remain active at the final
+frame. The example strut 2253/element 535 first has positive bottom SDEG at frame
+5, has both reported surfaces near one from frame 8, and remains STATUS=1 through
+frame 20. These counts describe the saved time window, not inevitable later
+failure. FT has no all-active positive-SDEG parent at any recorded frame.
 
 The ignored p2 `samples/damage-audit/` contains NPZs, provenance, frame CSVs,
 raw-value examples and inspected figures. Producer, review code, tests and this

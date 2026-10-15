@@ -77,20 +77,28 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   `reference_field_edges`. Each has 21 recorded frames, zero missing expected
   SDEG/STATUS records, section points 1/5 (bottom/top), and no STATUS reactivation.
   Final verified failed parents UT 83, FT 7 (one failed element per affected parent).
-  Stored SDEG reaches only 0.99999; whole-element STATUS=0 establishes failure. Maximum
-  reported-section then parent severity is implemented but requires the pending
-  researcher choice; failure-only exports leave partial D unassigned and preserve
-  raw observations. Twelve focused tests and 78 contract checks passed, zero
-  failures. Readable report/raw examples/figures/NPZs: `samples/damage-audit/`.
+  Stored SDEG reaches only 0.99999; whole-element STATUS=0 establishes failure.
+  The researcher clarified the target as binary fracture from STATUS: use existing
+  `strut_failed`/`strut_failure_known`, with 0 for known all-active parents and 1
+  for any failed member. Raw SDEG is optional diagnostic context; no partial
+  reduction choice blocks this target. Historical scalar-severity NaNs remain
+  separate from the known binary labels. Twelve focused tests and 80 contract
+  checks pass, zero failures; all 96,138 binary parent/frame labels independently
+  match raw STATUS, including fully known states where severity is NaN.
+  Readable report/raw examples/figures/NPZs: `samples/damage-audit/`.
   No architecture, source data or jobs changed. No disordered/bulk processing or
   model integration authorised. User clarified D=highest UT ductility,
   K=initial FT toughness, B=same-disorder UT/FT property-Pareto pair; only per
   files were processed here. Independent live-ODB checks matched all 296,079
   STATUS records/all-frame parent failures and 140,990 section SDEG spot checks.
   Implementation/guidance are tracked; generated research artifacts remain
-  ignored under the existing samples policy. Report now leads with conclusions
-  and figures; red D=1 is included in the numeric legend, grey explicitly means
-  observed active surface damage awaiting scalar reduction. The tracked runbook
+  ignored under the existing samples policy. Report leads with conclusions
+  and binary fracture figures: purple0/red1, black-dashed unknown, no grey active
+  state. Of 109 UT parents observed active with surface damage, 33 later fracture
+  and 76 remain active at the final frame. Example2253/e535 never fails through
+  frame20, even after both reported outer section points degrade. Interior points
+  are not saved. Parent-fate CSVs preserve this observed-window evidence. The
+  tracked runbook
   starts with usage commands; the full specification is optional reference.
 
 - 14 October retention cleanup: all56 preflight archive directories from nine
