@@ -589,6 +589,11 @@ Common local paths:
 
 - p1 local data: `Z:/p1/data/Ti/...`
 - p2 local saved runs: `Z:/p2`
+- Current Windows independence-review artifacts use `Z:/00-PhD-gitRepo/data/`
+  with the remote relative tree preserved; readable figures/report are in
+  `p2-DisorderML/samples/independence-review/README.md`. Both remain ignored and
+  can be merged with the incoming Mac artifacts. PuTTY sharing transfers use
+  PSCP; the existing Windows B3 script retains its OpenSSH route/default.
 - p1 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`
 - p2 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p2`
 

@@ -18,8 +18,19 @@ RMSE non-inferiority margin on BOTH tasks, with local-motion and curve safeguard
 their numerical tolerances still need specifying before final model selection.
 The user confirmed the following revised numbering. Local implementation is now
 in `resources/MLindependence.py`, the existing dual runner/preflight and
-`HPC/DualOutputs/B4_Dual-independence.sh`. Submitted13 October: gate31417279,
-banks/cases31417280–31417309, sourceec9189d; GPU validation remains pending.
+`HPC/DualOutputs/B4_Dual-independence.sh`. The original jobs failed at the split-ID
+representation guard and were cleaned after correction. Replacement
+`independence-261013-r1`, source6b0db82, gate31448215 and production31448216–31448245,
+is fully COMPLETED0:0. All24 case fits and six banks are downloaded to the ignored
+`data/MULTI/Dual/Transformer/` under `Z:/00-PhD-gitRepo`.
+Review `../samples/independence-review/README.md` before further experiments.
+Case1(i) is the current practical recommendation: four independently trained
+models. Mean validation skill percentages across three seeds are UTfield6.11,
+FTfield24.20, UTcurve4.55, FTcurve18.73; current joint Case3(ii) gives5.09,13.30,
+3.43,−0.17. End-to-end FT curve collapse also occurs without UT/FT sharing.
+This is evidence about the tested configuration/training, not proof of gradient
+conflict or failure of every possible DUAL model. Preserve the pending safeguards
+and locked-test boundary; no training/default changes are implied by the review.
 The adjacent run README owns exact settings, bank provenance and invocation:
 
 | Case | Separate training groups | Gradient boundary |

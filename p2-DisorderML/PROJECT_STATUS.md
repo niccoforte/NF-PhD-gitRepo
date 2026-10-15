@@ -4,6 +4,27 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Independence review: gate31448215 and all30 production jobs31448216–31448245
+  COMPLETED0:0. All24 case fits/six banks downloaded to ignored
+  `Z:/00-PhD-gitRepo/data/MULTI/Dual/Transformer/`;591 JSON/NPZ/checkpoint/history
+  files match remote SHA-256. Human report/figures: `samples/independence-review/`.
+  All1356 files match remote sizes. All24 prediction arrays pass ID, train-scaler,
+  mask/truth identity and independently recomputed physical-RMSE checks; frozen
+  fields match exactly between their two consumer cases. Eighteen figures include
+  seed variation, safeguards, diversity, full-body UT/crack-tip FT truth/prediction/
+  error maps, curves with error bars and log loss histories. Guidance/changed-surface
+  validation passes (six non-failing/zero failed); no training implementation changed.
+  Case1(i), four independently trained models, is the practical recommendation
+  under this fixed configuration. Three-seed mean validation RMSE skill (%) is
+  UTfield6.11, FTfield24.20, UTcurve4.55, FTcurve18.73; joint3(ii) gives5.09,
+  13.30,3.43,−0.17. End-to-end FT curves collapse across all seeds, also in1(ii)
+  without any UT/FT sharing. Shared fields worsen FT; shared curves on identical
+  frozen fields do not improve mean accuracy. This is not proof of gradient
+  interference or globally optimal architecture. Keep locked test untouched and
+  agreed2% field margin; curve/local acceptance tolerances remain unagreed.
+  Follow-ups remain the approved matched loss and curve-source comparisons,
+  conditional on the user's review; no defaults or jobs changed during processing.
+
 - Handoff freshness review: optimisation now records the completed property-oracle
   evidence and architecture-neutral boundary while sharing selection is pending;
   physics/strain distinguishes implemented CPU-tested sudden weights from unproven
@@ -34,8 +55,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 - 14 October retention cleanup: all56 preflight archive directories from nine
   COMPLETED0:0 jobs removed permanently; successful home logs retained. Failed
   original independence scratch/archive/home logs were already removed (54 paths).
-  Replacement gate31448215 passed; full jobs are running/queued, not deleted or
-  resubmitted. B1 now skips preflight archiving and removes successful scratch;
+  Replacement gate31448215 passed; all full jobs subsequently completed, not deleted
+  or resubmitted. B1 now skips preflight archiving and removes successful scratch;
   failed evidence cleanup after correction is a high-priority HPC instruction.
 
 - Recovery13 October: original gate31417279 COMPLETED0:0; all18 started full jobs
@@ -49,9 +70,11 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   and concise failure evidence remain. Replacement independence-261013-r1 submitted
   from6b0db82: gate31448215; six banks/24 cases31448216–31448245 dependency-gated.
   Full requests remain240h/1GPU/12CPU/90000MB. Eight focused tests passed;
-  base-ref changed validation10 non-failing/zero failed. GPU gate not yet passed.
+  base-ref changed validation10 non-failing/zero failed. GPU gate subsequently passed.
 
-- 13 October: submitted the eight-case suite `independence-261013` from immutable `ec9189d` after clean HPC fast-forward, both Git-host pushes and Slurm resource dry-run. Gate31417279 requests8h and is RUNNING on sbg16; six OOF banks and24 case fits31417280–31417309 each request240h, 1GPU/12CPU/90000MB on andrena/pilot_andrena and remain PENDING Dependency. Python has launched; this is not a passed GPU gate or accuracy evidence. Home manifest `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013/jobs.tsv`; archives under `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/` with the suite prefix. Do not resubmit. Temporary transport bundle removed after verified deployment; source/history remain in Git and immutable job snapshot. Shared SSH master remains open; no model/scientific changes in this deployment.
+- Original `independence-261013` (sourceec9189d, gate31417279/full31417280–31417309)
+  is superseded by the completed replacement above. Its home source/manifest retain
+  provenance; failed useless outputs were cleaned after the guard correction.
 - Verification for the independence preparation: 48 dual regression tests passed (including seven isolation/OOF/checkpoint/launcher tests); changed-surface22 and contract76 non-failing/zero failed. Existing notebook, `.gitignore` and field-test edits remain untouched. Names1(i),1(ii),2a(i),2a(ii),2b(i),2b(ii),3(i),3(ii) use predicted-field deployment, seeds42/43/44, matched configuration and equal normalized MSE. Staged cases reuse three-fold training-only OOF banks with inner selection and fold-only normalization. High-priority AFTER sharing selection: matched custom-loss comparisons and predicted-only/true-only/mixed curve training, ALL evaluated on predicted fields. True-only training removes the curve-to-field gradient. Gradient logging, other features/weights and correction remain deferred. The2% field margin is accepted; numerical curve/local safeguards remain to agree before final selection.
 - Retirement audit complete13 October: read full available user/assistant histories of Assess unified ML model feasibility, Summarize GNN chat changes and Review cleanup folder from the reconnected PC. No extra experiments added: useful missing ideas were already retained in the accuracy brief or CurveOutputs cleanup notes; obsolete code/revival proposals stay superseded. These three chats may be archived. Keep the active accuracy checklist; no chats were automatically archived.
 - Source reconciliation complete: the full available user/answer history of **Dual Model** (`01a0a5ba-1e2c-7682-92c7-cefabb96a6e8`) and the accuracy brief have been reconciled into **Improve ML Accuracy**, against current code and the user's newer decisions. Dual Model may be archived; this is transfer of ownership, not completion of every experiment. Keep `handoffs/HANDOFF-ML-ACCURACY.md` for now: the run guide/index still link to its detailed notebook backlog, controlled-gallery/pin-tolerance checks and per-test visual review requirements. Also retain the proposed task-embedding usage diagnostic (zero/swap at fixed weights, with gradient/update checks); it is not a completed scientific result. Retire the brief only after these details have a maintained home and all incoming links are updated; explicitly tell the user then. No completed runs, cancelled proposals or sibling-task work were reactivated, and no chat/file was deleted or archived in this audit.

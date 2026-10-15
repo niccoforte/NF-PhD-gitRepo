@@ -24,14 +24,29 @@ successful preflight artifacts and the original source/manifest remain evidence.
 Replacement `independence-261013-r1` submitted from `6b0db82`: gate31448215,
 six banks and24 cases31448216–31448245, all full jobs240h and dependency-gated.
 Manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013-r1/jobs.tsv`.
-Eight focused tests pass; replacement GPU gate remains unconfirmed.
+Gate31448215 and all30 production jobs31448216–31448245 are verified
+COMPLETED0:0. The24 case fits and six reusable field banks are downloaded under
+`Z:/00-PhD-gitRepo/data/MULTI/Dual/Transformer/`, retaining the archive labels.
+The human review is `../../samples/independence-review/README.md` relative to this
+directory. Generated data and samples remain ignored; source notebooks stay in code.
+
+The three-seed validation review recommends Case1(i) as the practical starting
+point for further accuracy work. Mean RMSE reductions versus the training-mean
+prediction are UTfield6.11%, FTfield24.20%, UTcurve4.55%, FTcurve18.73%.
+For current joint Case3(ii), they are5.09%,13.30%,3.43%,−0.17%, respectively.
+All end-to-end variants have nearly constant FT curves across specimens, including
+Case1(ii), which has no shared UT/FT parameters. This does not identify gradient
+conflict as the cause. The fixed configuration, OOF cost and per-task rather than
+total-capacity matching limit generalisation of the verdict. Locked test remains
+unevaluated; numerical local-motion/curve acceptance margins remain unagreed.
 
 Submitted on13 October as `independence-261013`, immutable source `ec9189d`.
 Original GPU gate **31417279** completed on `sbg16`; the full jobs failed as
 described above. Use the replacement manifest, not these historical IDs.
 Manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/independence-261013/jobs.tsv`.
-Archives will be under `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/`
-with labels `independence-261013-<case>p-s<seed>` and matching `bank-1i|3i` labels.
+Successful replacement archives are under
+`/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/`
+with labels `independence-261013-r1-<case>p-s<seed>` and matching `bank-1i|3i` labels.
 These names supersede the older case numbering in historical notes.
 `F` means geometry→field; `C` means field→curve; `(i)` freezes the completed field
 fit before curve training; `(ii)` retains end-to-end field+curve supervision.
@@ -151,8 +166,8 @@ retain B1 scratch and existing artifacts for inspection, not blind overwriting.
 
 The active `test_independence.py` checks parameter/gradient isolation, frozen
 field invariance, group counts, fold-only scalers/IDs, all eight CPU fits, checkpoint
-round trips and non-submitting launcher behavior. GPU success and scientific
-accuracy remain to be established on HPC.
+round trips and non-submitting launcher behavior. Completed GPU execution and
+validation results are recorded above; synthetic checks alone do not establish accuracy.
 
 ## Controlled architecture and interface experiments
 

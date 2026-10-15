@@ -115,6 +115,16 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## HPO, resume, and transfer
 
+Windows PuTTY sharing: the user authenticates an `HPC` session started with
+`putty -load HPC -l exy053 -share`; `plink -shareexists -load HPC -l exy053` must
+return0, followed by a harmless `plink -batch -share ...` remote check. Use
+`pscp -batch -share -load HPC -l exy053` for this connection; Windows OpenSSH scp
+cannot reuse it. Preserve the current repo-root `data/` and paper `samples/`
+layout on Z:, both ignored. The existing B3 Windows script still defaults to
+`Z:/p2` and uses OpenSSH; do not claim it was used for a PuTTY transfer or change
+its defaults implicitly. Successful independence archives were downloaded to
+`Z:/00-PhD-gitRepo/data/MULTI/Dual/Transformer/`.
+
 For dual single runs use `B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py`. Defaults are all samples, CUDA, 450 epochs, validation diagnostics, full curves, and a joint normalized-field/physical-curve objective. Explicit smoke overrides are `--nsims 64 --epochs 3 --batch 2 --no-range-split`; `--allow-cpu` is local/debug only. Outputs follow `MULTI/Dual/Transformer/<run-label>`. Do not route checkpoints through legacy `MODEL` or B2. Dual HPO uses B1 with `DualOutputs/A0-HPC-Dual-HPO.py`; `--resume` restores completed study history and retries an interrupted configuration from epoch one. A 230-hour budget leaves margin below the unchanged ten-day limit. Best physical diagnostics are under `HPO/<study>/best/results/`; the dual notebook consumes that directory. Transfer a study using the platform B3 script with `MULTI Dual Transformer HPO <study>`.
 
 - Prefer the Slurm `-J` value as the HPO study descriptor unless the study folder intentionally differs.
