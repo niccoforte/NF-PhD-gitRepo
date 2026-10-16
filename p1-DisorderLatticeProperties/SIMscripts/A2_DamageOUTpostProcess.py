@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-from resources.damage import periodic_fcc_map, reduce_damage, require, validate_damage_arrays
+from resources.damage import fcc_map, reduce_damage, require, validate_damage_arrays
 
 
 def fingerprint(path):
@@ -41,25 +41,27 @@ def nodal_component(frame, assembly, set_name, variable, component, reduction):
 def export_damage(odb_path, inp_path, task, output, partial_rule, step_name="Step-1", carry_failure=False):
     from odbAccess import openOdb
     odb_path, inp_path, output = map(lambda p: Path(p).resolve(), (odb_path, inp_path, output))
-    require(odb_path.stem == inp_path.stem and "-per-" in inp_path.stem,
-            "This validated profile accepts only matching periodic ODB/INP stems")
+    require(odb_path.stem == inp_path.stem, "Matching ODB/INP stems are required")
     require(output.suffix == ".npz" and output not in {odb_path, inp_path}, "Invalid output path")
-    require(task == ("UT" if inp_path.stem.startswith("Ductile-") else "FT"), "Task/stem mismatch")
+    require(inp_path.stem.startswith("Ductile-" if task == "UT" else "Fracture-"), "Task/stem mismatch")
     before = dict(inp=fingerprint(inp_path), odb=fingerprint(odb_path))
-    arrays, mesh, mapping = periodic_fcc_map(inp_path, task)
-    metadata = dict(schema_version="strut_damage_v1", task=task, simulation_id=0,
+    arrays, mesh, mapping = fcc_map(inp_path, task)
+    simulation_id = mapping["simulation_id"]
+    metadata = dict(schema_version="strut_damage_v1", task=task, simulation_id=simulation_id,
                     source_stem=inp_path.stem, inp_path=str(inp_path), odb_path=str(odb_path),
-                    source_sha256=before, mapping=mapping, profile="periodic_fcc20_body_v1",
-                    canonical_order="audit-only periodic 800 coordinates sorted (y,x), not saved ML order",
+                    source_sha256=before, mapping=mapping, profile=mapping["profile"],
+                    canonical_order="audit-only FCC reference 800 coordinates sorted (y,x), not saved ML order",
                     coordinate_units="mm", time_units="s", force_units="N", unit_basis="Ti producer convention",
                     partial_rule=partial_rule, point_rule="max_observed_section_SDEG_with_complete_coverage",
                     failure_rule="whole_element_STATUS_zero_v1", carry_failure=carry_failure,
                     requested_initiation_variable="DMICRT", actual_initiation_variable="DUCTCRT",
-                    scope="one explicitly selected periodic ODB; UT main body excludes grips",
+                    scope="one explicitly selected FCC ODB; UT main body excludes grips",
                     coverage_definition="strut_coverage: fraction assigned member D; strut_observation_coverage: fraction members with raw STATUS and all expected reported SDEG points",
                     code_sha256={"exporter":fingerprint(__file__),
                                  "damage_core":fingerprint(Path(__file__).resolve().parents[2]/"resources"/"damage.py")},
                     extraction_utc=datetime.now(timezone.utc).isoformat())
+    if task == "FT":
+        metadata["nominal_crack_tip"] = [120., 95.]
     element_lookup = {int(e): i for i, e in enumerate(arrays["element_label"])}
     node_lookup = {int(n): i for i, n in enumerate(arrays["node_label"])}
     odb = openOdb(str(odb_path), readOnly=True)
@@ -170,7 +172,7 @@ def export_damage(odb_path, inp_path, task, output, partial_rule, step_name="Ste
     metadata["source_unchanged_sha256"] = True
     metadata["status_reactivations"] = int(((arrays["status"][1:] == 1) &
                                             np.maximum.accumulate(arrays["status"] == 0, axis=0)[:-1]).sum())
-    arrays.update(schema_version=np.array("strut_damage_v1"), simulation_id=np.array(0), task=np.array(task),
+    arrays.update(schema_version=np.array("strut_damage_v1"), simulation_id=np.array(simulation_id), task=np.array(task),
                   partial_rule=np.array(partial_rule), carry_failure=np.array(carry_failure),
                   metadata_json=np.array(json.dumps(metadata, sort_keys=True)))
     summary = validate_damage_arrays(arrays)

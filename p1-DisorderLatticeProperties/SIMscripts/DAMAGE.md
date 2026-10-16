@@ -1,10 +1,12 @@
 # Read-only element-to-strut damage export
 
 Separate opt-in producer; displacement/curve pipelines and ML architecture are
-unchanged. The validated scope is the two periodic Ti FCC B21 UT/FT ODB/INP pairs
-in `Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`, stems `Ductile-FCC-20-per-1` and
-`Fracture-FCC-20-per-1`. Periodic simulation ID is 0. No recursive discovery,
-ODB upgrade, FEA or job submission is involved.
+unchanged. The bounded scope is the two periodic Ti FCC B21 UT/FT ODB/INP pairs
+and four explicitly selected 20% nodal-disorder pairs in
+`Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`. Periodic stems are
+`Ductile-FCC-20-per-1` and `Fracture-FCC-20-per-1`, with simulation ID 0.
+The disordered cases are UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK.
+No recursive discovery, ODB upgrade, FEA or job submission is involved.
 
 ## Start here
 
@@ -19,7 +21,9 @@ the generated results and visual report, not the executable implementation.
 
 There is no damage loader in `DATA`, training target/head in `MODEL`, or automatic
 HPC launch integration. This is a working export-and-review route; connecting it
-to ML is a separate task. Only the checked periodic FCC profile is supported.
+to ML is a separate task. The checked FCC profiles support periodic bodies and
+the selected 20% nodal-disorder bodies, with independent original-joint and
+topology validation before ODB processing.
 
 To rebuild the report from the two existing saved products, use the existing
 environment below. It does not open an ODB. `Push-Location`/`Pop-Location` keep
@@ -31,9 +35,28 @@ Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
 Pop-Location
 ```
 
-Read `p2-DisorderML/samples/damage-audit/README.md` for the visual results. The
+Read `p2-DisorderML/samples/damage-audit/README.md` for the periodic visual results
+and `p2-DisorderML/samples/damage-disordered/README.md` for the separate four-case
+disordered report. The
 technical reference below records how labels and files are defined; routine use
 does not require reading it.
+
+To rebuild the separate disordered report from its four saved products, pass
+each case explicitly. The label distinguishes files/selection roles; the numeric
+simulation ID remains 397 or 747 in the export metadata. This command reads saved
+NPZs only and does not reopen or discover ODBs:
+
+```powershell
+Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
+$damageAudit = 'p2-DisorderML/samples/damage-disordered'
+.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" `
+  --case UT-397-maxD UT "$damageAudit/UT-397-maxD.npz" `
+  --case UT-747-maxB UT "$damageAudit/UT-747-maxB.npz" `
+  --case FT-747-maxB FT "$damageAudit/FT-747-maxB.npz" `
+  --case FT-747-maxK FT "$damageAudit/FT-747-maxK.npz" `
+  --title 'Disordered FCC binary-fracture audit' --output-dir $damageAudit
+Pop-Location
+```
 
 Only if re-extraction is needed, this example regenerates the selected periodic
 UT product. It explicitly overwrites that derived NPZ and its adjacent JSON;
@@ -49,6 +72,12 @@ Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
   --partial-rule failure-only --overwrite
 Pop-Location
 ```
+
+For a selected disordered file, use its full matching source stem and a distinct
+output, for example `Ductile-FCC-20-20disNodes-lhs-all-397-maxD` with
+`--task UT --output p2-DisorderML/samples/damage-disordered/UT-397-maxD.npz`.
+The exporter validates the supported disorder profile before opening the ODB.
+Repeat only for explicitly authorised cases; this is not an archive-wide runner.
 
 The requested target is **binary fracture**, derived directly from STATUS:
 
@@ -81,15 +110,23 @@ does not define the target.
    identities and sets. Reject includes, transformed instances and unsupported
    element types rather than guessing. UT selects BodySet; FT AllPartSet.
 2. Identify the checked periodic 800 body joints or native 788-joint FT subset.
+   For the selected nodal-disorder profile, first identify original joints as
+   selected-mesh nodes whose graph degree differs from two. Require exactly
+   800 UT or 788 FT original joints, one-to-one canonical reference identities
+   within +/-sqrt(2) mm per coordinate plus INP precision tolerance, and unchanged
+   boundary coordinates. This bound follows `Geometry.deltaNM=10/sqrt(2)` mm
+   and A1's `delta=0.2*deltaNM`; it is not a blind nearest-node match.
    Traverse actual FE connectivity from joint to joint. Require degree-two
    interior nodes, straight monotonic chains, no loops, complete unique FE
    coverage and unique unordered endpoint pairs. Measure subdivisions; never
    infer membership from consecutive labels or a fixed element count.
 3. Save original endpoints, FE connectivity, parent indices and chain order.
    Audit canonical indices use periodic coordinates sorted `(y,x)`, not saved
-   DATA/DUAL order. The actual endpoint sets were compared exactly against
-   `reference_field_edges`. Disordered original-joint identity needs separate
-   validated metadata; do not nearest-match it blindly to periodic coordinates.
+   DATA/DUAL order. Require the complete canonical edge set: 2,319 UT or 2,259
+   FT parents, not merely the same count. These agree with the checked initial
+   FCC topology and `reference_field_edges`. Hundreds of subdivision nodes also
+   lie within these bounds around reference sites; graph-based joint
+   identification must precede the bounded coordinate match.
 4. Hash INP/ODB, open the explicit ODB with `readOnly=True` in Abaqus Python,
    then verify original IDs, connectivity, initial coordinates (2e-5 mm
    tolerance) and element selection. Matching meshes/stems are evidence, not
@@ -203,10 +240,35 @@ failure. FT has no all-active positive-SDEG parent at any recorded frame.
 The ignored p2 `samples/damage-audit/` contains NPZs, provenance, frame CSVs,
 raw-value examples and inspected figures. Producer, review code, tests and this
 runbook are tracked; generated research artifacts are not force-added to Git.
-Disordered/bulk processing and model integration remain separate decisions.
+The separate `samples/damage-disordered/` report covers only the four authorised
+files. UT 397 has 9,463 selected elements, UT 747 has 9,461, and each excludes
+830 grip elements. Both FT files have 4,429 elements. Original joints, complete
+chains and canonical edge sets validate; subdivisions range from 2 to 6 for UT
+and 1 to 6 for FT. Shared maxB UT/FT original-joint coordinates match exactly.
+The FT maxB/maxK INPs are byte-identical, although the ODB hashes differ. Their
+exported STATUS/SDEG, displacement, loading/reaction and raw history arrays also
+match exactly. Keep both requested file results, but count them as duplicate
+exported responses rather than independent specimens.
 
-The independent live-ODB test compared all 296,079 saved STATUS values and all
-parent failure states at every frame directly with the ODBs, plus 140,990 raw
-section SDEG values at five selected frames/task. All comparisons passed.
+| Disordered file | Recorded frames | Final failed parents | Final failed elements |
+| --- | ---: | ---: | ---: |
+| UT 397 maxD | 21 | 95 | 97 |
+| UT 747 maxB | 21 | 92 | 93 |
+| FT 747 maxB | 21 | 9 | 9 |
+| FT 747 maxK | 21 | 9 | 9 |
+
+All 192,276 parent/frame binary labels are known. No expected STATUS/SDEG values
+are missing, no element reactivates and source INP/ODB hashes remain unchanged.
+The failed-element count can exceed the failed-parent count because multiple
+failed elements may belong to one strut; parent fracture is an OR, not a sum.
+Broader bulk processing and model integration remain separate decisions.
+
+The independent live-ODB test compared all 296,079 periodic STATUS values and
+all parent failure states at every frame directly with the ODBs, plus 140,990 raw
+section SDEG values at five selected frames/task. For the four disordered files,
+it matched all 583,422 raw STATUS values, all 192,276 parent/frame failure and
+known masks, and 277,820 raw section SDEG spot checks at five frames/file. All
+comparisons passed. Sixteen synthetic mapping/reduction tests also pass; these
+include rejection of invalid joint identities and altered initial topology.
 
 </details>

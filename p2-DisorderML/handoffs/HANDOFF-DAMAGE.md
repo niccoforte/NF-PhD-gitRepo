@@ -16,14 +16,33 @@ The researcher authorised the local periodic UT/FT ODB pair. Both have 21 actual
 frames, stored bottom/top section SDEG and whole-element STATUS; input meshes
 match and hashes remain unchanged. STATUS=0 establishes failure even though stored
 SDEG reaches only 0.99999. Separate `strut_damage_v1` products retain raw data,
-body-only UT membership and masks. The researcher has clarified the target as
+body-only UT membership and masks. The researcher has selected the target as
 binary fracture from STATUS: any failed member gives `D_fracture=1`, all known
 active members give 0, otherwise unknown. Use existing `strut_failed` under
 `strut_failure_known`; no re-extraction or schema change is needed. SDEG remains
 an optional raw diagnostic. Maximum partial severity is unselected and no longer
 blocks this binary target; the saved failure-only numeric-severity arrays still
-leave active surface damage as NaN. No new model, bulk export, disordered
-processing or job is authorised by these periodic tests.
+leave active surface damage as NaN.
+
+The researcher additionally authorised all four local disordered FCC files in
+that same directory: UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK.
+Keep their report separate at `p2-DisorderML/samples/damage-disordered/README.md`.
+The checked original-joint strategy is selected-mesh graph degree other than
+two, unique canonical reference identity within A1's +/-sqrt(2) mm per-coordinate
+bound at fac=0.2, unchanged boundaries, straight actual FE chains and exact full
+canonical edge sets. Proximity alone would admit subdivision nodes. The maxB
+UT/FT pair shares exactly matching coordinates for all 788 common original
+joints. The four exports each contain 21 actual frames, complete expected
+STATUS/SDEG and unchanged source hashes. Final failed parents/elements: UT 397
+95/97, UT 747 92/93 and each FT 9/9. FT maxB/maxK INPs are byte-identical, and
+their exported STATUS/SDEG, displacement, loading/reaction and raw history arrays
+match exactly. Preserve both requested file results without treating them as
+independent specimens. Independent live-ODB verification passed for all 583,422
+raw STATUS values, all 192,276 parent/frame failure/known masks and 277,820 raw
+section SDEG spot checks. Sixteen synthetic mapping/reduction tests also pass.
+The separate report contains labelled full-body, example and history figures.
+This authorisation excludes broader
+archive extraction, model integration, new simulations and job submission.
 
 ## Damage export: element → strut → loading history
 

@@ -4,10 +4,118 @@ import unittest
 from pathlib import Path
 
 import numpy as np
-from resources.damage import map_beam_chains, read_beam_inp, reduce_damage
+from resources.damage import fcc_map, map_beam_chains, periodic_fcc_map, read_beam_inp, reduce_damage
+
+
+def write_fcc_fixture(path, task="UT", shifted=True, mutation=None):
+    """Independent FCC construction with shuffled labels and 1/3/8 FE per strut."""
+    xy = [(10*x, 10*y) for y in range(20) for x in range(21)]
+    xy += [(10*x+5, 10*y+5) for y in range(19) for x in range(20)]
+    edges = []
+    for y in range(20):
+        edges.extend([((10*x, 10*y), (10*x+10, 10*y)) for x in range(20)])
+    for x in range(21):
+        edges.extend([((10*x, 10*y), (10*x, 10*y+10)) for y in range(19)])
+    for y in range(19):
+        for x in range(20):
+            edges.extend([((10*x+5, 10*y+5), (10*x+dx, 10*y+dy))
+                          for dx, dy in [(0, 0), (10, 0), (0, 10), (10, 10)]])
+    if task == "FT":
+        xy = [p for p in xy if not (p[1] == 95 and p[0] < 120)]
+        edges = [(a, b) for a, b in edges if a in xy and b in xy and not
+                 ((a[0]+b[0])/2 < 118 and (a[1]+b[1])/2 == 95)]
+    if mutation == "topology":
+        edges[21] = ((5, 5), (15, 5))  # unsupported center-to-center strut
+    rng = np.random.RandomState(729)
+    labels = dict(zip(xy, 101+17*rng.permutation(len(xy))))
+    coordinates = {}
+    for point, label in labels.items():
+        boundary = point[0] in {0, 200} or point[1] in {0, 190}
+        shift = rng.uniform(-1.4, 1.4, 2) if shifted and not boundary else np.zeros(2)
+        if point == (10, 10) and mutation == "bound":
+            shift = np.array([1.5, 0.])
+        if point == (0, 0) and mutation == "boundary":
+            shift = np.array([.1, 0.])
+        coordinates[int(label)] = np.array(point, float)+shift
+    elements, next_node = {}, 20000
+    for edge_index, (a, b) in enumerate(edges):
+        count = (1, 3, 8)[edge_index % 3]
+        path_nodes = [int(labels[a])]
+        for segment in range(1, count):
+            coordinates[next_node] = (coordinates[int(labels[a])] +
+                                      segment/count*(coordinates[int(labels[b])]-coordinates[int(labels[a])]))
+            path_nodes.append(next_node)
+            next_node += 19
+        path_nodes.append(int(labels[b]))
+        for segment in range(count):
+            label = 17*(len(elements)+1)+7
+            pair = (path_nodes[segment], path_nodes[segment+1])
+            elements[label] = pair if segment % 2 else pair[::-1]
+    body = list(elements)
+    if task == "UT":
+        coordinates[900000], coordinates[900001] = np.array([-5., -5.]), np.array([-5., -10.])
+        elements[800000] = (900000, 900001)
+    lines = ["*Instance, name=Part-1-1", "*Node"]
+    lines += [f"{n},{p[0]:.12f},{p[1]:.12f}" for n, p in coordinates.items()]
+    lines += ["*Element, type=B21"]
+    lines += [f"{e},{a},{b}" for e, (a, b) in reversed(list(elements.items()))]
+    lines += ["*Elset, elset=AllPartSet", ",".join(map(str, elements))]
+    if task == "UT":
+        lines += ["*Elset, elset=BodySet", ",".join(map(str, body)),
+                  "*Elset, elset=BracketSet", "800000"]
+    lines += ["*End Instance"]
+    path.write_text("\n".join(lines))
 
 
 class DamageContract(unittest.TestCase):
+    def test_disordered_fcc_uses_topological_joints_despite_nearby_mesh_nodes(self):
+        for task, token, count, joints in (("UT", "Ductile", 2319, 800), ("FT", "Fracture", 2259, 788)):
+            with tempfile.TemporaryDirectory() as folder:
+                path = Path(folder)/f"{token}-FCC-20-20disNodes-lhs-all-747-maxB.inp"
+                write_fcc_fixture(path, task)
+                arrays, mesh, metadata = fcc_map(path, task)
+                self.assertEqual(len(arrays["strut_id"]), count)
+                self.assertEqual(metadata["joints"], joints)
+                self.assertEqual(metadata["simulation_id"], 747)
+                self.assertEqual(set(arrays["subdivision_count"]), {1, 3, 8})
+                self.assertEqual(len(set(arrays["element_label"])), len(arrays["element_label"]))
+                self.assertEqual(metadata["excluded_elements"], int(task == "UT"))
+                self.assertTrue(metadata["complete_initial_topology_match"])
+                self.assertLess(metadata["maximum_joint_component_displacement_mm"], np.sqrt(2))
+                # Numerous FE interior points lie close to reference joints. They
+                # cannot become extra original joints through coordinate proximity.
+                near = sum(((abs(p-arrays["canonical_xy"]) <= np.sqrt(2)).all(axis=1)).any()
+                           for p in mesh["nodes"].values())
+                self.assertGreater(near, joints)
+
+    def test_periodic_wrapper_remains_strict_and_endpoint_order_is_shared(self):
+        with tempfile.TemporaryDirectory() as folder:
+            periodic = Path(folder)/"Ductile-FCC-20-per-1.inp"
+            disordered = Path(folder)/"Ductile-FCC-20-20disNodes-lhs-all-397-maxD.inp"
+            write_fcc_fixture(periodic, shifted=False)
+            write_fcc_fixture(disordered)
+            a, _, metadata = fcc_map(periodic, "UT")
+            b, _, _ = fcc_map(disordered, "UT")
+            np.testing.assert_array_equal(a["canonical_endpoint"], b["canonical_endpoint"])
+            self.assertEqual(metadata["simulation_id"], 0)
+            with self.assertRaisesRegex(ValueError, "unique bounded"):
+                periodic_fcc_map(disordered, "UT")
+
+    def test_fcc_rejects_bound_boundary_and_wrong_initial_topology(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"Ductile-FCC-20-20disNodes-lhs-all-747-maxB.inp"
+            for mutation, error in (("bound", "unique bounded"), ("boundary", "boundary joint"),
+                                    ("topology", "topology mismatch")):
+                write_fcc_fixture(path, mutation=mutation)
+                with self.assertRaisesRegex(ValueError, error):
+                    fcc_map(path, "UT")
+
+    def test_fcc_rejects_unsupported_profile_and_wrong_task(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported FCC source stem"):
+            fcc_map("Ductile-FCC-20-40disNodes-lhs-all-747.inp", "UT")
+        with self.assertRaisesRegex(ValueError, "Task/stem mismatch"):
+            fcc_map("Ductile-FCC-20-20disNodes-lhs-all-747-maxB.inp", "FT")
+
     def test_nonconsecutive_labels_variable_subdivision_and_direction(self):
         nodes = {8:np.array([0.,0.]), 31:np.array([1.,0.]), 2:np.array([2.,0.]),
                  99:np.array([3.,0.]), 7:np.array([4.,0.])}

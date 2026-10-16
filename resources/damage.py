@@ -1,10 +1,11 @@
 """Explicit INP parent maps and auditable strut damage reduction (no Abaqus import).
 
-Only the periodic 20-by-19 FCC profile is inferred automatically. Disordered
-meshes must supply independently validated original joint/canonical identities.
+Automatic mapping is restricted to checked periodic and 20% LHS node-disorder
+20-by-19 FCC profiles. Original joints come from FE topology, never label ranges.
 """
 from collections import defaultdict
 from pathlib import Path
+import re
 
 import numpy as np
 
@@ -119,33 +120,68 @@ def map_beam_chains(nodes, elements, selected, joint_to_canonical, tolerance=2e-
     return chains
 
 
-def periodic_fcc_map(inp, task, tolerance=2e-5):
-    """Checked periodic reference profile only; simulation id 0, body-only UT."""
+def _fcc_reference(task):
+    """Audit order and full initial topology, independently of FE subdivisions."""
+    xy = np.array(sorted(
+        {(10*x, 10*y) for y in range(20) for x in range(21)} |
+        {(10*x+5, 10*y+5) for y in range(19) for x in range(20)},
+        key=lambda p: (p[1], p[0])), float)
+    present = np.ones(len(xy), bool)
+    if task == "FT":
+        present[(xy[:, 1] == 95) & (xy[:, 0] < 120)] = False
+    distance2 = ((xy[:, None] - xy[None, :])**2).sum(axis=-1)
+    edges = np.argwhere(np.triu((distance2 > 0) & (distance2 <= 100), 1))
+    corner = (xy % 10 == 0).all(axis=1)
+    edges = edges[corner[edges].any(axis=1)]
+    edges = edges[present[edges].all(axis=1)]
+    if task == "FT":
+        midpoint = xy[edges].mean(axis=1)
+        edges = edges[~((midpoint[:, 0] < 118) & (midpoint[:, 1] > 93) &
+                        (midpoint[:, 1] < 97))]
+    return xy, present, edges
+
+
+def _fcc_map(inp, task, disorder_bound, tolerance):
     require(task in {"UT", "FT"}, "Task must be UT or FT")
     instances = read_beam_inp(inp)
-    require(len(instances) == 1, "Periodic profile requires exactly one physical instance")
+    require(len(instances) == 1, "FCC profile requires exactly one physical instance")
     instance, mesh = next(iter(instances.items()))
     selected_set = "BODYSET" if task == "UT" else "ALLPARTSET"
     selected = mesh["elsets"][selected_set]
-    canonical_xy = np.array(sorted(
-        {(10*x, 10*y) for y in range(20) for x in range(21)} |
-        {(10*x+5, 10*y+5) for y in range(19) for x in range(20)}, key=lambda p: (p[1], p[0])), float)
-    lookup = {tuple(p): i for i, p in enumerate(canonical_xy)}
-    expected = set(lookup)
-    if task == "FT":
-        expected -= {(10*x+5, 95) for x in range(12)}
+    require(selected and selected <= mesh["elements"].keys(), "Missing FCC body selection")
+    require(mesh["elsets"]["ALLPARTSET"] == set(mesh["elements"]), "Incomplete AllPartSet")
+    if task == "UT":
+        grips = mesh["elsets"]["BRACKETSET"]
+        require(not (selected & grips) and selected | grips == mesh["elsets"]["ALLPARTSET"],
+                "BodySet/BracketSet must partition AllPartSet")
+    canonical_xy, present, expected_edges = _fcc_reference(task)
+    degree = defaultdict(int)
+    for e in selected:
+        for n in mesh["elements"][e]:
+            degree[n] += 1
     labels = {n for e in selected for n in mesh["elements"][e]}
-    joints, found = {}, set()
-    for n in labels:
+    # Every joint in this checked FCC topology has degree >=3; FE subdivision
+    # nodes have degree 2. Near-reference FE interior nodes are NOT candidates.
+    joint_labels = [n for n in labels if degree[n] != 2]
+    require(len(joint_labels) == int(present.sum()), "Unexpected FCC original-joint count")
+    joints, found, displacement = {}, set(), []
+    for n in joint_labels:
         xy = mesh["nodes"][n]
-        key = tuple(np.rint(xy))
-        if key in expected and np.linalg.norm(xy - key) <= tolerance:
-            require(key not in found, "Ambiguous periodic joint")
-            joints[n] = lookup[key]
-            found.add(key)
-    require(found == expected, "Not the validated periodic FCC body; supply original joint identities")
+        delta = xy - canonical_xy
+        candidates = np.flatnonzero(present & (np.abs(delta) <= disorder_bound + tolerance).all(axis=1))
+        require(len(candidates) == 1, "FCC joint lacks a unique bounded canonical identity")
+        index = int(candidates[0])
+        require(index not in found, "Duplicate canonical FCC joint")
+        reference = canonical_xy[index]
+        if reference[0] in {0, 200} or reference[1] in {0, 190}:
+            require(np.linalg.norm(delta[index]) <= tolerance, "Disordered boundary joint")
+        joints[n] = index
+        found.add(index)
+        displacement.append(delta[index])
+    require(found == set(np.flatnonzero(present)), "Incomplete canonical FCC joint coverage")
     chains = map_beam_chains(mesh["nodes"], mesh["elements"], selected, joints, tolerance)
-    require(len(chains) == (2319 if task == "UT" else 2259), "Unexpected periodic strut count")
+    require({tuple(c["canonical"]) for c in chains} == set(map(tuple, expected_edges)),
+            "FCC initial strut topology mismatch")
     members = [e for c in chains for e in c["elements"]]
     parents = np.repeat(np.arange(len(chains)), [len(c["elements"]) for c in chains])
     node_labels = np.array(sorted(labels), dtype=np.int64)
@@ -165,8 +201,47 @@ def periodic_fcc_map(inp, task, tolerance=2e-5):
         canonical_node_present=np.array([i in joints.values() for i in range(len(canonical_xy))]),
         strut_present=np.ones(len(chains), bool),
     )
-    return arrays, mesh, dict(instance=instance.upper(), selected_set=selected_set, joints=len(joints),
-                              excluded_elements=len(mesh["elements"])-len(members), tolerance=tolerance)
+    displacement = np.array(displacement)
+    return arrays, mesh, dict(
+        instance=instance.upper(), selected_set=selected_set, joints=len(joints),
+        excluded_elements=len(mesh["elements"])-len(members), tolerance=tolerance,
+        coordinate_identity="degree-not-two original joints; exactly one reference inside component bound; complete initial edge-set equality",
+        canonical_order="audit-only periodic 800 coordinates sorted (y,x), not saved ML order",
+        disorder_component_bound_mm=disorder_bound,
+        maximum_joint_component_displacement_mm=float(np.abs(displacement).max()),
+        maximum_joint_displacement_mm=float(np.linalg.norm(displacement, axis=1).max()),
+        canonical_candidate_count=1, expected_native_struts=len(expected_edges),
+        boundary_joints_unchanged=True, complete_initial_topology_match=True,
+        maximum_chain_residual_mm=float(arrays["mapping_residual"].max()))
+
+
+def periodic_fcc_map(inp, task, tolerance=2e-5):
+    """Strict periodic reference wrapper; rejects shifted original joints."""
+    arrays, mesh, mapping = _fcc_map(inp, task, 0., tolerance)
+    mapping.update(profile="periodic_fcc20_body_v1", simulation_id=0)
+    return arrays, mesh, mapping
+
+
+def fcc_map(inp, task, tolerance=2e-5):
+    """Map one explicit supported FCC filename and independently checked mesh.
+
+    At l=10 mm and fac=.2, producer Geometry.deltaNM=.5*sqrt(l*l+l*l)
+    gives LHS component bound sqrt(2) mm. Candidate boxes do not overlap;
+    topology, complete joint identities and every straight FE chain must agree.
+    A matching filename alone never establishes a valid profile.
+    """
+    stem = Path(inp).stem
+    match = re.fullmatch(r"(Ductile|Fracture)-FCC-20-(?:per-(\d+)|20disNodes-lhs-all-(\d+)(?:-(maxD|maxK|maxB))?)", stem)
+    require(match is not None, "Unsupported FCC source stem")
+    require(task == ("UT" if match[1] == "Ductile" else "FT"), "Task/stem mismatch")
+    if match[2] is not None:
+        return periodic_fcc_map(inp, task, tolerance)
+    require(int(match[3]) > 0, "Disordered simulation ID must be positive")
+    arrays, mesh, mapping = _fcc_map(inp, task, .2*.5*np.sqrt(10.**2 + 10.**2), tolerance)
+    mapping.update(profile="disnodes20_lhs_fcc20_body_v1", simulation_id=int(match[3]),
+                   selection_suffix=match[4] or "", distribution="lhs_uniform", disorder_factor=.2,
+                   bound_source="Geometry FCC deltaNM * fac; node LHS_uniform lim=delta")
+    return arrays, mesh, mapping
 
 
 def reduce_damage(sdeg, point_element, status, parents, partial_rule, carry_failure=False):

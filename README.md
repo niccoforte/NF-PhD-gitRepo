@@ -241,7 +241,7 @@ This folder contains the active local and HPC Abaqus workflow.
 | `A2_INpostProcess.py` | Parses `.inp` files and exports input-side transfer CSVs for node positions, strut thicknesses, and frequency-disorder parameters. |
 | `A2_OUTpostProcess.py` | Parses `.odb` history outputs and writes curve-side `OUT-Ductile...csv` and `OUT-Fracture...csv` files. |
 | `A2_FieldOUTpostProcess.py` | Parses `.odb` field outputs and writes per-simulation `FIELDu-...npz` files with displacement fields, node labels, coordinates, frames, components, masks, and source metadata. |
-| `A2_DamageOUTpostProcess.py` | Opt-in read-only export of one matching periodic Ti FCC B21 ODB/INP to a separate `strut_damage_v1` NPZ, preserving section-point SDEG, whole-element STATUS, original FE-parent membership and actual recorded loading/time. Uses explicit named arguments, not the legacy positional contract. |
+| `A2_DamageOUTpostProcess.py` | Opt-in read-only export of one matching periodic or checked 20% nodal-disorder Ti FCC B21 ODB/INP to a separate `strut_damage_v1` NPZ, preserving section-point SDEG, whole-element STATUS, original FE-parent membership and actual recorded loading/time. Uses explicit named arguments, not the legacy positional contract. |
 | `A3_ContinuumPP.py` | Older continuum-style displacement post-processing helper for `frame*.csv` and `NodesElems.csv` outputs. |
 | `B1_ABAQUS-new.sh` | Main Slurm wrapper. Stages scripts and `resources/` to scratch, runs Abaqus generation/post-processing, and archives outputs. |
 | `B1_ABAQUS-inp-rerun.sh` | Runs existing `.inp` files and can post-process them in place. |
@@ -421,8 +421,10 @@ The [task handoff index](p2-DisorderML/handoffs/HANDOFFS.md) routes accuracy,
 damage-variable processing, repository context, surrogate optimisation, and the
 proposed physics/strain feasibility task; it also links the existing tokenisation
 brief. Give each chat only its own brief, not all briefs or the full prior chat.
-The [damage-label audit](p2-DisorderML/samples/damage-audit/README.md) uses two
-authorised periodic Ti FCC ODB/INP samples. `resources/damage.py` owns checked
+The [periodic damage-label audit](p2-DisorderML/samples/damage-audit/README.md)
+and separate [disordered-lattice report](p2-DisorderML/samples/damage-disordered/README.md)
+cover the two periodic and four explicitly authorised 20% nodal-disorder Ti FCC
+ODB/INP pairs in `Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`. `resources/damage.py` owns checked
 INP-chain mapping, missing-aware reduction and the separate `strut_damage_v1`
 contract; `code/review_damage.py` produces labelled raw-value examples and
 actual-frame fracture/loading figures. The target is binary fracture:
@@ -449,15 +451,26 @@ abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIM
 python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir p2-DisorderML/samples/damage-audit
 ```
 
+For the separate four-case report, use repeated `--case LABEL TASK NPZ` arguments
+and `--output-dir p2-DisorderML/samples/damage-disordered`. The quick start lists
+the complete command and exact case filenames; the periodic `--ut`/`--ft` route
+remains available. Neither reporting command opens an ODB.
+
 The review derives binary fracture directly from the saved failure masks, without
 re-extraction or a schema change. Existing failure-only `strut_damage` arrays
 retain NaNs for active surface-damaged struts; those historical scalar-severity
 NaNs do not mean the binary fracture state is unknown. Maximum SDEG reduction
 remains implemented but unselected and is unnecessary for the binary target.
 The exporter refuses an existing output unless `--overwrite` is supplied. It does
-not discover files, upgrade ODBs, launch simulations or submit jobs. Automatic
-original-joint inference is restricted to the checked periodic profile;
-disordered/bulk processing requires new provenance checks and scope approval.
+not discover files, upgrade ODBs, launch simulations or submit jobs. The disordered
+profile first identifies original joints from selected-mesh graph degree, then
+requires unique reference identities within the producer's +/-sqrt(2) mm
+coordinate bounds, complete straight FE chains and exact canonical edge sets.
+It never matches subdivision nodes by proximity alone. The four selected cases
+are UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK; the two FT INPs are
+byte-identical and exported responses match exactly, so they are not independent
+specimens. The separate report preserves both requested file results.
+Broader archive processing and model integration still require approval.
 Readable sharing/peak-loss diagrams and the latest validation review are in
 `p2-DisorderML/samples/dual-clarification-evidence.md`; these do not change training defaults.
 
