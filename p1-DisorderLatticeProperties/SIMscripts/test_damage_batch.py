@@ -139,6 +139,19 @@ class DamageBatch(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "endpoints missing"):
                 batch.validate_field_alignment(record, arrays)
 
+    def test_original_inp_instance_case_matches_abaqus_normalized_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            record = self.make_record(folder)
+            inp = Path(record["inp"])
+            inp.write_text(inp.read_text().replace("name=PART-1-1", "name=Part-1-1"))
+            result = batch.validate_field_alignment(record, status_fixture())
+            self.assertEqual(result["field_nodes"], 4)
+            self.assertEqual(result["field_nodes_outside_selected_body"], 1)
+            inp.write_text(inp.read_text() + "*Instance, name=PART-1-1\n*Node\n1,0,0\n2,1,0\n"
+                           "*Element, type=B21\n1,1,2\n*End Instance\n")
+            with self.assertRaisesRegex(ValueError, "Ambiguous INP instance names"):
+                batch.validate_field_alignment(record, status_fixture())
+
     def test_publish_and_restart_require_valid_npz_sidecar_and_source_code_fingerprints(self):
         with tempfile.TemporaryDirectory() as folder:
             record = self.make_record(folder)

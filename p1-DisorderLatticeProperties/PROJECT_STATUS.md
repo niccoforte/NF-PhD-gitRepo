@@ -67,4 +67,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   both local periodic Abaqus exports (UT83/FT7 final failed parents;6.85s/3.66s
   export time). Archived periodic INPs match those sources byte-for-byte; ODB
   hashes differ and require direct response comparison in the cluster preflight.
-  No jobs have yet been submitted for this production route.
+  First cluster preflight32084036 read all eight ODBs but failed before publishing
+  at a case-sensitive instance-name comparison. The comparison is corrected with
+  regression coverage and real local FIELDu alignment checks; replacement
+  preflight preparation is in progress. No production array has been submitted.

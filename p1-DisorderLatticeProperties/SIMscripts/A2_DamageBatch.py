@@ -184,9 +184,11 @@ def validate_field_alignment(record, arrays):
     # INP instance, while fracture targets remain restricted to the selected body.
     instances = np.unique(arrays["element_instance"])
     require(len(instances) == 1, "FCC field validation requires one original instance")
-    mesh = read_beam_inp(record["inp"])
-    require(str(instances[0]) in mesh, "FIELDu/INP instance mismatch")
-    lookup = mesh[str(instances[0])]["nodes"]
+    original_mesh = read_beam_inp(record["inp"])
+    mesh = {name.upper(): values for name, values in original_mesh.items()}
+    require(len(mesh) == len(original_mesh), "Ambiguous INP instance names after Abaqus case normalization")
+    require(str(instances[0]).upper() in mesh, "FIELDu/INP instance mismatch")
+    lookup = mesh[str(instances[0]).upper()]["nodes"]
     require(set(labels).issubset(lookup), "FIELDu node labels missing from full INP instance")
     require(set(np.asarray(arrays["endpoint_node_label"]).reshape(-1)).issubset(set(labels)),
             "Native parent endpoints missing from raw FIELDu original nodes")

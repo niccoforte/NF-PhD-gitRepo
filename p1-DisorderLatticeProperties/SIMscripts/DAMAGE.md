@@ -44,6 +44,11 @@ bounded ODB/INP pair is copied into Slurm-owned scratch at a time. Outputs are
 `<job>/zip/transfer/FIELDd-<original-stem>.npz` plus JSON. Completed outputs are
 skipped only after code/source, schema, geometry/frame and checksum verification.
 Failures are recorded per file and retain their scratch evidence.
+Verify selected preflight products independently in Abaqus Python with
+`test_damage_odb.py --npz /ABS/FIELDd-STEM.npz`. This reopens the original ODB
+read-only and compares every raw STATUS value and every parent failure/known
+mask; STATUS-only products do not require SDEG. INP/ODB instance names are
+matched case-insensitively while original node labels and geometry stay strict.
 
 HPC roots are `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC`
 and periodic `per/0.0/FCC/6538532/zip` beneath the same data root. Local transfer
