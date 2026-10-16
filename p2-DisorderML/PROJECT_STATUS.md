@@ -80,6 +80,13 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   remap; disordered actual/shared times differ by at most2.7567e-7s. No time
   interpolation, specimen join or prediction evaluation follows from this result.
   Local pinned bundle: `Z:/p2/diagnostics/damage-contract-261016/fixtures/`.
+  Disposable B1 GPU check31976809 submitted from aa1d2e0,1h/1GPU/12CPU/90000MB;
+  current PENDING/Resources, no GPU result yet. All13 remote file hashes match.
+  Home check: `/data/home/exy053/p2/MULTI/Dual/Transformer/damage-contract-261016/`.
+  After success retrieve the home-log JSON and remove only its unused temporary
+  fixture/source copies; no preflight archives. Human report/two figures:
+  `samples/damage-hpc-contract/README.md`. Changed-surface9 and contract82 checks
+  non-failing/zero failed; these do not establish GPU/ODB execution.
 
 - The researcher requests damage handback to the current Windows **Improve ML
   Accuracy** chat for HPC tests. `handoffs/HANDOFF-DAMAGE.md` is the reconciled

@@ -31,6 +31,11 @@ and permitted-split proof. Leave the locked test untouched. Consumer-layout repl
 is distinct from DATA/MODEL damage integration. Preserve the running input study,
 its immutable sources and custom-loss hold; later supervised work needs an explicit
 coverage/model/loss decision and the selected input policy.
+The bounded B1 check31976809 is submitted (source aa1d2e0), currently pending
+resources. Do not duplicate it. Retrieve its home result on completion, then
+prioritise exact-target removal of its temporary fixture/source copies once no
+active consumer needs them. Review `../samples/damage-hpc-contract/README.md`;
+CPU replay is passed, GPU evidence is not yet available.
 
 The user selected Case1(i) for the next source and custom-loss studies. Prepare
 the input study first, with predicted/true/mixed and corrected/mixed-corrected
