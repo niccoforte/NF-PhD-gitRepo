@@ -1,12 +1,73 @@
-# Read-only element-to-strut damage export
+# FCC element-to-strut fracture processing
 
-Separate opt-in producer; displacement/curve pipelines and ML architecture are
-unchanged. The bounded scope is the two periodic Ti FCC B21 UT/FT ODB/INP pairs
+The original diagnostic audit covers two periodic Ti FCC B21 UT/FT ODB/INP pairs
 and four explicitly selected 20% nodal-disorder pairs in
 `Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`. Periodic stems are
 `Ductile-FCC-20-per-1` and `Fracture-FCC-20-per-1`, with simulation ID 0.
 The disordered cases are UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK.
-No recursive discovery, ODB upgrade, FEA or job submission is involved.
+The researcher additionally authorised the existing FCC dataset:9,000 UT and
+9,000 FT ODBs plus the periodic pair. The STATUS-only route below adds derived
+files and MLdata banks. No new FEA, ODB upgrade, other lattice or ML architecture
+change is included.
+
+## Existing FCC dataset: STATUS-only route
+
+`A2_DamageOUTpostProcess.py --status-only` reuses the checked mapper and exports
+`strut_status_v1` without SDEG, displacement or history dependencies. Its binary
+target is1 if any constituent STATUS is0,0 if all are known active, and unknown
+otherwise. `strut_failure_known` must accompany `strut_failed`; no failure carry
+or near-one damage threshold is applied. Raw STATUS, native membership, actual
+frames including frame0, source/code fingerprints and original archive paths
+remain available. NPZ is validated before publication and JSON records its hash.
+
+The existing B2 wrapper accepts an explicit damage-only manifest. Its normal
+legacy mode reruns other exporters and must not be used for this pass. Freeze a
+clean code snapshot and prepare the manifest against that snapshot; fingerprints
+must match at execution. From its repository root on HPC:
+
+```bash
+python3 p1-DisorderLatticeProperties/SIMscripts/A2_DamageBatch.py prepare --preflight --output /ABS/LAUNCH/preflight.json
+python3 p1-DisorderLatticeProperties/SIMscripts/A2_DamageBatch.py prepare --output /ABS/LAUNCH/dataset.json
+bash p1-DisorderLatticeProperties/SIMscripts/B2_ABAQUS-PPscratch-new.sh --damage-only --manifest /ABS/LAUNCH/preflight.json --dry-run
+sbatch --job-name=FCC-FIELDd-preflight p1-DisorderLatticeProperties/SIMscripts/B2_ABAQUS-PPscratch-new.sh --damage-only --manifest /ABS/LAUNCH/preflight.json
+# After verifying preflight completion and its eight per-file checks:
+sbatch --job-name=FCC-FIELDd --array=0-90%4 p1-DisorderLatticeProperties/SIMscripts/B2_ABAQUS-PPscratch-new.sh --damage-only --manifest /ABS/LAUNCH/dataset.json
+```
+
+Set `REPO_ROOT` to the immutable code root when launching outside its usual home
+checkout. Existing B2 CPU/memory/partition/time/licence directives are retained.
+Record the manifest SHA256 and pass `--manifest-sha256 HASH` to pin its exact
+bytes during dry runs and submission; the driver also pins exporter/core hashes.
+The preflight contains UT/FT IDs1,4501,8901 and the periodic pair. Full batches
+follow the90 existing disordered job groups and one periodic group; only a
+bounded ODB/INP pair is copied into Slurm-owned scratch at a time. Outputs are
+`<job>/zip/transfer/FIELDd-<original-stem>.npz` plus JSON. Completed outputs are
+skipped only after code/source, schema, geometry/frame and checksum verification.
+Failures are recorded per file and retain their scratch evidence.
+
+HPC roots are `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC`
+and periodic `per/0.0/FCC/6538532/zip` beneath the same data root. Local transfer
+consolidates into only `Z:/p1/data/Ti/disNodes/0.2/FCC/transfer` and
+`Z:/p1/data/Ti/per/FCC/transfer`. Preserve job/path provenance when flattening.
+The curated local `sims/` examples are not bulk input directories.
+
+After all required products pass, build the four additive banks with standard
+Python/NumPy. This reads only existing field identities/geometry/header metadata:
+
+```bash
+python -m resources.damage_data --mldata-dir /ABS/MLdata --output-dir /ABS/STAGING --inventory /ABS/LAUNCH/dataset.json
+```
+
+Products are `{UT-UT,FT-FT,MULTI-UT,MULTI-FT}-disNodes-allD.npz` plus JSON, schema
+`strut_status_bank_v1`. They retain exact allFIELD sample IDs/order, periodic0,
+native strut axes and masks. `edge_index` explicitly maps endpoints into saved
+task-node order; labels are not broadcast to nodes. Align by frame index/count,
+as for existing fields; small timestamp differences are allowed and actual
+per-specimen times remain metadata. Existing allFIELD/curve files and filtering
+are not changed. Verify staged banks and transfer checksums before promoting to
+local `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
+`/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Windows uses the authenticated PuTTY
+share via `pscp -batch -share -load HPC -l exy053`; leave its master open.
 
 ## Start here
 
@@ -19,8 +80,8 @@ the generated results and visual report, not the executable implementation.
 | `resources/damage.py` | Shared element-to-strut mapping, reduction and array validation. |
 | `p2-DisorderML/code/review_damage.py` | Read saved arrays and rebuild the human-readable report and figures. Uses standard Python. |
 
-There is no damage loader in `DATA`, training target/head in `MODEL`, or automatic
-HPC launch integration. This is a working export-and-review route; connecting it
+There is no damage loader in `DATA` or training target/head in `MODEL`.
+The explicit dataset route prepares labels; connecting them
 to ML is a separate task. The checked FCC profiles support periodic bodies and
 the selected 20% nodal-disorder bodies, with independent original-joint and
 topology validation before ODB processing.

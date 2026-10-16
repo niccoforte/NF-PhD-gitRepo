@@ -22,7 +22,7 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 - `MULTI`/`both`: aligned UT and FT samples.
 - `per`: periodic/reference case, represented downstream by simulation id `0`.
 - `disNodes` and `disStruts`: nodal and strut-thickness disorder.
-- Raw families: `IN-n`, `IN-s`, `IN-f`, `OUT-Ductile`, `OUT-Fracture`, and `FIELDu`.
+- Raw families: `IN-n`, `IN-s`, `IN-f`, `OUT-Ductile`, `OUT-Fracture`, `FIELDu` and separate binary-fracture `FIELDd` (lowercase d).
 - Saved output-layout tokens: `Curve`, `Field`, and `FieldToCurve`. `FieldToCurve` uses field inputs and curve targets but must not be stored as an ordinary `Curve` run.
 
 ## Alignment invariants
@@ -48,6 +48,10 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 
 ## Separate strut-damage boundary
 
+- The authorised FCC dataset route extends the existing p1 exporter with `--status-only` (`strut_status_v1`) and B2 with an explicit damage-only manifest route. `A2_DamageBatch.py` restricts discovery to the reviewed Ti FCC disNodes0.2 archive and separate periodic baseline, pins code/source evidence, stages bounded scratch copies and publishes `FIELDd-<stem>.npz` plus JSON beside existing exports. Other lattices and new FEA remain outside scope. Existing FIELDu/curve products are not rewritten.
+- `resources/damage_data.py` prepares additive `{UT-UT,FT-FT,MULTI-UT,MULTI-FT}-disNodes-allD.npz` banks (`strut_status_bank_v1`) using the exact IDs/order of the corresponding allFIELD products. Native task struts stay separate from node tensors; explicitly remap canonical endpoints to saved node order and verify actual specimen geometry. Retain periodic ID0 and existing filtering/membership. Unknown fracture stays masked; initial FT absence is not failure. No DATA/MODEL training integration is implied.
+- Align STATUS and displacement by recorded frame index/order and count, following the existing field convention. Retain initial frame0 and per-specimen actual times as provenance; do not interpolate binary states or require identical timestamps across specimens. Local raw products consolidate into the separate periodic/disordered transfer folders; MLdata banks go to local `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`, with checksum verification.
+
 - `p2/HPC/DualOutputs/A0-HPC-Damage-contract.py` is a bounded fixture execution check, not a DATA/MODEL loader: pinned NPZ/INP/consumer hashes, endpoint remapping, presence/binary-known masks, frame0-only removal, exact shared-time differences and NPZ/Torch reload. No specimen join, interpolation, prediction evaluation or training follows from a layout match. Scalar-severity coverage is separate from binary-target coverage.
 
 - Producer: p1 `SIMscripts/A2_DamageOUTpostProcess.py`; pure mapping/reduction/validation: `resources/damage.py`; review consumer: p2 `code/review_damage.py`. No existing DATA/MODEL loader consumes this schema.
@@ -55,7 +59,7 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 - Retain raw section/IP SDEG, DUCTCRT initiation and whole-element STATUS, actual recorded frames including frame 0, raw nodal load histories/time, source/code fingerprints, source-match evidence, masks and reduction rules. Never broadcast strut labels to nodes or silently stack unlike frame/load grids.
 - The binary fracture target uses `strut_failed` with `strut_failure_known` (and the element equivalents), not optional scalar-severity `strut_damage`: 1 if any member has STATUS=0, 0 if all members are known active, unknown otherwise. The review colours this binary variable only; raw SDEG and observed active-damage fates are separate diagnostics. Historical scalar-severity NaNs do not imply unknown fracture.
 - STATUS=0 establishes element failure; a verified failed member overrides the parent to D=1. Maximum reported section then constituent damage is an explicit severity rule, not average degradation. Preserve incomplete observations as unknown, with independent failure-known/coverage masks. Optional irreversible carry has a separate mask and rejects reactivation; it is disabled in the initial periodic tests.
-- Run the dedicated synthetic damage tests and independent real Abaqus read-only validation separately for every selected file, including parent-known masks. Existing synthetic CSV/field fixtures do not establish damage correctness. The two periodic plus four selected disordered files are authorised; broader extraction and model integration require further scope approval.
+- Run dedicated synthetic tests and real Abaqus read-only checks, including parent-known masks. The original six-file audit remains diagnostic evidence. The researcher additionally authorised the existing periodic and 20% nodal-disorder FCC archive only: preflight before resumable batches, then verified local/HPC MLdata additions. Existing synthetic CSV/field fixtures do not establish native ODB correctness; ML model integration remains separate.
 
 ## Dual serial consumer boundary
 

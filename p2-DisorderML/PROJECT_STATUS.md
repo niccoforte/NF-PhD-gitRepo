@@ -4,6 +4,15 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Damage dataset production is now authorised for existing FCC periodic and
+  20% nodal-disorder results only:90 original job groups,9,000 UT/9,000 FT ODBs,
+  plus the periodic pair. Extend p1's existing exporter/B2 route with STATUS-only
+  FIELDd products and manifest-driven scratch batches. Add four allD banks to
+  local disNodes/0.2/FCC/MLdata and HPC p2/MLdata using exact existing IDs/order,
+  periodic0 and saved-frame-index alignment. Other lattices, new FEA and ML
+  architecture/training integration stay outside scope. Implementation/preflight
+  preparation is in progress; production jobs have not yet been submitted.
+
 - Case1(i) is selected for the next two studies. Input variation is prepared first:
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
   mixture), every deployment path using predicted fields. Three nested correction

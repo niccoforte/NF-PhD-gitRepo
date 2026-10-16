@@ -4,10 +4,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- Current bounded implementation: read-only periodic and four explicitly selected
-  20% nodal-disorder Ti FCC UT/FT element-to-strut fracture processing for Damage
-  Modeling. The target is binary fracture from whole-element STATUS=0. No new
-  FEA, architecture changes or archive-wide extraction.
+- Current authorised implementation: process existing Ti FCC periodic and 20%
+  nodal-disorder UT/FT archives for binary strut fracture from whole-element
+  STATUS=0. Add lowercase FIELDd products in the original job transfer folders,
+  consolidate local transfers and add aligned banks to both MLdata archives.
+  Preflight precedes resumable Slurm batches. Other lattices, new FEA and ML
+  architecture/training integration remain outside scope.
 - Broader p1 research objective and phase remain `To be confirmed`.
 
 ## Authoritative Working Surfaces
@@ -54,9 +56,15 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Decisions And Next Task
 
-- The researcher selected binary fracture: any failed constituent gives parent
-  1; all known active constituents give 0; missing without a failed member is
-  unknown. SDEG stays diagnostic; no partial aggregation decision blocks this
-  target. The four local disordered cases (UT 397 maxD, UT 747 maxB, FT 747 maxB,
-  FT 747 maxK) are authorised. Broader extraction, model integration and jobs are
-  outside this scope.
+- The researcher selected binary fracture: any failed constituent gives parent1;
+  all known active constituents give0; otherwise unknown. SDEG stays diagnostic.
+  Production processing is authorised for the existing FCC archive only:90 job
+  groups,9,000 UT plus9,000 FT ODBs, and the separate periodic pair. Each ODB has
+  matching INP/FIELDu filenames; native STATUS availability still needs preflight.
+  Extend the existing exporter/B2 route, keep frame-index alignment, periodic ID0
+  and exact existing MLdata populations. Local/HPC paths and contracts are in
+  SIMscripts/DAMAGE.md. The lean route matches every raw STATUS/parent mask in
+  both local periodic Abaqus exports (UT83/FT7 final failed parents;6.85s/3.66s
+  export time). Archived periodic INPs match those sources byte-for-byte; ODB
+  hashes differ and require direct response comparison in the cluster preflight.
+  No jobs have yet been submitted for this production route.

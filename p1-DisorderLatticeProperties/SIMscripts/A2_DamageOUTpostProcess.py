@@ -6,11 +6,14 @@ The legacy A1/A2 positional contract and FIELDu/curve exporters are unchanged.
 import argparse
 import hashlib
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-from resources.damage import fcc_map, reduce_damage, require, validate_damage_arrays
+from resources.damage import (fcc_map, reduce_damage, reduce_status, require,
+                              validate_damage_arrays, validate_status_arrays)
 
 
 def fingerprint(path):
@@ -186,19 +189,137 @@ def export_damage(odb_path, inp_path, task, output, partial_rule, step_name="Ste
     return summary
 
 
+def export_status(odb_path, inp_path, task, output, step_name="Step-1", source_paths=None):
+    """Export one supported mesh's whole-element STATUS without SDEG/U/history reads.
+
+    ``source_paths`` records original archive paths when the source is staged in
+    scratch; the actual files read are hashed before and after read-only access.
+    A validated temporary NPZ is promoted atomically, with its JSON marker last.
+    """
+    from odbAccess import openOdb
+    odb_path, inp_path, output = map(lambda p: Path(p).resolve(), (odb_path, inp_path, output))
+    require(task in {"UT", "FT"}, "Task must be UT or FT")
+    require(odb_path.stem == inp_path.stem, "Matching ODB/INP stems are required")
+    require(output.suffix == ".npz" and output not in {odb_path, inp_path}, "Invalid output path")
+    require(inp_path.stem.startswith("Ductile-" if task == "UT" else "Fracture-"), "Task/stem mismatch")
+    original = dict(odb=str(odb_path), inp=str(inp_path))
+    if source_paths is not None:
+        require(set(source_paths) == {"odb", "inp"} and all(isinstance(v, str) and v for v in source_paths.values()),
+                "Original source_paths must contain nonempty odb/inp paths")
+        original = dict(source_paths)
+        require(all(Path(original[k]).name == p.name for k, p in (("odb", odb_path), ("inp", inp_path))),
+                "Original/staged source filename mismatch")
+    before = dict(inp=fingerprint(inp_path), odb=fingerprint(odb_path))
+    arrays, mesh, mapping = fcc_map(inp_path, task)
+    metadata = dict(schema_version="strut_status_v1", task=task, simulation_id=mapping["simulation_id"],
+                    source_stem=inp_path.stem, inp_path=original["inp"], odb_path=original["odb"],
+                    read_paths=dict(inp=str(inp_path), odb=str(odb_path)), source_sha256=before,
+                    source_size_bytes=dict(inp=inp_path.stat().st_size, odb=odb_path.stat().st_size),
+                    mapping=mapping, profile=mapping["profile"],
+                    canonical_order=mapping["canonical_order"], coordinate_units="mm", time_units="s",
+                    unit_basis="Ti producer convention", failure_rule="whole_element_STATUS_zero_v1",
+                    carry_failure=False, unknown_rule="no failed member and at least one missing STATUS",
+                    frame_alignment="saved frame index/order; initial frame retained",
+                    scope="one explicitly selected FCC ODB; UT main body excludes grips",
+                    code_sha256={"exporter": fingerprint(__file__),
+                                 "damage_core": fingerprint(Path(__file__).resolve().parents[2]/"resources"/"damage.py")},
+                    extraction_utc=datetime.now(timezone.utc).isoformat())
+    if task == "FT":
+        metadata["nominal_crack_tip"] = [120., 95.]
+    lookup = {int(e): i for i, e in enumerate(arrays["element_label"])}
+    odb = openOdb(str(odb_path), readOnly=True)
+    try:
+        require(mapping["instance"] in odb.rootAssembly.instances, "INP/ODB instance mismatch")
+        inst = odb.rootAssembly.instances[mapping["instance"]]
+        odb_elements = {e.label: tuple(e.connectivity) for e in inst.elements}
+        odb_nodes = {n.label: np.array(n.coordinates[:2]) for n in inst.nodes}
+        require(set(odb_elements) == set(mesh["elements"]), "INP/ODB full element ID mismatch")
+        require(all(odb_elements[e] == conn for e, conn in mesh["elements"].items()), "INP/ODB connectivity mismatch")
+        require(set(odb_nodes) == set(mesh["nodes"]), "INP/ODB node ID mismatch")
+        coordinate_error = max(np.linalg.norm(odb_nodes[n]-xy) for n, xy in mesh["nodes"].items())
+        require(coordinate_error <= mapping["tolerance"], "INP/ODB initial coordinate mismatch")
+        require({e.label for e in inst.elementSets[mapping["selected_set"]].elements} == set(lookup),
+                "INP/ODB body selection mismatch")
+        require(step_name in odb.steps, "Explicit step not found")
+        frames = odb.steps[step_name].frames
+        require(len(frames) >= 2 and frames[0].frameValue == 0, "Initial frame missing")
+        arrays.update(status=np.full((len(frames), len(lookup)), np.nan, np.float32),
+                      frame_time=np.array([v.frameValue for v in frames], np.float64),
+                      frame_increment=np.array([v.incrementNumber for v in frames], np.int64),
+                      frame_index=np.arange(len(frames), dtype=np.int32))
+        metadata.update(step=step_name, odb_version=str(odb.jobData.version),
+                        odb_initial_coordinate_error=float(coordinate_error))
+        observed = 0
+        for j, frame in enumerate(frames):
+            if "STATUS" not in frame.fieldOutputs:
+                continue  # preserve missing records; never imply active from absence
+            seen = set()
+            for value in frame.fieldOutputs["STATUS"].values:
+                if value.instance is None or value.instance.name != mapping["instance"] or value.elementLabel not in lookup:
+                    continue
+                index = lookup[value.elementLabel]
+                require(str(value.position) == "WHOLE_ELEMENT" and index not in seen, "Invalid/duplicate STATUS layout")
+                raw = float(value.data)
+                require(np.isfinite(raw) and raw in (0., 1.), "Observed STATUS is not binary 0/1")
+                arrays["status"][j, index] = raw
+                seen.add(index)
+                observed += 1
+        require(observed > 0, "No selected whole-element STATUS observations")
+    finally:
+        odb.close()
+    require(before == dict(inp=fingerprint(inp_path), odb=fingerprint(odb_path)), "Input changed during read-only export")
+    arrays.update(reduce_status(arrays["status"], arrays["parent_strut_index"]))
+    metadata.update(source_unchanged_sha256=True, status_reactivations=0)
+    arrays.update(schema_version=np.array("strut_status_v1"), simulation_id=np.array(mapping["simulation_id"], np.int64),
+                  task=np.array(task), metadata_json=np.array(json.dumps(metadata, sort_keys=True)))
+    summary = validate_status_arrays(arrays)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    pending = []
+    try:
+        with tempfile.NamedTemporaryFile(prefix="."+output.stem+"-", suffix=".npz", dir=str(output.parent), delete=False) as handle:
+            temporary = Path(handle.name)
+            pending.append(temporary)
+            np.savez_compressed(handle, **arrays)
+            handle.flush()
+            os.fsync(handle.fileno())
+        with np.load(str(temporary), allow_pickle=False) as saved:
+            require(validate_status_arrays(saved) == summary, "Saved STATUS NPZ round trip failed")
+        summary.update(output=str(output), npz_sha256=fingerprint(temporary), metadata=metadata)
+        with tempfile.NamedTemporaryFile(prefix="."+output.stem+"-", suffix=".json", mode="w", encoding="utf-8",
+                                         dir=str(output.parent), delete=False) as handle:
+            marker = Path(handle.name)
+            pending.append(marker)
+            handle.write(json.dumps(summary, indent=2)+"\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        temporary.replace(output)
+        marker.replace(output.with_suffix(".json"))
+    finally:
+        for path in pending:
+            if path.exists():
+                path.unlink()
+    return summary
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--odb", required=True)
     parser.add_argument("--inp", required=True)
     parser.add_argument("--task", choices=("UT", "FT"), required=True)
     parser.add_argument("--output", required=True)
-    parser.add_argument("--partial-rule", choices=("max", "failure-only"), required=True)
+    parser.add_argument("--status-only", action="store_true", help="Compact FIELDd whole-element STATUS export")
+    parser.add_argument("--partial-rule", choices=("max", "failure-only"))
     parser.add_argument("--step", default="Step-1")
     parser.add_argument("--carry-failure", action="store_true", help="Explicit irreversible STATUS carry; observed/carried masks remain separate")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args()
     require(args.overwrite or not Path(args.output).exists(), "Output exists; pass --overwrite explicitly")
-    result = export_damage(args.odb, args.inp, args.task, args.output, args.partial_rule, args.step, args.carry_failure)
+    if args.status_only:
+        require(args.partial_rule is None and not args.carry_failure, "STATUS-only mode has no severity rule or carry")
+        result = export_status(args.odb, args.inp, args.task, args.output, args.step)
+    else:
+        require(args.partial_rule is not None, "Full audit requires an explicit --partial-rule")
+        result = export_damage(args.odb, args.inp, args.task, args.output, args.partial_rule, args.step, args.carry_failure)
     print(json.dumps({k:v for k,v in result.items() if k != "metadata"}, indent=2))
 
 

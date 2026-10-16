@@ -5,6 +5,7 @@ Automatic mapping is restricted to checked periodic and 20% LHS node-disorder
 """
 from collections import defaultdict
 from pathlib import Path
+import json
 import re
 
 import numpy as np
@@ -342,3 +343,130 @@ def validate_damage_arrays(arrays):
     return dict(frames=f, struts=s, elements=e, points=p, valid_labels=int(arrays["strut_valid"].sum()),
                 final_failed_struts=int(arrays["strut_failed"][-1].sum()),
                 final_failed_elements=int(arrays["element_failed"][-1].sum()))
+
+
+def reduce_status(status, parent_strut_index):
+    """Binary fracture from observed whole-element STATUS; missing stays unknown.
+
+    A failed member establishes parent failure even when other members are
+    missing. Otherwise every member must be observed active. There is no carry
+    across frames, and an observed return from failed to active is rejected.
+    """
+    status = np.asarray(status, float)
+    parents = np.asarray(parent_strut_index)
+    require(status.ndim == 2 and status.shape[0] > 0, "Invalid STATUS frame axis")
+    require(parents.ndim == 1 and parents.dtype.kind in "iu" and len(parents) == status.shape[1],
+            "Invalid element-to-parent map")
+    require(len(parents) > 0 and (parents >= 0).all() and
+            np.array_equal(np.unique(parents), np.arange(parents.max()+1)),
+            "Parent indices must be contiguous and nonempty")
+    require(not np.isinf(status).any() and np.isin(status[np.isfinite(status)], [0., 1.]).all(),
+            "STATUS must be binary 0/1 or missing NaN")
+    failed, known = status == 0, np.isfinite(status)
+    require(not (np.maximum.accumulate(failed, axis=0) & (status == 1)).any(),
+            "Element reactivation contradicts absorbing failure")
+    shape = (status.shape[0], int(parents.max())+1)
+    parent_failed = np.zeros(shape, bool)
+    parent_known = np.zeros(shape, bool)
+    count = np.zeros(shape, np.int32)
+    coverage = np.zeros(shape, np.float32)
+    for parent in range(shape[1]):
+        members = parents == parent
+        parent_failed[:, parent] = failed[:, members].any(axis=1)
+        parent_known[:, parent] = parent_failed[:, parent] | known[:, members].all(axis=1)
+        count[:, parent] = failed[:, members].sum(axis=1)
+        coverage[:, parent] = known[:, members].mean(axis=1)
+    first = np.array([np.flatnonzero(v)[0] if v.any() else -1 for v in parent_failed.T], np.int32)
+    previous = np.full(shape[1], -1, np.int32)
+    for parent, frame in enumerate(first):
+        if frame > 0:
+            active = np.flatnonzero(parent_known[:frame, parent] & ~parent_failed[:frame, parent])
+            if len(active):
+                previous[parent] = active[-1]
+    return dict(status_valid=known, element_failed=failed, element_failure_known=known,
+                strut_failed=parent_failed, strut_failure_known=parent_known,
+                failed_element_count=count, strut_status_coverage=coverage,
+                first_failure_frame=first, previous_active_frame=previous)
+
+
+def validate_status_arrays(arrays):
+    """Validate the compact STATUS-only FIELDd product without Abaqus imports."""
+    require(str(arrays["schema_version"]) == "strut_status_v1", "Unsupported STATUS schema")
+    require(all(not np.asarray(v).dtype.hasobject for v in arrays.values()), "Pickled/object arrays forbidden")
+    task = str(arrays["task"])
+    require(task in {"UT", "FT"}, "Invalid STATUS task")
+    sample_id = np.asarray(arrays["simulation_id"])
+    require(sample_id.ndim == 0 and sample_id.dtype.kind in "iu" and int(sample_id) >= 0,
+            "Invalid simulation identity")
+    expected = reduce_status(arrays["status"], arrays["parent_strut_index"])
+    f, e = arrays["status"].shape
+    s = expected["strut_failed"].shape[1]
+    require(f >= 2, "STATUS product requires initial and subsequent frames")
+    for key, value in expected.items():
+        saved = np.asarray(arrays[key])
+        require(saved.shape == value.shape and saved.dtype.kind == value.dtype.kind and
+                np.array_equal(saved, value), "Derived STATUS array mismatch: " + key)
+    require(np.array_equal(arrays["strut_id"], np.arange(s)), "Invalid strut identity")
+    times = np.asarray(arrays["frame_time"])
+    require(times.shape == (f,) and np.isfinite(times).all() and times[0] == 0 and
+            (np.diff(times) > 0).all(), "Invalid recorded frame times or missing initial frame")
+    require(np.array_equal(arrays["frame_index"], np.arange(f)), "Invalid recorded frame order")
+    increment = np.asarray(arrays["frame_increment"])
+    require(increment.shape == (f,) and increment.dtype.kind in "iu" and
+            (increment >= 0).all() and (np.diff(increment) >= 0).all(), "Invalid frame increments")
+    labels, instances = np.asarray(arrays["element_label"]), np.asarray(arrays["element_instance"])
+    require(labels.shape == instances.shape == (e,) and labels.dtype.kind in "iu" and (labels > 0).all(),
+            "Invalid element identities")
+    require(len(set(zip(instances, labels))) == e, "Duplicate element identity")
+    parents = np.asarray(arrays["parent_strut_index"])
+    require(np.array_equal(arrays["subdivision_count"], np.bincount(parents, minlength=s)),
+            "Invalid parent membership counts")
+    endpoints = np.asarray(arrays["canonical_endpoint"])
+    canonical = np.asarray(arrays["canonical_xy"])
+    present = np.asarray(arrays["canonical_node_present"])
+    require(canonical.ndim == 2 and canonical.shape[1] == 2 and np.isfinite(canonical).all(),
+            "Invalid canonical coordinates")
+    require(present.shape == (len(canonical),) and present.dtype.kind == "b", "Invalid canonical presence")
+    require(endpoints.shape == (s, 2) and endpoints.dtype.kind in "iu" and
+            (endpoints >= 0).all() and (endpoints < len(canonical)).all() and
+            (endpoints[:, 0] < endpoints[:, 1]).all(), "Invalid canonical endpoints")
+    require(len(set(map(tuple, endpoints))) == s and present[endpoints].all(),
+            "Duplicate or absent parent endpoints")
+    require(np.asarray(arrays["strut_present"]).dtype.kind == "b" and
+            np.asarray(arrays["strut_present"]).shape == (s,) and arrays["strut_present"].all(),
+            "Native STATUS products contain present struts only")
+    require(np.asarray(arrays["endpoint_xy0"]).shape == (s, 2, 2) and
+            np.isfinite(arrays["endpoint_xy0"]).all(), "Invalid initial parent geometry")
+    require(np.asarray(arrays["endpoint_node_label"]).shape == (s, 2) and
+            np.asarray(arrays["endpoint_instance"]).shape == (s, 2), "Invalid endpoint identity axes")
+    node_labels, node_xy = np.asarray(arrays["node_label"]), np.asarray(arrays["node_xy0"])
+    require(node_labels.ndim == 1 and node_labels.dtype.kind in "iu" and
+            len(np.unique(node_labels)) == len(node_labels) and (node_labels > 0).all() and
+            node_xy.shape == (len(node_labels), 2) and np.isfinite(node_xy).all(), "Invalid selected node inventory")
+    require(np.asarray(arrays["element_connectivity"]).shape == (e, 2) and
+            np.isin(arrays["element_connectivity"], node_labels).all() and
+            np.isin(arrays["endpoint_node_label"], node_labels).all(), "Invalid selected mesh connectivity")
+    for parent in range(s):
+        order = np.asarray(arrays["chain_order"])[parents == parent]
+        require(np.array_equal(np.sort(order), np.arange(len(order))), "Invalid parent chain order")
+    require(np.asarray(arrays["mapping_residual"]).shape == (s,) and
+            np.isfinite(arrays["mapping_residual"]).all() and (arrays["mapping_residual"] >= 0).all(),
+            "Invalid mapping residual")
+    metadata = json.loads(str(arrays["metadata_json"]))
+    require(metadata["schema_version"] == "strut_status_v1" and metadata["task"] == task and
+            metadata["simulation_id"] == int(sample_id), "STATUS metadata identity mismatch")
+    require(metadata["failure_rule"] == "whole_element_STATUS_zero_v1" and
+            metadata["carry_failure"] is False and metadata["source_unchanged_sha256"] is True and
+            metadata["status_reactivations"] == 0, "Invalid STATUS extraction policy")
+    require(metadata["mapping"]["expected_native_struts"] == s and
+            metadata["mapping"]["complete_initial_topology_match"] is True, "Unverified native topology")
+    for group in ("source_sha256", "code_sha256"):
+        require(metadata[group] and all(re.fullmatch(r"[0-9a-f]{64}", v) for v in metadata[group].values()),
+                "Invalid extraction fingerprints: " + group)
+    require(set(metadata["source_sha256"]) == {"inp", "odb"} and
+            set(metadata["code_sha256"]) == {"exporter", "damage_core"}, "Missing extraction fingerprint identity")
+    return dict(frames=f, struts=s, elements=e, known_parent_frames=int(expected["strut_failure_known"].sum()),
+                failed_parent_frames=int(expected["strut_failed"].sum()),
+                final_failed_struts=int(expected["strut_failed"][-1].sum()),
+                final_failed_elements=int(expected["element_failed"][-1].sum()),
+                missing_status=int((~expected["status_valid"]).sum()), status_reactivations=0)

@@ -118,6 +118,21 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## HPO, resume, and transfer
 
+For the authorised FCC fracture dataset, use p1's existing B2 with explicit
+`--damage-only --manifest`, not B1 simulation generation or legacy recursive B2.
+`SIMscripts/DAMAGE.md` owns the commands. Scope is the90 existing Ti
+disNodes0.2/FCC job groups plus the periodic FCC baseline; preserve the p1
+compute1CPU/8GB/240h/abaqus:5 policy and benchmark before selecting concurrency.
+Use immutable code/manifests and Slurm-owned bounded scratch, publish only
+FIELDd NPZ/JSON pairs beside existing FIELDu, then build additive allD banks.
+Local raw exports consolidate into p1's separate periodic/disordered transfer
+folders; local MLdata stays in `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata`, while HPC
+MLdata is `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Z:/p2 is the saved-ML-run
+root, not a replacement for the local p1 training-data archive. No training
+architecture, other lattice, FEA or ODB upgrade follows from this processing.
+Non-interactive sessions may need `/opt/slurm/bin` on PATH; export HOSTNAME and
+source `/etc/profile.d/modules.sh` before loading site modules.
+
 Windows PuTTY sharing: the user authenticates an `HPC` session started with
 `putty -load HPC -l exy053 -share`; `plink -shareexists -load HPC -l exy053` must
 return0, followed by a harmless `plink -batch -share ...` remote check. Use

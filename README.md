@@ -241,11 +241,12 @@ This folder contains the active local and HPC Abaqus workflow.
 | `A2_INpostProcess.py` | Parses `.inp` files and exports input-side transfer CSVs for node positions, strut thicknesses, and frequency-disorder parameters. |
 | `A2_OUTpostProcess.py` | Parses `.odb` history outputs and writes curve-side `OUT-Ductile...csv` and `OUT-Fracture...csv` files. |
 | `A2_FieldOUTpostProcess.py` | Parses `.odb` field outputs and writes per-simulation `FIELDu-...npz` files with displacement fields, node labels, coordinates, frames, components, masks, and source metadata. |
-| `A2_DamageOUTpostProcess.py` | Opt-in read-only export of one matching periodic or checked 20% nodal-disorder Ti FCC B21 ODB/INP to a separate `strut_damage_v1` NPZ, preserving section-point SDEG, whole-element STATUS, original FE-parent membership and actual recorded loading/time. Uses explicit named arguments, not the legacy positional contract. |
+| `A2_DamageOUTpostProcess.py` | Read-only export of one supported Ti FCC B21 ODB/INP. Full audit: `strut_damage_v1`; `--status-only`: lean `strut_status_v1` with whole-element STATUS, native parent membership and actual frames. Uses named arguments. |
+| `A2_DamageBatch.py` | Explicit FCC-only archive inventory and resumable STATUS batches through the same exporter, with scratch copies, source/code hashes and FIELDu alignment checks. |
 | `A3_ContinuumPP.py` | Older continuum-style displacement post-processing helper for `frame*.csv` and `NodesElems.csv` outputs. |
 | `B1_ABAQUS-new.sh` | Main Slurm wrapper. Stages scripts and `resources/` to scratch, runs Abaqus generation/post-processing, and archives outputs. |
 | `B1_ABAQUS-inp-rerun.sh` | Runs existing `.inp` files and can post-process them in place. |
-| `B2_ABAQUS-PPscratch-new.sh` | Re-runs post-processing over archived simulation directories. |
+| `B2_ABAQUS-PPscratch-new.sh` | Legacy archived post-processing plus explicit manifest-driven `--damage-only` batches; see `SIMscripts/DAMAGE.md`. |
 | `B3_ABAQUS-transfer.sh` | Transfers `transfer/` files and archives between QMUL HPC and local `Z:/p1/data/Ti`. |
 | `run-local.ps1` | Local Windows launcher for Abaqus testing. |
 | `odbUpgrade.py` | ODB upgrade helper. It can delete old ODBs depending on configuration, so treat it carefully. |
@@ -476,7 +477,25 @@ It never matches subdivision nodes by proximity alone. The four selected cases
 are UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK; the two FT INPs are
 byte-identical and exported responses match exactly, so they are not independent
 specimens. The separate report preserves both requested file results.
-Broader archive processing and model integration still require approval.
+The researcher has additionally authorised processing the existing FCC periodic
+and 20% nodal-disorder archive only. The lean route writes lowercase
+`FIELDd-<original-stem>.npz` beside existing HPC FIELDu products. B2's explicit
+damage-only path uses a pinned manifest, compute-node scratch and verified
+publication; its legacy recursive route is not used. Preflight precedes the
+9,000 UT/9,000 FT dataset plus the periodic pair. Other lattices and new FEA are
+outside scope. `resources.damage_data` builds four additive
+`*-disNodes-allD.npz` banks against exact existing allFIELD IDs/order, preserving
+periodic ID0 and current filtering. Frame alignment follows saved frame order
+and count, with per-sample times retained as provenance and no interpolation.
+Local raw exports use the separate `Z:/p1/data/Ti/per/FCC/transfer` and
+`Z:/p1/data/Ti/disNodes/0.2/FCC/transfer` folders. MLdata additions go to local
+`Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
+`/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`; existing displacement/curve products
+and ML architecture remain unchanged. See the quick start for execution.
+`p2-DisorderML/code/review_damage_dataset.py` builds the dataset preflight report
+from explicit FIELDd products and saved execution metadata; its selected plots
+do not imply whole-corpus completion. The human report lives in ignored
+`p2-DisorderML/samples/damage-dataset/`.
 The local audit is handed back to **Improve ML Accuracy** through the current
 [damage continuation](p2-DisorderML/handoffs/HANDOFF-DAMAGE.md): bounded HPC
 contract/alignment checks first, preserving input-study priority and the existing
