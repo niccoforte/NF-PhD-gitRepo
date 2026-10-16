@@ -68,6 +68,16 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   physics/strain distinguishes implemented CPU-tested sudden weights from unproven
   accuracy benefit. Damage and Tokenisation need no additional scope or changes.
 
+- The researcher requests damage handback to the current Windows **Improve ML
+  Accuracy** chat for HPC tests. `handoffs/HANDOFF-DAMAGE.md` is the reconciled
+  source-attributed transfer. Preserve input-study priority and the custom-loss
+  hold until its input-policy winner is selected. Bounded cluster contract/data
+  alignment checks can proceed first; any damage-training ablation requires a
+  sufficient explicit label corpus and a separately agreed model/loss plan.
+  No damage DATA/MODEL loader/head exists; the six selected fixtures include
+  duplicate FT evidence. The recipient owns the existing checklist and fresh
+  queue reconciliation. This handback submits no jobs or claims HPC results.
+
 - Damage Modeling: periodic UT/FT ODBs read in Abaqus 2024 Python; the researcher
   additionally authorised exactly four local disordered files: UT 397 maxD,
   UT 747 maxB, FT 747 maxB and FT 747 maxK in the same FCC sims directory.

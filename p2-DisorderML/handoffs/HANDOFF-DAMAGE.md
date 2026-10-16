@@ -1,110 +1,157 @@
-# Damage variable processing — task brief
+# Damage Modeling -> Improve ML Accuracy: HPC continuation
 
-Location: p2-DisorderML/handoffs/. Source paths below are repository-relative unless stated otherwise.
+From **Damage Modeling** (`01a13c9f-c95e-7ff1-854f-a3b2f4fbea6c`) to the current
+Windows **Improve ML Accuracy** continuation (`bc645215-a354-451c-93f7-540e7d36d3dc`).
+The researcher requests this handback for HPC tests, merged into that chat's
+current workflow. The bounded local label audit is complete. Improve ML Accuracy
+owns the next cluster checks and any separately agreed model integration.
 
-This is a separate task, not the Improve ML Accuracy continuation. Read applicable
-repo/p1 simulation and p2 samples instructions plus relevant progress notes first.
-Do not load the other handoff files or full previous chat by default. Start by
-inspecting existing producer/export code and proposing a bounded sample audit;
-confirm remote access and scope before ODB processing or job submissions.
-Preserve the existing displacement/curve pipeline and its artifacts.
+Read applicable repository instructions, p2 PROJECT_STATUS, the relevant HPC run
+guide/skills and the implementation below. This brief replaces the original
+start-the-local-audit instructions; do not repeat the audit or revive old jobs.
 
-Current implementation: p1 `SIMscripts/A2_DamageOUTpostProcess.py` and shared
-`resources/damage.py`; review consumer p2 `code/review_damage.py`. See
-`p2-DisorderML/samples/damage-audit/README.md` and the damage status entry.
-The researcher authorised the local periodic UT/FT ODB pair. Both have 21 actual
-frames, stored bottom/top section SDEG and whole-element STATUS; input meshes
-match and hashes remain unchanged. STATUS=0 establishes failure even though stored
-SDEG reaches only 0.99999. Separate `strut_damage_v1` products retain raw data,
-body-only UT membership and masks. The researcher has selected the target as
-binary fracture from STATUS: any failed member gives `D_fracture=1`, all known
-active members give 0, otherwise unknown. Use existing `strut_failed` under
-`strut_failure_known`; no re-extraction or schema change is needed. SDEG remains
-an optional raw diagnostic. Maximum partial severity is unselected and no longer
-blocks this binary target; the saved failure-only numeric-severity arrays still
-leave active surface damage as NaN.
+## Merge with the current workflow
 
-The researcher additionally authorised all four local disordered FCC files in
-that same directory: UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK.
-Keep their report separate at `p2-DisorderML/samples/damage-disordered/README.md`.
-The checked original-joint strategy is selected-mesh graph degree other than
-two, unique canonical reference identity within A1's +/-sqrt(2) mm per-coordinate
-bound at fac=0.2, unchanged boundaries, straight actual FE chains and exact full
-canonical edge sets. Proximity alone would admit subdivision nodes. The maxB
-UT/FT pair shares exactly matching coordinates for all 788 common original
-joints. The four exports each contain 21 actual frames, complete expected
-STATUS/SDEG and unchanged source hashes. Final failed parents/elements: UT 397
-95/97, UT 747 92/93 and each FT 9/9. FT maxB/maxK INPs are byte-identical, and
-their exported STATUS/SDEG, displacement, loading/reaction and raw history arrays
-match exactly. Preserve both requested file results without treating them as
-independent specimens. Independent live-ODB verification passed for all 583,422
-raw STATUS values, all 192,276 parent/frame failure/known masks and 277,820 raw
-section SDEG spot checks. Sixteen synthetic mapping/reduction tests also pass.
-The separate report contains labelled full-body, example and history figures.
-This authorisation excludes broader
-archive extraction, model integration, new simulations and job submission.
+- Keep Case1(i): independent UT/FT models and separate field/curve training.
+  `independent-inputs-261015` was submitted with gate31869463 and production
+  31869464-31869478. These are historical submission IDs, not a fresh queue-state
+  claim. Recheck its manifest/queue/results and preserve immutable snapshots;
+  do not duplicate or alter the input study.
+- Custom-loss submission remains ON HOLD until the researcher reviews the input
+  winner. Inherit that winning training-input policy, including true/mixed or
+  correction if selected; deployment remains predicted/corrected. Do not launch
+  the current 30-job raw-P loss draft unchanged or add damage to it silently.
+- Add damage to the existing Accuracy checklist as a distinct follow-on. Bounded
+  execution/data-alignment checks can run while the input study proceeds. Place
+  a later predictive damage ablation explicitly in the selected baseline's plan,
+  preserving the held loss-study decision and one-change comparisons.
+- This handback authorizes the receiving chat to progress HPC testing; it does
+  not define a new damage architecture/loss, grant archive-scale extraction, or
+  make the selected extreme specimens a training corpus. No jobs were submitted
+  by Damage Modeling.
 
-## Damage export: element → strut → loading history
+## Code and artifact locations
 
-Continue p1 damage processing for the paired FCC UT/FT simulations in the p1 HPC
-archive. First inspect a small authorised sample and the actual ODB field/history
-names to establish which damage variable is available (do not assume SDEG, STATUS
-or a particular SDV are interchangeable). Preserve ODBs and existing displacement
-exports. Use Abaqus Python and the existing p1 scratch/archive workflow; do not
-upgrade or scan thousands of ODBs by default.
+Implementation baseline: **7166de8**, verified on both Git remotes. This handoff's
+own documentation commit follows it. The receiving Windows chat last used
+`Z:/00-PhD-gitRepo`, clean at d3db4e8 when inspected; it needs a fast-forward to
+the current remote, preserving any newer/unrelated work.
 
-The output entities are **struts, not lattice nodes**. Reconstruct an explicit
-element-label-to-parent-strut map from the original INP connectivity/producer
-metadata, with instance names and beam subdivisions handled correctly. Do not use
-consecutive labels or an assumed fixed number of elements as the mapping rule.
-The researcher expects five or ten elements per strut, but the prior audit found
-variable subdivision counts: measure and report them instead of assuming either.
+The actual local audit implementation and ignored products are in
+`C:/Users/exy053/Documents/00-PhD-gitRepo`. Git carries code, not these ignored
+research products. Read their reports directly on this host or transfer only the
+explicit required files with a hash manifest before HPC use. Do not recreate a
+Windows repo-root data/ folder. Raw sources are under
+`Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`.
 
-At each recorded frame, if any constituent element has verified STATUS=0,
-assign binary fracture 1 to its whole parent strut. If all constituent statuses
-are known and active, assign 0 regardless of SDEG. Keep raw SDEG for audit;
-continuous severity aggregation is optional and would require an explicit
-researcher choice, but is unnecessary for this target. Handle deleted elements
-and missing output: missing does not automatically mean undamaged or failed. Identify failure through
-the validated damage/status convention and retain absorbing failure only when
-the simulation definition supports it. Distinguish first failure from average
-strut degradation. Do not maximise a raw sum of element failures.
+| Product under p2-DisorderML/samples | Raw source stem | Final failed parents / elements |
+| --- | --- | --- |
+| damage-audit/UT-periodic-damage.npz | Ductile-FCC-20-per-1 | 83 / 83 |
+| damage-audit/FT-periodic-damage.npz | Fracture-FCC-20-per-1 | 7 / 7 |
+| damage-disordered/UT-397-maxD.npz | Ductile-FCC-20-20disNodes-lhs-all-397-maxD | 95 / 97 |
+| damage-disordered/UT-747-maxB.npz | Ductile-FCC-20-20disNodes-lhs-all-747-maxB | 92 / 93 |
+| damage-disordered/FT-747-maxB.npz | Fracture-FCC-20-20disNodes-lhs-all-747-maxB | 9 / 9 |
+| damage-disordered/FT-747-maxK.npz | Fracture-FCC-20-20disNodes-lhs-all-747-maxK | 9 / 9 |
 
-Produce small, labelled examples under the existing `p2-DisorderML/samples/`:
-an intact strut, an active surface-damaged strut, and a strut with one failed
-element; show endpoints, strut identity, constituent element labels, raw values, aggregation
-arithmetic and the resulting binary fracture value. Full-body and example maps
-use purple 0/red 1, with black-dashed unknown observations and no grey active
-state. Keep local SDEG diagnostics distinct. Include a crack-adjacent FT example
-and different subdivision counts. Plot a highlighted parent strut and its
-elements at several frames, and binary fracture against explicitly defined
-global loading/strain.
-Ask for researcher confirmation before scaling up.
+Each samples directory has a visual README, labelled figures, provenance and
+independent verification JSONs. Source/code fingerprints are retained per file.
+D means researcher-selected highest UT ductility, K initial FT toughness, B the
+same-disorder UT/FT property-Pareto pair; this audit does not recalculate optima.
 
-Propose a versioned edge/strut NPZ contract with stable specimen IDs, endpoint
-mapping, frame/load values, valid masks, source provenance and variable names.
-Keep it separate from the node-displacement arrays; never broadcast strut labels
-onto nodes silently. No architecture change is part of this task. The dual local
-graph uses **initial** connectivity and is not already a damage-evolution model.
+The FT maxB/maxK INPs and all exported nonmetadata arrays are identical, despite
+different ODB bytes. Six files are five unique task responses across three
+underlying designs, with only two complete UT/FT geometry pairs. They are audit
+fixtures, not independent population/train/validation/test samples.
 
-## Interface to model work
+Executable sources:
+- p1 `SIMscripts/A2_DamageOUTpostProcess.py`: one explicit ODB/INP, Abaqus Python,
+  readOnly=True; no discovery, upgrades or job submission.
+- `resources/damage.py`: checked original-joint identities, actual FE chains,
+  missing-aware failure masks and strut_damage_v1 validation; pure NumPy.
+- p1 `SIMscripts/test_damage_contract.py` and `test_damage_odb.py`: focused
+  synthetic checks and independent live-ODB comparison respectively.
+- p2 `code/review_damage.py`: saved-NPZ visual review, repeated --case arguments.
 
-Deliver the validated label contract, readable examples and unresolved decisions
-to the user for transfer to Improve ML Accuracy. That task owns model integration:
-a future strut head may read endpoint-node embeddings plus edge geometry, without
-new Transformer tokens. It must handle endpoint-order invariance, task/absent-strut
-masks, class/loss imbalance and frame alignment. A local graph can help but is not
-a prerequisite; no damage head exists yet. Initial adjacency is not survival, and
-true future damage must never determine inference-time edges. Do not independently
-edit architecture/loss modules. Reuse validated reference_field_edges as an initial
-topology reference; the original INP owns FE-element-to-strut provenance.
+The quick start and array specification remain in
+`p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md`. Samples contains outputs,
+not executable dependencies. No DATA/MODEL damage loader, head or training flag
+has been implemented.
 
-A node's fraction of incident struts broken is an optional summary, never a
-replacement for edge histories. Shared displacement/damage representations can
-still produce inconsistent heads: first test auxiliary supervision without
-feeding predicted damage back into displacement or removing predicted edges.
-Avoid feedback until the labels/head are independently validated.
+## Label and alignment contract
 
-Completed work goes into the appropriate producer documentation/progress notes;
-keep this brief current until its actions have migrated. No bulk export, new FEA
-or damage training is authorised merely by reading this file.
+- Binary fracture is **1 if any member STATUS=0**, **0 if all member statuses
+  are known active**, unknown otherwise. Use `strut_failed` under
+  `strut_failure_known`; element equivalents retain original FE identity.
+  Missing output is never filled with zero or interpreted as failure.
+- SDEG/DUCTCRT are raw diagnostics, not this target. Historical optional scalar
+  `strut_damage` severity can be NaN while binary fracture is fully known; no
+  partial aggregation decision blocks these binary labels. Carry is disabled.
+- UT selects BodySet and excludes830 grips. Native struts:2319UT/2259FT.
+  Original joints:800UT/788FT. Initially absent FT geometry is not failed.
+- Disordered joints derive from selected-mesh degree, unique reference identity
+  within the producer's +/-sqrt(2) mm coordinate bound, unchanged boundaries,
+  straight FE chains and full canonical-edge equality. Subdivisions vary2-6UT,
+  1-6FT; do not infer membership from labels or a fixed element count.
+- Audit-canonical reference order is sorted(y,x), **not DATA/DUAL node order**.
+  Match specimen provenance and original coordinates, remap endpoints explicitly,
+  retain native FT/presence masks and record unmatched/dropped samples. Numeric
+  ID397/747 alone does not prove correspondence with an archived ML sample.
+- Damage products contain21 actual frames including0. The active ML runner
+  drops frame0 by default. Match saved step/frame/time/load metadata; remove0
+  only to match the verified consumer configuration. Never ordinal-stack21 with
+  20 frames, interpolate binary labels or invent between-frame onset.
+- Preserve the existing7137/793/881 specimen partition, seeds42/43/44 and locked
+  test exclusion where corresponding data exists. Group related/duplicate files
+  by underlying design; never split frames or elements as independent specimens.
+  Check a fixture's partition before evaluating any saved model on it.
+
+## Next actions in Improve ML Accuracy
+
+1. Synchronize the receiving checkout and reconcile its current checklist,
+   live queue and data availability. Reuse the existing authenticated HPC session;
+   leave it open. Confirm exact archive/source identity rather than assuming a
+   local path or filename maps to the current training data.
+2. Run a **bounded cluster contract/consumer replay on these six fixtures**:
+   original identity, endpoint remapping, frame0 alignment, task/absence/unknown
+   masks, STATUS-derived parent rule and save/reload. Sixteen focused local tests
+   already pass. Standard Python can read NPZs; actual ODB replay requires Abaqus
+   Python and matching INPs via the p1 route, not an assumption that the p2 GPU
+   environment exposes odbAccess. No new FEA is needed.
+3. If useful, prepare post-hoc fracture-region diagnostics for existing saved
+   predictions only after exact geometry/source and permitted split membership
+   match. This can diagnose displacement errors; it does not establish a trained
+   fracture predictor or an improvement from damage supervision.
+4. Before supervised damage training, inventory label coverage read-only and
+   agree an explicit data/split/extraction plan with the researcher. The few
+   selected fixtures cannot establish generalisation. Broader extraction and
+   architecture/loss decisions remain explicit scope choices.
+5. Once an isolated model test is agreed, retain the selected Case1(i) input
+   policy and an unchanged matched control. A symmetric endpoint-embedding strut
+   readout is an option, not an existing implementation. Avoid new tokens or
+   graph changes in the first auxiliary test; never feed true future damage into
+   inference or remove inference edges with it. If field generators change and
+   correction won, refit the required TRAIN-only OOF/nested correction banks.
+   Select damage weights and train-only balancing explicitly; spatial0.1 and
+   existing curve coefficients are not damage-loss optima. Retain the fixed
+   field/curve selection and safeguards; add binary precision/recall, prevalence
+   and onset diagnostics without substituting them for that comparison.
+6. Use the existing preview-first staging, immutable sources, manifest and
+   disposable GPU/save/reload preflight before matching production training.
+   Preserve the established resource policy, successful-gate dependencies and
+   seeds; determine the actual job count from the agreed test rather than this
+   brief. Execution success is not accuracy evidence. Keep Windows raw runs in
+   Z:/p2 and provide one conclusions-first visual report per study in samples,
+   including controls, seed variation, full UT/FT crack-tip views, errors and
+   class prevalence. Preserve current preflight retention/failed-run cleanup.
+
+## Evidence and limits
+
+All source hashes stayed unchanged. All audited binary labels are known.
+The disordered pass independently matched583422 raw STATUS values, all192276
+parent/frame failure/known masks and277820 section SDEG values at five frames/file.
+The periodic pass matched296079 STATUS values and140990 section SDEG values.
+Sixteen focused tests pass; repository validation reported80 non-failing contract
+checks and14 non-failing changed-surface checks, including explicit syntax-only
+and skipped coverage. Those are distinct from the real Abaqus checks.
+No HPC execution, damage training, learned fracture accuracy or scientific
+improvement is claimed by this handoff.

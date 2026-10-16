@@ -471,6 +471,10 @@ are UT 397 maxD, UT 747 maxB, FT 747 maxB and FT 747 maxK; the two FT INPs are
 byte-identical and exported responses match exactly, so they are not independent
 specimens. The separate report preserves both requested file results.
 Broader archive processing and model integration still require approval.
+The local audit is handed back to **Improve ML Accuracy** through the current
+[damage continuation](p2-DisorderML/handoffs/HANDOFF-DAMAGE.md): bounded HPC
+contract/alignment checks first, preserving input-study priority and the existing
+custom-loss hold. No damage training loader/head is already available.
 Readable sharing/peak-loss diagrams and the latest validation review are in
 `p2-DisorderML/samples/dual-clarification-evidence.md`; these do not change training defaults.
 
