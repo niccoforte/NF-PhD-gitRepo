@@ -74,10 +74,13 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   and verifier-launch import-path failures were corrected; their failed scratch
   and unused launch artifacts were removed after concise diagnosis was retained.
   Production array32085486 tasks0–90 is RUNNING, throttled to four concurrent
-  batches; original CPU MLdata job32085487 is held for a bank-only correction.
+  batches; corrected CPU MLdata job32095821 waits afterok on that array, using
+  immutable bank-code-4c435cf. Original bank job32085487 was cancelled before running.
   Required UT601 has20 raw frames; existing allFIELD preserves that exact prefix
   and masks its21st frame. The corrected builder follows this existing padding
   rule with explicit frame presence/counts; a real periodic0/601 NumPy check passes.
+  Thirteen bank and13 report tests pass; contract validation is85 non-failing,
+  zero failed checks. Report execution records retain the replacement job evidence.
   The extraction array is unaffected. Frozen e92e899 source and
   dataset-v2 manifest live in home p1/Ti/disNodes/0.2/FCC/damage-261016. Eight
   checked preflight products are hash-verified in the canonical local transfer folders;

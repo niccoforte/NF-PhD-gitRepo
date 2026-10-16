@@ -14,7 +14,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   and independent native verification32084803 COMPLETED0:0:1,171,296 raw STATUS
   positions and384,552 parent/frame labels checked, zero missing values.49 focused
   tests pass. Production array32085486 tasks0–90 is RUNNING with four concurrent
-  batches; original CPU MLdata job32085487 is held for the correction below.
+  batches; corrected CPU MLdata job32095821 waits afterok, using immutable
+  bank-code-4c435cf for the padding correction below.
   Immutable e92e899 extraction source and
   pinned dataset-v2 manifest are under home p1/Ti/disNodes/0.2/FCC/damage-261016.
   Eight checked preflight products/sidecars are in canonical local transfer folders;
@@ -32,8 +33,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   The corrected bank builder matches this convention with explicit frame counts,
   presence and masked trailing times; a bounded real-data check with periodic0
   and601 passes. Thirteen bank and13 report tests pass; contract validation
-  records85 non-failing/zero failed checks. The original pending bank job32085487 is held for replacement
-  after correction checks; the extraction array and its frozen sources continue.
+  records85 non-failing/zero failed checks. Original bank job32085487 was cancelled
+  before execution; the extraction array and its frozen sources continue.
 
 - Case1(i) is selected for the next two studies. Input variation is prepared first:
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
