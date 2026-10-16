@@ -67,7 +67,16 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   both local periodic Abaqus exports (UT83/FT7 final failed parents;6.85s/3.66s
   export time). Archived periodic INPs match those sources byte-for-byte; ODB
   hashes differ and require direct response comparison in the cluster preflight.
-  First cluster preflight32084036 read all eight ODBs but failed before publishing
-  at a case-sensitive instance-name comparison. The comparison is corrected with
-  regression coverage and real local FIELDu alignment checks; replacement
-  preflight preparation is in progress. No production array has been submitted.
+  Corrected cluster export preflight32084741 and independent native verification
+  32084803 COMPLETED0:0: eight products,1,171,296 raw STATUS positions and384,552
+  parent/frame labels agree exactly, zero missing STATUS. Earlier instance-case
+  and verifier-launch import-path failures were corrected; their failed scratch
+  and unused launch artifacts were removed after concise diagnosis was retained.
+  Production array32085486 tasks0–90 is RUNNING, throttled to four concurrent
+  batches; dependent CPU MLdata job32085487 is queued. Frozen e92e899 source and
+  dataset-v2 manifest live in home p1/Ti/disNodes/0.2/FCC/damage-261016. Eight
+  checked products are hash-verified in both canonical local transfer folders;
+  periodic raw STATUS/masks/times exactly match the earlier audit despite
+  different ODB hashes.49 focused tests pass. The complete corpus and both
+  MLdata archive additions are still in progress; a30-minute chat follow-up
+  monitors completion and performs the remaining verified local transfer/report.

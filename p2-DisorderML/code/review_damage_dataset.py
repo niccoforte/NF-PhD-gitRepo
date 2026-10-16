@@ -44,7 +44,7 @@ def review(products, output_dir, execution_json=None):
     cases.sort(key=lambda case: (case[1]["task"] != "UT", case[1]["simulation_id"]))
     ids = sorted({record["simulation_id"] for _, record in cases})
     colors = dict(active="#440154", failed="#d62728", unknown="#111111")
-    fig, axes = plt.subplots(2, len(ids), figsize=(max(5, 3.4*len(ids)), 7.7), squeeze=False)
+    fig, axes = plt.subplots(2, len(ids), figsize=(max(5, 3.4*len(ids)), 9.8), squeeze=False)
     for ax in axes.flat:
         ax.set_visible(False)
     for arrays, record in cases:
@@ -68,7 +68,7 @@ def review(products, output_dir, execution_json=None):
               Line2D([0], [0], color=colors["unknown"], lw=2, ls="--", label="Unknown: incomplete STATUS, no observed failure")]
     fig.suptitle("FCC fracture at the final saved frame\nWhole-element STATUS only", fontsize=13)
     fig.legend(handles=legend, loc="lower center", ncol=1, fontsize=9, frameon=False)
-    fig.tight_layout(rect=(0, .105, 1, .95))
+    fig.tight_layout(rect=(0, .105, 1, .95), h_pad=3.2, w_pad=1.3)
     fig.savefig(output_dir/"fracture-final.png", dpi=190)
     plt.close(fig)
     fig, axes = plt.subplots(2, 2, figsize=(12, 6.5), squeeze=False, sharex="col")
@@ -122,8 +122,9 @@ def review(products, output_dir, execution_json=None):
               "fracture between recorded frames, or the statistical representativeness of these selected examples.", "",
               "[Product table](product-summary.csv) · [Source fingerprints, metadata and execution record](results.json)"]
     if execution:
-        lines += ["", "## Execution and periodic-source identity", "", "The supplied execution record is reproduced below; job states are not queried by this reporting script.",
-                  "", "```json", json.dumps(execution, indent=2), "```"]
+        lines += ["", "<details>", "<summary>Execution records and periodic-source identity</summary>", "",
+                  "The supplied record is reproduced below; this report does not query job states.",
+                  "", "```json", json.dumps(execution, indent=2), "```", "", "</details>"]
     (output_dir/"README.md").write_text("\n".join(lines)+"\n", encoding="utf-8")
     return records
 

@@ -10,10 +10,17 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   FIELDd products and manifest-driven scratch batches. Add four allD banks to
   local disNodes/0.2/FCC/MLdata and HPC p2/MLdata using exact existing IDs/order,
   periodic0 and saved-frame-index alignment. Other lattices, new FEA and ML
-  architecture/training integration stay outside scope. Implementation and local
-  Abaqus checks pass. Cluster preflight32084036 failed before publication at an
-  INP/ODB instance-name case comparison; the tested correction is being staged
-  for replacement preflight. Production batches have not yet been submitted.
+  architecture/training integration stay outside scope. Export preflight32084741
+  and independent native verification32084803 COMPLETED0:0:1,171,296 raw STATUS
+  positions and384,552 parent/frame labels checked, zero missing values.49 focused
+  tests pass. Production array32085486 tasks0–90 is RUNNING with four concurrent
+  batches; CPU MLdata job32085487 waits afterok. Immutable e92e899 source and
+  pinned dataset-v2 manifest are under home p1/Ti/disNodes/0.2/FCC/damage-261016.
+  Eight checked products/sidecars are already in canonical local transfer folders;
+  corpus-wide processing and MLdata publication/transfer remain in progress.
+  Human preflight report: samples/damage-dataset/README.md. A30-minute chat
+  follow-up monitors and finishes the remaining archive/report work. Earlier
+  failed preflight scratch/unused launch artifacts were cleaned after diagnosis.
 
 - Case1(i) is selected for the next two studies. Input variation is prepared first:
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
@@ -81,8 +88,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   accuracy benefit. Damage and Tokenisation need no additional scope or changes.
 
 - Damage handback is integrated into the current Accuracy checklist. Bounded
-  cluster fixture/consumer checks are prepared; no damage-training comparison or
-  broader extraction is defined or authorised. Six ignored NPZs are on C:, not
+  cluster fixture/consumer checks are separate from the newly authorised FCC
+  dataset export above; no damage-training comparison is defined. Six ignored NPZs are on C:, not
   supplied by Git; exact hash-verified transfer precedes cluster execution.
   New `HPC/DualOutputs/A0-HPC-Damage-contract.py` packages only these six NPZ/INP
   pairs and a saved Case1(i) DATA descriptor, then replays masks/reference endpoints,
@@ -132,8 +139,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   severity is NaN.
   Periodic report/raw examples/figures/NPZs: `samples/damage-audit/`; the separate
   disordered comparison belongs in `samples/damage-disordered/`.
-  No architecture, source data or jobs changed. Broader bulk processing and
-  model integration remain outside scope. User clarified D=highest UT ductility,
+  Those audits changed no architecture or source data. The subsequent authorised
+  FCC bulk pass is recorded above; model integration remains separate. User clarified D=highest UT ductility,
   K=initial FT toughness, B=same-disorder UT/FT property-Pareto pair.
   Periodic independent live-ODB checks matched all 296,079
   STATUS records/all-frame parent failures and 140,990 section SDEG spot checks.
