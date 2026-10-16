@@ -60,9 +60,10 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   all known active constituents give0; otherwise unknown. SDEG stays diagnostic.
   Production processing is authorised for the existing FCC archive only:90 job
   groups,9,000 UT plus9,000 FT ODBs, and the separate periodic pair. Each ODB has
-  matching INP/FIELDu filenames; native STATUS availability still needs preflight.
-  Extend the existing exporter/B2 route, keep frame-index alignment, periodic ID0
-  and exact existing MLdata populations. Local/HPC paths and contracts are in
+  matching INP/FIELDu filenames. Eight preflight cases passed native STATUS
+  verification; whole-corpus validation remains in progress. The existing
+  exporter/B2 route now preserves frame-index alignment, periodic ID0 and exact
+  existing MLdata populations. Local/HPC paths and contracts are in
   SIMscripts/DAMAGE.md. The lean route matches every raw STATUS/parent mask in
   both local periodic Abaqus exports (UT83/FT7 final failed parents;6.85s/3.66s
   export time). Archived periodic INPs match those sources byte-for-byte; ODB
@@ -73,10 +74,16 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   and verifier-launch import-path failures were corrected; their failed scratch
   and unused launch artifacts were removed after concise diagnosis was retained.
   Production array32085486 tasks0–90 is RUNNING, throttled to four concurrent
-  batches; dependent CPU MLdata job32085487 is queued. Frozen e92e899 source and
+  batches; original CPU MLdata job32085487 is held for a bank-only correction.
+  Required UT601 has20 raw frames; existing allFIELD preserves that exact prefix
+  and masks its21st frame. The corrected builder follows this existing padding
+  rule with explicit frame presence/counts; a real periodic0/601 NumPy check passes.
+  The extraction array is unaffected. Frozen e92e899 source and
   dataset-v2 manifest live in home p1/Ti/disNodes/0.2/FCC/damage-261016. Eight
-  checked products are hash-verified in both canonical local transfer folders;
+  checked preflight products are hash-verified in the canonical local transfer folders;
   periodic raw STATUS/masks/times exactly match the earlier audit despite
   different ODB hashes.49 focused tests pass. The complete corpus and both
   MLdata archive additions are still in progress; a30-minute chat follow-up
   monitors completion and performs the remaining verified local transfer/report.
+  Timestamped batch counts, per-file results and incremental local transfer
+  receipts are retained under ignored p2 samples/damage-dataset/execution/.

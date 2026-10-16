@@ -19,7 +19,7 @@ from resources.damage import require, validate_status_arrays
 
 BANKS = (("UT", "UT"), ("FT", "FT"), ("MULTI", "UT"), ("MULTI", "FT"))
 SAMPLE_KEYS = ("D", "valid_mask", "sample_ids", "sample_stems", "sample_node_coords",
-               "frame_time", "first_failure_frame", "source_damage_files",
+               "frame_time", "frame_present", "sample_frame_count", "first_failure_frame", "source_damage_files",
                "source_damage_sha256", "source_inp_sha256", "source_odb_sha256")
 
 
@@ -169,10 +169,17 @@ def validate_damage_bank(arrays):
     ids = np.asarray(arrays["sample_ids"])
     require(ids.shape == (n,) and len(set(ids)) == n and "0" in ids,
             "Invalid bank sample identity or missing reference")
-    require(np.asarray(arrays["frame_time"]).shape == (n, f) and
-            np.isfinite(arrays["frame_time"]).all() and
-            (arrays["frame_time"][:, 0] == 0).all() and
-            (np.diff(arrays["frame_time"], axis=1) > 0).all(), "Invalid sample frame times")
+    counts, present = np.asarray(arrays["sample_frame_count"]), np.asarray(arrays["frame_present"])
+    require(counts.shape == (n,) and counts.dtype.kind in "iu" and
+            ((counts > 0) & (counts <= f)).all() and present.shape == (n, f) and
+            present.dtype.kind == "b" and
+            np.array_equal(present, np.arange(f)[None] < counts[:, None]),
+            "Invalid sample frame prefix/count")
+    times = np.asarray(arrays["frame_time"])
+    require(times.shape == (n, f) and np.isfinite(times[present]).all() and
+            np.isnan(times[~present]).all() and (times[:, 0] == 0).all() and
+            (np.diff(times, axis=1)[present[:, 1:]] > 0).all(), "Invalid sample frame times")
+    require(not known[~present].any(), "Unavailable sample frames must be entirely unknown")
     require(np.asarray(arrays["frame_values"]).shape == (f,) and
             np.array_equal(arrays["frame_index"], np.arange(f)), "Invalid bank frame axes")
     edge = np.asarray(arrays["edge_index"])
@@ -202,6 +209,10 @@ def validate_damage_bank(arrays):
         require(all(len(value) == 64 and set(str(value)) <= set("0123456789abcdef") for value in arrays[key]),
                 "Invalid bank source fingerprints: "+key)
     return dict(samples=n, frames=f, struts=s, unknown_parent_frames=int((~known).sum()),
+                unavailable_sample_frames=int((~present).sum()),
+                unavailable_parent_frames=int((~present).sum())*s,
+                samples_with_unavailable_trailing_frames=int((counts < f).sum()),
+                observed_unknown_parent_frames=int(((~known) & present[:, :, None]).sum()),
                 failed_parent_frames=int(values.sum()),
                 failed_struts_per_frame=values.sum(axis=(0, 2), dtype=np.int64).tolist(),
                 unknown_struts_per_frame=(~known).sum(axis=(0, 2), dtype=np.int64).tolist())
@@ -210,7 +221,9 @@ def validate_damage_bank(arrays):
 def _build_task(layout, task, index, tolerance):
     ids, stems = layout["sample_ids"], layout["sample_stems"]
     reference = None
-    times, firsts, files, hashes, inp_hashes, odb_hashes = [], [], [], [], [], []
+    firsts, counts, files, hashes, inp_hashes, odb_hashes = [], [], [], [], [], []
+    frames = len(layout["frame_values"])
+    times = np.full((len(ids), frames), np.nan)
     for row, (sample_id, stem) in enumerate(zip(ids, stems)):
         record = index[(task, sample_id)]
         path = record["path"]
@@ -219,24 +232,26 @@ def _build_task(layout, task, index, tolerance):
         with np.load(path, allow_pickle=False) as saved:
             source = {key: saved[key] for key in saved.files}
         summary = validate_status_arrays(source)
-        require(summary["frames"] == len(layout["frame_values"]), "Field/FIELDd frame count mismatch: "+str(path))
+        keep = summary["frames"]
+        require(0 < keep <= frames, "Field/FIELDd frame count mismatch: "+str(path))
         require(str(source["task"]) == task and str(int(source["simulation_id"])) == sample_id,
                 "FIELDd identity changed after indexing")
         if reference is None:
             edge = _edge_mapping(source, layout, tolerance)
             reference = {key: source[key] for key in ("canonical_endpoint", "canonical_xy", "strut_present", "strut_id")}
             reference["edge_index"] = edge
-            values = np.empty((len(ids), summary["frames"], summary["struts"]), np.uint8)
-            known = np.empty(values.shape, bool)
+            values = np.zeros((len(ids), frames, summary["struts"]), np.uint8)
+            known = np.zeros(values.shape, bool)
         else:
             require(all(np.array_equal(source[key], reference[key]) for key in
                         ("canonical_endpoint", "canonical_xy", "strut_present", "strut_id")),
                     "FIELDd native strut axes differ between samples")
         require(np.allclose(source["endpoint_xy0"], layout["sample_node_coords"][row][edge],
                             rtol=0, atol=tolerance), "Field/FIELDd initial sample geometry mismatch: "+str(path))
-        values[row] = source["strut_failed"]
-        known[row] = source["strut_failure_known"]
-        times.append(source["frame_time"])
+        values[row, :keep] = source["strut_failed"]
+        known[row, :keep] = source["strut_failure_known"]
+        times[row, :keep] = source["frame_time"]
+        counts.append(keep)
         firsts.append(source["first_failure_frame"])
         meta = json.loads(str(source["metadata_json"]))
         files.append(str(path.resolve()))
@@ -246,7 +261,9 @@ def _build_task(layout, task, index, tolerance):
         odb_hashes.append(meta["source_sha256"]["odb"])
     reference.update(D=values, valid_mask=known, sample_ids=ids, sample_stems=stems,
                      node_coords=layout["node_coords"], sample_node_coords=layout["sample_node_coords"],
-                     frame_values=layout["frame_values"], frame_time=np.asarray(times),
+                     frame_values=layout["frame_values"], frame_time=times,
+                     sample_frame_count=np.asarray(counts, np.int32),
+                     frame_present=np.arange(frames)[None] < np.asarray(counts)[:, None],
                      frame_index=np.arange(values.shape[1], dtype=np.int32),
                      first_failure_frame=np.asarray(firsts, np.int32), source_damage_files=np.asarray(files),
                      source_damage_sha256=np.asarray(hashes), source_inp_sha256=np.asarray(inp_hashes),
@@ -300,7 +317,8 @@ def build_damage_banks(mldata_dir, output_dir, transfer_roots=(), inventory=None
             metadata = dict(schema_version="strut_status_bank_v1", task=task, mech_mode=mech,
                             failure_rule="any member whole-element STATUS=0; active only when all members known active",
                             unknown_rule="D storage is 0 with valid_mask=false; never supervise unknown entries",
-                            frame_alignment="saved frame index/order; initial frame retained; no interpolation",
+                            frame_alignment="saved frame index/order; raw prefix retained; unavailable trailing frames masked; no interpolation or carry",
+                            frame_presence="sample_frame_count counts the observed prefix; frame_present marks it; absent frame_time is NaN",
                             edge_axis="native task struts; edge_index remaps audit canonical endpoints to saved ML node order",
                             source_field_layout=layout["provenance"],
                             source_scope=source_scope,
@@ -317,17 +335,23 @@ def build_damage_banks(mldata_dir, output_dir, transfer_roots=(), inventory=None
                 os.fsync(stream.fileno())
             with np.load(temporary, allow_pickle=False) as saved:
                 require(validate_damage_bank(saved) == summary, "Fracture bank round trip failed")
-                require(all(np.array_equal(saved[key], value) for key, value in arrays.items()),
+                require(all(np.array_equal(saved[key], value, equal_nan=np.issubdtype(value.dtype, np.inexact))
+                            for key, value in arrays.items()),
                         "Fracture bank array round trip differs")
             report = dict(output=str(target.resolve()), npz_sha256=fingerprint(temporary), **summary,
                           metadata=metadata, source_products=len(arrays["source_damage_files"]),
                           source_scope=source_scope,
                           sample_ids=arrays["sample_ids"].tolist(),
                           source_damage_sha256=arrays["source_damage_sha256"].tolist(),
+                          sample_frame_count=arrays["sample_frame_count"].tolist(),
+                          samples_with_unavailable_trailing_frame_ids=arrays["sample_ids"][
+                              arrays["sample_frame_count"] < len(arrays["frame_values"])].tolist(),
                           final_failed_struts_per_sample=arrays["D"][:, -1].sum(axis=1).tolist(),
                           final_unknown_struts_per_sample=(~arrays["valid_mask"][:, -1]).sum(axis=1).tolist(),
+                          last_observed_failed_struts_per_sample=arrays["D"][
+                              np.arange(len(arrays["sample_ids"])), arrays["sample_frame_count"]-1].sum(axis=1).tolist(),
                           maximum_frame_time_offset_from_field_reference=float(
-                              np.abs(arrays["frame_time"]-arrays["frame_values"][None]).max()))
+                              np.nanmax(np.abs(arrays["frame_time"]-arrays["frame_values"][None]))))
             with tempfile.NamedTemporaryFile(prefix="."+target.stem+"-", suffix=".json", dir=output_dir,
                                              delete=False, mode="w") as stream:
                 temporary_json = Path(stream.name)

@@ -66,9 +66,15 @@ python -m resources.damage_data --mldata-dir /ABS/MLdata --output-dir /ABS/STAGI
 Products are `{UT-UT,FT-FT,MULTI-UT,MULTI-FT}-disNodes-allD.npz` plus JSON, schema
 `strut_status_bank_v1`. They retain exact allFIELD sample IDs/order, periodic0,
 native strut axes and masks. `edge_index` explicitly maps endpoints into saved
-task-node order; labels are not broadcast to nodes. Align by frame index/count,
-as for existing fields; small timestamp differences are allowed and actual
-per-specimen times remain metadata. Existing allFIELD/curve files and filtering
+task-node order; labels are not broadcast to nodes. Raw STATUS/FIELDu counts
+and frame order must match. Banks follow existing field stacking: shorter raw
+histories occupy the original frame prefix, with unavailable trailing frames
+stored as D=0/valid_mask=false and actual frame_time=NaN. These zeros are unknown,
+never observed active labels. Retain sample_frame_count and frame_present;
+reject sources longer than the bank. Small timestamp differences are allowed,
+without interpolation or failure carry. Reports separate observed unknown STATUS
+from unavailable sample frames and retain the last observed fracture counts.
+Existing allFIELD/curve files and filtering
 are not changed. Verify staged banks and transfer checksums before promoting to
 local `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
 `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Windows uses the authenticated PuTTY

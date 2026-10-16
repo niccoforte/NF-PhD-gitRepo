@@ -6,21 +6,34 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - Damage dataset production is now authorised for existing FCC periodic and
   20% nodal-disorder results only:90 original job groups,9,000 UT/9,000 FT ODBs,
-  plus the periodic pair. Extend p1's existing exporter/B2 route with STATUS-only
-  FIELDd products and manifest-driven scratch batches. Add four allD banks to
+  plus the periodic pair. p1's existing exporter/B2 route now writes STATUS-only
+  FIELDd products through manifest-driven scratch batches. Four allD banks target
   local disNodes/0.2/FCC/MLdata and HPC p2/MLdata using exact existing IDs/order,
   periodic0 and saved-frame-index alignment. Other lattices, new FEA and ML
   architecture/training integration stay outside scope. Export preflight32084741
   and independent native verification32084803 COMPLETED0:0:1,171,296 raw STATUS
   positions and384,552 parent/frame labels checked, zero missing values.49 focused
   tests pass. Production array32085486 tasks0–90 is RUNNING with four concurrent
-  batches; CPU MLdata job32085487 waits afterok. Immutable e92e899 source and
+  batches; original CPU MLdata job32085487 is held for the correction below.
+  Immutable e92e899 extraction source and
   pinned dataset-v2 manifest are under home p1/Ti/disNodes/0.2/FCC/damage-261016.
-  Eight checked products/sidecars are already in canonical local transfer folders;
+  Eight checked preflight products/sidecars are in canonical local transfer folders;
   corpus-wide processing and MLdata publication/transfer remain in progress.
-  Human preflight report: samples/damage-dataset/README.md. A30-minute chat
+  Human report: samples/damage-dataset/README.md. A30-minute chat
   follow-up monitors and finishes the remaining archive/report work. Earlier
   failed preflight scratch/unused launch artifacts were cleaned after diagnosis.
+  Timestamped processing counts, per-file results and incremental local transfer
+  receipts live in samples/damage-dataset/execution/; the eight example plots
+  remain separate from whole-corpus completion evidence.
+  The report now reconciles explicit raw attempts, existing ML exclusions,
+  transfer receipts and four bank proofs before claiming delivery complete.
+  Current corpus evidence remains partial. Real UT601 has20 raw frames; both
+  existing allFIELD banks preserve that exact prefix and mask their21st frame.
+  The corrected bank builder matches this convention with explicit frame counts,
+  presence and masked trailing times; a bounded real-data check with periodic0
+  and601 passes. Thirteen bank and13 report tests pass; contract validation
+  records85 non-failing/zero failed checks. The original pending bank job32085487 is held for replacement
+  after correction checks; the extraction array and its frozen sources continue.
 
 - Case1(i) is selected for the next two studies. Input variation is prepared first:
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true

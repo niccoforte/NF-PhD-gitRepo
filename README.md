@@ -485,16 +485,23 @@ publication; its legacy recursive route is not used. Preflight precedes the
 9,000 UT/9,000 FT dataset plus the periodic pair. Other lattices and new FEA are
 outside scope. `resources.damage_data` builds four additive
 `*-disNodes-allD.npz` banks against exact existing allFIELD IDs/order, preserving
-periodic ID0 and current filtering. Frame alignment follows saved frame order
-and count, with per-sample times retained as provenance and no interpolation.
+periodic ID0 and current filtering. Frame alignment follows saved frame order.
+As for existing fields, shorter raw histories occupy their original prefix;
+unavailable trailing bank frames are masked unknown, with NaN actual times.
+`sample_frame_count` and `frame_present` retain this distinction; no interpolation
+or failure carry is applied.
 Local raw exports use the separate `Z:/p1/data/Ti/per/FCC/transfer` and
 `Z:/p1/data/Ti/disNodes/0.2/FCC/transfer` folders. MLdata additions go to local
 `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
 `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`; existing displacement/curve products
 and ML architecture remain unchanged. See the quick start for execution.
-`p2-DisorderML/code/review_damage_dataset.py` builds the dataset preflight report
-from explicit FIELDd products and saved execution metadata; its selected plots
-do not imply whole-corpus completion. The human report lives in ignored
+`p2-DisorderML/code/review_damage_dataset.py` builds the dataset report from
+explicit FIELDd examples and saved execution metadata. Optional corpus evidence
+adds processing outcomes, final fracture distributions and a per-attempt table;
+completion requires reconciled raw attempts, verified transfers and all four
+aligned MLdata banks. Existing ML exclusions remain distinct from failed ODB
+processing. The eight illustrated products and their native ODB comparisons
+remain selected evidence. The human report lives in ignored
 `p2-DisorderML/samples/damage-dataset/`.
 The local audit is handed back to **Improve ML Accuracy** through the current
 [damage continuation](p2-DisorderML/handoffs/HANDOFF-DAMAGE.md): bounded HPC

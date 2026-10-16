@@ -116,6 +116,8 @@ class DamageData(unittest.TestCase):
                 self.assertEqual(bank["D"][row, -1, 1], 0)
                 self.assertFalse(bank["valid_mask"][row, -1, 1])
                 self.assertEqual(bank["frame_time"][row, -1], 2.00004)
+                np.testing.assert_array_equal(bank["sample_frame_count"], np.full(len(expected_ids), 3))
+                self.assertTrue(bank["frame_present"].all())
                 np.testing.assert_array_equal(bank["frame_values"], [0, 1, 2])
                 self.assertGreater(json.loads(path.with_suffix(".json").read_text())["unknown_parent_frames"], 0)
 
@@ -152,12 +154,76 @@ class DamageData(unittest.TestCase):
             self._build()
         self.assertEqual(list(self.output.iterdir()), [])
 
-    def test_frame_count_mismatch_rejected(self):
+    def test_source_longer_than_bank_rejected(self):
         path = self.transfer/("FIELDd-"+_stem("FT", 2)+".npz")
         np.savez_compressed(path, **_source("FT", 2, frames=4))
         with self.assertRaisesRegex(ValueError, "frame count mismatch"):
             self._build()
         self.assertEqual(list(self.output.iterdir()), [])
+
+    def _short_prefix_bank(self):
+        for path in self.transfer.glob("*.npz"):
+            with np.load(path, allow_pickle=False) as source:
+                task, sample_id = str(source["task"]), int(source["simulation_id"])
+            frames = 20 if (task, sample_id) == ("UT", 2) else 21
+            np.savez_compressed(path, **_source(task, sample_id, frames=frames))
+        for mech, task in BANKS:
+            path = self.inputs/f"{mech}-{task}-disNodes-allFIELD.npz"
+            with np.load(path, allow_pickle=False) as source:
+                n, _, nodes, components = source["Y"].shape
+            self._replace(path, Y=np.zeros((n, 21, nodes, components)),
+                          valid_mask=np.ones((n, 21, nodes, components), bool),
+                          frame_values=np.arange(21, dtype=float))
+        return self._build()
+
+    def test_twenty_of_twenty_one_preserves_observations_and_masks_only_trailing_frame(self):
+        reports = self._short_prefix_bank()
+        for report in reports:
+            with np.load(report["output"], allow_pickle=False) as bank:
+                summary = validate_damage_bank(bank)
+                self.assertTrue(np.isfinite(report["maximum_frame_time_offset_from_field_reference"]))
+                if str(bank["task"]) == "FT":
+                    self.assertEqual(summary["unavailable_sample_frames"], 0)
+                    continue
+                row = bank["sample_ids"].tolist().index("2")
+                original = _source("UT", 2, frames=20)
+                self.assertEqual(bank["sample_frame_count"][row], 20)
+                np.testing.assert_array_equal(bank["frame_present"][row], np.arange(21) < 20)
+                np.testing.assert_array_equal(bank["D"][row, :20], original["strut_failed"])
+                np.testing.assert_array_equal(bank["valid_mask"][row, :20], original["strut_failure_known"])
+                np.testing.assert_array_equal(bank["frame_time"][row, :20], original["frame_time"])
+                self.assertTrue(np.isnan(bank["frame_time"][row, 20]))
+                self.assertFalse(bank["valid_mask"][row, 20].any())
+                self.assertFalse(bank["D"][row, 20].any())
+                self.assertEqual(bank["D"][row, 19, 0], 1)
+                self.assertEqual(bank["first_failure_frame"][row, 0], 1)
+                self.assertEqual(bank["first_failure_frame"][row, 2], -1)
+                self.assertEqual(summary["unavailable_sample_frames"], 1)
+                self.assertEqual(summary["unavailable_parent_frames"], 3)
+                self.assertEqual(summary["unknown_parent_frames"],
+                                 summary["observed_unknown_parent_frames"]+summary["unavailable_parent_frames"])
+                self.assertEqual(summary["samples_with_unavailable_trailing_frames"], 1)
+                self.assertEqual(report["samples_with_unavailable_trailing_frame_ids"], ["2"])
+                self.assertEqual(report["last_observed_failed_struts_per_sample"][row], 1)
+                self.assertEqual(report["final_failed_struts_per_sample"][row], 0)
+                self.assertEqual(report["final_unknown_struts_per_sample"][row], 3)
+
+    def test_bank_validator_rejects_invalid_presence_padding_and_times(self):
+        self._short_prefix_bank()
+        with np.load(self.output/"UT-UT-disNodes-allD.npz", allow_pickle=False) as source:
+            original = {key: source[key] for key in source.files}
+        row = original["sample_ids"].tolist().index("2")
+        for key, position, value, message in (
+                ("frame_present", (row, 2), False, "frame prefix/count"),
+                ("sample_frame_count", row, 0, "frame prefix/count"),
+                ("frame_time", (row, 20), 20., "sample frame times"),
+                ("frame_time", (row, 19), np.nan, "sample frame times"),
+                ("valid_mask", (row, 20, 0), True, "entirely unknown")):
+            with self.subTest(key=key, position=position):
+                arrays = {name: array.copy() for name, array in original.items()}
+                arrays[key][position] = value
+                with self.assertRaisesRegex(ValueError, message):
+                    validate_damage_bank(arrays)
 
     def test_source_stem_identity_not_inferred_from_position(self):
         path = self.inputs/"UT-UT-disNodes-allFIELD.npz"
