@@ -18,6 +18,20 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Case 1(i) follow-ups
 
+### Damage handback — bounded execution first
+
+Integrated the researcher-authorised Damage Modeling handback from7166de8/7b59d7f.
+Read `HANDOFF-DAMAGE.md` for the six exact fixtures; do not repeat the local ODB
+audit or load other briefs. First check hashes, original INP identity, binary
+STATUS parent/known masks, endpoint remapping, recorded frames and save/reload in
+the cluster environment. No damage head, loss, training corpus or bulk extraction
+is authorised. These six files are five unique task responses from three designs.
+Do not join numeric397/747 to saved predictions without original-geometry/source
+and permitted-split proof. Leave the locked test untouched. Consumer-layout replay
+is distinct from DATA/MODEL damage integration. Preserve the running input study,
+its immutable sources and custom-loss hold; later supervised work needs an explicit
+coverage/model/loss decision and the selected input policy.
+
 The user selected Case1(i) for the next source and custom-loss studies. Prepare
 the input study first, with predicted/true/mixed and corrected/mixed-corrected
 training sources, then isolated spatial/temporal/both field and soft-peak curve

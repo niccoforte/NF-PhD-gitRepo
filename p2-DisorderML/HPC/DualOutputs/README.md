@@ -1,5 +1,38 @@
 # Joint UT/FT runs
 
+## Bounded damage contract replay
+
+`A0-HPC-Damage-contract.py` is an execution/consumer-layout check for the six exact
+fixtures in `handoffs/HANDOFF-DAMAGE.md`, not a trainer. It reuses `resources.damage`;
+it does not open an ODB, change the input study, join IDs to predictions, or release
+the custom-loss hold.
+
+Package the six NPZ/original-INP pairs and an existing Case1(i) DATA descriptor:
+`--prepare --samples-root PATH --inp-root PATH --consumer-data MODEL_DATA_JSON
+--output-dir NEW_DIRECTORY`. This verifies original INP fingerprints, copies only
+the explicit files and writes a manifest with thirteen file hashes. No ODB is
+copied. Use the C: audit samples, not an assumed Z: copy. Keep the pinned bundle
+under `Z:/p2/diagnostics/damage-contract-261016/fixtures/`; transfer only its named
+files to the home-side check directory and verify their hashes on HPC.
+
+Preview the arguments and submit through B1 with an immutable source snapshot and
+a unique `damage-contract-preflight-*` label: `--manifest FILE
+--manifest-sha256 HASH --require-cuda`. One hour is ample for this bounded replay;
+retain existing GPU/CPU/memory/account directives. No production damage job is
+implied. B1 deletes successful scratch and keeps the home log, not an archive copy.
+Remove temporary home fixture/source copies only after terminal success with no
+remaining consumer. The pinned local bundle and Git revision support reproduction.
+The human report belongs in ignored `samples/damage-hpc-contract/`.
+
+Checks cover STATUS parent/known masks, original INP geometry, FT absence,
+reference-connectivity remapping, frame0-only removal and NumPy/Torch/device reload.
+`DAMAGE_CONTRACT_REPORT=` in the home log is the machine-readable result. Actual
+times remain unchanged; differences from saved shared ML times are reported, not
+interpolated or accepted as exact alignment. Legacy scalar-severity NaNs are not
+unknown binary labels. Six files are five unique task responses from three
+designs, not a training corpus. A later specimen join still needs exact initial
+geometry/source and permitted-split proof; locked-test evaluation remains excluded.
+
 ## Case 1(i): input and custom-loss studies
 
 The next studies retain fully independent UT/FT models and separately trained

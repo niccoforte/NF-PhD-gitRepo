@@ -456,6 +456,12 @@ and `--output-dir p2-DisorderML/samples/damage-disordered`. The quick start list
 the complete command and exact case filenames; the periodic `--ut`/`--ft` route
 remains available. Neither reporting command opens an ODB.
 
+For the bounded six-fixture cluster/consumer-layout replay (not damage training),
+see [the HPC contract guide](p2-DisorderML/HPC/DualOutputs/README.md#bounded-damage-contract-replay).
+It verifies hashes, STATUS masks, endpoint order, actual frames and device/reload
+behaviour through a disposable B1 check; it does not establish specimen joins or
+change the current input-study/custom-loss decisions.
+
 The review derives binary fracture directly from the saved failure masks, without
 re-extraction or a schema change. Existing failure-only `strut_damage` arrays
 retain NaNs for active surface-damaged struts; those historical scalar-severity

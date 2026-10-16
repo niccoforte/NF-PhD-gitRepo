@@ -14,6 +14,8 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Production and debug policy
 
+- `DualOutputs/A0-HPC-Damage-contract.py` is not a trainer. Package only the six explicit handoff NPZ/INP pairs and saved consumer descriptor, pin the manifest SHA256, stage immutable code, and use a B1 `preflight` label with `--require-cuda`. Keep only successful home logs, not archive outputs; remove temporary home fixtures/source after success/no active dependency. The ignored local report preserves the pinned bundle and result. No specimen join or binary interpolation follows from matching layout.
+
 - `DualOutputs/B4_Independent-followups.sh SUITE inputs|losses` previews Case1(i) follow-ups; only `--submit` queues them. Source study15 jobs; the30-job raw-P loss draft is ON HOLD until the selected input policy is integrated into inputs/references/gate and counts are rechecked. A corrector must be refitted for changed generators. Use `--followup-suite` disposable gates, full240h/1GPU/12CPU/90000MB, immutable snapshots and afterok dependencies. The run README owns loss presets and interpretation.
 - The approved eight-case comparison uses `DualOutputs/B4_Dual-independence.sh`, preview-only unless `--submit`. Preserve one8h all-case GPU gate, six training-only OOF field banks and24 240h case fits, with immutable source and afterok dependencies. It extends existing B1/test/preflight paths, not Slurm policy. Staged fits must verify bank IDs, scalers, architecture and seed; joint cases must not consume true-only fields. Full details and names are in `DualOutputs/README.md`.
 - Active entry points default to full data (`--nsims all`) and production-scale epochs, scheduler patience, and early stopping.

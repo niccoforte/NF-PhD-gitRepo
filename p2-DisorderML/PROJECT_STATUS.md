@@ -16,7 +16,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   early-stop52, disposable8h preflights and240h full resource requests. Preview-first
   `HPC/DualOutputs/B4_Independent-followups.sh`. Input suite
   `independent-inputs-261015` submitted from c0ab41a: gate31869463 and15 production
-  jobs31869464–31869478. Last check: gate PENDING/Priority; full jobs dependency-held.
+  jobs31869464–31869478. Fresh16 October check: gate COMPLETED0:0; correction-bank
+  jobs31869464/31869469/31869474 RUNNING, twelve curve fits dependency-held.
   Full resources verified240h/1GPU/12CPU/90000MB. Home manifest:
   `/data/home/exy053/p2/MULTI/Dual/Transformer/independent-inputs-261015/jobs.tsv`.
   Custom-loss submission ON HOLD: first select the input-policy winner, then
@@ -67,6 +68,18 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   evidence and architecture-neutral boundary while sharing selection is pending;
   physics/strain distinguishes implemented CPU-tested sudden weights from unproven
   accuracy benefit. Damage and Tokenisation need no additional scope or changes.
+
+- Damage handback is integrated into the current Accuracy checklist. Bounded
+  cluster fixture/consumer checks are prepared; no damage-training comparison or
+  broader extraction is defined or authorised. Six ignored NPZs are on C:, not
+  supplied by Git; exact hash-verified transfer precedes cluster execution.
+  New `HPC/DualOutputs/A0-HPC-Damage-contract.py` packages only these six NPZ/INP
+  pairs and a saved Case1(i) DATA descriptor, then replays masks/reference endpoints,
+  frame0 removal and NumPy/Torch/device reload. Four new and16 producer tests pass;
+  six real CPU layout replays passed, no ODB reopened. All800 reference indices
+  remap; disordered actual/shared times differ by at most2.7567e-7s. No time
+  interpolation, specimen join or prediction evaluation follows from this result.
+  Local pinned bundle: `Z:/p2/diagnostics/damage-contract-261016/fixtures/`.
 
 - The researcher requests damage handback to the current Windows **Improve ML
   Accuracy** chat for HPC tests. `handoffs/HANDOFF-DAMAGE.md` is the reconciled

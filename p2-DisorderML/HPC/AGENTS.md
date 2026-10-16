@@ -41,6 +41,8 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
 
 ## Validation
 
+- `DualOutputs/A0-HPC-Damage-contract.py` replays only the six handoff fixtures: STATUS masks, INP identity, endpoint/frame layout and NumPy/Torch reload, not training. Use disposable B1 retention; see README. Layout matches do not prove specimen joins.
+
 - `DualOutputs/B4_Independent-followups.sh` gates15 input jobs. Its30-job raw-P loss draft is ON HOLD until the winning input policy is integrated and revalidated; see README. Preserve nested corrector folds, fixed RMSE selection and disposable preflights. Explicit submission authority is required.
 - `DualOutputs/B4_Dual-independence.sh` previews eight sharing cases: one8h gate, six OOF banks,24 full240h fits across seeds42/43/44 through B1. Explicit `--submit` requires user authority. The adjacent README owns cases, isolation, bank contracts and safeguards. Do not mix deferred losses/features or gradient diagnostics into this suite.
 - `../handoffs/HANDOFFS.md` routes separate tasks; read only the relevant brief. Passing tests is not researcher sign-off. Verify saved loss classes/nonzero coefficients. Fresh `--curve-loss-ablation` baseline/source fits use the five-case `--curve-loss-suite` gate; combined variants have soft targets and differ only in location weight. Preserve fixed selection, MSE controls and historical runs. PROJECT_STATUS owns submission evidence.
