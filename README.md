@@ -498,11 +498,13 @@ and ML architecture remain unchanged. See the quick start for execution.
 All 18,002 FCC raw products and all four aligned MLdata banks are delivered
 and checksum-verified locally against HPC. The completed report below retains
 per-file receipts, bank alignment proofs and the HPC directory inventory.
-MLdata contains only training/testing inputs: publish the four NPZ banks there,
-not their JSON audit reports. Build in separate staging; reports and completed
-launch records are archived under
-`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016/`.
-The completed home launch now contains only its 94 successful output logs.
+MLdata and its subfolders contain only files directly consumed by ML
+training/testing: publish the four NPZ banks there, keeping optional info/audit/
+report files elsewhere only when needed. Build in separate staging; necessary
+reports and completed launch records follow the existing archive layout under
+`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016/`,
+without an extra provenance tier. The 94 successful logs remain in home and are
+also copied alongside the completed job's archived results.
 `p2-DisorderML/code/review_damage_dataset.py` builds the dataset report from
 explicit FIELDd examples and saved execution metadata. Optional corpus evidence
 adds processing outcomes, final fracture distributions and a per-attempt table;
@@ -672,6 +674,11 @@ Common local paths:
   PSCP; Windows B3 already defaults to `Z:/p2` via its OpenSSH route.
 - p1 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`
 - p2 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p2`
+
+`MLdata`, including its subfolders, contains only files directly consumed by ML
+training/testing. Retain optional info, audit and report files elsewhere only
+when needed, following the existing job/run archive layout without an extra
+provenance directory.
 
 ### Human-readable analysis reports
 

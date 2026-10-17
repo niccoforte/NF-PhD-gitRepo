@@ -83,13 +83,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   execution/ folder retains per-file results/receipts, four bank proofs, source
   equivalence/padding evidence, HPC layout and directory-level source inventory.
   Frozen code, manifests and result records are checksum-verified in the remote
-  FCC archive's provenance/damage-261016/execution.tar.gz; four bank JSON audit
-  reports are in its bank-reports/ folder. MLdata contains only NPZ/CSV inputs.
+  FCC archive's damage-261016/execution.tar.gz; four bank JSON audit reports
+  are in its bank-reports/ folder. MLdata retains its NPZ/CSV training/testing files.
 - Home p1/Ti/disNodes/0.2/FCC/damage-261016 now retains only 94 successful logs.
+  Copies also accompany the completed job's archived results.
   All 120 non-log launch files and four JSON reports from each local/HPC MLdata
   folder were removed after verifying the archived copies. NPZ hashes, arrays
-  and all 19 remaining MLdata files are preserved. The provenance root is
-  /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016.
+  and all 19 remaining MLdata files are preserved. The processing archive is
+  /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016.
 - All 91 production scratch roots and the task-owned local staging/helpers are
   removed. Original ODB/INP/FIELDu/curves are preserved. The scheduled follow-up
   was deleted at the researcher's request and was not recreated.

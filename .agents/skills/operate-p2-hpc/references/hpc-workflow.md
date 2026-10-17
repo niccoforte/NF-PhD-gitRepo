@@ -130,10 +130,12 @@ folders; local MLdata stays in `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata`, while HP
 MLdata is `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Z:/p2 is the saved-ML-run
 root, not a replacement for the local p1 training-data archive. No training
 architecture, other lattice, FEA or ODB upgrade follows from this processing.
-Build banks in separate staging; publish only NPZ training inputs to MLdata.
-Keep bank JSON reports and completed execution provenance outside MLdata, under
-the FCC archive's `provenance/<processing-run>/`. After checksum verification,
-remove non-log launch files from home and retain successful job-output logs.
+Build banks in separate staging. MLdata and its subfolders hold only files
+directly consumed by ML training/testing. Retain optional info/audits/reports
+elsewhere only when needed, in the FCC archive's existing `<processing-run>/`
+layout without a provenance tier; this pass uses `FCC/damage-261016/`.
+After checksum verification, remove non-log launch files from home; successful
+job-output logs remain there and may also accompany the archived results.
 Non-interactive sessions may need `/opt/slurm/bin` on PATH; export HOSTNAME and
 source `/etc/profile.d/modules.sh` before loading site modules.
 

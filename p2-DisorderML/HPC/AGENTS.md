@@ -1,6 +1,6 @@
 # HPC Agent Context
 
-This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, and transfer. Read `../PROJECT_STATUS.md` for the current p2 objective. Use the `operate-p2-hpc` skill for any edit, review, planned run, resume, transfer, or diagnosis here; its reference holds the detailed entry-point and path mappings on demand.
+This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. Read `../PROJECT_STATUS.md` for the objective; use `operate-p2-hpc` for work here and its reference for entry-point/path mappings.
 
 ## Ownership
 
@@ -18,12 +18,11 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
   script/job/run label, skips archive copies and retains only the successful home
   log; successful scratch is deleted. Never use these test outputs as production
   dependencies. Full-data field banks are production artifacts, not preflights.
-- Failed scratch/logs are temporary troubleshooting evidence. Once diagnosis is
-  recorded and correction is in place, cleanup is HIGH PRIORITY: confirm terminal
-  jobs and exact paths, preserve useful resumable production results, then remove
-  failed scratch, home logs and useless failed archive outputs. Never delete active
-  jobs or unidentified data. Completed home keeps successful logs only;
-  archive code, manifests and audits with data.
+- Failure evidence is temporary. After diagnosis/correction, cleanup is HIGH PRIORITY:
+  confirm terminal jobs and exact paths, preserve resumable production results,
+  then remove failed scratch/logs/useless archives. Never delete active jobs or
+  unidentified data. Completed home keeps successful logs only; archive code,
+  manifests, needed audits and log copies beside results in the existing run layout.
 
 - Active entry points are production-oriented: full data and realistic training budgets by default. Small datasets, short epochs/trials, and CPU execution must be explicit debug overrides.
 - Do not change Slurm partition, account, license, CPU, memory, or time policy without the user's target cluster policy.

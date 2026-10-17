@@ -73,7 +73,7 @@ Important meanings:
 - `B1_ABAQUS-new.sh` stages scripts and `resources/` into scratch and archives to `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`.
 - Preserve scratch path safety checks before deleting scratch content.
 - Preserve run configuration capture (`run_config`) and the staged `resources/` copy; archived runs need provenance.
-- After jobs complete, home retains successful output logs only. Archive code, manifests and audit records with the data. MLdata receives training/testing inputs, not bank JSON audit reports.
+- After jobs complete, home retains successful output logs only; copies may accompany archived results. Keep code, manifests and necessary audit records in the existing run archive, without a provenance tier. MLdata and its subfolders contain only files directly consumed by ML training/testing.
 - `PATH_EXTRA` changes archive layout for targeted data such as `Target-xs`; keep local and remote transfer path rules aligned with `B3_ABAQUS-transfer.sh`.
 - Do not change Slurm partition, account, license, CPU, memory, or time directives unless the user gives the target policy.
 

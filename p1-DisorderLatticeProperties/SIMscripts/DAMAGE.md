@@ -79,12 +79,15 @@ are not changed. Build in a separate directory outside MLdata and its descendant
 the builder rejects MLdata destinations. Verify staged banks and checksums, then
 publish only NPZ training inputs to local
 `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
-`/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Keep JSON audit reports and completed
-launch provenance in the upstream FCC archive's `provenance/<processing-run>/`.
+`/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. MLdata and its subfolders hold only
+files directly consumed by ML training/testing. Retain optional info/audit/report
+files elsewhere only when needed, in the upstream FCC archive's existing
+`<processing-run>/` layout without a provenance tier.
 For this pass that is
-`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016/`:
+`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016/`:
 four unchanged reports in `bank-reports/`, `execution.tar.gz` for the non-log launch
-records, and a checksum manifest. Home retains only successful output logs.
+records, and a checksum manifest. The 94 successful output logs remain in home
+and are copied alongside these archived results.
 Windows uses the authenticated PuTTY
 share via `pscp -batch -share -load HPC -l exy053`; leave its master open.
 

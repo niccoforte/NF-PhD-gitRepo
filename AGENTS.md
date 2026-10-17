@@ -24,7 +24,7 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 
 - Local p1 data is commonly rooted at `Z:/p1/data/Ti/...`.
 - p2 saved runs belong under `Z:/p2`, outside Git, preserving archive-relative paths. No checkout may contain `data/`; other hosts require an explicit external root.
-- Reports/examples use only `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; other checkouts keep tracked guidance only. MLdata holds training/testing inputs only; archive audit/provenance reports elsewhere.
+- Reports/examples use only `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; other checkouts keep tracked guidance only. MLdata and its subfolders contain only files directly consumed by ML training/testing; retain optional info/audits/reports elsewhere only when needed, following the existing archive structure without an extra provenance tier.
 - QMUL HPC archive paths commonly use `/data/SEMS-TaoLab/Niccolo-Forte/...`; scratch paths may use `/gpfs/scratch/...`.
 - Generated Abaqus files, transfer CSVs/NPZs, MLdata products, model checkpoints, HPO databases, Slurm logs, and notebook output bulk are research artifacts. Do not delete, rename, or commit them unless the task explicitly asks for that.
 - `AGENTS.md` files and repo skills under `.agents/skills/` are tracked project infrastructure. Keep them synchronized with the implementation.

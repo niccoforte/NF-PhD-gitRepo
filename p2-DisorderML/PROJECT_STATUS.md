@@ -39,12 +39,13 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   inspection; binary/roundtrip validation was performed by the frozen builder.
   Execution records include HPC layout, padding/source-equivalence/replacement
   evidence, source changes and cleanup. All 91 production scratch roots and local
-  staging/helpers are removed. Home now retains only 94 successful output logs;
+  staging/helpers are removed. Home now retains only 94 successful output logs,
+  also copied alongside the completed job's archived results;
   its 120 non-log launch files are checksum-verified in the FCC archive's
-  provenance/damage-261016/execution.tar.gz. Bank JSON audit reports are in that
-  provenance folder's bank-reports/, outside both MLdata folders. Each MLdata
+  damage-261016/execution.tar.gz. Bank JSON audit reports are in that
+  run folder's bank-reports/, outside both MLdata folders. Each MLdata
   folder retains its 19 NPZ/CSV inputs, with unchanged bank hashes. The full
-  provenance root is /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016.
+  processing archive is /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016.
   The follow-up was deleted at the researcher request and was not recreated.
   Other lattices, new FEA and ML architecture/training integration remain outside
   this completed data-processing task.
