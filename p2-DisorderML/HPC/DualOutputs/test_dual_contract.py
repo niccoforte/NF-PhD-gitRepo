@@ -591,6 +591,11 @@ class DualMLTest(unittest.TestCase):
             self.assertIsInstance(namespace["TR_DUAL"], DUAL_MODEL)
             self.assertIn("UT_val_curve_outputs", namespace["predictions"])
             self.assertTrue((namespace["NEW_RUN"] / "results/metrics.json").is_file())
+            descriptor = json.loads((namespace["NEW_RUN"] / "model.json").read_text())
+            self.assertEqual(descriptor["run_layout"], {
+                "task": "MULTI", "output_kind": "Dual", "model": "Transformer",
+                "run_name": namespace["RUN_NAME"],
+            })
             hpo = Mock()
             namespace["run_dual_hpo"] = hpo
             code = "".join(cells[8]["source"]).replace('RUN_HPO = False', 'RUN_HPO = True').replace('ALLOW_CPU_HPO = False', 'ALLOW_CPU_HPO = True')

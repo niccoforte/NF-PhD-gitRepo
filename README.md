@@ -76,6 +76,10 @@ The `review-p1-p2-data-contract` skill treats the boundary like an internal API:
 
 ## Git Remotes And Dual Push
 
+Complete repository changes by validating, committing and pushing the intended
+work. Pull before publishing and verify that the local branch and both remote
+branches match. Any synchronization blocker must be reported before handoff.
+
 The intended setup fetches from QMUL GitHub while a single `git push` publishes the current branch to both QMUL GitHub and the public GitHub.com mirror. Configure each fresh clone once because push URLs live in that clone's local `.git/config` and are not versioned:
 
 ```powershell

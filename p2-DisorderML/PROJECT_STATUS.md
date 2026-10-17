@@ -4,6 +4,20 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Mac checkout backlog is included in the authorized repository synchronization:
+  the pending dual-notebook cells and saved outputs, field-review metadata and
+  crack-topology regression assertions are preserved alongside the latest remote
+  changes. Final dual checkpoint/result saves retain explicit run-layout metadata,
+  protected by the existing fresh-notebook regression. The old `.gitignore`
+  staged edit cancels against its working copy;
+  `/data/` remains ignored. These saved outputs are historical, not a new training
+  or scientific validation run. Future completed repository work is committed
+  and pushed under the standing instruction in root `AGENTS.md`.
+  Validation: 14 field-loss tests and the synthetic fresh-notebook
+  build/train/save/HPO-call regression pass; changed-surface12 and contract85
+  checks are non-failing, zero failed. Real data, Abaqus and cluster execution
+  are not revalidated by this synchronization.
+
 - Artifact storage consolidation: canonical reports/examples are in
   `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; saved ML runs stay in external
   `Z:/p2/`. All three Windows checkouts were inspected: none has root `data/`.

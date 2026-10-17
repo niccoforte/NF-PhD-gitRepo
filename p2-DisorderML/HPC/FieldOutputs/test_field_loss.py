@@ -64,6 +64,17 @@ class FieldLossTests(unittest.TestCase):
                     [(x*10+5,y*10+5) for y in range(19) for x in range(20)])
         ut=reference_field_edges(xy,"UT");ft=reference_field_edges(xy,"FT")
         self.assertEqual(len(ut),2319);self.assertEqual(len(ft),2259)
+        index = {tuple(p): i for i, p in enumerate(xy)}
+        ut_set = {tuple(e) for e in ut}; ft_set = {tuple(e) for e in ft}
+        def edge(a, b):
+            return tuple(sorted((index[a], index[b])))
+        # Retained endpoints do not imply a retained crack-crossing strut.
+        for a, b in (((100,100), (100,90)), ((100,100), (95,95)), ((100,100), (105,95))):
+            self.assertIn(edge(a,b), ut_set)
+            self.assertNotIn(edge(a,b), ft_set)
+        self.assertIn(edge((120,90), (120,100)), ft_set)  # first intact tip strut
+        for point, degree in (((100,100),5), ((110,90),5), ((105,105),4), ((120,90),7)):
+            self.assertEqual(int(np.sum(ft == index[point])), degree)
         np.testing.assert_array_equal(ft,reference_field_edges(xy*.001+[3,4],"FT"))
 
     def test_degree_averaging_and_temporal_hole(self):
