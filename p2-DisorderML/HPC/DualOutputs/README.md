@@ -459,7 +459,7 @@ Property archive: `MULTI/FieldToProperty/Transformer/field-property-261004`
 (and `field-property-preflight-261004`). Joint archives:
 `MULTI/Dual/Transformer/dual-recovery-261004-residual` and
 `dual-recovery-261004-true_field`. Both are relative to the same p2 archive root
-and Windows `Z:/p2/` (Mac may use ignored repo-root `data/`). Read `samples/accuracy-continuation/README.md` for
+and external Windows `Z:/p2/` (other hosts require an explicit external root). Read the Z: checkout's `samples/accuracy-continuation/README.md` for
 the ten-run comparison and property/thickness reports; the debug gate is not an
 accuracy result. `true_field` adds auxiliary supervision, not oracle inference.
 

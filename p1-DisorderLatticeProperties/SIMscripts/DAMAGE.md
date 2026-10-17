@@ -282,7 +282,7 @@ From the repository root in existing environments:
 
 ```powershell
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" --odb ODB_PATH --inp INP_PATH --task UT --output OUTPUT.npz --partial-rule failure-only
-python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir p2-DisorderML/samples/damage-audit
+python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-audit
 python -m unittest discover -s p1-DisorderLatticeProperties/SIMscripts -p test_damage_contract.py -v
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/test_damage_odb.py', run_name='__main__')" --npz OUTPUT.npz
 ```

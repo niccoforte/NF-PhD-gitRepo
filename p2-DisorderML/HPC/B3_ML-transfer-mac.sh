@@ -2,8 +2,7 @@
 # macOS Bash 3.2-compatible saved-run download. No remote writes or deletions.
 set -euo pipefail
 
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-LOCAL_ROOT=${LOCAL_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)/data}
+LOCAL_ROOT=${LOCAL_ROOT:-}
 REMOTE=${REMOTE:-apocrita}
 REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 SSH_CONTROL_PATH=${SSH_CONTROL_PATH:-$HOME/.ssh/codex-apocrita}
@@ -36,6 +35,20 @@ case "$REMOTE_ROOT" in
     /*) ;;
     *) echo "REMOTE_ROOT must be absolute." >&2; exit 2 ;;
 esac
+# Never recreate artifacts in this or another checkout, including via symlinks.
+case "$LOCAL_ROOT" in
+    /*) ;;
+    *) echo "Set LOCAL_ROOT to an absolute external data directory." >&2; exit 2 ;;
+esac
+case "/${LOCAL_ROOT%/}/" in
+    */../*|*/./*) echo "LOCAL_ROOT must not contain traversal components." >&2; exit 2 ;;
+esac
+command -v git >/dev/null || { echo "Git is required to verify the destination." >&2; exit 2; }
+EXISTING_PARENT=${LOCAL_ROOT%/}/$RUN_PATH
+while [ ! -d "$EXISTING_PARENT" ]; do EXISTING_PARENT=$(dirname "$EXISTING_PARENT"); done
+if [ "$(git -C "$EXISTING_PARENT" rev-parse --is-inside-work-tree 2>/dev/null || true)" = true ]; then
+    echo "LOCAL_ROOT must be outside all Git checkouts." >&2; exit 2
+fi
 SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=15"
 if [ -S "$SSH_CONTROL_PATH" ]; then
     SSH_COMMAND="$SSH_COMMAND -S \"$SSH_CONTROL_PATH\""

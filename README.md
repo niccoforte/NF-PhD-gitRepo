@@ -308,13 +308,13 @@ Curve-output models predict macroscopic stress-strain or force-displacement curv
 
 ### Downloaded run review
 
-On macOS, run `bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-MULTI-test-260907` from the repo root. Prefix `--dry-run` before the task to preview the transfer. The default destination is `data/MULTI/Dual/Transformer/dual-MULTI-test-260907/`; `LOCAL_ROOT`, `REMOTE`, `REMOTE_ROOT`, and `SSH_CONTROL_PATH` are explicit overrides. No remote writes or deletions occur. The former `B3_ML-transfer.sh` is now named `B3_ML-transfer-windows.sh` and retains its Windows/Git Bash behaviour.
+On macOS, run `LOCAL_ROOT=/ABS/EXTERNAL/p2 bash p2-DisorderML/HPC/B3_ML-transfer-mac.sh MULTI Dual Transformer dual-MULTI-test-260907` from the repo root, replacing the placeholder with an external data directory. Prefix `--dry-run` before the task to preview. `LOCAL_ROOT` is required: there is no checkout `data/` fallback. `REMOTE`, `REMOTE_ROOT`, and `SSH_CONTROL_PATH` remain explicit overrides; neither B3 script accepts a Git-contained destination or deletes remote data. The former `B3_ML-transfer.sh` is now named `B3_ML-transfer-windows.sh` and defaults to `Z:/p2`.
 
-Both dual notebooks default to Trial 1, locally renamed by the user to `data/MULTI/Dual/Transformer/dual-MULTI-trial1`. The archive retains its original dated name. In Outputs, `LOAD_MODEL=True` loads saved architecture/loss/weights and predictions without raw data; for a fresh model set `LOAD_MODEL=False`, `LOAD_DATA=True`, supply `DATA_ROOT`, and enable `RUN_TRAINING`. `RUN_HPO=True` calls the shared search on the constructed DAT; a new local study name avoids the live HPC study. Training and HPO remain disabled by default. Raw datasets are needed for new predictions/training, not saved-result review.
+Both dual notebooks default to Trial 1 at `Z:/p2/MULTI/Dual/Transformer/dual-MULTI-trial1`; on other hosts set an external `RUN_ROOT` explicitly. The archive retains its original dated name. In Outputs, `LOAD_MODEL=True` loads saved architecture/loss/weights and predictions without raw data; for a fresh model set `LOAD_MODEL=False`, `LOAD_DATA=True`, supply `DATA_ROOT`, and enable `RUN_TRAINING`. `RUN_HPO=True` calls the shared search on the constructed DAT; a new local study name avoids the live HPC study. Training and HPO remain disabled by default. Raw datasets are needed for new predictions/training, not saved-result review.
 
 DualPostProcessing displays **both UT and FT in every field and curve subsection**, including two live field viewers, log-scale losses and a sample-ID-aligned 2×2 joint error comparison. This retains both field datasets in memory. Plot controls sit beside their plots. For dual HPO use the existing `ML-HPOpostProcess.ipynb` with `OUTPUT_KIND="dual"`, `TASK="MULTI"`, `MODEL="Transformer"`, `RUN_TYPE="model_hpo"` and the downloaded study name. Its history, importance, leaderboard, best parameters, artifact inspection and light winner review are retained. Cross-family comparison is only meaningful for cross-model studies; raw DATA reconstruction belongs in Outputs. Missing winner files are reported without preventing available study-history review. Detailed winner review uses DualPostProcessing with `RUN_DIR` pointing to `HPO/<study>/best`.
 
-All maintained notebooks stay in `p2-DisorderML/code/`. **Do not create scripts or executed notebook copies in `data/`.** It holds datasets/results/checkpoints and requested figures only. Input/feature calculations belong in `samples/`; validation intermediates belong outside the repository. `data/` and generated `samples/` remain ignored; tests must not depend on ignored examples.
+All maintained notebooks stay in `p2-DisorderML/code/`. **No checkout should contain `data/`.** Datasets/results/checkpoints belong in external storage, not alongside executable notebooks. Generated input examples and reports belong only in the Z: checkout's `p2-DisorderML/samples/`; other checkouts retain tracked guidance only. Validation intermediates belong outside the repository. Keep `data/` and generated `samples/` ignored as a safeguard; tests must not depend on ignored examples.
 
 ### Controlled displacement-loss trials
 
@@ -449,11 +449,11 @@ and `failure-only` to preserve the current raw diagnostic products:
 
 ```powershell
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" --odb ODB_PATH --inp INP_PATH --task UT --output OUTPUT.npz --partial-rule failure-only
-python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir p2-DisorderML/samples/damage-audit
+python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-audit
 ```
 
 For the separate four-case report, use repeated `--case LABEL TASK NPZ` arguments
-and `--output-dir p2-DisorderML/samples/damage-disordered`. The quick start lists
+and `--output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-disordered`. The quick start lists
 the complete command and exact case filenames; the periodic `--ut`/`--ft` route
 remains available. Neither reporting command opens an ODB.
 
@@ -602,7 +602,7 @@ This folder contains the QMUL HPC/Slurm training and HPO workflow.
 | `B0_ML-env-setup.sh` | Creates or refreshes the `nf-ml-gpu` conda environment with CUDA PyTorch, PyTorch Geometric, Optuna, BoTorch/GPyTorch, and related ML dependencies. |
 | `B1_ML-new.sh` | Main Slurm submit wrapper. Copies the selected run script and `resources/` to scratch, runs training/HPO, and rsyncs outputs to the archive root. |
 | `B2_ML-resumeHPO.sh` | Resumes archived cross-model Optuna studies and supports a non-running `--dry-run` plan check. |
-| `B3_ML-transfer-mac.sh` | macOS Bash 3.2-compatible rsync download to ignored repo-root `data/`; supports `--dry-run`, SSH ControlMaster and `LOCAL_ROOT` overrides. |
+| `B3_ML-transfer-mac.sh` | macOS Bash 3.2-compatible rsync download to required external `LOCAL_ROOT`; supports `--dry-run` and SSH ControlMaster. No checkout fallback. |
 | `B3_ML-transfer-windows.sh` | Transfers saved p2 run folders from HPC archives to local `Z:/p2` or fallback local folders. |
 | `CurveOutputs/A0-HPC_Curve-test.py` | Production-oriented single-run curve entry point; reduced debug runs require explicit CLI overrides. |
 | `CurveOutputs/A0-HPC_Curve-CrossModelHPO.py` | Cross-model HPO entry point for curve surrogates. |
@@ -658,11 +658,11 @@ Common local paths:
 
 - p1 local data: `Z:/p1/data/Ti/...`
 - p2 local saved runs: `Z:/p2`
-- Windows artifacts, including the relocated independence runs, use `Z:/p2/`
-  with the remote relative tree preserved, outside Git. Do not recreate the
-  checkout's `data/` there. Mac may retain its ignored repo-root `data/`.
-  Readable figures/report remain in ignored
-  `p2-DisorderML/samples/independence-review/README.md`. Merge incoming Mac
+- Saved p2 artifacts use `Z:/p2/` with the remote relative tree preserved,
+  outside Git. No checkout may contain `data/`, on Windows or Mac; other hosts
+  require an explicit external data root. Readable figures/reports belong only
+  in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`. Other checkouts retain tracked
+  `samples/AGENTS.md`, not generated copies. Merge incoming Mac
   artifacts without overwriting unrelated content. PuTTY sharing transfers use
   PSCP; Windows B3 already defaults to `Z:/p2` via its OpenSSH route.
 - p1 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`
@@ -671,7 +671,7 @@ Common local paths:
 ### Human-readable analysis reports
 
 For analyses, comparisons and performance reviews—not only HPC—deliver one
-compiled visual report under `<paper>/samples/<suite>/README.md`. Keep its
+compiled visual report under the Z: checkout's `<paper>/samples/<suite>/README.md`. Keep its
 figures, supporting tables and provenance together and provide one report link.
 Explain what each variant changes, controls/populations/input sources, relative
 errors and meaningful baselines, seed variability, conclusions and limitations.

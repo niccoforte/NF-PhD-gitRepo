@@ -16,11 +16,11 @@ REMOTE_ROOT=${REMOTE_ROOT:-/data/SEMS-TaoLab/Niccolo-Forte/p2}
 #   bash B3_ML-transfer-windows.sh UT Field HPO cross_model_hOpt
 #   bash B3_ML-transfer-windows.sh UT Field HPO cross_model_hOpt GAT  # optional single model subfolder
 
-if [ -d "Z:/" ]; then
-    LOCAL_ROOT=${LOCAL_ROOT:-Z:/p2}
-else
-    LOCAL_ROOT=${LOCAL_ROOT:-$(pwd)/p2-MLruns}
+if [ ! -d "Z:/" ] && [ -z "${LOCAL_ROOT:-}" ]; then
+    echo "Z: is unavailable; set LOCAL_ROOT to an external data directory." >&2
+    exit 2
 fi
+LOCAL_ROOT=${LOCAL_ROOT:-Z:/p2}
 
 prompt_default() {
     local var_name=$1
@@ -140,6 +140,26 @@ fi
 prompt_default LOCAL_ROOT "Local root" "$LOCAL_ROOT"
 
 RUN_PATH=${RUN_PATH#/}
+case "$RUN_PATH" in
+    ''|*/|*//*|*[!a-zA-Z0-9_./-]*) echo "Invalid archive-relative run path." >&2; exit 2 ;;
+esac
+case "/$RUN_PATH/" in
+    */../*|*/./*) echo "Path traversal is not allowed." >&2; exit 2 ;;
+esac
+case "$LOCAL_ROOT" in
+    /*|[a-zA-Z]:/*) ;;
+    *) echo "LOCAL_ROOT must be an absolute external data directory." >&2; exit 2 ;;
+esac
+case "/${LOCAL_ROOT%/}/" in
+    */../*|*/./*) echo "LOCAL_ROOT must not contain traversal components." >&2; exit 2 ;;
+esac
+command -v git >/dev/null || { echo "Git is required to verify the destination." >&2; exit 2; }
+EXISTING_PARENT=${LOCAL_ROOT%/}/$RUN_PATH
+while [ ! -d "$EXISTING_PARENT" ]; do EXISTING_PARENT=$(dirname "$EXISTING_PARENT"); done
+if [ "$(git -C "$EXISTING_PARENT" rev-parse --is-inside-work-tree 2>/dev/null || true)" = true ]; then
+    echo "LOCAL_ROOT must be outside all Git checkouts." >&2; exit 2
+fi
+
 REMOTE_PATH=$REMOTE_ROOT/$RUN_PATH
 LOCAL_PATH=$LOCAL_ROOT/$RUN_PATH
 LOCAL_PARENT=$(dirname "$LOCAL_PATH")

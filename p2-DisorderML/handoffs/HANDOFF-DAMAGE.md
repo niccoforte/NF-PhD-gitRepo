@@ -37,11 +37,12 @@ own documentation commit follows it. The receiving Windows chat last used
 `Z:/00-PhD-gitRepo`, clean at d3db4e8 when inspected; it needs a fast-forward to
 the current remote, preserving any newer/unrelated work.
 
-The actual local audit implementation and ignored products are in
-`C:/Users/exy053/Documents/00-PhD-gitRepo`. Git carries code, not these ignored
-research products. Read their reports directly on this host or transfer only the
-explicit required files with a hash manifest before HPC use. Do not recreate a
-Windows repo-root data/ folder. Raw sources are under
+The ignored audit products/reports now live in
+`Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; Git carries code, not these products.
+The Documents copies were SHA256-verified against Z: on17 October; their deletion
+is pending because tool policy blocked it. Use Z:, not those copies. Transfer
+only explicit required files with a hash manifest before HPC use. No checkout
+may contain data/. Raw sources are under
 `Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`.
 
 | Product under p2-DisorderML/samples | Raw source stem | Final failed parents / elements |

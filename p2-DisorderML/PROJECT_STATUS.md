@@ -4,6 +4,21 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Artifact storage consolidation: canonical reports/examples are in
+  `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; saved ML runs stay in external
+  `Z:/p2/`. All three Windows checkouts were inspected: none has root `data/`.
+  The Documents damage-audit, damage-disordered and damage-dataset packs
+  (278 generated files,146,065,480 bytes) are copied to Z: and SHA256-verified.
+  Source deletion was blocked by tool policy, so Documents originals still need
+  removal; retain its tracked samples/AGENTS.md. Receipt:
+  `Z:/p2/diagnostics/storage-cleanup-261017/migration.json`; report index:
+  Z: `samples/README.md`. Older Mac data/examples have not yet been reconciled
+  from the promised ZIP. Notebook/transfer defaults no longer create repo data.
+  Nine follow-up contracts and the fresh Outputs build/train/save/HPO-call check
+  pass; changed-surface15 and contract85 checks are non-failing/zero failed.
+  Transfer commands were stubbed for destination tests; no archive download or
+  native macOS execution was needed for this storage change.
+
 - Existing FCC periodic/20% nodal-disorder STATUS dataset delivery is complete.
   Production array 32085486 finished all 91 batches/18,002 records without errors;
   corrected CPU bank job 32095821 completed 0:0 in 1 h 13 min using bank-code-4c435cf.
@@ -96,8 +111,9 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - Damage handback is integrated into the current Accuracy checklist. Bounded
   cluster fixture/consumer checks are separate from the newly authorised FCC
-  dataset export above; no damage-training comparison is defined. Six ignored NPZs are on C:, not
-  supplied by Git; exact hash-verified transfer precedes cluster execution.
+  dataset export above; no damage-training comparison is defined. Six ignored audit
+  NPZs are now in the Z: checkout's samples, not supplied by Git; exact
+  hash-verified transfer precedes cluster execution.
   New `HPC/DualOutputs/A0-HPC-Damage-contract.py` packages only these six NPZ/INP
   pairs and a saved Case1(i) DATA descriptor, then replays masks/reference endpoints,
   frame0 removal and NumPy/Torch/device reload. Four new and16 producer tests pass;

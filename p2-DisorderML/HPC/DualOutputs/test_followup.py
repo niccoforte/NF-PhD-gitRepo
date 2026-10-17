@@ -9,6 +9,7 @@ import unittest
 import os
 import subprocess
 import ast
+import shutil
 from types import SimpleNamespace
 
 import numpy as np
@@ -50,9 +51,50 @@ class FollowupTests(unittest.TestCase):
             node=next(n for n in tree.body if isinstance(n,ast.Assign) and any(
                 isinstance(t,ast.Name) and t.id=='RUN_ROOT' for t in n.targets))
             expression=compile(ast.Expression(node.value),name,'eval')
-            for platform,expected in (('nt',Path('Z:/p2')),('posix',Path('fixture/data'))):
+            for platform,expected in (('nt',Path('Z:/p2')),('posix',None)):
                 value=eval(expression,{'os':SimpleNamespace(name=platform),'Path':Path,'REPO':Path('fixture')})
                 self.assertEqual(value,expected)
+            guard=tree.body[tree.body.index(node)+1]
+            with self.assertRaisesRegex(ValueError,'external data directory'):
+                exec(compile(ast.Module(body=[guard],type_ignores=[]),name,'exec'),{'RUN_ROOT':None})
+
+    def test_transfers_require_external_destinations(self):
+        bash=shutil.which('bash')
+        if bash is None:
+            self.skipTest('Bash unavailable; transfer guards require a shell')
+        scripts=Path(__file__).resolve().parents[1]
+        # Stub only transfer commands: exercise the real Git destination guard.
+        wrapper='''
+rsync() { echo MOCK_TRANSFER; }
+scp() { echo MOCK_TRANSFER; }
+export -f rsync scp
+if command -v cygpath >/dev/null; then export LOCAL_ROOT=$(cygpath -u "$LOCAL_ROOT"); fi
+exec bash "$@"
+'''
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            checkout=root/'checkout';checkout.mkdir()
+            subprocess.run(['git','init','--quiet',str(checkout)],check=True)
+            for name in ('B3_ML-transfer-mac.sh','B3_ML-transfer-windows.sh'):
+                script=scripts/name
+                for destination,allowed in ((checkout/'data',False),(root/'external',True)):
+                    env=dict(os.environ,LOCAL_ROOT=destination.as_posix())
+                    result=subprocess.run([bash,'-c',wrapper,'transfer-test',script.as_posix(),
+                                           'MULTI/Dual/Transformer/example'],env=env,
+                                          capture_output=True,text=True)
+                    if allowed:
+                        self.assertEqual(result.returncode,0,result.stderr)
+                        self.assertIn('MOCK_TRANSFER',result.stdout)
+                    else:
+                        self.assertEqual(result.returncode,2,result.stderr)
+                        self.assertIn('outside all Git checkouts',result.stderr)
+                        self.assertFalse(destination.exists())
+                if name.endswith('-mac.sh'):
+                    env=dict(os.environ);env.pop('LOCAL_ROOT',None)
+                    result=subprocess.run([bash,script.as_posix(),'MULTI/Dual/Transformer/example'],
+                                          env=env,capture_output=True,text=True)
+                    self.assertEqual(result.returncode,2,result.stderr)
+                    self.assertIn('Set LOCAL_ROOT',result.stderr)
 
     def test_identity_masks_independence_and_reload(self):
         data=fixture();a=self.args();model=model_for(data,'1i')

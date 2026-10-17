@@ -47,7 +47,8 @@ Input suite `independent-inputs-261015` is submitted (see PROJECT_STATUS for IDs
 do not resubmit it. Custom-loss submission is ON HOLD until
 after that study. Include held-out true-field evaluation of the true-trained
 curve checkpoint as well as predicted-field deployment. Windows runs now live in
-`Z:/p2` (user relocation), not checkout `data/`; reports remain in p2 `samples/`.
+`Z:/p2` (user relocation), never checkout `data/`; generated reports belong only
+in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`, not Documents/OneDrive copies.
 Use the selected deployable input policy for the loss study, not automatically
 raw predicted-only training. The current30-job loss launcher is a raw-P draft;
 integrate the winner and recheck reference weights, preflight and job counts
@@ -67,8 +68,8 @@ in `resources/MLindependence.py`, the existing dual runner/preflight and
 `HPC/DualOutputs/B4_Dual-independence.sh`. The original jobs failed at the split-ID
 representation guard and were cleaned after correction. Replacement
 `independence-261013-r1`, source6b0db82, gate31448215 and production31448216–31448245,
-is fully COMPLETED0:0. All24 case fits and six banks are downloaded to the ignored
-`data/MULTI/Dual/Transformer/` under `Z:/00-PhD-gitRepo`.
+is fully COMPLETED0:0. All24 case fits and six banks are downloaded outside Git
+to `Z:/p2/MULTI/Dual/Transformer/` after the researcher's relocation.
 Review `../samples/independence-review/README.md` before further experiments.
 Case1(i) is the current practical recommendation: four independently trained
 models. Mean validation skill percentages across three seeds are UTfield6.11,
@@ -538,8 +539,9 @@ All nine modes passed full-800-node synthetic train/save/diagnostic/reload check
 
 ## Completed runs and what their evidence says
 
-All requested transfers finished through B3. Full HPO is local at
-data/MULTI/Dual/Transformer/HPO/dual-joint-hpo1, including DB and checkpoints.
+All requested transfers finished through B3 on the Mac. Full HPO's archive-relative
+path is `MULTI/Dual/Transformer/HPO/dual-joint-hpo1`, including DB and checkpoints.
+The current Windows root is external `Z:/p2`; Mac-only copies await ZIP reconciliation.
 Job26375307 completed in 9d14h05m: 45 complete,10 pruned,1 waiting retry; NOT 200
 evaluations. Winner46, epoch58, fixed score .82661694 (earlier37: .83263056).
 Validation RMSE skill vs training mean: UTfield4.20%, FTfield16.55%, UTcurve4.06%,

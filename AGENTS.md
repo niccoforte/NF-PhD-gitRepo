@@ -23,7 +23,8 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 ## Data And Path Conventions
 
 - Local p1 data is commonly rooted at `Z:/p1/data/Ti/...`.
-- Windows p2 saved runs belong under `Z:/p2`, outside Git; preserve the archive-relative tree. Do not recreate repo-root `data/` on Windows. Mac `data/` remains an ignored, explicit local override.
+- p2 saved runs belong under `Z:/p2`, outside Git, preserving archive-relative paths. No checkout may contain `data/`; other hosts require an explicit external root.
+- Generated p2 samples/reports belong only in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`. Other checkouts retain tracked guidance only; keep artifacts ignored.
 - QMUL HPC archive paths commonly use `/data/SEMS-TaoLab/Niccolo-Forte/...`; scratch paths may use `/gpfs/scratch/...`.
 - Generated Abaqus files, transfer CSVs/NPZs, MLdata products, model checkpoints, HPO databases, Slurm logs, and notebook output bulk are research artifacts. Do not delete, rename, or commit them unless the task explicitly asks for that.
 - `AGENTS.md` files and repo skills under `.agents/skills/` are tracked project infrastructure. Keep them synchronized with the implementation.
@@ -76,7 +77,7 @@ Default to one human-readable visual report per study/comparison under the paper
 
 Treat the user's cleanup preference as a high-priority engineering constraint, not a cosmetic preference.
 
-- **High priority: no surprises.** Do not expand scope, relocate files or create alternate notebook copies without explicit authorization. Keep p2 notebooks in `p2-DisorderML/code/`. `data/` holds datasets, results and requested figures—not executable notebooks, scripts or deployment bundles. Use outside-repository temporary directories for validation intermediates.
+- **High priority: no surprises.** Do not expand scope, relocate files or create alternate notebook copies without explicit authorization. Keep p2 notebooks in `p2-DisorderML/code/`. External data stores hold datasets, results and requested figures—not executable notebooks, scripts or deployment bundles. Use outside-repository temporary directories for validation intermediates.
 - Keep active scripts, notebooks, and helpers compact, current, and intentional. Remove abandoned approaches, stale notebook cells and outputs, duplicated or superseded code, obsolete workaround helpers, and unnecessary compatibility or fallback scaffolding as part of the change.
 - Prefer direct code and compact helpers: inline one-off helpers that do not clarify the flow, and move genuinely reused logic into the appropriate `resources/` module.
 - Important exception: archived or explicitly historical folders, such as `p1-DisorderLatticeProperties/SIMscripts/OldScriptVersions/`, can preserve old versions. Active/current scripts and notebooks should not accumulate old experiments.

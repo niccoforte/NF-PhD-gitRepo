@@ -117,6 +117,6 @@ causal if its enrichment only reflects a generation batch.
   confirmation step.
 
 Use `p2-DisorderML/code/Tokenization.ipynb` as the existing notebook surface.
-Human examples belong in `samples/`, run artifacts in `data/`; no duplicate
+Human examples belong in the Z: checkout's `samples/`, run artifacts in external `Z:/p2/` (never checkout `data/`); no duplicate
 notebooks. Ask the user to settle the first score/elite definition before a
 large study. No tokenisation code was changed by this reconciliation.

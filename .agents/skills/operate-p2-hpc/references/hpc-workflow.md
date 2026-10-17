@@ -8,7 +8,7 @@ Read only the section relevant to the task and confirm it against the actual scr
 - `B0_ML-env-setup.sh`: creates or refreshes the `nf-ml-gpu` environment.
 - `B1_ML-new.sh`: stages `resources/` plus a selected Python entry point to scratch, runs it, and archives outputs.
 - `B2_ML-resumeHPO.sh`: resumes archived cross-model Optuna studies; use `--dry-run` before launch.
-- `B3_ML-transfer-windows.sh`: preserves the Windows/Git Bash download path to `Z:/p2` or a fallback. `B3_ML-transfer-mac.sh`: macOS Bash 3.2/rsync download to repo-root `data/`, with `--dry-run` and optional `SSH_CONTROL_PATH`. Both keep the saved-run relative tree.
+- `B3_ML-transfer-windows.sh`: Windows/Git Bash download to external `Z:/p2`, with no checkout fallback. `B3_ML-transfer-mac.sh`: macOS Bash 3.2/rsync download to an explicitly supplied external `LOCAL_ROOT`, with `--dry-run` and optional `SSH_CONTROL_PATH`. Both reject Git-contained destinations and keep the saved-run relative tree.
 - `CurveOutputs/`, `FieldOutputs/`, and `FieldToCurve/`: single-run and cross-model HPO entry points for each output family.
 - `DualOutputs/`: joint single-run entry point, thin Trial 1 preset, active contract tests, and `A0-HPC-Dual-HPO.py`. Dual HPO runs/resumes through B1 using `--study-name` and explicit `--resume`, not legacy B2. It uses model-specific `MULTI/Dual/Transformer/HPO/<study>` storage, one archive lock, SQLite backups and fixed validation ranking. See the adjacent README for ranges, artifacts and recovery limitations.
 
@@ -139,10 +139,10 @@ return0, followed by a harmless `plink -batch -share ...` remote check. Use
 `pscp -batch -share -load HPC -l exy053` for this connection; Windows OpenSSH scp
 cannot reuse it. Windows artifacts belong in `Z:/p2`, outside Git, preserving
 archive-relative paths; the user relocated the former checkout `data/` there.
-Do not recreate it. Paper `samples/` remains ignored and holds the single visual
-suite report described in root AGENTS. B3 Windows already defaults to `Z:/p2`
-and uses OpenSSH; do not claim it was used for a PuTTY transfer. Mac B3 retains
-its explicit ignored repo-root `data/` default.
+Do not recreate it on any host. Generated paper samples/reports belong only in
+`Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; other checkouts retain tracked guidance.
+B3 Windows defaults to `Z:/p2` and uses OpenSSH; do not claim it was used for a
+PuTTY transfer. Mac B3 requires explicit external `LOCAL_ROOT`, not checkout data.
 
 For dual single runs use `B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py`. Defaults are all samples, CUDA, 450 epochs, validation diagnostics, full curves, and a joint normalized-field/physical-curve objective. Explicit smoke overrides are `--nsims 64 --epochs 3 --batch 2 --no-range-split`; `--allow-cpu` is local/debug only. Outputs follow `MULTI/Dual/Transformer/<run-label>`. Do not route checkpoints through legacy `MODEL` or B2. Dual HPO uses B1 with `DualOutputs/A0-HPC-Dual-HPO.py`; `--resume` restores completed study history and retries an interrupted configuration from epoch one. A 230-hour budget leaves margin below the unchanged ten-day limit. Best physical diagnostics are under `HPO/<study>/best/results/`; the dual notebook consumes that directory. Transfer a study using the platform B3 script with `MULTI Dual Transformer HPO <study>`.
 
