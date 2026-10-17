@@ -131,6 +131,17 @@ class DamageData(unittest.TestCase):
             result = read_field_layout(self.inputs/"UT-UT-disNodes-allFIELD.npz")
         self.assertEqual(result["provenance"]["Y_shape"], [2, 3, 4, 2])
 
+    def test_bank_reports_cannot_be_written_inside_mldata(self):
+        before = {path.name: path.read_bytes() for path in self.inputs.iterdir()}
+        destinations = (self.inputs, self.inputs/"reports", self.inputs/".."/"MLdata",
+                        self.root/"another"/"mLdAtA", self.root/"another"/"MLdata"/"reports")
+        for destination in destinations:
+            with self.subTest(destination=destination):
+                with self.assertRaisesRegex(ValueError, "staging outside MLdata"):
+                    build_damage_banks(self.inputs, destination, [self.transfer], overwrite=True)
+                self.assertEqual({path.name: path.read_bytes() for path in self.inputs.iterdir()}, before)
+        self.assertFalse((self.root/"another").exists())
+
     def test_missing_input_does_not_publish_any_bank(self):
         (self.transfer/("FIELDd-"+_stem("FT", 2)+".npz")).unlink()
         with self.assertRaisesRegex(ValueError, "Missing required FIELDd"):

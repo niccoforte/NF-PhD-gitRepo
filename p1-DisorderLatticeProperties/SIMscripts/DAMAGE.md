@@ -63,7 +63,7 @@ Python/NumPy. This reads only existing field identities/geometry/header metadata
 python -m resources.damage_data --mldata-dir /ABS/MLdata --output-dir /ABS/STAGING --inventory /ABS/LAUNCH/dataset.json
 ```
 
-Products are `{UT-UT,FT-FT,MULTI-UT,MULTI-FT}-disNodes-allD.npz` plus JSON, schema
+Staging products are `{UT-UT,FT-FT,MULTI-UT,MULTI-FT}-disNodes-allD.npz` plus JSON, schema
 `strut_status_bank_v1`. They retain exact allFIELD sample IDs/order, periodic0,
 native strut axes and masks. `edge_index` explicitly maps endpoints into saved
 task-node order; labels are not broadcast to nodes. Raw STATUS/FIELDu counts
@@ -75,9 +75,17 @@ reject sources longer than the bank. Small timestamp differences are allowed,
 without interpolation or failure carry. Reports separate observed unknown STATUS
 from unavailable sample frames and retain the last observed fracture counts.
 Existing allFIELD/curve files and filtering
-are not changed. Verify staged banks and transfer checksums before promoting to
-local `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
-`/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Windows uses the authenticated PuTTY
+are not changed. Build in a separate directory outside MLdata and its descendants;
+the builder rejects MLdata destinations. Verify staged banks and checksums, then
+publish only NPZ training inputs to local
+`Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
+`/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`. Keep JSON audit reports and completed
+launch provenance in the upstream FCC archive's `provenance/<processing-run>/`.
+For this pass that is
+`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016/`:
+four unchanged reports in `bank-reports/`, `execution.tar.gz` for the non-log launch
+records, and a checksum manifest. Home retains only successful output logs.
+Windows uses the authenticated PuTTY
 share via `pscp -batch -share -load HPC -l exy053`; leave its master open.
 
 ## Start here

@@ -291,6 +291,10 @@ def build_damage_banks(mldata_dir, output_dir, transfer_roots=(), inventory=None
     deliberately left to the caller. Existing allFIELD files are never modified.
     """
     mldata_dir, output_dir = Path(mldata_dir), Path(output_dir)
+    source_root, staging_root = mldata_dir.resolve(), output_dir.resolve()
+    require(source_root not in (staging_root, *staging_root.parents) and
+            all(part.casefold() != "mldata" for part in staging_root.parts),
+            "Build bank NPZ/JSON in staging outside MLdata; publish only NPZ training inputs")
     require(tolerance > 0 and np.isfinite(tolerance), "Invalid geometry tolerance")
     targets = [output_dir/f"{mech}-{task}-disNodes-allD.npz" for mech, task in BANKS]
     require(overwrite or not any(p.exists() or p.with_suffix(".json").exists() for p in targets),

@@ -22,7 +22,8 @@ This directory is the QMUL HPC/Slurm side of p2 training, HPO, resume, archive, 
   recorded and correction is in place, cleanup is HIGH PRIORITY: confirm terminal
   jobs and exact paths, preserve useful resumable production results, then remove
   failed scratch, home logs and useless failed archive outputs. Never delete active
-  jobs or unidentified data. Keep successful home preflight logs, not archive copies.
+  jobs or unidentified data. Completed home keeps successful logs only;
+  archive code, manifests and audits with data.
 
 - Active entry points are production-oriented: full data and realistic training budgets by default. Small datasets, short epochs/trials, and CPU execution must be explicit debug overrides.
 - Do not change Slurm partition, account, license, CPU, memory, or time policy without the user's target cluster policy.

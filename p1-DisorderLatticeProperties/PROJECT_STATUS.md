@@ -63,7 +63,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   18,000 disordered plus the separate periodic pair, reconciled by 91 receipts.
   Corrected bank job 32095821 completed 0:0 in 1 h 13 min using bank-code-4c435cf.
   Original bank 32085487 was cancelled before execution and remains superseded.
-- Four allD NPZ/JSON pairs are verified in HPC p2/MLdata and local FCC MLdata,
+- Four allD NPZ banks are verified in HPC p2/MLdata and local FCC MLdata,
   with exact existing ordered UT 8882, FT 8928 and MULTI 8811 populations and ID 0.
   Full bank byte hashes match; geometry, source hashes and saved field layouts
   reconcile. The frozen builder validated binary arrays, masks, onset and exact
@@ -82,8 +82,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 - The complete visual report is p2 samples/damage-dataset/README.md. Its
   execution/ folder retains per-file results/receipts, four bank proofs, source
   equivalence/padding evidence, HPC layout and directory-level source inventory.
-  Frozen extraction code-e92e899 and the pinned dataset-v2 manifest remain in
-  home p1/Ti/disNodes/0.2/FCC/damage-261016 with successful home logs.
+  Frozen code, manifests and result records are checksum-verified in the remote
+  FCC archive's provenance/damage-261016/execution.tar.gz; four bank JSON audit
+  reports are in its bank-reports/ folder. MLdata contains only NPZ/CSV inputs.
+- Home p1/Ti/disNodes/0.2/FCC/damage-261016 now retains only 94 successful logs.
+  All 120 non-log launch files and four JSON reports from each local/HPC MLdata
+  folder were removed after verifying the archived copies. NPZ hashes, arrays
+  and all 19 remaining MLdata files are preserved. The provenance root is
+  /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016.
 - All 91 production scratch roots and the task-owned local staging/helpers are
   removed. Original ODB/INP/FIELDu/curves are preserved. The scheduled follow-up
   was deleted at the researcher's request and was not recreated.

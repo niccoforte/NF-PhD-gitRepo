@@ -498,6 +498,11 @@ and ML architecture remain unchanged. See the quick start for execution.
 All 18,002 FCC raw products and all four aligned MLdata banks are delivered
 and checksum-verified locally against HPC. The completed report below retains
 per-file receipts, bank alignment proofs and the HPC directory inventory.
+MLdata contains only training/testing inputs: publish the four NPZ banks there,
+not their JSON audit reports. Build in separate staging; reports and completed
+launch records are archived under
+`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/provenance/damage-261016/`.
+The completed home launch now contains only its 94 successful output logs.
 `p2-DisorderML/code/review_damage_dataset.py` builds the dataset report from
 explicit FIELDd examples and saved execution metadata. Optional corpus evidence
 adds processing outcomes, final fracture distributions and a per-attempt table;
