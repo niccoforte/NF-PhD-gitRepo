@@ -4,47 +4,30 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
-- Damage dataset production is now authorised for existing FCC periodic and
-  20% nodal-disorder results only:90 original job groups,9,000 UT/9,000 FT ODBs,
-  plus the periodic pair. p1's existing exporter/B2 route now writes STATUS-only
-  FIELDd products through manifest-driven scratch batches. Four allD banks target
-  local disNodes/0.2/FCC/MLdata and HPC p2/MLdata using exact existing IDs/order,
-  periodic0 and saved-frame-index alignment. Other lattices, new FEA and ML
-  architecture/training integration stay outside scope. Export preflight32084741
-  and independent native verification32084803 COMPLETED0:0:1,171,296 raw STATUS
-  positions and384,552 parent/frame labels checked, zero missing values.49 focused
-  tests pass. Production array 32085486 completed all 91 batches/18,002 records
-  without errors. Corrected CPU MLdata job32095821 is RUNNING, using immutable
-  bank-code-4c435cf for the padding correction below.
-  Immutable e92e899 extraction source and
-  pinned dataset-v2 manifest are under home p1/Ti/disNodes/0.2/FCC/damage-261016.
-  All 18,002 FIELDd NPZ/JSON pairs are checksum-verified in the canonical local
-  transfer folders (18,000 disordered plus 2 periodic), with 91 reconciled receipts.
+- Existing FCC periodic/20% nodal-disorder STATUS dataset delivery is complete.
+  Production array 32085486 finished all 91 batches/18,002 records without errors;
+  corrected CPU bank job 32095821 completed 0:0 in 1 h 13 min using bank-code-4c435cf.
+  All 18,002 raw FIELDd NPZ/JSON pairs and four allD bank pairs are checksum-verified
+  locally against HPC. Exact existing IDs/order remain UT 8882, FT 8928 and
+  MULTI 8811 per task, including periodic0. Both archive locations now contain the
+  new banks; existing displacement/curve products and filtering are preserved.
   Recorded checks cover 2,622,439,219 raw STATUS positions and 865,222,188
-  parent/frame labels; missing observed STATUS, unknown observed parents and
-  reactivation counts are all zero. Four-bank verification and MLdata
-  publication/transfer remain in progress.
-  Human report: samples/damage-dataset/README.md. A30-minute chat
-  follow-up monitors and finishes the remaining bank/report work. All 91 terminal
-  production scratch roots are confirmed absent; successful home logs and frozen
-  sources are retained. Earlier failed preflight scratch/unused launch artifacts
-  were cleaned after diagnosis.
-  Timestamped processing counts, per-file results and incremental local transfer
-  receipts live in samples/damage-dataset/execution/; the eight example plots
-  remain separate from whole-corpus completion evidence.
-  The report now reconciles explicit raw attempts, existing ML exclusions,
-  transfer receipts and four bank proofs before claiming delivery complete.
-  Current corpus evidence remains partial with zero verified bank proofs.
-  Eleven short UT histories are required by each UT bank: 50 unavailable sample
-  frames/115,950 masked parent-frame entries; both FT banks require none. These
-  are absent observations, distinct from unknown observed STATUS.
-  Real UT601 has20 raw frames; both
-  existing allFIELD banks preserve that exact prefix and mask their21st frame.
-  The corrected bank builder matches this convention with explicit frame counts,
-  presence and masked trailing times; a bounded real-data check with periodic0
-  and601 passes. Thirteen bank and13 report tests pass; contract validation
-  records85 non-failing/zero failed checks. Original bank job32085487 was cancelled
-  before execution; the completed extraction array's frozen sources are preserved.
+  parent/frame labels, with zero missing/unknown observed states or reactivation.
+  Independent native ODB comparison remains limited to eight preflight products.
+  Eleven short UT histories account for 50 absent sample frames/115,950 masked
+  parent-frame entries in each UT bank; FT has none. Explicit counts/presence
+  preserve raw prefixes and unknown trailing padding without interpolation/carry.
+  Human report: samples/damage-dataset/README.md. It derives completion from all
+  attempts, existing ML exclusions, 91 transfer receipts and four canonical bank
+  proofs, and keeps the eight geometry/evolution examples separate. The delivery
+  proof verifies hashes, IDs, source/field layouts and coverage with D/mask header
+  inspection; binary/roundtrip validation was performed by the frozen builder.
+  Execution records include HPC layout, padding/source-equivalence/replacement
+  evidence, source changes and cleanup. All 91 production scratch roots and local
+  staging/helpers are removed; successful home logs and frozen sources remain.
+  The follow-up was deleted at the researcher request and was not recreated.
+  Other lattices, new FEA and ML architecture/training integration remain outside
+  this completed data-processing task.
 
 - Case1(i) is selected for the next two studies. Input variation is prepared first:
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true

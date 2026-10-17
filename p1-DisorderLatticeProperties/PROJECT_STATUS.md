@@ -4,12 +4,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- Current authorised implementation: process existing Ti FCC periodic and 20%
-  nodal-disorder UT/FT archives for binary strut fracture from whole-element
-  STATUS=0. Add lowercase FIELDd products in the original job transfer folders,
-  consolidate local transfers and add aligned banks to both MLdata archives.
-  Preflight precedes resumable Slurm batches. Other lattices, new FEA and ML
-  architecture/training integration remain outside scope.
+- The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
+  processing and local/HPC archive delivery are complete. The generated labels,
+  aligned banks and visual report are ready for the separate ML workflow.
+  Other lattices, new FEA and ML architecture/training integration remain outside
+  this completed data-processing task.
 - Broader p1 research objective and phase remain `To be confirmed`.
 
 ## Authoritative Working Surfaces
@@ -56,49 +55,35 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Decisions And Next Task
 
-- The researcher selected binary fracture: any failed constituent gives parent1;
-  all known active constituents give0; otherwise unknown. SDEG stays diagnostic.
-  Production processing is authorised for the existing FCC archive only:90 job
-  groups,9,000 UT plus9,000 FT ODBs, and the separate periodic pair. Each ODB has
-  matching INP/FIELDu filenames. Eight preflight cases passed native STATUS
-  verification; four-bank delivery validation remains in progress. The existing
-  exporter/B2 route now preserves frame-index alignment, periodic ID0 and exact
-  existing MLdata populations. Local/HPC paths and contracts are in
-  SIMscripts/DAMAGE.md. The lean route matches every raw STATUS/parent mask in
-  both local periodic Abaqus exports (UT83/FT7 final failed parents;6.85s/3.66s
-  export time). Archived periodic INPs match those sources byte-for-byte; ODB
-  hashes differ and require direct response comparison in the cluster preflight.
-  Corrected cluster export preflight32084741 and independent native verification
-  32084803 COMPLETED0:0: eight products,1,171,296 raw STATUS positions and384,552
-  parent/frame labels agree exactly, zero missing STATUS. Earlier instance-case
-  and verifier-launch import-path failures were corrected; their failed scratch
-  and unused launch artifacts were removed after concise diagnosis was retained.
-  Production array 32085486 completed all 91 batches/18,002 records with zero
+- The researcher selected binary fracture: any constituent whole-element
+  STATUS=0 gives parent 1; all known active constituents give 0; otherwise unknown.
+  SDEG remains diagnostic.
+- Production array 32085486 completed all 91 batches/18,002 records with zero
   errors. All 18,002 FIELDd NPZ/JSON pairs are checksum-verified locally:
-  18,000 disordered products and the separate periodic pair, reconciled through
-  91 transfer receipts. Recorded validation covers 2,622,439,219 raw STATUS
-  positions and 865,222,188 parent/frame labels, with zero missing observations,
-  unknown observed parent states or reactivation. Corrected CPU MLdata job
-  32095821 is RUNNING using immutable bank-code-4c435cf; four-bank verification
-  and local delivery remain pending. Original bank job32085487 was cancelled
-  before running.
-  Required UT601 has20 raw frames; existing allFIELD preserves that exact prefix
-  and masks its21st frame. The corrected builder follows this existing padding
-  rule with explicit frame presence/counts; a real periodic0/601 NumPy check passes.
-  Thirteen bank and13 report tests pass; contract validation is85 non-failing,
-  zero failed checks. Report execution records retain the replacement job evidence.
-  Eleven short UT histories are present in both required UT memberships: each
-  UT bank must preserve 50 unavailable sample frames/115,950 masked parent-frame
-  entries, distinct from unknown observed STATUS. Both FT banks require no padding.
-  Frozen e92e899 source and
-  dataset-v2 manifest live in home p1/Ti/disNodes/0.2/FCC/damage-261016. Eight
-  preflight products retain independent native verification; periodic raw
-  STATUS/masks/times exactly match the earlier audit despite different ODB hashes.
-  This eight-product comparison remains distinct from whole-corpus batch checks.
-  All 91 terminal production scratch roots are confirmed absent; successful home
-  logs and immutable sources remain. 49 focused tests pass. Both MLdata archive
-  additions and the final report remain in progress; the 30-minute chat follow-up
-  stays active until verification, delivery and cleanup are complete.
-  Per-file results, receipts and scratch proof remain under ignored p2
-  samples/damage-dataset/execution/; the corpus report correctly remains partial
-  with zero bank proofs until the four-bank delivery is checked.
+  18,000 disordered plus the separate periodic pair, reconciled by 91 receipts.
+  Corrected bank job 32095821 completed 0:0 in 1 h 13 min using bank-code-4c435cf.
+  Original bank 32085487 was cancelled before execution and remains superseded.
+- Four allD NPZ/JSON pairs are verified in HPC p2/MLdata and local FCC MLdata,
+  with exact existing ordered UT 8882, FT 8928 and MULTI 8811 populations and ID 0.
+  Full bank byte hashes match; geometry, source hashes and saved field layouts
+  reconcile. The frozen builder validated binary arrays, masks, onset and exact
+  serialization round trips; the separate delivery proof checks byte identity,
+  metadata/layout/coverage and D/mask headers without loading full label tensors.
+- Recorded corpus checks cover 2,622,439,219 raw STATUS positions and 865,222,188
+  parent/frame labels, with zero missing observations, unknown observed parents
+  or reactivation. Independent native ODB comparison remains bounded to eight
+  preflight products: 1,171,296 raw positions and 384,552 parent/frame labels.
+- Eleven short UT histories preserve their actual prefixes. Each UT bank has
+  50 absent sample frames/115,950 masked parent-frame entries; FT has none.
+  Frame counts/presence and NaN unavailable times distinguish these from unknown
+  observed STATUS; no interpolation or failure carry is applied. The real
+  periodic0/UT601 prefix check, 13 bank tests and 13 report tests passed. Earlier
+  contract validation recorded 85 non-failing/zero failed checks.
+- The complete visual report is p2 samples/damage-dataset/README.md. Its
+  execution/ folder retains per-file results/receipts, four bank proofs, source
+  equivalence/padding evidence, HPC layout and directory-level source inventory.
+  Frozen extraction code-e92e899 and the pinned dataset-v2 manifest remain in
+  home p1/Ti/disNodes/0.2/FCC/damage-261016 with successful home logs.
+- All 91 production scratch roots and the task-owned local staging/helpers are
+  removed. Original ODB/INP/FIELDu/curves are preserved. The scheduled follow-up
+  was deleted at the researcher's request and was not recreated.
