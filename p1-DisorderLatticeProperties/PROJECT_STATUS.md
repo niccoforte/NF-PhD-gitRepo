@@ -61,7 +61,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Production processing is authorised for the existing FCC archive only:90 job
   groups,9,000 UT plus9,000 FT ODBs, and the separate periodic pair. Each ODB has
   matching INP/FIELDu filenames. Eight preflight cases passed native STATUS
-  verification; whole-corpus validation remains in progress. The existing
+  verification; four-bank delivery validation remains in progress. The existing
   exporter/B2 route now preserves frame-index alignment, periodic ID0 and exact
   existing MLdata populations. Local/HPC paths and contracts are in
   SIMscripts/DAMAGE.md. The lean route matches every raw STATUS/parent mask in
@@ -73,20 +73,32 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   parent/frame labels agree exactly, zero missing STATUS. Earlier instance-case
   and verifier-launch import-path failures were corrected; their failed scratch
   and unused launch artifacts were removed after concise diagnosis was retained.
-  Production array32085486 tasks0–90 is RUNNING, throttled to four concurrent
-  batches; corrected CPU MLdata job32095821 waits afterok on that array, using
-  immutable bank-code-4c435cf. Original bank job32085487 was cancelled before running.
+  Production array 32085486 completed all 91 batches/18,002 records with zero
+  errors. All 18,002 FIELDd NPZ/JSON pairs are checksum-verified locally:
+  18,000 disordered products and the separate periodic pair, reconciled through
+  91 transfer receipts. Recorded validation covers 2,622,439,219 raw STATUS
+  positions and 865,222,188 parent/frame labels, with zero missing observations,
+  unknown observed parent states or reactivation. Corrected CPU MLdata job
+  32095821 is RUNNING using immutable bank-code-4c435cf; four-bank verification
+  and local delivery remain pending. Original bank job32085487 was cancelled
+  before running.
   Required UT601 has20 raw frames; existing allFIELD preserves that exact prefix
   and masks its21st frame. The corrected builder follows this existing padding
   rule with explicit frame presence/counts; a real periodic0/601 NumPy check passes.
   Thirteen bank and13 report tests pass; contract validation is85 non-failing,
   zero failed checks. Report execution records retain the replacement job evidence.
-  The extraction array is unaffected. Frozen e92e899 source and
+  Eleven short UT histories are present in both required UT memberships: each
+  UT bank must preserve 50 unavailable sample frames/115,950 masked parent-frame
+  entries, distinct from unknown observed STATUS. Both FT banks require no padding.
+  Frozen e92e899 source and
   dataset-v2 manifest live in home p1/Ti/disNodes/0.2/FCC/damage-261016. Eight
-  checked preflight products are hash-verified in the canonical local transfer folders;
-  periodic raw STATUS/masks/times exactly match the earlier audit despite
-  different ODB hashes.49 focused tests pass. The complete corpus and both
-  MLdata archive additions are still in progress; a30-minute chat follow-up
-  monitors completion and performs the remaining verified local transfer/report.
-  Timestamped batch counts, per-file results and incremental local transfer
-  receipts are retained under ignored p2 samples/damage-dataset/execution/.
+  preflight products retain independent native verification; periodic raw
+  STATUS/masks/times exactly match the earlier audit despite different ODB hashes.
+  This eight-product comparison remains distinct from whole-corpus batch checks.
+  All 91 terminal production scratch roots are confirmed absent; successful home
+  logs and immutable sources remain. 49 focused tests pass. Both MLdata archive
+  additions and the final report remain in progress; the 30-minute chat follow-up
+  stays active until verification, delivery and cleanup are complete.
+  Per-file results, receipts and scratch proof remain under ignored p2
+  samples/damage-dataset/execution/; the corpus report correctly remains partial
+  with zero bank proofs until the four-bank delivery is checked.

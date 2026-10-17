@@ -495,6 +495,9 @@ Local raw exports use the separate `Z:/p1/data/Ti/per/FCC/transfer` and
 `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata` and HPC
 `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata`; existing displacement/curve products
 and ML architecture remain unchanged. See the quick start for execution.
+All 18,002 FCC raw products are processed and checksum-verified locally; the
+four-bank MLdata job is running. Bank delivery is still pending, as recorded in
+the paper status files and the report below.
 `p2-DisorderML/code/review_damage_dataset.py` builds the dataset report from
 explicit FIELDd examples and saved execution metadata. Optional corpus evidence
 adds processing outcomes, final fracture distributions and a per-attempt table;

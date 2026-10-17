@@ -13,28 +13,38 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   architecture/training integration stay outside scope. Export preflight32084741
   and independent native verification32084803 COMPLETED0:0:1,171,296 raw STATUS
   positions and384,552 parent/frame labels checked, zero missing values.49 focused
-  tests pass. Production array32085486 tasks0–90 is RUNNING with four concurrent
-  batches; corrected CPU MLdata job32095821 waits afterok, using immutable
+  tests pass. Production array 32085486 completed all 91 batches/18,002 records
+  without errors. Corrected CPU MLdata job32095821 is RUNNING, using immutable
   bank-code-4c435cf for the padding correction below.
   Immutable e92e899 extraction source and
   pinned dataset-v2 manifest are under home p1/Ti/disNodes/0.2/FCC/damage-261016.
-  Eight checked preflight products/sidecars are in canonical local transfer folders;
-  corpus-wide processing and MLdata publication/transfer remain in progress.
+  All 18,002 FIELDd NPZ/JSON pairs are checksum-verified in the canonical local
+  transfer folders (18,000 disordered plus 2 periodic), with 91 reconciled receipts.
+  Recorded checks cover 2,622,439,219 raw STATUS positions and 865,222,188
+  parent/frame labels; missing observed STATUS, unknown observed parents and
+  reactivation counts are all zero. Four-bank verification and MLdata
+  publication/transfer remain in progress.
   Human report: samples/damage-dataset/README.md. A30-minute chat
-  follow-up monitors and finishes the remaining archive/report work. Earlier
-  failed preflight scratch/unused launch artifacts were cleaned after diagnosis.
+  follow-up monitors and finishes the remaining bank/report work. All 91 terminal
+  production scratch roots are confirmed absent; successful home logs and frozen
+  sources are retained. Earlier failed preflight scratch/unused launch artifacts
+  were cleaned after diagnosis.
   Timestamped processing counts, per-file results and incremental local transfer
   receipts live in samples/damage-dataset/execution/; the eight example plots
   remain separate from whole-corpus completion evidence.
   The report now reconciles explicit raw attempts, existing ML exclusions,
   transfer receipts and four bank proofs before claiming delivery complete.
-  Current corpus evidence remains partial. Real UT601 has20 raw frames; both
+  Current corpus evidence remains partial with zero verified bank proofs.
+  Eleven short UT histories are required by each UT bank: 50 unavailable sample
+  frames/115,950 masked parent-frame entries; both FT banks require none. These
+  are absent observations, distinct from unknown observed STATUS.
+  Real UT601 has20 raw frames; both
   existing allFIELD banks preserve that exact prefix and mask their21st frame.
   The corrected bank builder matches this convention with explicit frame counts,
   presence and masked trailing times; a bounded real-data check with periodic0
   and601 passes. Thirteen bank and13 report tests pass; contract validation
   records85 non-failing/zero failed checks. Original bank job32085487 was cancelled
-  before execution; the extraction array and its frozen sources continue.
+  before execution; the completed extraction array's frozen sources are preserved.
 
 - Case1(i) is selected for the next two studies. Input variation is prepared first:
   five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
