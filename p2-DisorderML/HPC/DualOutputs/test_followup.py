@@ -10,15 +10,18 @@ import os
 import subprocess
 import ast
 import shutil
+import copy
+import hashlib
+from unittest import mock
 from types import SimpleNamespace
 
 import numpy as np
 import torch
 
 from test_independence import fixture, model_for, arguments
-from resources.MLdual import DualStageTransformer, DualLoss
+from resources.MLdual import DualStageTransformer, DualLoss, FieldCorrectionStage
 from resources.MLindependence import prepare_bank, _CurveInputs, _fit_groups
-from resources.MLfollowup import prepare_correction_bank, train_followup, new_corrector
+from resources.MLfollowup import prepare_correction_bank, train_followup, new_corrector, field_objective, reference_model
 
 
 class FollowupTests(unittest.TestCase):
@@ -31,6 +34,8 @@ class FollowupTests(unittest.TestCase):
         a.field_loss_variant=None
         a.corrector_d_model=8; a.corrector_n_heads=2; a.corrector_n_layers=1
         a.correction_bank=None; a.curve_training_source="predicted";a.reference_model_json=None
+        a.followup_study="inputs"; a.reference_curve_source="predicted"; a.curve_loss_ablation=None
+        a.spatial_weight=.1; a.temporal_weight=.1
         return a
 
     def test_mixture_is_training_sampling_not_interpolation(self):
@@ -177,6 +182,119 @@ exec bash "$@"
         self.assertEqual(args.loss,'mse')
         with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
             parse(['--followup-study','inputs','--independence-case','3ii','--experiment','baseline'])
+        common=['--followup-study','losses','--independence-case','1i','--experiment','baseline','--field-bank','raw']
+        for source in ('predicted','true','mixed','corrected','corrected_mixed'):
+            correction=['--correction-bank','new'] if source.startswith('corrected') else []
+            for objective in (['--field-loss-variant','spatial'],['--curve-loss-ablation','combined_soft']):
+                parsed=parse(common+['--curve-training-source',source]+correction+objective)
+                self.assertEqual(parsed.curve_training_source,source)
+        for extra in (['--curve-training-source','corrected_mixed'],
+                      ['--field-loss-variant','spatial','--curve-loss-ablation','combined_soft'],
+                      ['--prepare-correction-bank','--reference-model-json','ref','--curve-loss-ablation','combined_soft'],
+                      ['--reference-model-json','ref','--reference-curve-source','mixed'],
+                      ['--eval-split','test']):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                parse(common+extra)
+        self.assertEqual(parse([]).curve_training_source,'predicted')
+
+    def test_reference_hash_exception_is_bounded_and_checked_before_nested_fits(self):
+        data=fixture(); a=self.args(); model=model_for(data,'1i')
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            meta={'case':'1ip','run_config':{'seed':42},'field_bank_sha256':'original'}
+            model.save(root/'reference',metadata=meta)
+            a.reference_model_json=str(root/'reference/model.json')
+            with self.assertRaisesRegex(ValueError,'hash mismatch'):
+                reference_model(model,a,'changed')
+            a.followup_study='losses'; a.field_loss_variant='spatial'
+            provenance={}
+            reference_model(model,a,'changed',provenance)
+            self.assertEqual(provenance['reference_field_bank_sha256'],'original')
+            self.assertTrue(provenance['changed_generator_reference'])
+            original=json.loads(Path(a.reference_model_json).read_text())
+            for edit,message in ((lambda d:d['metadata']['run_config'].update(seed=43),'seeded'),
+                                 (lambda d:d['data']['sample_ids'].update(val=['wrong']),'data/splits/scalers'),
+                                 (lambda d:d['data']['normalizers']['field']['UT'].update(scale=[123]),'data/splits/scalers'),
+                                 (lambda d:d['model_config']['curve_model'].update(d_model=16),'configuration')):
+                descriptor=copy.deepcopy(original);edit(descriptor)
+                Path(a.reference_model_json).write_text(json.dumps(descriptor))
+                with self.assertRaisesRegex(ValueError,message):
+                    reference_model(model,a,'changed')
+            Path(a.reference_model_json).write_text(json.dumps(original))
+            a.curve_loss_ablation='combined_soft'
+            with self.assertRaisesRegex(ValueError,'hash mismatch'):
+                reference_model(model,a,'changed')
+            a.curve_loss_ablation=None; a.followup_study='inputs'
+            with self.assertRaisesRegex(ValueError,'hash mismatch'):
+                reference_model(model,a,'changed')
+            a.field_bank=str(root);(root/'field_bank.npz').write_bytes(b'changed')
+            destination=root/'correction';destination.mkdir()
+            with mock.patch('resources.MLfollowup.load_bank',return_value=({},{})), \
+                 mock.patch('resources.MLfollowup.prepare_bank') as nested:
+                with self.assertRaisesRegex(ValueError,'hash mismatch'):
+                    prepare_correction_bank(model,a,destination,{})
+                nested.assert_not_called()
+                self.assertFalse((destination/'nested').exists())
+            # Curve losses may not quietly attach a different refiner to the same raw bank.
+            corrected=model_for(data,'1i')
+            refiner=new_corrector(corrected.model,data,a).field_model.correction
+            corrected.model.field_model=FieldCorrectionStage(refiner,corrected.model.field_model)
+            corrected.save(root/'cm',metadata=dict(meta,curve_training_source='corrected_mixed'))
+            a.reference_model_json=str(root/'cm/model.json');a.reference_curve_source='corrected_mixed'
+            a.followup_study='losses';a.field_loss_variant=None;a.curve_loss_ablation='combined_soft'
+            reference_model(corrected,a,'original')
+            with torch.no_grad():
+                next(corrected.model.field_model.correction.parameters()).add_(1.)
+            with self.assertRaisesRegex(ValueError,'winning frozen correction pipeline'):
+                reference_model(corrected,a,'original')
+
+    def test_changed_spatial_generators_use_fold_local_loss_and_mse_correctors(self):
+        data=fixture(24); a=self.args()
+        a.followup_study='losses'; a.field_loss_variant='spatial'; a.reference_curve_source='corrected_mixed'
+        edges=np.array([[0,2],[2,3],[3,4],[4,5]])
+        with tempfile.TemporaryDirectory() as folder, mock.patch('resources.MLfield.reference_field_edges',return_value=edges):
+            root=Path(folder); bank=root/'bank';bank.mkdir()
+            parent=model_for(data,'1i')
+            prepare_bank(parent,'1i',a,bank,{},loss_factory=lambda d:field_objective(d,a))
+            parent.save(bank);a.field_bank=str(bank)
+            winner=model_for(data,'1i')
+            refiner=new_corrector(winner.model,data,a).field_model.correction
+            winner.model.field_model=FieldCorrectionStage(refiner,winner.model.field_model)
+            winner.save(root/'winner',metadata={'case':'1ip','run_config':{'seed':42,'followup_study':'inputs'},
+                'curve_training_source':'corrected_mixed','field_bank_sha256':hashlib.sha256(b'original MSE').hexdigest()})
+            a.reference_model_json=str(root/'winner/model.json')
+            correction=model_for(data,'1i');correction.lossf=field_objective(data,a)
+            dest=root/'correction';dest.mkdir();meta={}
+            prepare_correction_bank(correction,a,dest,meta);correction.save(dest,metadata=meta)
+            self.assertEqual(correction.lossf.get_config()['field_losses']['UT']['class'],'MaskedFieldMSELoss')
+            self.assertNotEqual(meta['field_bank_sha256'],meta['reference_field_bank_sha256'])
+            provenance=json.loads((dest/'correction_bank.json').read_text())
+            self.assertEqual(provenance['generator_loss_variant'],'spatial')
+            self.assertEqual(provenance['corrector_loss'],'mse')
+            for outer in provenance['folds']:
+                nested=dest/'nested'/str(outer['fold'])
+                manifest=json.loads((nested/'field_bank.json').read_text())
+                self.assertEqual(manifest['field_loss_variant'],'spatial')
+                for descriptor_path in nested.glob('**/groups/field_UT/model.json'):
+                    descriptor=json.loads(descriptor_path.read_text());loss=descriptor['loss_config']['field_losses']['UT']
+                    if 'corrector' in descriptor_path.parts:
+                        self.assertEqual(loss['class'],'MaskedFieldMSELoss')
+                    else:
+                        self.assertEqual(loss['class'],'StructuredFieldLoss')
+                        self.assertEqual(loss['params']['spatial_weight'],.1)
+                        normalizers=descriptor['data']['normalizers']['field']['UT']
+                        np.testing.assert_allclose(loss['params']['mean'],normalizers['mean'])
+                        np.testing.assert_allclose(loss['params']['scale'],normalizers['scale'])
+                        self.assertFalse(set(outer['heldout_train_ids']) & set(descriptor['data']['sample_ids']['train']))
+            a.curve_training_source='corrected_mixed';a.correction_bank=str(dest)
+            fit=model_for(data,'1i');adapted=root/'adapted';adapted.mkdir()
+            train_followup(fit,a,adapted,{})
+            self.assertTrue((adapted/'fixed_readout_curves.npz').is_file())
+            for key,value in correction.model.field_model.state_dict().items():
+                torch.testing.assert_close(fit.model.field_model.state_dict()[key],value,rtol=0,atol=0)
+            for mode in ('UT','FT'):
+                saved=json.loads((adapted/'groups'/('curve_'+mode)/'model.json').read_text())
+                self.assertEqual(saved['loss_config']['curve_losses'][mode]['class'],'MSELoss')
 
     def test_custom_curve_objective_reaches_saved_independent_fit(self):
         from resources.MLfunc import CombinedCurveLoss
@@ -204,7 +322,14 @@ exec bash "$@"
             self.assertEqual(d['loss_config']['weights']['field'],{'UT':1.,'FT':0.})
 
     def test_launcher_dependency_graph_without_slurm(self):
+        bash=shutil.which('bash')
+        if bash is None:
+            self.skipTest('Bash unavailable; launcher requires a shell')
         script=Path(__file__).with_name('B4_Independent-followups.sh').read_text()
+        wrapper=(Path(__file__).resolve().parents[1]/'B1_ML-new.sh').read_text()
+        for directive in ('#SBATCH -n 12','#SBATCH --cpus-per-gpu=12','#SBATCH --mem-per-cpu=7500M','#SBATCH --gres=gpu:1'):
+            self.assertIn(directive,wrapper)
+        parse=runpy.run_path(str(Path(__file__).with_name('A0-HPC-Dual-test.py')))['parse_args']
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);repo=root/'repo';repo.mkdir();archive=root/'archive';home=root/'home'
             hpc=repo/'p2-DisorderML/HPC';hpc.mkdir(parents=True)
@@ -218,18 +343,43 @@ exec bash "$@"
                 for role,name in [('bank-1i','field_bank.json'),('1ip','model.json')]:
                     f=base/f'independence-261013-r1-{role}-s{seed}'/name
                     f.parent.mkdir();f.write_text('{}')
+                for role,names in [('correction',('correction_bank.json','model.json')),('corrected_mixed',('model.json',))]:
+                    for name in names:
+                        f=base/f'winning-inputs-{role}-s{seed}'/name
+                        f.parent.mkdir(exist_ok=True);f.write_text('{}')
             counter=root/'counter';counter.write_text('100')
+            calls=root/'calls'
             stub=root/'sbatch'
-            stub.write_text(f'#!/bin/bash\nn=$(cat "{counter.as_posix()}")\nn=$((n+1))\necho "$n" > "{counter.as_posix()}"\necho "$n"\n')
+            stub.write_text(f'#!/bin/bash\nn=$(cat "{counter.as_posix()}")\nn=$((n+1))\necho "$n" > "{counter.as_posix()}"\n'
+                f'printf "%s\\t" "$n" "$@" >> "{calls.as_posix()}"\nprintf "\\n" >> "{calls.as_posix()}"\necho "$n"\n')
             local=root/'launch.sh'
             local.write_text(script.replace('/opt/slurm/bin/sbatch',f'bash "{stub.as_posix()}"')
                                    .replace('/data/home/exy053/p2',home.as_posix()))
             env=dict(os.environ,REPO_ROOT=repo.as_posix(),ARCHIVE_ROOT=archive.as_posix())
-            for study,count in [('inputs',15),('losses',30)]:
-                subprocess.run(['bash',str(local),study,study,'--submit'],env=env,capture_output=True,text=True,check=True)
-                lines=(home/f'MULTI/Dual/Transformer/{study}/jobs.tsv').read_text().splitlines()[1:]
+            for suite,study,source,count in [('inputs','inputs','predicted',15),('losses-P','losses','predicted',30),
+                                             ('losses-CM','losses','corrected_mixed',42)]:
+                env.update(LOSS_CURVE_SOURCE=source,INPUT_SUITE='winning-inputs')
+                before=counter.read_text()
+                preview=subprocess.run([bash,str(local),suite,study],env=env,capture_output=True,text=True,check=True)
+                self.assertEqual(counter.read_text(),before)
+                self.assertFalse((home/f'MULTI/Dual/Transformer/{suite}').exists())
+                self.assertEqual(sum(line.startswith('PLAN ') for line in preview.stdout.splitlines()),count)
+                subprocess.run([bash,str(local),suite,study,'--submit'],env=env,capture_output=True,text=True,check=True)
+                lines=(home/f'MULTI/Dual/Transformer/{suite}/jobs.tsv').read_text().splitlines()[1:]
                 self.assertEqual(len(lines),count+1)
                 rows=[r.split('\t') for r in lines];gate=rows[0][2]
+                commands={r[0]:r[1:] for line in calls.read_text().splitlines() if (r:=line.rstrip('\t').split('\t'))}
+                self.assertIn('8:0:0',commands[gate])
+                self.assertEqual(commands[gate][commands[gate].index('--loss-curve-source')+1],source)
+                for row in rows[1:]:
+                    command=commands[row[2]]
+                    self.assertIn('240:0:0',command)
+                    self.assertIn('--kill-on-invalid-dep=yes',command)
+                    self.assertNotIn('--nsims',command)
+                    cli=command[command.index('DualOutputs/A0-HPC-Dual-test.py')+1:]
+                    anchor_index=cli.index('--base-model-json');del cli[anchor_index:anchor_index+2]
+                    parsed=parse(cli)
+                    self.assertEqual(parsed.seed,int(row[1]))
                 for seed in ('42','43','44'):
                     selected={r[0]:r for r in rows if r[1]==seed and r[0]!='preflight'}
                     if study=='inputs':
@@ -237,8 +387,59 @@ exec bash "$@"
                         self.assertTrue(all(selected[s][3]==selected['correction'][2] for s in ('true','mixed','corrected','corrected_mixed')))
                     else:
                         for variant in ('spatial','temporal','both','sudden'):
-                            self.assertEqual(selected[variant][3],selected['bank-'+variant][2])
+                            upstream='correction-'+variant if source.startswith('corrected') else 'bank-'+variant
+                            self.assertEqual(selected[variant][3],selected[upstream][2])
+                            fit=commands[selected[variant][2]]
+                            self.assertEqual(fit[fit.index('--curve-training-source')+1],source)
+                            if source.startswith('corrected'):
+                                correction=selected['correction-'+variant]
+                                self.assertEqual(correction[3],selected['bank-'+variant][2])
+                                self.assertIn(f'winning-inputs-corrected_mixed-s{seed}/model.json',' '.join(commands[correction[2]]))
+                                self.assertIn(f'losses-CM-correction-{variant}-s{seed}',' '.join(fit))
                         self.assertEqual(selected['combined_soft'][3],gate)
+                        for loss in ('combined_soft','combined_no_location'):
+                            fit=commands[selected[loss][2]]
+                            self.assertNotIn('--field-loss-variant',fit)
+                            self.assertIn(f'independence-261013-r1-bank-1i-s{seed}',' '.join(fit))
+                            if source.startswith('corrected'):
+                                self.assertIn(f'winning-inputs-correction-s{seed}',' '.join(fit))
+
+    def test_cm_preflight_routes_each_loss_through_selected_source(self):
+        preflight=runpy.run_path(str(Path(__file__).with_name('A0-HPC-Dual-preflight.py')))['main']
+        parse=runpy.run_path(str(Path(__file__).with_name('A0-HPC-Dual-test.py')))['parse_args']
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder); calls=[]
+            def runner(argv):
+                anchor_index=argv.index('--base-model-json');argv=argv[:anchor_index]+argv[anchor_index+2:]
+                args=parse(argv);calls.append(args)
+                dest=root/args.run_label;dest.mkdir();(dest/'results').mkdir()
+                (dest/'results/true_field_curves.npz').touch()
+                return SimpleNamespace(model_file=str(dest/'model.mdl'),results_dir=str(dest/'results'),data=None)
+            with mock.patch('sys.argv',['preflight','--base-model-json','unused','--run-label','gate',
+                                        '--followup-suite','losses','--loss-curve-source','corrected_mixed']), \
+                 mock.patch('runpy.run_path',return_value={'main':runner}), \
+                 mock.patch('resources.MLmetrics.postprocess_load_dual_run'), contextlib.redirect_stdout(io.StringIO()):
+                preflight()
+            self.assertEqual(len(calls),18)
+            for args in calls:
+                self.assertEqual((args.nsims,args.epochs,args.seed,args.split_seed),(64,1,42,42))
+                self.assertEqual(args.independence_case,'1i')
+            for variant in ('spatial','temporal','both','sudden'):
+                selected=[a for a in calls if a.field_loss_variant==variant]
+                self.assertEqual(len(selected),3)
+                bank,correction,fit=selected
+                self.assertTrue(bank.prepare_field_bank)
+                self.assertTrue(correction.prepare_correction_bank)
+                self.assertEqual(correction.field_bank,str(root/('gate-bank-'+variant)))
+                self.assertEqual(fit.correction_bank,str(root/('gate-correction-'+variant)))
+                self.assertEqual(fit.curve_training_source,'corrected_mixed')
+                self.assertEqual(fit.reference_curve_source,'corrected_mixed')
+                self.assertEqual(fit.loss,'mse')
+            for args in (a for a in calls if a.curve_loss_ablation):
+                self.assertEqual(args.field_bank,str(root/'gate-bank'))
+                self.assertEqual(args.correction_bank,str(root/'gate-input-correction'))
+                self.assertEqual(args.curve_training_source,'corrected_mixed')
+                self.assertEqual(Path(args.reference_model_json),root/'gate-input-corrected_mixed/model.json')
 
 
 if __name__=='__main__':

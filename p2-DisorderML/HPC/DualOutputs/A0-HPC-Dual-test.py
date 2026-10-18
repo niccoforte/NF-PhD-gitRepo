@@ -26,6 +26,8 @@ def parse_args(argv=None):
     parser.add_argument("--prepare-correction-bank", action="store_true")
     parser.add_argument("--correction-bank")
     parser.add_argument("--reference-model-json", help="Matching Case1(i) baseline for fixed-curve correction diagnostics.")
+    parser.add_argument("--reference-curve-source", choices=["predicted", "true", "mixed", "corrected", "corrected_mixed"],
+                        default="predicted", help="Explicit expected input-study policy of the frozen reference.")
     parser.add_argument("--corrector-d-model", type=int, default=96)
     parser.add_argument("--corrector-n-heads", type=int, default=4)
     parser.add_argument("--corrector-n-layers", type=int, default=2)
@@ -149,8 +151,6 @@ def parse_args(argv=None):
             parser.error("Follow-ups require the fully independent Case1(i).")
         if args.followup_study == "inputs" and (args.field_loss_variant or args.curve_loss_ablation):
             parser.error("Input study keeps MSE losses fixed.")
-        if args.followup_study == "losses" and (args.curve_training_source != "predicted" or args.prepare_correction_bank or args.correction_bank):
-            parser.error("Loss study keeps raw predicted-field inputs fixed.")
         if args.field_loss_variant == "weighted":
             parser.error("Localisation weighting is a separate later ablation.")
         if args.field_loss_variant and args.curve_loss_ablation:
@@ -159,13 +159,24 @@ def parse_args(argv=None):
             parser.error("Corrector creation requires a frozen field bank and reference baseline.")
         if args.prepare_correction_bank and (args.correction_bank or args.curve_training_source != "predicted"):
             parser.error("Corrector bank preparation must precede corrected-source curve fits.")
+        if args.prepare_field_bank and (args.prepare_correction_bank or args.correction_bank
+                or args.curve_training_source != "predicted" or args.curve_loss_ablation):
+            parser.error("Field-bank creation only changes the generator objective.")
+        if args.prepare_correction_bank and args.curve_loss_ablation:
+            parser.error("Corrector retains MSE; curve-loss changes require a frozen correction bank.")
+        if (args.followup_study == "losses" and args.reference_model_json
+                and not (args.prepare_field_bank or args.prepare_correction_bank)
+                and args.reference_curve_source != args.curve_training_source):
+            parser.error("Loss fits must use the same source policy as their frozen input-study reference.")
         if args.curve_training_source.startswith("corrected") and not args.correction_bank:
             parser.error("Corrected-source training requires --correction-bank.")
         if (args.corrector_n_heads < 1 or args.corrector_d_model < 1 or args.corrector_n_layers < 1
                 or args.corrector_d_model % args.corrector_n_heads):
             parser.error("Corrector width must divide by heads and layers must be positive.")
-    elif args.prepare_correction_bank or args.correction_bank or args.reference_model_json or args.curve_training_source != "predicted" or args.field_loss_variant == "sudden":
-        parser.error("Source/correction switches require --followup-study inputs.")
+    elif (args.prepare_correction_bank or args.correction_bank or args.reference_model_json
+            or args.reference_curve_source != "predicted" or args.curve_training_source != "predicted"
+            or args.field_loss_variant == "sudden"):
+        parser.error("Source/correction switches require --followup-study inputs|losses.")
     if args.curve_loss_ablation:
         if args.experiment not in ("baseline", "curve_true", "curve_predicted"):
             parser.error("Curve-loss ablations require baseline, curve_true or curve_predicted; isolate other changes.")

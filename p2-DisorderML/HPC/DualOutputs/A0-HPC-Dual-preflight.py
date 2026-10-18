@@ -15,9 +15,13 @@ def main():
     parser.add_argument("--sudden-suite", action="store_true", help="Gate baseline and specimen-specific sudden weighting only.")
     parser.add_argument("--independence-suite", action="store_true", help="Gate two OOF field banks and all eight sharing cases.")
     parser.add_argument("--followup-suite", choices=["inputs", "losses"], help="Case1(i) source/corrector or custom-loss gate.")
+    parser.add_argument("--loss-curve-source", choices=["predicted", "true", "mixed", "corrected", "corrected_mixed"],
+                        default="predicted", help="Exercise the explicitly selected input policy under every loss.")
     args = parser.parse_args()
     if sum((args.sudden_suite, args.curve_loss_suite, args.independence_suite, bool(args.followup_suite))) > 1:
         parser.error("Choose one isolated suite.")
+    if args.loss_curve_source != "predicted" and args.followup_suite != "losses":
+        parser.error("--loss-curve-source requires --followup-suite losses.")
     runner = runpy.run_path(str(Path(__file__).with_name("A0-HPC-Dual-test.py")))["main"]
     if args.followup_suite:
         common = ["--experiment", "baseline", "--base-model-json", args.base_model_json,
@@ -38,8 +42,8 @@ def main():
             import torch
             torch.cuda.empty_cache()
             return str(path)
-        bank = fit("bank", ["--prepare-field-bank"])
-        baseline = fit("predicted", ["--field-bank", bank])
+        bank = fit("bank", ["--prepare-field-bank", "--followup-study", "inputs"])
+        baseline = fit("predicted", ["--field-bank", bank, "--followup-study", "inputs"])
         if args.followup_suite == "inputs":
             correction = fit("correction", ["--field-bank", bank, "--prepare-correction-bank",
                                              "--reference-model-json", baseline + "/model.json"])
@@ -47,12 +51,29 @@ def main():
                 fit(source, ["--field-bank", bank, "--curve-training-source", source,
                              "--correction-bank", correction])
         else:
+            source = args.loss_curve_source
+            correction_options = []
+            if source.startswith("corrected"):
+                correction = fit("input-correction", ["--field-bank", bank, "--prepare-correction-bank",
+                    "--reference-model-json", baseline + "/model.json", "--followup-study", "inputs"])
+                correction_options = ["--correction-bank", correction]
+            if source != "predicted":
+                baseline = fit("input-" + source, ["--field-bank", bank, "--curve-training-source", source,
+                    "--followup-study", "inputs"] + correction_options)
+            reference = ["--reference-model-json", baseline + "/model.json", "--reference-curve-source", source]
+            source_options = ["--curve-training-source", source]
             for variant in ("spatial", "temporal", "both", "sudden"):
                 custom = ["--field-loss-variant", variant]
                 loss_bank = fit("bank-" + variant, ["--prepare-field-bank"] + custom)
-                fit(variant, ["--field-bank", loss_bank, "--reference-model-json", baseline + "/model.json"] + custom)
+                new_correction = []
+                if source.startswith("corrected"):
+                    corrected = fit("correction-" + variant, ["--field-bank", loss_bank,
+                        "--prepare-correction-bank"] + custom + reference)
+                    new_correction = ["--correction-bank", corrected]
+                fit(variant, ["--field-bank", loss_bank] + custom + reference + source_options + new_correction)
             for loss in ("combined_no_location", "combined_soft"):
-                fit(loss, ["--field-bank", bank, "--curve-loss-ablation", loss])
+                fit(loss, ["--field-bank", bank, "--curve-loss-ablation", loss]
+                    + reference + source_options + correction_options)
         print("Case1(i) follow-up GPU/data/save/reload gate passed.", flush=True)
         return
     if args.independence_suite:

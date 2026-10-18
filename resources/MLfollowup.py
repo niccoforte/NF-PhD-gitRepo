@@ -85,15 +85,52 @@ def save_curve_probe(model, path, prefix):
     model.predictions = {}
 
 
-def reference_model(model, args, bank_hash=None):
+def reference_model(model, args, bank_hash=None, metadata=None):
     from resources.MLmetrics import postprocess_load_dual_run
     descriptor = json.loads(Path(args.reference_model_json).read_text())
     meta = descriptor["metadata"]
-    if (meta.get("case") != "1ip" or meta["run_config"]["seed"] != args.seed
-            or (bank_hash is not None and meta.get("field_bank_sha256") != bank_hash)):
-        raise ValueError("Reference must be the matching seeded Case1(i) baseline.")
-    return postprocess_load_dual_run(Path(args.reference_model_json).parent,
+    config = meta.get("run_config", {})
+    source = getattr(args, "reference_curve_source", "predicted")
+    if (meta.get("case") != "1ip" or config.get("seed") != args.seed
+            or meta.get("curve_training_source", config.get("curve_training_source", "predicted")) != source
+            or config.get("followup_study") not in (None, "inputs")
+            or config.get("field_loss_variant") or config.get("curve_loss_ablation") not in (None, "mse")):
+        raise ValueError("Reference must be the matching seeded Case1(i) input-policy baseline.")
+    current = _json_safe(model.model.get_config())
+    expected = descriptor["model_config"]
+    # The winner may compose a corrector with the same fixed-capacity generator.
+    if (descriptor["data"] != _json_safe(model.data.to_metadata())
+            or expected["curve_model"] != current["curve_model"]
+            or expected["field_model"].get("base_stage", expected["field_model"]) !=
+               current["field_model"].get("base_stage", current["field_model"])):
+        raise ValueError("Reference data/splits/scalers or model configuration mismatch.")
+    correction = expected["field_model"].get("correction_stage")
+    if (bool(correction) != source.startswith("corrected") or (correction and any(
+            correction[k] != getattr(args, "corrector_" + k) for k in ("d_model", "n_heads", "n_layers")))):
+        raise ValueError("Reference correction configuration does not match the selected source policy.")
+    if bank_hash is None:
+        bank_hash = hashlib.sha256((Path(args.field_bank)/"field_bank.npz").read_bytes()).hexdigest()
+    changed_generator = (getattr(args, "followup_study", None) == "losses"
+        and args.field_loss_variant in ("spatial", "temporal", "both", "sudden")
+        and getattr(args, "curve_loss_ablation", None) in (None, "mse"))
+    if not meta.get("field_bank_sha256") or (meta["field_bank_sha256"] != bank_hash and not changed_generator):
+        raise ValueError("Reference field-bank hash mismatch outside a changed-generator loss comparison.")
+    if metadata is not None:
+        metadata.update(reference_model_json=str(args.reference_model_json),
+            reference_model_json_sha256=hashlib.sha256(Path(args.reference_model_json).read_bytes()).hexdigest(),
+            reference_checkpoint_sha256=hashlib.sha256(Path(args.reference_model_json).with_suffix(".mdl").read_bytes()).hexdigest(),
+            reference_field_bank_sha256=meta["field_bank_sha256"],
+            changed_generator_reference=meta["field_bank_sha256"] != bank_hash,
+            reference_curve_source=source)
+    reference = postprocess_load_dual_run(Path(args.reference_model_json).parent,
         load_model=True, data=model.data, device=model.device)[3]
+    if (getattr(args, "followup_study", None) == "losses" and getattr(args, "curve_loss_ablation", None)
+            and source.startswith("corrected")):
+        actual = model.model.field_model.state_dict()
+        frozen = reference.model.field_model.state_dict()
+        if actual.keys() != frozen.keys() or any(not torch.equal(actual[k], frozen[k]) for k in actual):
+            raise ValueError("Curve-loss comparison must reuse the winning frozen correction pipeline.")
+    return reference
 
 
 def prepare_correction_bank(model, args, path, metadata):
@@ -105,6 +142,11 @@ def prepare_correction_bank(model, args, path, metadata):
     """
     data, net = model.data, model.model
     cached, manifest = load_bank(net, data, args, args.field_bank)
+    raw_hash = hashlib.sha256((Path(args.field_bank)/"field_bank.npz").read_bytes()).hexdigest()
+    metadata.update(field_bank=str(args.field_bank), field_bank_sha256=raw_hash)
+    reference = reference_model(model, args, raw_hash, metadata)
+    reference_curve = copy.deepcopy(reference.model.curve_model.state_dict())
+    del reference
     # Fold generators start from the same seeded initialization as Case 1(i).
     with torch.random.fork_rng():
         torch.manual_seed(args.seed)
@@ -130,7 +172,8 @@ def prepare_correction_bank(model, args, path, metadata):
         inner_dir = Path(path)/"nested"/str(fold["fold"])
         inner_dir.mkdir(parents=True, exist_ok=True)
         inner = DUAL_MODEL(copy.deepcopy(initial), DualLoss(), data=folded, device=model.device)
-        prepare_bank(inner, "1i", args, inner_dir, dict(metadata, nested_outer_fold=fold))
+        prepare_bank(inner, "1i", args, inner_dir, dict(metadata, nested_outer_fold=fold),
+                     loss_factory=(lambda d: field_objective(d, args)) if args.field_loss_variant else None)
         with np.load(inner_dir/"field_bank.npz", allow_pickle=False) as arrays:
             inputs = {s: {m: arrays[f"{s}_{m}"] for m in ("UT", "FT")} for s in ("train", "val")}
         correction, _, _ = _fit_corrector(inner.model, folded, inputs, args,
@@ -149,19 +192,24 @@ def prepare_correction_bank(model, args, path, metadata):
             torch.cuda.empty_cache()
     correction, reports, histories = _fit_corrector(net, data, cached, args, Path(path)/"corrector", metadata)
     val = corrected_predictions(correction, data, cached["val"], "val", args)
-    raw_hash = hashlib.sha256((Path(args.field_bank)/"field_bank.npz").read_bytes()).hexdigest()
-    reference = reference_model(model, args, raw_hash)
-    net.curve_model.load_state_dict(reference.model.curve_model.state_dict())
+    net.curve_model.load_state_dict(reference_curve)
     net.field_model = FieldCorrectionStage(correction.field_model.correction, net.field_model).to(model.device)
+    # The generator objective is provenance, not the objective used to fit its refiner.
+    model.lossf = DualLoss().to(model.device)
     model.history, model.best_epoch, model.best_loss = histories, None, None
     np.savez(Path(path)/"correction_bank.npz", **{f"{s}_{m}": a for s, values in
              (("train", train), ("val", val)) for m, a in values.items()})
     provenance = dict(kind="nested-field-correction-bank", version=1,
         data_fingerprint=fingerprint(data), sample_ids=data.sample_ids,
         raw_bank_sha256=raw_hash,
+        generator_loss_variant=manifest.get("field_loss_variant"),
+        generator_loss_parameters=manifest.get("loss_parameters"), corrector_loss="mse",
+        reference_curve_source=getattr(args, "reference_curve_source", "predicted"),
+        reference_model_json=str(args.reference_model_json),
+        reference_field_bank_sha256=metadata["reference_field_bank_sha256"],
         seed=args.seed, folds=nested, refiner=dict(d_model=args.corrector_d_model,
             n_heads=args.corrector_n_heads, n_layers=args.corrector_n_layers),
-        note="Nested OOF outer TRAIN only; frozen original curve readout in standard results.")
+        note="Nested OOF outer TRAIN only; fold-local generator objective; frozen input-policy curve readout.")
     (Path(path)/"correction_bank.json").write_text(json.dumps(_json_safe(provenance), indent=2))
     metadata.update(group_selection=reports, correction=provenance,
                     source_policy="corrected predicted fields; frozen Case1(i) curve readout")
@@ -182,6 +230,9 @@ def train_followup(model, args, path, metadata):
             raise ValueError("Correction bank IDs/scales/seed mismatch.")
         if provenance["raw_bank_sha256"] != hashlib.sha256((Path(args.field_bank)/"field_bank.npz").read_bytes()).hexdigest():
             raise ValueError("Correction bank belongs to another field generator.")
+        metadata.update(correction_bank=str(bank),
+            correction_bank_sha256=hashlib.sha256((bank/"correction_bank.npz").read_bytes()).hexdigest(),
+            correction_checkpoint_sha256=hashlib.sha256((bank/"model.mdl").read_bytes()).hexdigest())
         with np.load(bank/"correction_bank.npz", allow_pickle=False) as a:
             corrected = {s: {m: a[f"{s}_{m}"] for m in ("UT", "FT")} for s in ("train", "val")}
         for s, values in corrected.items():
@@ -202,7 +253,7 @@ def train_followup(model, args, path, metadata):
     if args.reference_model_json:
         # A fixed original curve readout separates field improvement from the
         # benefit of retraining a downstream curve model on a new field source.
-        reference = reference_model(model, args)
+        reference = reference_model(model, args, metadata=metadata)
         original_curve = copy.deepcopy(net.curve_model.state_dict())
         net.curve_model.load_state_dict(reference.model.curve_model.state_dict())
         del reference

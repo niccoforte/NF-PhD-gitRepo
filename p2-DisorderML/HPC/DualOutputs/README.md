@@ -11,7 +11,7 @@ Package the six NPZ/original-INP pairs and an existing Case1(i) DATA descriptor:
 `--prepare --samples-root PATH --inp-root PATH --consumer-data MODEL_DATA_JSON
 --output-dir NEW_DIRECTORY`. This verifies original INP fingerprints, copies only
 the explicit files and writes a manifest with thirteen file hashes. No ODB is
-copied. Use the C: audit samples, not an assumed Z: copy. Keep the pinned bundle
+copied. Use the hash-verified canonical Z: audit samples. Keep the pinned bundle
 under `Z:/p2/diagnostics/damage-contract-261016/fixtures/`; transfer only its named
 files to the home-side check directory and verify their hashes on HPC.
 
@@ -44,7 +44,8 @@ Locked test is untouched. There is no architecture HPO or change to legacy defau
 ```bash
 # Preview only. Run inputs first; explicit --submit queues through B1.
 bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-inputs-NEW inputs
-bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-losses-NEW losses
+LOSS_CURVE_SOURCE=corrected_mixed INPUT_SUITE=independent-inputs-261015 \
+  bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-losses-NEW losses
 ```
 
 Every full job requests240h/1GPU/12CPU/90000MB. Each study has one disposable8h
@@ -76,8 +77,8 @@ The true-trained curve fit is also evaluated on held-out TRUE fields, saved in
 `results/true_field_curves.npz` and per-task sample metric CSVs. This same-checkpoint
 diagnostic measures source mismatch; selection remains predicted-field validation,
 so it is not a separately true-validation-selected oracle. The preflight verifies
-that this export exists. The custom-loss study is prepared but on hold until the
-user reviews the input study; do not submit both together.
+that this export exists. The input study completed successfully and its saved
+validation results were reviewed before preparing the selected-policy loss study.
 
 Each seed first fits a correction bank. The two independent residual Transformers
 have width96/4heads/2layers, FF4, GELU, sinusoidal positions and dropout.05; output
@@ -107,16 +108,38 @@ deployment source. `correction_bank.json/npz` is a versioned, fingerprinted cach
 the checkpoint includes base+correction field stages and loads via the existing
 dual review loader. All specimen, scale, mask and bank provenance checks apply.
 
-### Custom-loss study — wait for the input-policy winner
+### Selected-policy custom-loss study
 
-Select the best deployable input-study policy first and hold that policy fixed
-across the loss comparisons. This includes true-only/mixed curve training or a
-field corrector if selected; deployment still uses predicted or corrected fields,
-never unavailable true fields. The current `losses` launcher is a raw-P draft
-(30 full jobs plus gate), NOT ready for winner-policy submission unchanged.
-Reconcile its inputs, reference checkpoints, gate and job count after selection.
-A changed field generator needs newly fitted training-only correction banks if
-correction wins; do not blindly reuse its old corrector on a new error distribution.
+The18 October review of793 validation specimens/three seeds selects
+`corrected_mixed`: mean fixed four-output physical-MSE/baseline-MSE score0.743791,
+versus0.756978 for predicted-only. Paired mean RMSE changes are UTfield−0.57%,
+FTfield−1.95%, UTcurve−0.63%, FTcurve−0.68%. These are modest validation gains,
+not proof of statistical superiority or resolved fracture paths. Mixed raw/true
+training is cheaper and slightly better for the UT curve alone. True-trained
+curves on true validation fields remain a separate diagnostic, never deployment.
+See canonical `samples/field-input-study/README.md` and its `selection.json`.
+
+Explicitly set `LOSS_CURVE_SOURCE=corrected_mixed` and
+`INPUT_SUITE=independent-inputs-261015` for the selected run. The existing raw-P
+default remains available for controls; it is not the selected next-study setup.
+The selected suite has42 full jobs plus one disposable8h gate:
+
+| Production work | Jobs | Dependency/source |
+| --- | ---: | --- |
+| Custom-loss OOF field banks |12| Four losses × three seeds; after gate |
+| Newly nested-cross-fitted correctors |12| After their matching changed generator |
+| Adapted MSE curve fits |12| Matching new corrector;50/50 corrected/true training |
+| Combined curve loss, location off/on |6| Original frozen winning field/correction pipeline |
+
+Nested generator fits inherit the same custom field loss and fold-local scales as
+their parent bank; corrector training retains MSE, isolating the generator loss.
+Correction manifests bind to the actual new generator bank. Frozen reference
+curve readouts come from the same-seed winning input-policy model. A bank-hash
+difference is allowed only for explicitly changed-generator field-loss comparisons;
+seed/data/scaler/model/policy checks remain strict and run before costly fitting.
+For curve-loss comparisons, original generator/corrector state equality is checked.
+The64-sample/one-epoch GPU gate exercises all selected source/loss/correction paths,
+diagnostics and reload, not full-population split validation or accuracy.
 
 Reuse normalized masked-MSE field and MSE-curve controls under that policy. Test field changes
 separately, with independently retrained OOF banks and final generators:
@@ -156,7 +179,8 @@ Report hard peak height/location, work, field motion/local errors, mean-relative
 RMSE skill, seed variation and log-scale histories. No improvement is assumed.
 Gaussian/frame, fixed FT-region, residual and graph changes remain later isolated
 tests. Carry forward the winning input policy, then vary losses alone so their
-effects remain distinguishable. No loss jobs are authorised before this review.
+effects remain distinguishable. Submission is explicitly authorised by the
+researcher after the completed input review; submission evidence lives in PROJECT_STATUS.
 
 ## Preflight retention
 

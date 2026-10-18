@@ -64,44 +64,38 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   Other lattices, new FEA and ML architecture/training integration remain outside
   this completed data-processing task.
 
-- Case1(i) is selected for the next two studies. Input variation is prepared first:
-  five source policies (predicted, true, 50/50 mixture, corrected, corrected/true
-  mixture), every deployment path using predicted fields. Three nested correction
-  banks/four new curve fits per seed give15 full jobs; existing predicted controls
-  are reused. Custom-loss raw-P draft comprises30 full jobs: spatial/temporal/both/sudden
-  banks and adapted curves, plus combined-curve fits without location and with
-  soft/soft peak location per seed. Original
-  fixed curve readouts and source substitutions diagnose adaptation separately.
-  Both use the existing trainer/runner, matched splits/seeds42/43/44, max450 epochs,
-  early-stop52, disposable8h preflights and240h full resource requests. Preview-first
-  `HPC/DualOutputs/B4_Independent-followups.sh`. Input suite
-  `independent-inputs-261015` submitted from c0ab41a: gate31869463 and15 production
-  jobs31869464–31869478. Fresh16 October check: gate COMPLETED0:0; correction-bank
-  jobs31869464/31869469/31869474 RUNNING, twelve curve fits dependency-held.
-  Full resources verified240h/1GPU/12CPU/90000MB. Home manifest:
-  `/data/home/exy053/p2/MULTI/Dual/Transformer/independent-inputs-261015/jobs.tsv`.
-  Custom-loss submission ON HOLD: first select the input-policy winner, then
-  integrate it into the loss launcher/reference/gate and re-evaluate job counts.
-  Do not assume raw P; changed generators require new corrector fits if selected.
-  Current coefficients are fixed starting presets, not HPO-selected optima.
-  True-trained curves
-  also export held-out true-field evaluations; the gate now checks that artifact.
-  **HIGH PRIORITY manual task:** researcher personally reviews HPC home, scratch
-  and archive ordering/names/conventions; recorded under Cleanup in the active
-  accuracy checklist. This manual review is not marked completed by agent checks.
-  Eight CPU follow-up tests pass, including platform-specific notebook paths,
-  true-trained/true-field export agreement, complete nested-source fits,
-  frozen-generator equality, saved correction reload, loss serialization and
-  mocked15/30-job dependencies. Eight prior independence,14 field-loss and10 sudden
-  tests pass. Current path/evaluation change: changed-surface13 and contract80
-  checks non-failing/zero failed.
-  The broader31-test dual suite has one skipped
-  test and one Windows SQLite temporary-file cleanup error in the unchanged HPO
-  test (its training/resume assertions pass); no HPO implementation changed.
-  Windows raw runs have been relocated by the researcher to `Z:/p2`; the three
-  dual/HPO notebook configurations and operational guidance now use that root.
-  The fresh Outputs build/train/save/HPO-call regression passes. General visual
-  report guidance is in root AGENTS/README; existing reports stay in ignored samples.
+- Input suite `independent-inputs-261015`, source c0ab41a, gate31869463 and all15
+  production jobs31869464–31869478 completed0:0 (verified18 October).
+  All1,167 archived files/30,093,577,858 bytes are downloaded to `Z:/p2/` and
+  SHA256-verified. The new maintained `code/review_field_inputs.py` verifies18
+  validation evaluations, identical IDs/scalers/masks/truths, recomputed physical
+  RMSE, frozen-source equality and nested TRAIN-only folds. Human report:
+  `samples/field-input-study/README.md`; selection/transfer receipts are alongside.
+  Corrected+true50/50 curve training wins the fixed equal four-output physical
+  MSE/baseline-MSE comparison: .743790700 versus P .756978430 and mixed .751883740.
+  Mean RMSE changes versus same-seed P: UTfield−.57%, FTfield−1.95%, UTcurve−.63%,
+  FTcurve−.68%. Mean training-mean-relative skill is6.64/25.68/5.15/19.29% in that
+  order. Gains are modest; mixed without correction slightly wins UT curves alone.
+  True-trained/true-input curves give50.69% UT and43.53% FT skill, but that diagnostic
+  is not deployable; true-only training deploys poorly on predicted fields.
+  No locked-test targets were evaluated. Case1(i) independence remains unchanged.
+
+- Selected-policy loss suite `independent-losses-261018` is prepared for the
+  researcher-authorised submission:42 full jobs plus disposable8h GPU gate.
+  Explicit source `corrected_mixed`, input suite `independent-inputs-261015`.
+  Twelve custom generator banks feed12 NEW nested correction banks and12 adapted
+  MSE curve fits; six separate combined-curve fits reuse original frozen winning
+  generators/correctors. Nested generators inherit fold-local custom losses;
+  correctors retain MSE. Reference compatibility is checked before nested fitting,
+  with a bounded changed-generator hash exception and recorded source hashes.
+  All fits retain seeds42/43/44, split42, max450 epochs, stopping52 and full
+  240h/1GPU/12CPU/90000MB requests. Coefficients remain fixed starting presets.
+  The64-sample/one-epoch gate does not exercise full-population split validation.
+  Twelve follow-up, eight independence,14 field-loss,10 sudden and three report
+  tests pass; changed-surface16 and contract87 checks are non-failing/zero failed.
+  Live GPU execution for this new route remains to be checked after submission.
+  **HIGH PRIORITY manual task:** researcher personally reviews remote home,
+  scratch and archive ordering/conventions; automated checks do not complete it.
 
 - Independence review: gate31448215 and all30 production jobs31448216–31448245
   COMPLETED0:0. All24 case fits/six banks downloaded to ignored
@@ -151,8 +145,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - The researcher requests damage handback to the current Windows **Improve ML
   Accuracy** chat for HPC tests. `handoffs/HANDOFF-DAMAGE.md` is the reconciled
-  source-attributed transfer. Preserve input-study priority and the custom-loss
-  hold until its input-policy winner is selected. Bounded cluster contract/data
+  source-attributed transfer. The input-policy winner now governs the custom-loss
+  study above. Bounded cluster contract/data
   alignment checks can proceed first; any damage-training ablation requires a
   sufficient explicit label corpus and a separately agreed model/loss plan.
   No damage DATA/MODEL loader/head exists; the six selected fixtures include

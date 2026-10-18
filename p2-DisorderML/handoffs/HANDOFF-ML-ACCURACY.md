@@ -28,14 +28,14 @@ the cluster environment. No damage head, loss, training corpus or bulk extractio
 is authorised. These six files are five unique task responses from three designs.
 Do not join numeric397/747 to saved predictions without original-geometry/source
 and permitted-split proof. Leave the locked test untouched. Consumer-layout replay
-is distinct from DATA/MODEL damage integration. Preserve the running input study,
-its immutable sources and custom-loss hold; later supervised work needs an explicit
+is distinct from DATA/MODEL damage integration. Preserve completed input-study
+evidence and its immutable sources; later damage-supervised work needs an explicit
 coverage/model/loss decision and the selected input policy.
-The bounded B1 check31976809 is submitted (source aa1d2e0), currently pending
-resources. Do not duplicate it. Retrieve its home result on completion, then
+The bounded B1 check31976809 completed0:0 on16 October (source aa1d2e0), with
+all six fixtures passing CUDA layout/reload checks. Do not duplicate it. Preserve its home result, then
 prioritise exact-target removal of its temporary fixture/source copies once no
 active consumer needs them. Review `../samples/damage-hpc-contract/README.md`;
-CPU replay is passed, GPU evidence is not yet available.
+CPU replay passed; the successful home log now contains GPU evidence.
 
 The user selected Case1(i) for the next source and custom-loss studies. Prepare
 the input study first, with predicted/true/mixed and corrected/mixed-corrected
@@ -43,17 +43,21 @@ training sources, then isolated spatial/temporal/both field and soft-peak curve
 loss comparisons. Reuse the completed baseline and its frozen banks. All
 deployment results use predicted fields; correctors require nested training-only
 cross-fitting for downstream corrected-field training. Keep this checklist active.
-Input suite `independent-inputs-261015` is submitted (see PROJECT_STATUS for IDs);
-do not resubmit it. Custom-loss submission is ON HOLD until
-after that study. Include held-out true-field evaluation of the true-trained
-curve checkpoint as well as predicted-field deployment. Windows runs now live in
+Input suite `independent-inputs-261015` completed; do not resubmit it.
+Its18 October report selects `corrected_mixed` by fixed four-output validation
+MSE ratio (.7437907 versus P .7569784). All1,167 files are SHA256-verified locally;
+see `../samples/field-input-study/README.md` for modest per-output gains and the
+true-field diagnostic. The researcher now authorises the selected-policy loss
+study; its adapted42-job route adds newly cross-fitted correctors for changed
+generators, and keeps corrector MSE fixed. Windows runs now live in
 `Z:/p2` (user relocation), never checkout `data/`; generated reports belong only
 in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`, not Documents/OneDrive copies.
 Use the selected deployable input policy for the loss study, not automatically
-raw predicted-only training. The current30-job loss launcher is a raw-P draft;
-integrate the winner and recheck reference weights, preflight and job counts
-before submission. If a corrector wins, refit it for changed field generators
-using nested TRAIN-only inputs. True-field oracle evaluation cannot supply
+raw predicted-only training. Set `LOSS_CURVE_SOURCE=corrected_mixed` and
+`INPUT_SUITE=independent-inputs-261015`; raw-P defaults remain controls only.
+The selected route has12 field banks→12 new nested correction banks→12 adapted
+curve fits, plus6 frozen-pipeline curve-loss fits. Check the disposable gate and
+record submission/status in PROJECT_STATUS. True-field oracle evaluation cannot supply
 unavailable deployment inputs. Loss coefficients remain provisional fixed presets,
 not established optima; the run README records their exact values and provenance.
 

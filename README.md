@@ -39,9 +39,12 @@ The root `requirements.txt` is set up for a standard local Python environment, i
 
 The independent-model accuracy follow-ups are documented in
 [the p2 run guide](p2-DisorderML/HPC/DualOutputs/README.md#case-1i-input-and-custom-loss-studies).
-They compare field-input sources (including residual correction) on Case1(i).
-The custom-loss follow-up remains on hold until its launcher is adapted to the
-winning input policy; both routes preview without submitting.
+The completed Case1(i) input comparison selects corrected fields plus50/50
+corrected/true curve training for the next study, not true fields at deployment.
+The [visual report](p2-DisorderML/samples/field-input-study/README.md) is available
+only in the Z: checkout. Rebuild it with maintained `code/review_field_inputs.py`
+using an explicit canonical samples output directory. The adapted custom-loss
+route uses42 full jobs plus a disposable gate; both launchers preview first.
 
 Repository guidance is tracked with the code so a fresh checkout carries the same working agreements:
 
