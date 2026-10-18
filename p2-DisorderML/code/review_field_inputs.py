@@ -271,6 +271,34 @@ def galleries(root, suite, control, winner, out):
     fig.tight_layout(); fig.savefig(out / "curve-diversity.png", dpi=170); plt.close(fig)
 
 
+def followup_section(out):
+    """Include the submitted study when its local scheduler receipt is present."""
+    manifest = out / "loss-study-jobs.tsv"
+    if not manifest.exists():
+        return []
+    jobs = pd.read_csv(manifest, sep="\t")
+    gate = jobs[jobs.role == "preflight"].iloc[0]
+    full = jobs[jobs.role != "preflight"]
+    lines = ["## Submitted custom-loss study", "",
+             f"Suite **independent-losses-261018**: gate **{gate.job_id}**, then **{len(full)} full jobs ({full.job_id.min()}–{full.job_id.max()})**. Immutable training source: `{gate.source_revision}`.", "",
+             "Each full job requests **240 hours, one GPU, 12 CPUs and 90,000 MB RAM**. Seeds 42/43/44 retain the selected corrected+true policy. Dependencies require successful upstream completion; submitted is not the same as completed.", "",
+             "| Comparison | Generator loss change | Full jobs across three seeds |",
+             "|---|---|---:|",
+             "| Spatial | MSE + 0.1 signed neighbour-motion loss | 9 |",
+             "| Temporal | MSE + 0.1 adjacent-frame increment loss | 9 |",
+             "| Both | MSE + 0.1 spatial + 0.1 temporal | 9 |",
+             "| Sudden motion | Capped specimen/node/frame weighting, gain 1 | 9 |",
+             "| Curve combined | Frozen original fields/correctors; no peak location versus soft/soft location | 6 |", "",
+             "The nine jobs per field variant are three generator banks, three new nested correction banks and three adapted curve fits. Correctors retain MSE. Curve-loss fits reuse the same original winning frozen field pipeline; the existing MSE winner is their control. Combined curve coefficients are MSE 1, zone 0.5, derivative 0.05, peak height 0.25 and work 0.1; peak-location coefficient is 0 versus 0.02 with soft-peak sharpness 20. These are starting ablation settings, not HPO-selected values.", "",
+             "Sudden-motion weights combine changes in a node's displacement increments with unusual local neighbour motion after removing a fitted affine contribution. They are capped and normalized per specimen, not based on displacement magnitude or a prescribed fracture region. They weight training errors only: no true fields or target-derived weights are required at inference. Spatial/temporal differences are formed in physical displacement units with fixed train-fitted normalization; adjacent recorded-frame increments are not velocities.", "",
+             "[Exact jobs, dependencies and source](loss-study-jobs.tsv). Home: `/data/home/exy053/p2/MULTI/Dual/Transformer/independent-losses-261018/`. Successful full-run archives: `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/independent-losses-261018-<role>-s<seed>/`. The disposable preflight is not archived.", ""]
+    receipt = out / "loss-study-status.json"
+    if receipt.exists():
+        state = json.loads(receipt.read_text(encoding="utf-8"))
+        lines += [f"Last verified **{state['checked_at']}**: {state['summary']}", ""]
+    return lines
+
+
 def review(root, suite, control, out):
     out.mkdir(parents=True, exist_ok=True)
     rows, extra, checks, sources = collect(root, suite, control)
@@ -288,9 +316,10 @@ def review(root, suite, control, out):
     selected = rows.query("policy == @winner").copy()
     selected["relative_change"] = [100 * (r.rmse / baseline.loc[(r.seed, r.kind, r.mode)] - 1) for r in selected.itertuples()]
     changes = selected.groupby(["kind", "mode"]).relative_change.mean()
+    true_skills = extra.query("policy == 'true' and metric == 'true_field_curve_skill'").groupby("mode").value.mean()
     text = ["# Field-input study: completed validation comparison", "",
-            f"**Selected next-study pipeline: {LABELS[winner]}.** It has the lowest fixed four-output score ({decision['score']:.6f}) across seeds42/43/44.", "",
-            "Case1(i) remains four independently trained UT/FT field/curve models. The selected correction option adds independently trained residual field refiners; it does not restore joint UT/FT training.", "",
+            f"**Selected next-study pipeline: {LABELS[winner]}.** It has the lowest fixed four-output score ({decision['score']:.6f}) across seeds 42/43/44.", "",
+            "Case 1(i) remains four independently trained UT/FT field/curve models. The selected correction option adds two independently trained residual field refiners; it does not restore joint UT/FT training.", "",
             "## Main result", "", "Skill = 100 × (1 − model RMSE / training-mean baseline RMSE). Higher is better; zero means the mean predictor. Entries are mean ± sample SD across three seeds, not confidence intervals.", "",
             "| Curve training source | UT field skill | FT field skill | UT curve skill | FT curve skill |",
             "|---|---:|---:|---:|---:|"]
@@ -299,32 +328,38 @@ def review(root, suite, control, out):
         text.append("| " + LABELS[policy] + " | " + " | ".join(f"{v['mean']:.2f} ± {v['std']:.2f}%" for v in values) + " |")
     text += ["", "![Accuracy overview](accuracy-overview.png)", "", "## What wins, and how much?", ""]
     text += [f"- {mode} {kind}: mean RMSE change **{changes.loc[(kind, mode)]:+.2f}%** versus its same-seed predicted-only control (negative is better)." for kind, mode in TASKS]
-    text += ["", "These are modest improvements, not a solution to fracture-path prediction. Predicted+true training without correction is a cheaper alternative and has slightly better mean UT curve accuracy here. The selected corrected+true pipeline improves the field-first four-output comparison; it is not best on every individual metric/seed.", "",
+    text += ["", "These are modest improvements, not a solution to fracture-path prediction. Predicted+true training without correction is a cheaper alternative and has slightly better mean UT curve accuracy here. Selection uses the existing equal four-output physical-MSE/baseline-MSE score, not a new field-first ranking; the winner is not best on every individual metric/seed.", "",
              "![Fixed selection score](selection-score.png)", "", "## What each experiment changes", "",
              "- **Predicted only:** original OOF predicted-field curve training, then final-generator predicted-field validation.",
              "- **True only:** curve training uses true fields, but the main evaluation still uses predicted fields. Poor deployment results measure source mismatch, not inability to learn curves from true fields.",
-             "- **Predicted + true:** each training specimen/update samples one complete source with probability0.5; validation uses predicted fields.",
+             "- **Predicted + true:** each training specimen/update samples one complete source with probability 0.5; validation uses predicted fields.",
              "- **Corrected only:** a residual Transformer corrects predicted fields; curves train on nested-OOF corrected fields and deploy on corrected predictions.",
              "- **Corrected + true:** the same corrector, with 50/50 corrected/true curve training. No true fields are available at deployment.", "",
              "The corrector is field-supervised and frozen during curve training. Its nested cross-fitting excludes each held-out training specimen from both upstream and corrector fitting. Reference curves held fixed after correction are saved as a separate diagnostic, not a fresh curve fit.", "",
              "## True fields versus deployment", "",
              "The green bars below bypass the field generator using true validation fields in the same checkpoint. They are diagnostic and are excluded from winner selection. Checkpoints were selected on predicted/corrected-field validation, not independently selected as true-field oracles.", "",
+             f"For the **true-only-trained** curve models, true-field evaluation gives **{true_skills['UT']:.2f}% UT and {true_skills['FT']:.2f}% FT RMSE skill** averaged across seeds, versus {summary.loc[('true', 'curve', 'UT'), 'mean']:.2f}% and {summary.loc[('true', 'curve', 'FT'), 'mean']:.2f}% when those same models receive predicted fields. This isolates a substantial source-distribution problem; it does not establish a deployable improvement.", "",
              "![True-field source substitution](true-versus-deployment.png)", "",
              "The UT deployment curve skill remains low, despite the winning overall score. The next plot shows whether across-specimen variation is recovered rather than merely the shared average curve shape; high global curve R² alone can conceal this collapse.", "",
              "![Curve diversity](curve-diversity.png)", "", "## Local-motion and curve safeguards", "",
              "Local jump error is normalized by target jump RMS on the same valid events, not by maximum displacement. Peak-location error uses the loading span; work error uses mean absolute true work. Kinematic jump events are not verified broken-strut labels. Full per-seed values, sign accuracy and eligible sample counts are in additional-metrics.csv; no new local acceptance threshold is silently imposed.", "",
              "![Local and peak errors](local-and-peak-errors.png)", "", "## Representative predictions", "",
-             "Seed42 is fixed, not selected for its score. Best/worst IDs are ranked by the selected pipeline's whole-field/full-curve RMSE; baseline and selected predictions use the same IDs. U2 field frames maximize the specimen's true adjacent-frame motion; this is not a confirmed fracture time. UT shows the full body; FT uses a 90–150 by65–125mm crack-tip window. Point plots avoid interpolation across cracks. Each baseline/selected pair uses common98th-percentile truth/prediction limits and common signed-error limits, calculated over the displayed region. Error has a separately labelled scale. Numerical metrics retain all valid values.", ""]
+             "Seed 42 is fixed, not selected for its score. Best/worst IDs are ranked by the selected pipeline's whole-field/full-curve RMSE; baseline and selected predictions use the same IDs. U2 field frames maximize the specimen's true adjacent-frame motion; this is not a confirmed fracture time. UT shows the full body; FT uses a 90–150 by 65–125 mm crack-tip window. Point plots avoid interpolation across cracks. Each baseline/selected pair uses common 98th-percentile truth/prediction limits and common signed-error limits, calculated over the displayed region. Error has a separately labelled scale. Numerical metrics retain all valid values.", ""]
     for mode in ("UT", "FT"):
         text += [f"### {mode}", "", f"![{mode} curve examples]({mode}-curve-examples.png)", ""]
         for rank in ("best", "worst"):
             for tag in ("baseline", "winner"):
                 text += [f"![{mode} {rank} {tag} field]({mode}-{rank}-{tag}-field.png)", ""]
     text += ["## Training and follow-up", "", "![Selected curve losses](winner-loss-history.png)", "",
-             "The correction-bank production jobs took approximately49–53hours per seed, including nested upstream fits; new curve fits took approximately3–8hours. These are training costs, not inference latency measurements. Correction adds field-refinement inference passes; latency was not benchmarked.", "",
+             "The correction-bank production jobs took approximately 49–53 hours per seed, including nested upstream fits; new curve fits took approximately 3–8 hours. These are training costs, not inference latency measurements. Correction adds field-refinement inference passes; latency was not benchmarked.", "",
              "The custom-loss comparison must preserve the selected source policy. Each changed field generator needs a newly cross-fitted corrector; the original corrector must not be reused on a different error distribution. Hold corrector MSE fixed while changing generator losses. Curve-loss comparisons instead reuse the same baseline field/correction pipeline. Loss coefficients remain controlled starting presets, not optimized optima.", "",
-             "## Verification and limits", "", "All18 saved validation evaluations (five candidates plus frozen-readout correction, three seeds) are checked for identical specimen IDs/order, training-fitted scalers, masks, truths, baseline denominators and recomputed physical RMSE. Raw/corrected fields remain identical across corresponding curve-source fits. validation.txt records these checks; selection.json records the rule and all source runs.", "",
-             "The split is7,137train /793validation /881locked test. No locked-test targets, inference, new training, FEA or ODB exports are used by this review. Selection on these same validation results is exploratory; three seeds are not a final generalization guarantee. Raw archives are under " + f"`{root}`.", ""]
+             *followup_section(out),
+             "## Verification and limits", "", "All 18 saved validation evaluations (five candidates plus frozen-readout correction, three seeds) are checked for identical specimen IDs/order, training-fitted scalers, masks, truths, baseline denominators and recomputed physical RMSE. Raw/corrected fields remain identical across corresponding curve-source fits. [Validation checks](validation.txt) and [selection receipt](selection.json) record the rule and source runs.", "",
+             "The split is 7,137 train / 793 validation / 881 locked test. No locked-test targets, inference, new training, FEA or ODB exports are used by this review. Selection on these same validation results is exploratory; three seeds are not a final generalization guarantee. Raw archives are under " + f"`{root}`.", ""]
+    receipt = out / "transfer-verification.json"
+    if receipt.exists():
+        transfer = json.loads(receipt.read_text(encoding="utf-8"))
+        text += [f"Download receipt: **{transfer['verified_files']:,} files, {transfer['bytes']:,} bytes, {transfer['hash_mismatches']} SHA256 mismatches**. See the [transfer receipt](transfer-verification.json).", ""]
     (out / "README.md").write_text("\n".join(text), encoding="utf-8")
     print(json.dumps({"winner": winner, "score": decision["score"], "report": str(out / "README.md")}), flush=True)
     return decision

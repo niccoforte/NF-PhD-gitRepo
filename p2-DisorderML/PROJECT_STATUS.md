@@ -80,8 +80,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   is not deployable; true-only training deploys poorly on predicted fields.
   No locked-test targets were evaluated. Case1(i) independence remains unchanged.
 
-- Selected-policy loss suite `independent-losses-261018` is prepared for the
-  researcher-authorised submission:42 full jobs plus disposable8h GPU gate.
+- Selected-policy loss suite `independent-losses-261018` was submitted18 October
+  from immutable source92d844f: gate32471749, then42 full jobs32471750–32471791.
   Explicit source `corrected_mixed`, input suite `independent-inputs-261015`.
   Twelve custom generator banks feed12 NEW nested correction banks and12 adapted
   MSE curve fits; six separate combined-curve fits reuse original frozen winning
@@ -91,9 +91,14 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   All fits retain seeds42/43/44, split42, max450 epochs, stopping52 and full
   240h/1GPU/12CPU/90000MB requests. Coefficients remain fixed starting presets.
   The64-sample/one-epoch gate does not exercise full-population split validation.
-  Twelve follow-up, eight independence,14 field-loss,10 sudden and three report
+  Twelve follow-up, eight independence,14 field-loss,10 sudden and four report
   tests pass; changed-surface16 and contract87 checks are non-failing/zero failed.
-  Live GPU execution for this new route remains to be checked after submission.
+  Gate completed0:0 in15m33s on an A100; all18 small fit/save/reload routes passed.
+  Its scratch was removed; no preflight archive exists. At20:32 BST all42 full jobs
+  are queued:18 gate dependencies satisfied,24 await upstream banks. No new accuracy
+  results exist yet. All43 resource/account/partition requests and all42 dependency edges
+  were verified. Manifest: home suite `jobs.tsv` and report `loss-study-jobs.tsv`.
+  Production progress needs a later live check; do not duplicate these submissions.
   **HIGH PRIORITY manual task:** researcher personally reviews remote home,
   scratch and archive ordering/conventions; automated checks do not complete it.
 

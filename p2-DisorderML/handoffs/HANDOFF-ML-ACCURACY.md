@@ -56,8 +56,10 @@ Use the selected deployable input policy for the loss study, not automatically
 raw predicted-only training. Set `LOSS_CURVE_SOURCE=corrected_mixed` and
 `INPUT_SUITE=independent-inputs-261015`; raw-P defaults remain controls only.
 The selected route has12 field banks→12 new nested correction banks→12 adapted
-curve fits, plus6 frozen-pipeline curve-loss fits. Check the disposable gate and
-record submission/status in PROJECT_STATUS. True-field oracle evaluation cannot supply
+curve fits, plus6 frozen-pipeline curve-loss fits. Suite `independent-losses-261018`
+was submitted18 October from92d844f: gate32471749 and42 production32471750–32471791.
+See PROJECT_STATUS and the compiled input-study report for live-check evidence;
+do not resubmit completed or already queued work. True-field oracle evaluation cannot supply
 unavailable deployment inputs. Loss coefficients remain provisional fixed presets,
 not established optima; the run README records their exact values and provenance.
 
