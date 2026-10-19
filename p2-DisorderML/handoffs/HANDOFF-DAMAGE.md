@@ -1,158 +1,185 @@
-# Damage Modeling -> Improve ML Accuracy: HPC continuation
+# Damage Modeling -> Improve ML Accuracy: completed FCC dataset handback
 
-From **Damage Modeling** (`01a13c9f-c95e-7ff1-854f-a3b2f4fbea6c`) to the current
-Windows **Improve ML Accuracy** continuation (`bc645215-a354-451c-93f7-540e7d36d3dc`).
-The researcher requests this handback for HPC tests, merged into that chat's
-current workflow. The bounded local label audit is complete. Improve ML Accuracy
-owns the next cluster checks and any separately agreed model integration.
+Updated 19 October 2026. From **Damage Modeling**
+(01a13c9f-c95e-7ff1-854f-a3b2f4fbea6c) to the existing Windows
+**Improve ML Accuracy** task (bc645215-a354-451c-93f7-540e7d36d3dc).
 
-Read applicable repository instructions, p2 PROJECT_STATUS, the relevant HPC run
-guide/skills and the implementation below. This brief replaces the original
-start-the-local-audit instructions; do not repeat the audit or revive old jobs.
+## Outcome and ownership
 
-## Merge with the current workflow
+**Damage-label processing, validation, local/HPC delivery and cleanup are complete.**
+No required processing action or unresolved label decision remains in Damage
+Modeling. The researcher hands actual damage ML implementation, training and
+testing back to Improve ML Accuracy. No damage DATA/MODEL loader or prediction
+head is implemented yet; no trained damage accuracy or benefit is claimed.
 
-- Keep Case1(i): independent UT/FT models and separate field/curve training.
-  `independent-inputs-261015` was submitted with gate31869463 and production
-  31869464-31869478. These are historical submission IDs, not a fresh queue-state
-  claim. Recheck its manifest/queue/results and preserve immutable snapshots;
-  do not duplicate or alter the input study.
-- Custom-loss submission remains ON HOLD until the researcher reviews the input
-  winner. Inherit that winning training-input policy, including true/mixed or
-  correction if selected; deployment remains predicted/corrected. Do not launch
-  the current 30-job raw-P loss draft unchanged or add damage to it silently.
-- Add damage to the existing Accuracy checklist as a distinct follow-on. Bounded
-  execution/data-alignment checks can run while the input study proceeds. Place
-  a later predictive damage ablation explicitly in the selected baseline's plan,
-  preserving the held loss-study decision and one-change comparisons.
-- This handback authorizes the receiving chat to progress HPC testing; it does
-  not define a new damage architecture/loss, grant archive-scale extraction, or
-  make the selected extreme specimens a training corpus. No jobs were submitted
-  by Damage Modeling.
+Read applicable instructions, current p2 PROJECT_STATUS and the receiving task's
+active workflow before acting. This replaces the older six-fixture-only handoff,
+not that task's current experiment plan. Do not repeat extraction, bank building,
+transfers or the completed fixture replay. This Markdown submits no jobs and
+starts no scheduled follow-up.
 
-## Code and artifact locations
+## Ready-to-use datasets
 
-Implementation baseline: **7166de8**, verified on both Git remotes. This handoff's
-own documentation commit follows it. The receiving Windows chat last used
-`Z:/00-PhD-gitRepo`, clean at d3db4e8 when inspected; it needs a fast-forward to
-the current remote, preserving any newer/unrelated work.
+Local directory: `Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata/`.
+HPC directory: `/data/SEMS-TaoLab/Niccolo-Forte/p2/MLdata/`.
 
-The ignored audit products/reports now live in
-`Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; Git carries code, not these products.
-The Documents copies were SHA256-verified against Z: on17 October; their deletion
-is pending because tool policy blocked it. Use Z:, not those copies. Transfer
-only explicit required files with a hash manifest before HPC use. No checkout
-may contain data/. Raw sources are under
-`Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`.
+| NPZ bank | Ordered samples | Native struts | Stored frames |
+| --- | ---: | ---: | ---: |
+| UT-UT-disNodes-allD.npz | 8,882 | 2,319 | 21 |
+| FT-FT-disNodes-allD.npz | 8,928 | 2,259 | 21 |
+| MULTI-UT-disNodes-allD.npz | 8,811 | 2,319 | 21 |
+| MULTI-FT-disNodes-allD.npz | 8,811 | 2,259 | 21 |
 
-| Product under p2-DisorderML/samples | Raw source stem | Final failed parents / elements |
-| --- | --- | --- |
-| damage-audit/UT-periodic-damage.npz | Ductile-FCC-20-per-1 | 83 / 83 |
-| damage-audit/FT-periodic-damage.npz | Fracture-FCC-20-per-1 | 7 / 7 |
-| damage-disordered/UT-397-maxD.npz | Ductile-FCC-20-20disNodes-lhs-all-397-maxD | 95 / 97 |
-| damage-disordered/UT-747-maxB.npz | Ductile-FCC-20-20disNodes-lhs-all-747-maxB | 92 / 93 |
-| damage-disordered/FT-747-maxB.npz | Fracture-FCC-20-20disNodes-lhs-all-747-maxB | 9 / 9 |
-| damage-disordered/FT-747-maxK.npz | Fracture-FCC-20-20disNodes-lhs-all-747-maxK | 9 / 9 |
+These additive `strut_status_bank_v1` banks preserve the corresponding
+allFIELD IDs/order, existing filtering and periodic ID0. MULTI UT/FT IDs match.
+Choose banks by the existing consumer's mech_mode, exact saved IDs and split,
+not by whether its networks are independent. Independent Case1(i) models may
+still share the paired MULTI population; retain that population when matching
+its controls. Use individual UT/FT banks only for the corresponding individual
+populations. Do not silently intersect or expand populations.
 
-Each samples directory has a visual README, labelled figures, provenance and
-independent verification JSONs. Source/code fingerprints are retained per file.
-D means researcher-selected highest UT ductility, K initial FT toughness, B the
-same-disorder UT/FT property-Pareto pair; this audit does not recalculate optima.
+Each NPZ contains its arrays and metadata and is sufficient for loading.
+MLdata and its subfolders contain only files directly consumed by ML algorithms;
+optional JSON audit reports are outside MLdata. Both locations retain their
+19 NPZ/CSV algorithm inputs. Original FIELDu, curves and simulation data are
+preserved; no broad archive/data reorganisation is required.
 
-The FT maxB/maxK INPs and all exported nonmetadata arrays are identical, despite
-different ODB bytes. Six files are five unique task responses across three
-underlying designs, with only two complete UT/FT geometry pairs. They are audit
-fixtures, not independent population/train/validation/test samples.
+## Contract the new training consumer must preserve
 
-Executable sources:
-- p1 `SIMscripts/A2_DamageOUTpostProcess.py`: one explicit ODB/INP, Abaqus Python,
-  readOnly=True; no discovery, upgrades or job submission.
-- `resources/damage.py`: checked original-joint identities, actual FE chains,
-  missing-aware failure masks and strut_damage_v1 validation; pure NumPy.
-- p1 `SIMscripts/test_damage_contract.py` and `test_damage_odb.py`: focused
-  synthetic checks and independent live-ODB comparison respectively.
-- p2 `code/review_damage.py`: saved-NPZ visual review, repeated --case arguments.
+- `D[sample, frame, native_strut]` is binary fracture: **1 if any constituent
+  whole element has STATUS=0; 0 if all constituent statuses are known active;
+  otherwise unknown**. Train/evaluate only where `valid_mask` is true.
+  Storage0 under a false mask is not an observed negative label.
+- SDEG and historical scalar-severity NaNs are diagnostic, not this target.
+  UT is body-only; initial FT gaps are absent geometry, not failed struts.
+- `edge_index` explicitly maps native strut endpoints into saved task-node
+  order. Preserve task geometry, native axes and absence masks. Never broadcast
+  strut labels onto nodes, infer membership from consecutive element IDs, or
+  substitute the old audit-canonical node order for the ML order.
+- Match samples by exact IDs/order and verify their saved geometry/source
+  fingerprints. Retain existing TRAIN/validation/locked-test membership and
+  related-design grouping. Do not split frames or elements as independent samples.
+- All banks store 21 frames including frame0. If the configured ML consumer drops
+  frame0, apply the same slice to D, masks and frame metadata. Align by saved
+  frame index/order as for displacement fields; do not interpolate binary labels.
+- Eleven short UT histories contribute **50 unavailable sample frames and
+  115,950 masked strut/frame entries in each UT bank**; FT has none.
+  `sample_frame_count` and `frame_present` distinguish observed prefixes
+  from unavailable trailing frames; their actual times are NaN. Preserve these
+  masks through losses, metrics, batching and save/reload. Never carry failure
+  into unobserved frames. Observed unknown STATUS counts are zero.
+- Keep true future damage out of inference inputs and topology updates. A
+  proposed strut readout/loss is a new training implementation, not part of the
+  completed exporter. Its design and comparison belong in the receiving task.
 
-The quick start and array specification remain in
-`p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md`. Samples contains outputs,
-not executable dependencies. No DATA/MODEL damage loader, head or training flag
-has been implemented.
+## Merge with the current Accuracy workflow
 
-## Label and alignment contract
+Current PROJECT_STATUS supersedes historical queue/hold statements:
 
-- Binary fracture is **1 if any member STATUS=0**, **0 if all member statuses
-  are known active**, unknown otherwise. Use `strut_failed` under
-  `strut_failure_known`; element equivalents retain original FE identity.
-  Missing output is never filled with zero or interpreted as failure.
-- SDEG/DUCTCRT are raw diagnostics, not this target. Historical optional scalar
-  `strut_damage` severity can be NaN while binary fracture is fully known; no
-  partial aggregation decision blocks these binary labels. Carry is disabled.
-- UT selects BodySet and excludes830 grips. Native struts:2319UT/2259FT.
-  Original joints:800UT/788FT. Initially absent FT geometry is not failed.
-- Disordered joints derive from selected-mesh degree, unique reference identity
-  within the producer's +/-sqrt(2) mm coordinate bound, unchanged boundaries,
-  straight FE chains and full canonical-edge equality. Subdivisions vary2-6UT,
-  1-6FT; do not infer membership from labels or a fixed element count.
-- Audit-canonical reference order is sorted(y,x), **not DATA/DUAL node order**.
-  Match specimen provenance and original coordinates, remap endpoints explicitly,
-  retain native FT/presence masks and record unmatched/dropped samples. Numeric
-  ID397/747 alone does not prove correspondence with an archived ML sample.
-- Damage products contain21 actual frames including0. The active ML runner
-  drops frame0 by default. Match saved step/frame/time/load metadata; remove0
-  only to match the verified consumer configuration. Never ordinal-stack21 with
-  20 frames, interpolate binary labels or invent between-frame onset.
-- Preserve the existing7137/793/881 specimen partition, seeds42/43/44 and locked
-  test exclusion where corresponding data exists. Group related/duplicate files
-  by underlying design; never split frames or elements as independent specimens.
-  Check a fixture's partition before evaluating any saved model on it.
+- Case1(i) uses independent UT/FT models and separate field/curve training.
+  The completed input study selected `corrected_mixed`: corrected plus true
+  50/50 curve-training inputs, with deployable predicted/corrected inputs.
+- The selected-policy loss suite `independent-losses-261018` is already
+  submitted: gate 32471749 and 42 production jobs32471750-32471791, immutable
+  source 92d844f. These are recorded submissions, not a fresh live-state check.
+  Reconcile their latest manifest/results/queue in the receiving task; do not
+  repeat submissions, revive the older 30-job draft or alter frozen jobs.
+- Put damage in that task's checklist as a separate follow-on with an unchanged
+  matched control. Preserve the selected input policy, split 42, seeds 42/43/44,
+  fixed field/curve selection and locked-test safeguards. Do not silently fold
+  damage into the ongoing loss suite or announce an architecture/loss choice
+  that has not been made there.
 
-## Next actions in Improve ML Accuracy
+Receiving work:
 
-1. Synchronize the receiving checkout and reconcile its current checklist,
-   live queue and data availability. Reuse the existing authenticated HPC session;
-   leave it open. Confirm exact archive/source identity rather than assuming a
-   local path or filename maps to the current training data.
-2. Run a **bounded cluster contract/consumer replay on these six fixtures**:
-   original identity, endpoint remapping, frame0 alignment, task/absence/unknown
-   masks, STATUS-derived parent rule and save/reload. Sixteen focused local tests
-   already pass. Standard Python can read NPZs; actual ODB replay requires Abaqus
-   Python and matching INPs via the p1 route, not an assumption that the p2 GPU
-   environment exposes odbAccess. No new FEA is needed.
-3. If useful, prepare post-hoc fracture-region diagnostics for existing saved
-   predictions only after exact geometry/source and permitted split membership
-   match. This can diagnose displacement errors; it does not establish a trained
-   fracture predictor or an improvement from damage supervision.
-4. Before supervised damage training, inventory label coverage read-only and
-   agree an explicit data/split/extraction plan with the researcher. The few
-   selected fixtures cannot establish generalisation. Broader extraction and
-   architecture/loss decisions remain explicit scope choices.
-5. Once an isolated model test is agreed, retain the selected Case1(i) input
-   policy and an unchanged matched control. A symmetric endpoint-embedding strut
-   readout is an option, not an existing implementation. Avoid new tokens or
-   graph changes in the first auxiliary test; never feed true future damage into
-   inference or remove inference edges with it. If field generators change and
-   correction won, refit the required TRAIN-only OOF/nested correction banks.
-   Select damage weights and train-only balancing explicitly; spatial0.1 and
-   existing curve coefficients are not damage-loss optima. Retain the fixed
-   field/curve selection and safeguards; add binary precision/recall, prevalence
-   and onset diagnostics without substituting them for that comparison.
-6. Use the existing preview-first staging, immutable sources, manifest and
-   disposable GPU/save/reload preflight before matching production training.
-   Preserve the established resource policy, successful-gate dependencies and
-   seeds; determine the actual job count from the agreed test rather than this
-   brief. Execution success is not accuracy evidence. Keep Windows raw runs in
-   Z:/p2 and provide one conclusions-first visual report per study in samples,
-   including controls, seed variation, full UT/FT crack-tip views, errors and
-   class prevalence. Preserve current preflight retention/failed-run cleanup.
+1. Implement explicit bank loading/ID/geometry joins and native-strut target
+   support in the maintained ML architecture. Validate masks, frame0 handling,
+   padding, class counts and save/reload on the actual banks. The old fixture
+   replay does not validate a new full-population training consumer.
+2. Define the isolated damage prediction/supervision experiment and control,
+   including strut readout, loss, train-only class balancing and selection.
+   If new field generators are fitted, regenerate required TRAIN-only OOF/nested
+   correction banks; do not reuse corrections tied to changed generators.
+3. Follow the receiving task's authorised preview/immutable-source/GPU-gate
+   workflow before full training. Use current resource policy and its actual
+   job schedule. This handoff creates no new job count or automatic monitor.
+4. Compare identical permitted validation specimens and masks. Retain existing
+   displacement/curve metrics; add positive-class precision/recall, prevalence,
+   false positives and onset/spatial diagnostics for damage. Prevent abundant
+   intact labels from making plain accuracy look informative. Select on
+   validation only; locked-test testing follows the established frozen-policy gate.
+5. Produce a Markdown visual report in canonical Z: samples: matched controls,
+   seed variability, full UT body and FT crack-tip views, true/predicted fracture,
+   errors, masks and limits. Save ML runs under external `Z:/p2/`. Execution
+   success and correct labels do not establish learned predictive accuracy.
 
-## Evidence and limits
+## Completed processing and evidence
 
-All source hashes stayed unchanged. All audited binary labels are known.
-The disordered pass independently matched583422 raw STATUS values, all192276
-parent/frame failure/known masks and277820 section SDEG values at five frames/file.
-The periodic pass matched296079 STATUS values and140990 section SDEG values.
-Sixteen focused tests pass; repository validation reported80 non-failing contract
-checks and14 non-failing changed-surface checks, including explicit syntax-only
-and skipped coverage. Those are distinct from the real Abaqus checks.
-No HPC execution, damage training, learned fracture accuracy or scientific
-improvement is claimed by this handoff.
+- Array 32085486 completed 91 batches/18,002 records with zero errors. All 18,002
+  raw FIELDd NPZ/JSON pairs are locally checksum-verified: 18,000 disordered and
+  a separate periodic UT/FT pair. No required source product is unavailable.
+- Bank job 32095821 completed 0:0 using padded-builder snapshot 4c435cf; extraction
+  used e92e899. Superseded bank 32085487 was cancelled before execution; never
+  resume it. Use current maintained code for future work, not archived launchers.
+- Recorded corpus checks cover 2,622,439,219 raw STATUS positions and 865,222,188
+  parent/frame labels, with zero missing/observed-unknown/reactivation cases.
+  Independent native ODB comparison is bounded to **eight products**, 1,171,296
+  raw positions and 384,552 parent/frame labels, not the complete corpus.
+- The frozen bank builder checked binary arrays, masks, onset and serialization
+  round trips. Delivery proof separately checks full NPZ byte identity,
+  IDs/order, source fingerprints, geometry/layout and coverage; D/mask content
+  inspection there is header-only. Do not enlarge that validation claim.
+- Earlier six-fixture CUDA replay 31976809 completed 0:0 on 16 October (51s),
+  device=cuda; masks, endpoint/frame layout and reload passed. Saved confirmation
+  is in `samples/hpc-cleanup-261017/job-evidence.json` (17 October capture),
+  including its DAMAGE_CONTRACT_REPORT log. Older PENDING text in the dated
+  `damage-hpc-contract` report is superseded. The replay did not train,
+  reopen ODBs, join specimens to predictions or evaluate prediction accuracy.
+  Its current temporary-home cleanup is not rechecked here. The receiving task's
+  existing researcher-owned home/scratch/archive convention review remains
+  separate; neither replay success nor this dataset closeout completes it.
+
+Canonical report/evidence root:
+`Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-dataset/`.
+Start with README.md and corpus-summary.json; execution/ holds 91 transfer
+receipts, bank-delivery-proof.json, archive-layout.json, hpc-layout.md,
+source-equivalence and frame-padding evidence. Full bank hashes are there.
+
+Current completed-job archive, following the researcher's convention:
+`/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016/`.
+It directly contains 94 copied output logs, execution.tar.gz (120 historical
+non-log launch files), bank-reports/, manifest.json and README.md, with no extra
+provenance directory. Home retains the 94 log originals; 91 production scratch
+roots and task-owned staging/helpers are removed. The scheduled follow-up was
+**deleted** at the researcher's request; do not recreate it.
+
+Raw exports remain in original HPC job zip/transfer directories. Local copies
+are flattened into `Z:/p1/data/Ti/disNodes/0.2/FCC/transfer/` and
+`Z:/p1/data/Ti/per/FCC/transfer/`, retaining source-job identity in records.
+
+## Maintained implementation and older fixtures
+
+- p1 SIMscripts/A2_DamageOUTpostProcess.py and A2_DamageBatch.py: STATUS export
+  and explicitly bounded FCC batches; B2_ABAQUS-PPscratch-new.sh: damage-only route.
+- resources/damage.py: checked INP-chain mapping and missing-aware reduction.
+- resources/damage_data.py: aligned banks and staging guard.
+- p1 SIMscripts/DAMAGE.md: commands and array specification; p2
+  code/review_damage_dataset.py: saved-product/corpus visual report.
+
+The earlier six audit fixtures remain in canonical Z: samples:
+
+| Samples-relative NPZ | Role |
+| --- | --- |
+| damage-audit/UT-periodic-damage.npz | periodic UT |
+| damage-audit/FT-periodic-damage.npz | periodic FT |
+| damage-disordered/UT-397-maxD.npz | selected high-ductility UT |
+| damage-disordered/UT-747-maxB.npz | Pareto-pair UT |
+| damage-disordered/FT-747-maxB.npz | Pareto-pair FT |
+| damage-disordered/FT-747-maxK.npz | selected high-toughness FT |
+
+They are diagnostic fixtures, not the training population: the two FT responses
+are duplicates, giving five unique task responses across three designs. The
+Documents checkout's three generated damage report packs are now absent; use
+canonical Z: artifacts, not old paths. The old May test 11233922 contains no
+scientific outputs and was left untouched; optional disposal is not a label
+processing or ML prerequisite.

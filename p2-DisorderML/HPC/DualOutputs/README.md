@@ -3,11 +3,16 @@
 ## Bounded damage contract replay
 
 `A0-HPC-Damage-contract.py` is an execution/consumer-layout check for the six exact
-fixtures in `handoffs/HANDOFF-DAMAGE.md`, not a trainer. It reuses `resources.damage`;
-it does not open an ODB, change the input study, join IDs to predictions, or release
-the custom-loss hold.
+fixtures listed in `handoffs/HANDOFF-DAMAGE.md`, not a trainer. It reuses
+`resources.damage`; it does not open an ODB, change experiments or join predictions.
+Job31976809 already completed the six-fixture CUDA/reload replay on16 October;
+saved confirmation is in samples/hpc-cleanup-261017/job-evidence.json. Do not
+repeat it as a handoff prerequisite. The full FCC banks are delivered; the
+remaining training-consumer/model plan belongs to Improve ML Accuracy.
+A new training implementation still needs its own authorised execution gate.
 
-Package the six NPZ/original-INP pairs and an existing Case1(i) DATA descriptor:
+For a separately justified reproduction, package the six NPZ/original-INP pairs
+and an existing Case1(i) DATA descriptor:
 `--prepare --samples-root PATH --inp-root PATH --consumer-data MODEL_DATA_JSON
 --output-dir NEW_DIRECTORY`. This verifies original INP fingerprints, copies only
 the explicit files and writes a manifest with thirteen file hashes. No ODB is

@@ -9,7 +9,7 @@ submissions, bulk processing, optimisation searches or material cleanup."
 | Chat | Read this file | Owns |
 | --- | --- | --- |
 | Existing Improve ML Accuracy | [HANDOFF-ML-ACCURACY.md](HANDOFF-ML-ACCURACY.md) | Models/losses, incomplete experiment recovery, results, notebook diagnostics and per-test visual examples |
-| New Damage variable processing | [HANDOFF-DAMAGE.md](HANDOFF-DAMAGE.md) | Element-to-strut damage export, labels and validation samples; not model integration |
+| Existing Improve ML Accuracy: damage handback | [HANDOFF-DAMAGE.md](HANDOFF-DAMAGE.md) | Completed FCC label dataset; next ML integration, training and testing in the existing task |
 | New Repo context optimisation | [HANDOFF-CONTEXT.md](HANDOFF-CONTEXT.md) | Lossless instruction/reference/status consolidation plan; no ML behaviour/storage changes |
 | New Surrogate optimisation | [HANDOFF-SURROGATE-OPTIMISATION.md](HANDOFF-SURROGATE-OPTIMISATION.md) | Curve AND field-only design objectives, constraints and validated search plan; not HPO |
 | Proposed Physics/strain feasibility | [HANDOFF-PHYSICS-STRAIN.md](HANDOFF-PHYSICS-STRAIN.md) | True-field strain/coupling audits before any new physics loss; no bulk exports |

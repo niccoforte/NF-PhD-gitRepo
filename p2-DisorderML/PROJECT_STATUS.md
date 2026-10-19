@@ -23,8 +23,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   `Z:/p2/`. All three Windows checkouts were inspected: none has root `data/`.
   The Documents damage-audit, damage-disordered and damage-dataset packs
   (278 generated files,146,065,480 bytes) are copied to Z: and SHA256-verified.
-  Source deletion was blocked by tool policy, so Documents originals still need
-  removal; retain its tracked samples/AGENTS.md. Receipt:
+  The Documents generated packs are now absent (checked19 October); its tracked
+  samples/AGENTS.md remains. No damage-pack deletion remains. Migration receipt:
   `Z:/p2/diagnostics/storage-cleanup-261017/migration.json`; report index:
   Z: `samples/README.md`. Older Mac data/examples have not yet been reconciled
   from the promised ZIP. Notebook/transfer defaults no longer create repo data.
@@ -141,22 +141,27 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   interpolation, specimen join or prediction evaluation follows from this result.
   Local pinned bundle: `Z:/p2/diagnostics/damage-contract-261016/fixtures/`.
   Disposable B1 GPU check31976809 submitted from aa1d2e0,1h/1GPU/12CPU/90000MB;
-  current PENDING/Resources, no GPU result yet. All13 remote file hashes match.
+  completed0:0 on16 October in51s; all six CUDA/reload cases passed. Saved
+  17 October confirmation: samples/hpc-cleanup-261017/job-evidence.json; this is
+  recorded evidence, not a fresh scheduler check. All13 staged hashes matched.
   Home check: `/data/home/exy053/p2/MULTI/Dual/Transformer/damage-contract-261016/`.
-  After success retrieve the home-log JSON and remove only its unused temporary
-  fixture/source copies; no preflight archives. Human report/two figures:
-  `samples/damage-hpc-contract/README.md`. Changed-surface9 and contract82 checks
-  non-failing/zero failed; these do not establish GPU/ODB execution.
+  Completed replay log/report supersedes PENDING in the older visual report;
+  no fixture replay is outstanding. No preflight archive is a training dependency.
+  Current temporary-home cleanup is not rechecked by this handoff; the receiving
+  task's researcher-owned HPC convention review remains separate.
+  Human report/two figures: samples/damage-hpc-contract/README.md. Prior local
+  changed-surface9/contract82 checks and the CUDA replay do not establish ODB
+  revalidation, a full-population training consumer or predictive accuracy.
 
-- The researcher requests damage handback to the current Windows **Improve ML
-  Accuracy** chat for HPC tests. `handoffs/HANDOFF-DAMAGE.md` is the reconciled
-  source-attributed transfer. The input-policy winner now governs the custom-loss
-  study above. Bounded cluster contract/data
-  alignment checks can proceed first; any damage-training ablation requires a
-  sufficient explicit label corpus and a separately agreed model/loss plan.
-  No damage DATA/MODEL loader/head exists; the six selected fixtures include
-  duplicate FT evidence. The recipient owns the existing checklist and fresh
-  queue reconciliation. This handback submits no jobs or claims HPC results.
+- Damage Modeling's required label processing/delivery/cleanup is closed. The
+  researcher hands actual damage ML integration, training and testing to the
+  existing Windows **Improve ML Accuracy** task via handoffs/HANDOFF-DAMAGE.md.
+  The full four-bank corpus above replaces the old six-fixture coverage limit;
+  no damage DATA/MODEL loader/head or trained accuracy result exists yet.
+  Preserve Case1(i), the selected corrected_mixed policy and ongoing42-job loss
+  suite. Reconcile its current queue/results before a separate explicit damage
+  experiment; do not repeat extraction, delivery or completed replay31976809.
+  The handback starts no job or scheduled follow-up.
 
 - Damage Modeling: periodic UT/FT ODBs read in Abaqus 2024 Python; the researcher
   additionally authorised exactly four local disordered files: UT 397 maxD,

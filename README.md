@@ -521,10 +521,12 @@ aligned MLdata banks. Existing ML exclusions remain distinct from failed ODB
 processing. The eight illustrated products and their native ODB comparisons
 remain selected evidence. The human report lives in ignored
 `p2-DisorderML/samples/damage-dataset/`.
-The local audit is handed back to **Improve ML Accuracy** through the current
-[damage continuation](p2-DisorderML/handoffs/HANDOFF-DAMAGE.md): bounded HPC
-contract/alignment checks first, preserving input-study priority and the existing
-custom-loss hold. No damage training loader/head is already available.
+The completed FCC dataset is handed back to **Improve ML Accuracy** through the
+[damage continuation](p2-DisorderML/handoffs/HANDOFF-DAMAGE.md). Processing, delivery
+and the earlier fixture CUDA replay are complete. Next are explicit ML loading,
+model/loss integration, training and testing, reconciled with the selected input
+policy and already submitted loss suite. No damage training loader/head exists;
+the handoff does not repeat completed jobs or schedule new ones.
 Readable sharing/peak-loss diagrams and the latest validation review are in
 `p2-DisorderML/samples/dual-clarification-evidence.md`; these do not change training defaults.
 
