@@ -72,7 +72,7 @@ Checkout and Python setup use Node 24-based v7 actions to avoid deprecated actio
 
 ## Analysis Deliverables
 
-Per study, deliver ignored `samples/<suite>/README.md`: conclusions, labelled figures, controls, relative errors, uncertainty, limits, tables and provenance. Use absolute image paths; if previews fail, embed all figures in a PDF and verify its pages. Link the reading copy. Raw runs stay in data stores; analysis stays in maintained code, not copied notebooks. Applies beyond HPC.
+Per study, deliver ignored `samples/<suite>/README.md`: conclusions, labelled figures, controls, relative errors, uncertainty, limits, tables and provenance. Reports stay Markdown-only unless another format is explicitly requested. Use inline image syntax with absolute local paths, not PNG download links. Link the report. Raw runs stay in data stores; analysis stays in maintained code, not copied notebooks. Applies beyond HPC.
 
 ## Cleanup Constraint
 
