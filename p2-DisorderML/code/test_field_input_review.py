@@ -54,6 +54,12 @@ class InputReviewTests(unittest.TestCase):
             self.assertIn("Gate completed; production pending.", section)
             self.assertIn("`abc`", section)
 
+    def test_generated_figure_links_are_absolute_but_other_links_unchanged(self):
+        with tempfile.TemporaryDirectory(prefix="report images ") as directory:
+            source = "![Test figure](test.png)\n[Evidence](selection.json)"
+            expected = f"![Test figure](<{(Path(directory) / 'test.png').resolve().as_posix()}>)\n[Evidence](selection.json)"
+            self.assertEqual(review.absolute_figure_links(source, Path(directory)), expected)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -41,9 +41,11 @@ The independent-model accuracy follow-ups are documented in
 [the p2 run guide](p2-DisorderML/HPC/DualOutputs/README.md#case-1i-input-and-custom-loss-studies).
 The completed Case1(i) input comparison selects corrected fields plus50/50
 corrected/true curve training for the next study, not true fields at deployment.
-The [visual report](p2-DisorderML/samples/field-input-study/README.md) is available
-only in the Z: checkout. Rebuild it with maintained `code/review_field_inputs.py`
-using an explicit canonical samples output directory. The adapted custom-loss
+The [compiled visual report](p2-DisorderML/samples/field-input-study/field-input-study.pdf)
+embeds all16 figures and is available only in the Z: checkout; its Markdown source
+is alongside. Rebuild the analysis with maintained `code/review_field_inputs.py`
+using an explicit canonical samples output directory, then export the saved report
+with `code/render_visual_report.py` as described below. The adapted custom-loss
 route uses42 full jobs plus a disposable gate; both launchers preview first.
 
 Repository guidance is tracked with the code so a fresh checkout carries the same working agreements:
@@ -690,7 +692,7 @@ provenance directory.
 ### Human-readable analysis reports
 
 For analyses, comparisons and performance reviews—not only HPC—deliver one
-compiled visual report under the Z: checkout's `<paper>/samples/<suite>/README.md`. Keep its
+visual report under the Z: checkout's `<paper>/samples/<suite>/README.md`. Keep its
 figures, supporting tables and provenance together and provide one report link.
 Explain what each variant changes, controls/populations/input sources, relative
 errors and meaningful baselines, seed variability, conclusions and limitations.
@@ -699,6 +701,21 @@ For prediction reviews include truth/prediction/error fields (full UT, FT crack-
 zoom), curves with translucent error bars, and log-scale loss histories where
 available. Keep raw downloaded runs in their data store; reusable executable
 analysis stays in maintained code/resources, not copied notebooks in artifacts or samples.
+
+Markdown figures use absolute local paths for app previews. If the viewer shows
+image links rather than the plots, use the compiled `<suite>.pdf` reading copy:
+all figures are embedded, so separate PNG loading is unnecessary. Export only
+changes presentation, not metrics or dated scheduler evidence. The small exporter
+uses optional `reportlab`, available in the bundled document Python runtime,
+without loading PyTorch or research arrays:
+
+```powershell
+python p2-DisorderML/code/render_visual_report.py Z:/00-PhD-gitRepo/p2-DisorderML/samples/field-input-study/README.md
+```
+
+Run this with the document runtime (or a Python environment containing ReportLab),
+not by installing document dependencies into the HPC training environment. Keep
+the Markdown source and labelled figures; verify every PDF page before delivery.
 
 `Z:/p2/diagnostics/` holds derived cross-run exploratory artifacts, not trained
 models. Its existing `FieldToCurve-node-variance/` contains across-specimen nodal

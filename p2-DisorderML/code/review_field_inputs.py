@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 
 import matplotlib
 matplotlib.use("Agg")
@@ -18,6 +19,12 @@ LABELS = {"predicted": "Predicted only", "true": "True only", "mixed": "Predicte
           "corrected": "Corrected only", "corrected_mixed": "Corrected + true",
           "correction": "Correction / frozen curve"}
 TASKS = [(kind, mode) for kind in ("field", "curve") for mode in ("UT", "FT")]
+
+
+def absolute_figure_links(text, directory):
+    """Local app previews need absolute paths; keep regeneration consistent."""
+    return re.sub(r"(!\[[^\]]*\])\(([^)]+\.png)\)",
+                  lambda match: f"{match[1]}(<{(directory / match[2]).resolve().as_posix()}>)", text)
 
 
 def array_hash(array):
@@ -360,7 +367,8 @@ def review(root, suite, control, out):
     if receipt.exists():
         transfer = json.loads(receipt.read_text(encoding="utf-8"))
         text += [f"Download receipt: **{transfer['verified_files']:,} files, {transfer['bytes']:,} bytes, {transfer['hash_mismatches']} SHA256 mismatches**. See the [transfer receipt](transfer-verification.json).", ""]
-    (out / "README.md").write_text("\n".join(text), encoding="utf-8")
+    text[2:2] = [f"[Open compiled reading copy with embedded figures]({out.name}.pdf). Markdown below remains the source.", ""]
+    (out / "README.md").write_text(absolute_figure_links("\n".join(text), out), encoding="utf-8")
     print(json.dumps({"winner": winner, "score": decision["score"], "report": str(out / "README.md")}), flush=True)
     return decision
 
