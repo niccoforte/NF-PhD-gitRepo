@@ -18,20 +18,27 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   checks are non-failing, zero failed. Real data, Abaqus and cluster execution
   are not revalidated by this synchronization.
 
-- Artifact storage consolidation: canonical reports/examples are in
-  `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; saved ML runs stay in external
-  `Z:/p2/`. All three Windows checkouts were inspected: none has root `data/`.
-  The Documents damage-audit, damage-disordered and damage-dataset packs
-  (278 generated files,146,065,480 bytes) are copied to Z: and SHA256-verified.
-  The Documents generated packs are now absent (checked19 October); its tracked
-  samples/AGENTS.md remains. No damage-pack deletion remains. Migration receipt:
-  `Z:/p2/diagnostics/storage-cleanup-261017/migration.json`; report index:
-  Z: `samples/README.md`. Older Mac data/examples have not yet been reconciled
-  from the promised ZIP. Notebook/transfer defaults no longer create repo data.
-  Nine follow-up contracts and the fresh Outputs build/train/save/HPO-call check
-  pass; changed-surface15 and contract85 checks are non-failing/zero failed.
-  Transfer commands were stubbed for destination tests; no archive download or
-  native macOS execution was needed for this storage change.
+- Artifact navigation now reflects the restored Mac samples and current Z: data.
+  Canonical `Z:/00-PhD-gitRepo/p2-DisorderML/samples/README.md` covers11 folders,
+  37 Markdown documents including itself, seven root guides and nine restored
+  helper scripts. All36 other report documents are linked. External
+  `Z:/p2/README.md` catalogues all65 direct dual runs/banks, individual studies,
+  30 HPO databases, property probes and historical material, with report links.
+  Both indexes were checked20 October; every local link resolves. This is not
+  whole-Mac checksum reconciliation, result recomputation or a live HPC check.
+  Diagnostics (variance maps, damage-contract fixtures/replays, migration receipt)
+  and field-loss-audit (two original8701 INPs) remain untouched and excluded from
+  the saved-results catalogue pending researcher review. Restored helper scripts
+  can retain obsolete Mac ROOT/data paths; they were not run or silently adapted.
+  The earlier Documents damage-audit, damage-disordered and damage-dataset packs
+  (278 files,146,065,480 bytes) were copied to Z: and SHA256-verified; receipt:
+  `Z:/p2/diagnostics/storage-cleanup-261017/migration.json`. The Documents generated
+  packs are absent (checked19 October); tracked samples/AGENTS.md remains. No
+  damage-pack deletion remains. All three checkouts still have no root data/.
+  Notebook/transfer guards remain unchanged. Earlier storage validation passed
+  nine follow-up contracts, fresh Outputs build/train/save/HPO-call, changed-
+  surface15 and contract85 checks with zero failures. Transfer commands were
+  stubbed; those destination tests needed no download or native macOS execution.
 
 - Existing FCC periodic/20% nodal-disorder STATUS dataset delivery is complete.
   Production array 32085486 finished all 91 batches/18,002 records without errors;

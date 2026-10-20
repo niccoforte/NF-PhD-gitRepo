@@ -692,6 +692,13 @@ provenance directory.
 
 ### Human-readable analysis reports
 
+Browse the complete [samples and study-report index](p2-DisorderML/samples/README.md)
+in the canonical Z: checkout, or the external [saved-results catalogue](Z:/p2/README.md)
+for individual run/HPO folders and links back to their reports. The latter covers
+current local artifacts, not live HPC state; diagnostics/field-loss-audit remain
+excluded pending researcher review. Restored Mac reports retain their dated
+scientific evidence and may contain historical paths or superseded plans.
+
 For analyses, comparisons and performance reviews—not only HPC—deliver one
 visual report under the Z: checkout's `<paper>/samples/<suite>/README.md`. Keep its
 figures, supporting tables and provenance together and provide one report link.
