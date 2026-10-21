@@ -18,6 +18,8 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
   script/job/run label, skips archive copies and retains only the successful home
   log; successful scratch is deleted. Never use these test outputs as production
   dependencies. Full-data field banks are production artifacts, not preflights.
+  Temporary local replay fixtures/exports and migration staging are also
+  disposable after completion; do not require permanent fixture bundles.
 - Failure evidence is temporary. After diagnosis/correction, cleanup is HIGH PRIORITY:
   confirm terminal jobs and exact paths, preserve resumable production results,
   then remove failed scratch/logs/useless archives. Never delete active jobs or

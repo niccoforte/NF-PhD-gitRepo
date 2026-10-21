@@ -16,9 +16,8 @@ and an existing Case1(i) DATA descriptor:
 `--prepare --samples-root PATH --inp-root PATH --consumer-data MODEL_DATA_JSON
 --output-dir NEW_DIRECTORY`. This verifies original INP fingerprints, copies only
 the explicit files and writes a manifest with thirteen file hashes. No ODB is
-copied. Use the hash-verified canonical Z: audit samples. Keep the pinned bundle
-under `Z:/p2/diagnostics/damage-contract-261016/fixtures/`; transfer only its named
-files to the home-side check directory and verify their hashes on HPC.
+copied. Use the canonical Z: audit samples and original INPs, create the bundle
+in a temporary directory and verify its hashes before execution.
 
 Preview the arguments and submit through B1 with an immutable source snapshot and
 a unique `damage-contract-preflight-*` label: `--manifest FILE
@@ -26,7 +25,8 @@ a unique `damage-contract-preflight-*` label: `--manifest FILE
 retain existing GPU/CPU/memory/account directives. No production damage job is
 implied. B1 deletes successful scratch and keeps the home log, not an archive copy.
 Remove temporary home fixture/source copies only after terminal success with no
-remaining consumer. The pinned local bundle and Git revision support reproduction.
+remaining consumer. Local fixture bundles and replay exports are temporary too;
+they are not retained after a completed check.
 The human report belongs in ignored `samples/damage-hpc-contract/`.
 
 Checks cover STATUS parent/known masks, original INP geometry, FT absence,

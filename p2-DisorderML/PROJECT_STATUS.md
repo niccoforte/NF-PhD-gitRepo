@@ -24,33 +24,12 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   helper scripts. All36 other report documents are linked. External
   `Z:/p2/README.md` catalogues all65 direct dual runs/banks, individual studies,
   30 HPO databases, property probes and historical material, with report links.
-  Both indexes were checked20 October; every local link resolves. This is not
-  whole-Mac checksum reconciliation, result recomputation or a live HPC check.
-  Authorized21 October retention review approved removing the obsolete12-file
-  variance study,13 byte-identical replay-input copies,12 disposable consumer
-  arrays and the two8701 INP cache files. The deletion command was rejected by
-  the execution tool before launch: none of those39 files were removed. Actual
-  cleanup remains pending; exact targets are in Z:/p2/README.md. Both INPs matched
-  the originals in HPC
-  Ti/data/disNodes/0.2/FCC/10605572/zip by SHA256; recovery paths/hashes are in
-  samples/field-loss-review/README.md. Retain the pinned14-file six-case fixture
-  bundle, compact CPU replay report and migration receipt,
-  separately labelled as reference evidence in Z:/p2/README.md. The two INP-based
-  example helpers now require explicit --inp-root and default --data-root to
-  external Z:/p2; existing report figures/numerical evidence are unchanged.
+  The two INP-based example helpers require explicit --inp-root and default
+  --data-root to external Z:/p2; original source paths/hashes are in
+  samples/field-loss-review/README.md. Viewing figures needs no raw INP.
   Other restored helper scripts can still retain obsolete Mac ROOT/data paths.
-  Retention checks verified all13 pinned fixture hashes. Both edited helpers
-  pass syntax checks; their runtime checks were unavailable because this PC's
-  standard Python has no Torch. No environment was changed or report recomputed.
-  The earlier Documents damage-audit, damage-disordered and damage-dataset packs
-  (278 files,146,065,480 bytes) were copied to Z: and SHA256-verified; receipt:
-  `Z:/p2/diagnostics/storage-cleanup-261017/migration.json`. The Documents generated
-  packs are absent (checked19 October); tracked samples/AGENTS.md remains. No
-  damage-pack deletion remains. All three checkouts still have no root data/.
-  Notebook/transfer guards remain unchanged. Earlier storage validation passed
-  nine follow-up contracts, fresh Outputs build/train/save/HPO-call, changed-
-  surface15 and contract85 checks with zero failures. Transfer commands were
-  stubbed; those destination tests needed no download or native macOS execution.
+  All three checkouts have no root data/; other checkouts retain tracked
+  samples/AGENTS.md only. Notebook/transfer guards remain unchanged.
 
 - Existing FCC periodic/20% nodal-disorder STATUS dataset delivery is complete.
   Production array 32085486 finished all 91 batches/18,002 records without errors;
@@ -147,30 +126,11 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   physics/strain distinguishes implemented CPU-tested sudden weights from unproven
   accuracy benefit. Damage and Tokenisation need no additional scope or changes.
 
-- Damage handback is integrated into the current Accuracy checklist. Bounded
-  cluster fixture/consumer checks are separate from the newly authorised FCC
-  dataset export above; no damage-training comparison is defined. Six ignored audit
-  NPZs are now in the Z: checkout's samples, not supplied by Git; exact
-  hash-verified transfer precedes cluster execution.
-  New `HPC/DualOutputs/A0-HPC-Damage-contract.py` packages only these six NPZ/INP
-  pairs and a saved Case1(i) DATA descriptor, then replays masks/reference endpoints,
-  frame0 removal and NumPy/Torch/device reload. Four new and16 producer tests pass;
-  six real CPU layout replays passed, no ODB reopened. All800 reference indices
-  remap; disordered actual/shared times differ by at most2.7567e-7s. No time
-  interpolation, specimen join or prediction evaluation follows from this result.
-  Local pinned bundle: `Z:/p2/diagnostics/damage-contract-261016/fixtures/`.
-  Disposable B1 GPU check31976809 submitted from aa1d2e0,1h/1GPU/12CPU/90000MB;
-  completed0:0 on16 October in51s; all six CUDA/reload cases passed. Saved
-  17 October confirmation: samples/hpc-cleanup-261017/job-evidence.json; this is
-  recorded evidence, not a fresh scheduler check. All13 staged hashes matched.
-  Home check: `/data/home/exy053/p2/MULTI/Dual/Transformer/damage-contract-261016/`.
-  Completed replay log/report supersedes PENDING in the older visual report;
-  no fixture replay is outstanding. No preflight archive is a training dependency.
-  Current temporary-home cleanup is not rechecked by this handoff; the receiving
-  task's researcher-owned HPC convention review remains separate.
-  Human report/two figures: samples/damage-hpc-contract/README.md. Prior local
-  changed-surface9/contract82 checks and the CUDA replay do not establish ODB
-  revalidation, a full-population training consumer or predictive accuracy.
+- The bounded six-case damage consumer-layout check is complete: CPU and CUDA
+  mask, geometry/remapping and reload checks passed (job31976809,16 October).
+  Its scientific limits and two figures are in samples/damage-hpc-contract/README.md.
+  This does not establish a full-population training consumer or damage accuracy;
+  no fixture replay is outstanding.
 
 - Damage Modeling's required label processing/delivery/cleanup is closed. The
   researcher hands actual damage ML integration, training and testing to the
