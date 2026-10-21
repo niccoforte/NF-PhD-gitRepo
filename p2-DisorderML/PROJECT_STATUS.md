@@ -26,10 +26,22 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   30 HPO databases, property probes and historical material, with report links.
   Both indexes were checked20 October; every local link resolves. This is not
   whole-Mac checksum reconciliation, result recomputation or a live HPC check.
-  Diagnostics (variance maps, damage-contract fixtures/replays, migration receipt)
-  and field-loss-audit (two original8701 INPs) remain untouched and excluded from
-  the saved-results catalogue pending researcher review. Restored helper scripts
-  can retain obsolete Mac ROOT/data paths; they were not run or silently adapted.
+  Authorized21 October retention review approved removing the obsolete12-file
+  variance study,13 byte-identical replay-input copies,12 disposable consumer
+  arrays and the two8701 INP cache files. The deletion command was rejected by
+  the execution tool before launch: none of those39 files were removed. Actual
+  cleanup remains pending; exact targets are in Z:/p2/README.md. Both INPs matched
+  the originals in HPC
+  Ti/data/disNodes/0.2/FCC/10605572/zip by SHA256; recovery paths/hashes are in
+  samples/field-loss-review/README.md. Retain the pinned14-file six-case fixture
+  bundle, compact CPU replay report and migration receipt,
+  separately labelled as reference evidence in Z:/p2/README.md. The two INP-based
+  example helpers now require explicit --inp-root and default --data-root to
+  external Z:/p2; existing report figures/numerical evidence are unchanged.
+  Other restored helper scripts can still retain obsolete Mac ROOT/data paths.
+  Retention checks verified all13 pinned fixture hashes. Both edited helpers
+  pass syntax checks; their runtime checks were unavailable because this PC's
+  standard Python has no Torch. No environment was changed or report recomputed.
   The earlier Documents damage-audit, damage-disordered and damage-dataset packs
   (278 files,146,065,480 bytes) were copied to Z: and SHA256-verified; receipt:
   `Z:/p2/diagnostics/storage-cleanup-261017/migration.json`. The Documents generated

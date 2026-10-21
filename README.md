@@ -695,8 +695,8 @@ provenance directory.
 Browse the complete [samples and study-report index](p2-DisorderML/samples/README.md)
 in the canonical Z: checkout, or the external [saved-results catalogue](Z:/p2/README.md)
 for individual run/HPO folders and links back to their reports. The latter covers
-current local artifacts, not live HPC state; diagnostics/field-loss-audit remain
-excluded pending researcher review. Restored Mac reports retain their dated
+current local artifacts, not live HPC state; retained reference/check evidence
+is labelled separately from trained results. Restored Mac reports retain their dated
 scientific evidence and may contain historical paths or superseded plans.
 
 For analyses, comparisons and performance reviews—not only HPC—deliver one
@@ -715,11 +715,14 @@ Use inline image syntax with absolute local paths (`![caption](<Z:/.../figure.pn
 not ordinary PNG links. Check that every referenced image exists. Formatting
 changes do not alter metrics or refresh dated scheduler evidence.
 
-`Z:/p2/diagnostics/` holds derived cross-run exploratory artifacts, not trained
-models. Its existing `FieldToCurve-node-variance/` contains across-specimen nodal
-displacement-variance maps/tables; those scores are not learned attention or
-verified fracture labels. Do not delete or move it merely because it is separate
-from a saved run.
+The retention review for `Z:/p2/diagnostics/` keeps the pinned six-case damage
+regression fixtures, compact CPU replay report and verified storage-migration
+receipt. These are reference/check evidence, not trained models. Obsolete
+node-variance maps and disposable replay arrays/input copies are cleanup targets,
+as is the separate `field-loss-audit/` download cache after SHA256 agreement with
+both original INPs in HPC archive10605572. Actual deletion status is recorded in
+`Z:/p2/README.md`; original paths/hashes are in the
+[field-loss review](p2-DisorderML/samples/field-loss-review/README.md).
 
 Important file families:
 
