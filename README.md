@@ -46,7 +46,7 @@ explains this choice; the original measured accuracy comparison remains evidence
 not the active source policy.
 The [Markdown visual report](p2-DisorderML/samples/field-input-study/README.md)
 includes all16 figures inline and is available only in the Z: checkout. Rebuild
-it with maintained `code/review_field_inputs.py` using an explicit canonical
+it with maintained `HPC/studies/Input/review_field_inputs.py` using an explicit canonical
 samples output directory. The custom-loss continuation reuses12 compatible field
 banks and adds18 curve-only jobs plus a disposable gate; launchers preview first.
 
@@ -346,6 +346,11 @@ The path resolver maps that style of call into local `Z:/p1/data/Ti/...` folders
 
 ### `p2-DisorderML/code/`
 
+Notebooks remain here. Study-specific Python entry points, launchers, review
+generators and their tests live in [HPC/studies/](p2-DisorderML/HPC/studies/README.md),
+grouped by Independence, Input, Loss, Damage and Locality. Shared imported
+training/data functions stay in resources; do not put job CLIs there.
+
 This folder is the local notebook workspace for model development and post-processing.
 
 | Notebook/File | Role |
@@ -415,7 +420,7 @@ true/predicted-source combined fits. It does not submit jobs. Keep the establish
 MSE source controls and use fresh labels for the four new full runs.
 
 The true-field **property** diagnostic is
-`HPC/FieldToProperty/A0-HPC_FieldToProperty-test.py`, using the existing dual encoder
+`HPC/FieldToProperty/A0-HPC_FieldToProperty.py`, using the existing dual encoder
 and legacy trainer without a new model framework. It predicts archived UT
 Strength/Ductility/WoF and FT K_JIC directly from true field histories, with no
 disorder or physical-context inputs. Pass `--base-model-json` (architecture only)
@@ -426,8 +431,8 @@ and validation-only selection. Results use `MULTI/FieldToProperty/Transformer/`:
 `metrics.json`, an agreement figure and logarithmic loss plot. B3 accepts that
 relative path unchanged. These are property results, not loadable curve results;
 the probe is not a deployable disorder-only surrogate or an optimisation loop.
-Its `-test` filename is an experiment convention, not a reduced run: this is
-the production entry point. The [FieldToProperty guide](p2-DisorderML/HPC/FieldToProperty/README.md)
+Its maintained production filename has no `-test` suffix. The
+[FieldToProperty guide](p2-DisorderML/HPC/FieldToProperty/README.md)
 distinguishes it from the explicit64-pair/one-epoch preflight.
 
 Current worked comparisons and the bounded thickness-provenance finding are in
@@ -488,7 +493,7 @@ and separate [disordered-lattice report](p2-DisorderML/samples/damage-disordered
 cover the two periodic and four explicitly authorised 20% nodal-disorder Ti FCC
 ODB/INP pairs in `Z:/p1/data/Ti/disNodes/0.2/FCC/sims/`. `resources/damage.py` owns checked
 INP-chain mapping, missing-aware reduction and the separate `strut_damage_v1`
-contract; `code/review_damage.py` produces labelled raw-value examples and
+contract; `HPC/studies/Damage/review_damage.py` produces labelled raw-value examples and
 actual-frame fracture/loading figures. The target is binary fracture:
 `D_fracture=1` if any constituent element has STATUS=0, `D_fracture=0` if all
 constituent statuses are known and active, and unknown otherwise. It uses the
@@ -510,7 +515,7 @@ and `failure-only` to preserve the current raw diagnostic products:
 
 ```powershell
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" --odb ODB_PATH --inp INP_PATH --task UT --output OUTPUT.npz --partial-rule failure-only
-python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-audit
+python -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-audit
 ```
 
 For the separate four-case report, use repeated `--case LABEL TASK NPZ` arguments
@@ -566,7 +571,7 @@ reports and completed launch records follow the existing archive layout under
 `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016/`,
 without an extra provenance tier. The 94 successful logs remain in home and are
 also copied alongside the completed job's archived results.
-`p2-DisorderML/code/review_damage_dataset.py` builds the dataset report from
+`p2-DisorderML/HPC/studies/Damage/review_damage_dataset.py` builds the dataset report from
 explicit FIELDd examples and saved execution metadata. Optional corpus evidence
 adds processing outcomes, final fracture distributions and a per-attempt table;
 completion requires reconciled raw attempts, verified transfers and all four
@@ -680,7 +685,7 @@ This folder contains the QMUL HPC/Slurm training and HPO workflow.
 | `FieldOutputs/A0-HPC_Field-CrossModelHPO.py` | Cross-model HPO entry point for field surrogates. |
 | `FieldToCurve/A0-HPC_FieldToCurve-test.py` | Production-oriented Transformer single-run entry point for field-input to curve-output models. |
 | `FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py` | Cross-model HPO entry point for field-to-curve surrogates. |
-| `FieldToProperty/A0-HPC_FieldToProperty-test.py` | Production-default true-field to archived-property oracle; separate from curve prediction. |
+| `FieldToProperty/A0-HPC_FieldToProperty.py` | Production-default true-field to archived-property oracle; separate from curve prediction. |
 
 Important HPC conventions:
 

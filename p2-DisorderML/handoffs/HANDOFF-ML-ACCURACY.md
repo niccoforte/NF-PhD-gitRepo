@@ -8,6 +8,44 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
+## Current priority order (22 October; supersedes older next-step wording)
+
+- [x] Finish the source-layout cleanup and verification: named entry points and
+  reviews under `HPC/studies/<Study>/`, imported helpers in resources; keep
+  FieldToProperty's production rename and all active frozen job sources intact.
+- [ ] Finish/review `independent-losses-261022-mixed` and its twelve retained
+  banks; download completed results and compile the human comparison. Select
+  by fixed fracture-sensitive metrics plus global RMSE/seed safeguards, not
+  tunable training totals. Dynamic weighting is implemented, not yet adopted.
+- [ ] Implement the approved independent Damage field-only screen: exact native
+  strut consumer/head, field-only control, damage-only, auxiliary coefficients
+  0.1/1; seed42,450 epochs/patience52, execution/reload gate. No initial OOF or
+  curve fits; no true future damage input or inferred topology deletion.
+- [ ] Implement the isolated field Locality screen in `HPC/studies/Locality/`:
+  degree-only, existing/gated local graph, adjacency/relative-geometry attention,
+  one/two-block masked CNN. One change at a time; no automatic submissions.
+- [ ] Confirm promising field candidates across42/43/44, then generate their
+  OOF banks and retrain Predicted+True curves. Evaluate frozen readouts too.
+- [ ] On the selected independent architecture, retain separate FT crack-tip
+  box weighting, Gaussian frame weights (width0.15/0.25, amplitude1/3), task-wise
+  residual fields and static crack-face ablations. Do not re-run completed
+  matched losses unless another specific controlled question requires it.
+- [ ] Keep maintained notebooks/metrics aligned with retained changes, including
+  the interactive field viewer, UT/full and FT/zoom truth/prediction/error,
+  curve error bars, fixed local-motion/peak/work metrics and log-scale losses.
+- [ ] Only after field/architecture ablations: focused HPO, seed confirmation,
+  frozen final selection and one locked-test evaluation. No active sharing HPO,
+  correction pipeline, damage-feedback refinement or gradient instrumentation.
+
+Case1(i)+Predicted+True is the current practical policy, not proof that its fields
+are sufficiently accurate or that every optional implemented feature helps.
+Future damage-to-curve inputs remain a distinct oracle/deployable comparison;
+do not bundle them with the first auxiliary-output test. Existing Tokenisation,
+physics/strain and optimisation handoffs own those deferred directions. Output
+PCA/autoencoder remains conditional on a demonstrated compression need.
+Numerical fracture-metric acceptance tolerances remain unagreed; show fixed
+metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
+
 ## Cleanup
 
 - [ ] **HIGH PRIORITY — researcher manual review:** personally inspect remote
@@ -27,12 +65,12 @@ Do not repeat them or treat the diagnostic fixtures as the training population.
 
 - [ ] Add a masked native-strut damage consumer, exact specimen/geometry joins,
   aligned frame0 slicing and save/reload checks against the actual MULTI banks.
-- [ ] Confirm the first isolated ML experiment: auxiliary binary strut-fracture
-  outputs alongside displacement, independent UT/FT generators, unchanged
-  Case1(i)/Mixed curve route. Define train-only class balancing and damage loss
-  weight before fitting; report damage accuracy separately from field benefit.
-- [ ] Prepare its matched control, TRAIN-only OOF fields, GPU execution gate and
-  later full jobs. Do not add it to the frozen current loss study. No new ODB
+- [x] Agree the first isolated ML experiment: field-only control, damage-only,
+  and auxiliary binary strut-fracture loss0.1/1 on independent UT/FT generators.
+  Class balancing fits train only; report damage accuracy separately from field benefit.
+- [ ] Prepare its matched control and GPU execution gate, then final-generator
+  pilot. OOF fields/curve retraining follow only for useful candidates. Do not
+  add it to the frozen current loss study. No new ODB
   processing, corrector or true-future-damage inference input is needed.
 
 Use the full-bank masks and exact existing split, never frame/strut-level splits.
@@ -84,8 +122,8 @@ variation and global errors visible; damage path/onset metrics follow the new
 consumer. Numerical local tolerances remain to agree. This review rule does not
 retroactively change frozen checkpoint/HPO selection or active job losses.
 The user confirmed the following revised numbering. Local implementation is now
-in `resources/MLindependence.py`, the existing dual runner/preflight and
-`HPC/DualOutputs/B4_Dual-independence.sh`. The original jobs failed at the split-ID
+in `resources/MLcrossfit.py`, the existing dual runner/preflight and
+`HPC/studies/Independence/B4_Independence.sh`. The original jobs failed at the split-ID
 representation guard and were cleaned after correction. Replacement
 `independence-261013-r1`, source6b0db82, gate31448215 and production31448216–31448245,
 is fully COMPLETED0:0. All24 case fits and six banks are downloaded outside Git
@@ -135,7 +173,11 @@ use the matched population/configuration. Detachment is covered by staged versus
 end-to-end controls; an online stop-gradient fit is optional only if scheduling
 needs separating from gradient effects. Do not combine all changes at once.
 
-### Locality/attention checklist — owned here, after current loss comparisons
+### Locality/attention checklist — owned here, isolated from current loss comparisons
+
+Use `HPC/studies/Locality/README.md` for the current controlled plan. The MSE
+architecture screen can run independently of loss-study completion once its
+implementation/gate is ready; combine winning changes only in a later test.
 
 - [ ] Degree-only nodal context as a cheap independent baseline: degree/8, absent
   FT nodes masked. Degree is used internally in loss/message averaging and the
@@ -164,7 +206,7 @@ cross-fitted predictions where a frozen upstream model supplies training inputs.
 True-only curve training cannot send gradients to the field generator; explicitly
 separate that source comparison from claims about end-to-end architecture.
 The sharing verdict now selects Case1(i); the source/loss follow-ups are prepared
-through `HPC/DualOutputs/B4_Independent-followups.sh`, separate from the old suite.
+through `HPC/studies/B4_Field-source-study.sh`, separate from the old suite.
 
 Correction to the earlier verdict: fixed FT crack-tip-box weighting is a valid,
 user-approved physical region priority, not leakage/cheating or a rejected idea.

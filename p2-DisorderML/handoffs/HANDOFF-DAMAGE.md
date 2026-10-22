@@ -165,7 +165,7 @@ are flattened into `Z:/p1/data/Ti/disNodes/0.2/FCC/transfer/` and
 - resources/damage.py: checked INP-chain mapping and missing-aware reduction.
 - resources/damage_data.py: aligned banks and staging guard.
 - p1 SIMscripts/DAMAGE.md: commands and array specification; p2
-  code/review_damage_dataset.py: saved-product/corpus visual report.
+  HPC/studies/Damage/review_damage_dataset.py: saved-product/corpus visual report.
 
 The earlier six audit fixtures remain in canonical Z: samples:
 

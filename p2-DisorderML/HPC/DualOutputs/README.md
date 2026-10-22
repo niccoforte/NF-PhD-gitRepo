@@ -42,17 +42,17 @@ geometry/source and permitted-split proof; locked-test evaluation remains exclud
 
 ### Where the production study code lives
 
-The same production Python entry point routes these studies; separate copied
-Python trainers per suite would duplicate the DATA/model/training contracts.
-The historical `DualOutputs` directory also hosts the independent Case1(i) route;
-its location does not imply shared weights or joint training.
+Study entry points and launchers now live under `../studies/`; see its
+[study map](../studies/README.md). They reuse this existing runner's DATA/model
+contracts rather than copying trainers. The historical `DualOutputs` route stays
+available for saved interfaces; its location does not imply shared training.
 
 | Study | Submission script | Production Python route | Shared implementation |
 | --- | --- | --- | --- |
-| Eight-case independence | [B4_Dual-independence.sh](B4_Dual-independence.sh) | [A0-HPC-Dual-test.py](A0-HPC-Dual-test.py), `--independence-case` | [MLindependence.py](../../../resources/MLindependence.py) |
-| Field-input/source study | [B4_Independent-followups.sh](B4_Independent-followups.sh) `SUITE inputs` | Same runner, `--followup-study inputs` | [MLfollowup.py](../../../resources/MLfollowup.py) |
-| Custom-loss study | Same follow-up launcher, `SUITE losses` | Same runner, `--followup-study losses` | MLfollowup.py and [MLfield.py](../../../resources/MLfield.py) |
-| Field-to-property | Standard B1 workflow | [Own production entry point](../FieldToProperty/A0-HPC_FieldToProperty-test.py) | Existing encoder/trainer; [guide](../FieldToProperty/README.md) |
+| Eight-case independence | [B4_Independence.sh](../studies/Independence/B4_Independence.sh) | [A0-Independence.py](../studies/Independence/A0-Independence.py) | [MLcrossfit.py](../../../resources/MLcrossfit.py) |
+| Field-input/source study | [B4_Input.sh](../studies/Input/B4_Input.sh) | [A0-Input.py](../studies/Input/A0-Input.py) | [MLfield_sources.py](../../../resources/MLfield_sources.py) |
+| Custom-loss study | [B4_Loss.sh](../studies/Loss/B4_Loss.sh) | [A0-Loss.py](../studies/Loss/A0-Loss.py) | MLfield_sources.py and [MLfield.py](../../../resources/MLfield.py) |
+| Field-to-property | Standard B1 workflow | [Own production entry point](../FieldToProperty/A0-HPC_FieldToProperty.py) | Existing encoder/trainer; [guide](../FieldToProperty/README.md) |
 
 `-test.py` is the existing experiment-entry naming convention, not a one-epoch
 restriction. `A0-HPC-Dual-preflight.py` and `test_*.py` are the separate GPU gate
@@ -72,10 +72,10 @@ Locked test is untouched. There is no architecture HPO or change to legacy defau
 
 ```bash
 # Preview only. Run inputs first; explicit --submit queues through B1.
-bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-inputs-NEW inputs
+bash p2-DisorderML/HPC/studies/B4_Field-source-study.sh independent-inputs-NEW inputs
 LOSS_CURVE_SOURCE=mixed INPUT_SUITE=independent-inputs-261015 \
   FIELD_BANK_SUITE=independent-losses-261018 \
-  bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-losses-NEW losses
+  bash p2-DisorderML/HPC/studies/B4_Field-source-study.sh independent-losses-NEW losses
 ```
 
 Every full job requests240h/1GPU/12CPU/90000MB. Each study has one disposable8h
@@ -358,7 +358,7 @@ before declaring a winner. Gradient-norm/alignment logging is explicitly deferre
 
 ### Preparation and submission
 
-`resources/MLindependence.py` orchestrates the existing trainer; it does not
+`resources/MLcrossfit.py` orchestrates the existing trainer; it does not
 duplicate its optimization loop. The existing test runner accepts
 `--independence-case 1i|1ii|2ai|2aii|2bi|2bii|3i|3ii` with `--experiment baseline`.
 Bank preparation additionally uses `--prepare-field-bank` (1i or 3i); staged fits
@@ -370,9 +370,9 @@ Grouped history plots label independent fits and retain log scales.
 
 ```bash
 # Non-submitting preview; run from the clean HPC checkout when authorised.
-bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh NEW-UNUSED-LABEL
+bash p2-DisorderML/HPC/studies/Independence/B4_Independence.sh NEW-UNUSED-LABEL
 # Once authorised and synchronized:
-bash p2-DisorderML/HPC/DualOutputs/B4_Dual-independence.sh NEW-UNUSED-LABEL --submit
+bash p2-DisorderML/HPC/studies/Independence/B4_Independence.sh NEW-UNUSED-LABEL --submit
 ```
 
 One 8h GPU gate exercises two small banks and all eight cases, including checkpoint

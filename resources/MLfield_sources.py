@@ -1,4 +1,4 @@
-"""Case 1(i) source/correction and loss ablations using the existing trainer."""
+"""Reusable predicted/true/corrected field-source fitting and evaluation helpers."""
 import copy
 import hashlib
 import json
@@ -9,7 +9,7 @@ import torch
 
 from resources.MLdual import (DUAL_MODEL, DualLoss, DualStageTransformer,
     FieldCorrectionStage, IndependentTaskTransformers, _task_stage, _json_safe)
-from resources.MLindependence import (load_bank, fingerprint, fold_data,
+from resources.MLcrossfit import (load_bank, fingerprint, fold_data,
     prepare_bank, training_groups, _fit_groups, _field_predictions)
 
 
@@ -50,7 +50,7 @@ def _fit_corrector(network, data, inputs, args, path, metadata):
 def corrected_predictions(net, data, inputs, split, args):
     """Reuse batched prediction with cached field inputs in the geometry slot."""
     from torch.utils.data import DataLoader
-    from resources.MLindependence import _CurveInputs
+    from resources.MLcrossfit import _CurveInputs
     from resources.MLdual import _move_to_device
     net.eval()
     chunks = {m: [] for m in ("UT", "FT")}
@@ -215,7 +215,7 @@ def prepare_correction_bank(model, args, path, metadata):
                     source_policy="corrected predicted fields; frozen Case1(i) curve readout")
 
 
-def train_followup(model, args, path, metadata):
+def train_field_sources(model, args, path, metadata):
     data, net = model.data, model.model
     cached, _ = load_bank(net, data, args, args.field_bank)
     metadata.update(field_bank=str(args.field_bank),

@@ -320,6 +320,13 @@ fi
 
 # Copy the framework and entry point; the dual preset reuses its tested runner.
 rsync -av "$REPO_ROOT/resources/" "$SCRATCH_DIR/resources/"
+if [[ "$SCRIPT_SRC" == "$ML_CODE_DIR"/studies/* ]]; then
+    # Preserve the source-relative layout so study entry points use the same
+    # common runner path locally and in scratch, without copied training logic.
+    SCRIPT_LOCAL=$SCRATCH_DIR/${SCRIPT_SRC#"$ML_CODE_DIR"/}
+    mkdir -p "$(dirname "$SCRIPT_LOCAL")" "$SCRATCH_DIR/DualOutputs"
+    rsync -av "$ML_CODE_DIR/DualOutputs/A0-HPC-Dual-test.py" "$SCRATCH_DIR/DualOutputs/"
+fi
 rsync -av "$SCRIPT_SRC" "$SCRIPT_LOCAL"
 if [[ "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-trial1.py" || "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-lossTrial.py" || "$(basename "$SCRIPT_SRC")" = "A0-HPC-Dual-preflight.py" ]]; then
     rsync -av "$(dirname "$SCRIPT_SRC")/A0-HPC-Dual-test.py" "$SCRATCH_DIR/"

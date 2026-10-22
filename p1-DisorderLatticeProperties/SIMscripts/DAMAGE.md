@@ -60,7 +60,7 @@ After all required products pass, build the four additive banks with standard
 Python/NumPy. This reads only existing field identities/geometry/header metadata:
 
 ```bash
-python -m resources.damage_data --mldata-dir /ABS/MLdata --output-dir /ABS/STAGING --inventory /ABS/LAUNCH/dataset.json
+python p2-DisorderML/HPC/studies/Damage/build_damage_banks.py --mldata-dir /ABS/MLdata --output-dir /ABS/STAGING --inventory /ABS/LAUNCH/dataset.json
 ```
 
 Staging products are `{UT-UT,FT-FT,MULTI-UT,MULTI-FT}-disNodes-allD.npz` plus JSON, schema
@@ -100,7 +100,7 @@ the generated results and visual report, not the executable implementation.
 | --- | --- |
 | `p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py` | Read one explicit ODB/INP pair and write damage arrays plus provenance. Requires Abaqus Python. |
 | `resources/damage.py` | Shared element-to-strut mapping, reduction and array validation. |
-| `p2-DisorderML/code/review_damage.py` | Read saved arrays and rebuild the human-readable report and figures. Uses standard Python. |
+| `p2-DisorderML/HPC/studies/Damage/review_damage.py` | Read saved arrays and rebuild the human-readable report and figures. Uses standard Python. |
 
 There is no damage loader in `DATA` or training target/head in `MODEL`.
 The explicit dataset route prepares labels; connecting them
@@ -114,7 +114,7 @@ the chat project's working directory unchanged:
 
 ```powershell
 Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
-.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut p2-DisorderML/samples/damage-audit/UT-periodic-damage.npz --ft p2-DisorderML/samples/damage-audit/FT-periodic-damage.npz --output-dir p2-DisorderML/samples/damage-audit
+.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" --ut p2-DisorderML/samples/damage-audit/UT-periodic-damage.npz --ft p2-DisorderML/samples/damage-audit/FT-periodic-damage.npz --output-dir p2-DisorderML/samples/damage-audit
 Pop-Location
 ```
 
@@ -132,7 +132,7 @@ NPZs only and does not reopen or discover ODBs:
 ```powershell
 Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
 $damageAudit = 'p2-DisorderML/samples/damage-disordered'
-.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" `
+.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" `
   --case UT-397-maxD UT "$damageAudit/UT-397-maxD.npz" `
   --case UT-747-maxB UT "$damageAudit/UT-747-maxB.npz" `
   --case FT-747-maxB FT "$damageAudit/FT-747-maxB.npz" `
@@ -293,7 +293,7 @@ From the repository root in existing environments:
 
 ```powershell
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" --odb ODB_PATH --inp INP_PATH --task UT --output OUTPUT.npz --partial-rule failure-only
-python -c "import runpy; runpy.run_path('p2-DisorderML/code/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-audit
+python -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" --ut UT.npz --ft FT.npz --output-dir Z:/00-PhD-gitRepo/p2-DisorderML/samples/damage-audit
 python -m unittest discover -s p1-DisorderLatticeProperties/SIMscripts -p test_damage_contract.py -v
 abaqus python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/test_damage_odb.py', run_name='__main__')" --npz OUTPUT.npz
 ```

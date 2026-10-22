@@ -41,7 +41,7 @@ def _synthetic_split(rng, samples, nodes, field_features, curve_points, ft_node_
 
 class DualMLTest(unittest.TestCase):
     def test_field_property_oracle_uses_archived_ids(self):
-        script = Path(__file__).parents[1] / "FieldToProperty/A0-HPC_FieldToProperty-test.py"
+        script = Path(__file__).parents[1] / "FieldToProperty/A0-HPC_FieldToProperty.py"
         runner = runpy.run_path(str(script))
         self.assertFalse((Path(__file__).parents[1] / "FieldToCurve" / script.name).exists())
         with tempfile.TemporaryDirectory() as directory:

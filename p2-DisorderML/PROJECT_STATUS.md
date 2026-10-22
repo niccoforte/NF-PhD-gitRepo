@@ -4,6 +4,22 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Source cleanup: named Independence/Input/Loss entry points and launchers now
+  live under `HPC/studies/`, with Input/Damage Python reviews/tests moved out of
+  code/. Imported cross-fitting/source helpers are descriptively named
+  `MLcrossfit.py`/`MLfield_sources.py`; damage preprocessing remains reusable in
+  resources, with its CLI moved to studies/Damage. Training behavior and active
+  immutable submission sources are unchanged. See the study map and Accuracy
+  checklist for the agreed damage-only/auxiliary and isolated Locality screens.
+  These new scientific experiments are plans, not submitted jobs or results.
+  Validation: local report tests7+13 and scratch-layout tests5 pass; existing
+  Mixed checkpoint reloads. Linux CPU regressions in temporary staging pass
+  independence8 and field-source12, including fake-Slurm dependency plans.
+  No scientific training job or active source snapshot changed. Obsolete
+  corrected-source home logs were rechecked absent; retained bank logs and
+  the successful preflight remain. Current live check: four seed44 banks
+  running, Mixed gate pending Priority and18 fits pending Dependency.
+
 - Current review priorities:2% global-RMSE screening applies separately to UT/FT
   fields AND curves, backed by fixed fracture-motion/peak/postpeak/work metrics,
   event counts and seed variability. Weighted training-loss totals are not
@@ -14,11 +30,13 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 - Damage's completed full-bank handback has been read and reconciled here.
   All four allD banks exist in local upstream MLdata. Next is a new masked
   native-strut consumer and isolated auxiliary-damage ML experiment, not another
-  ODB export/bank build/fixture replay. Confirm first-head/loss setup before
-  training; keep Case1(i), Mixed, exact splits and the active loss study intact.
+  ODB export/bank build/fixture replay. The first screen is agreed: seed42 final
+  generators, field-only/damage-only/auxiliary0.1/1,450 epochs/patience52;
+  implement and gate before fitting. Keep Case1(i), Mixed, exact splits and
+  the active loss study intact. Defer OOF/curves until a useful field result.
 
 - FieldToProperty's existing production entry point now lives in its own
-  HPC/FieldToProperty/ folder, retaining the -test.py filename and full450-epoch
+  HPC/FieldToProperty/ folder, named A0-HPC_FieldToProperty.py with full450-epoch
   defaults. Tests/current commands follow the new path; saved snapshots and
   MULTI/FieldToProperty archives retain their original provenance. No new
   property run or duplicated trainer is implied by the move. The relocated
@@ -87,7 +105,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 - Input suite `independent-inputs-261015`, source c0ab41a, gate31869463 and all15
   production jobs31869464–31869478 completed0:0 (verified18 October).
   All1,167 archived files/30,093,577,858 bytes are downloaded to `Z:/p2/` and
-  SHA256-verified. The new maintained `code/review_field_inputs.py` verifies18
+  SHA256-verified. The new maintained `HPC/studies/Input/review_field_inputs.py` verifies18
   validation evaluations, identical IDs/scalers/masks/truths, recomputed physical
   RMSE, frozen-source equality and nested TRAIN-only folds. Human report:
   `samples/field-input-study/README.md`; selection/transfer receipts are alongside.
@@ -186,7 +204,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   additionally authorised exactly four local disordered files: UT 397 maxD,
   UT 747 maxB, FT 747 maxB and FT 747 maxK in the same FCC sims directory.
   Separate exporter `SIMscripts/A2_DamageOUTpostProcess.py` under p1 composes
-  `resources/damage.py`; p2 `code/review_damage.py` reviews versioned saved NPZs.
+  `resources/damage.py`; p2 `HPC/studies/Damage/review_damage.py` reviews versioned saved NPZs.
   Original mesh IDs/connectivity/coordinates match; source SHA-256 hashes are
   unchanged. Periodic UT BodySet: 2,319 struts/10,075 elements (4/5 per strut),
   excluding 830 grip elements. Periodic FT: 2,259/4,024 (1/2/4/5). Both initial
@@ -279,7 +297,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 - Explicit soft/soft peak loss implemented with saved mode and historical hard-target fallback; hard peak reporting and peak-height terms unchanged. No existing experiment/HPO changed; the new corrected-loss submission is recorded above. Automatic activity weights remain distinct from sudden/non-affine anomaly weights and excluded from the matched suite. Tokenisation plan reconciled with actual correlation-PCA/KMeans prototype; other handoffs retained untouched. samples/accuracy-continuation/test-guide.md covers all 31 current dual checks with expected/observed assertions, tolerances and limits; measured mask-leakage/gradient counterexamples and affine illustrations accompany it. All 31 dual and 14 field tests pass; changed-surface validator 17 non-failing/zero failed. First validator attempt timed out importing under concurrent load; thread-limited retry passed. Notebook comparison integration remains pending; existing dirty notebooks preserved.
 - Direct property oracle30367272 and preflight30367256 completed0:0; full run
   took55m23s, gate1m45s. Existing report: samples/accuracy-continuation/field-to-property.md.
-  Production runner is now HPC/FieldToProperty/A0-HPC_FieldToProperty-test.py;
+  Production runner is now HPC/FieldToProperty/A0-HPC_FieldToProperty.py;
   original immutable47fabb9/source paths remain provenance, not current commands.
   Archive: MULTI/FieldToProperty/Transformer/field-property-261004. True fields
   predict UT Strength/Ductility/WoF and FT K_JIC; exact7137/793/881 IDs and

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Case1(i) follow-ups. Preview by default; explicit --submit uses B1 unchanged.
+# Shared Input/Loss submission mechanics. Study-specific wrappers supply the mode.
 set -euo pipefail
 if [ "$#" -lt 2 ]; then echo "Usage: $0 SUITE inputs|losses [--submit]"; exit 2; fi
 suite=$1; study=$2; shift 2
@@ -17,6 +17,7 @@ loss_source=${LOSS_CURVE_SOURCE:-predicted}
 input_suite=${INPUT_SUITE:-}
 reuse_suite=${FIELD_BANK_SUITE:-}
 if [ "$study" = inputs ]; then loss_source=predicted; fi
+if [ "$study" = inputs ]; then entry=studies/Input/A0-Input.py; else entry=studies/Loss/A0-Loss.py; fi
 case "$loss_source" in predicted|true|mixed|corrected|corrected_mixed) ;; *) echo "Invalid LOSS_CURVE_SOURCE: $loss_source" >&2; exit 2;; esac
 corrected=false
 [[ "$loss_source" != corrected* ]] || corrected=true
@@ -136,7 +137,7 @@ for seed in 42 43 44; do
         fi
         job=$(/opt/slurm/bin/sbatch --parsable -J "$label" -t 240:0:0 \
             --dependency="afterok:$dependency" --kill-on-invalid-dep=yes B1_ML-new.sh \
-            DualOutputs/A0-HPC-Dual-test.py "${common[@]}" --run-label "$label" "$@")
+            "$entry" "${common[@]}" --run-label "$label" "$@")
         job=${job%%;*}
         printf '%s\t%s\t%s\t%s\t%s\n' "$role" "$seed" "$job" "$dependency" "$ML_SOURCE_REVISION" >> jobs.tsv
         last_job=$job

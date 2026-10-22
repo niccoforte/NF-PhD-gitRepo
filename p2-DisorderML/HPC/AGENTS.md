@@ -8,9 +8,9 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 - `B1_ML-new.sh` stages and submits work through scratch to the archive.
 - `B2_ML-resumeHPO.sh` resumes archived cross-model studies.
 - B3 Windows defaults to external `Z:/p2`; Mac requires explicit external `LOCAL_ROOT`. Both reject Git-contained destinations and preserve relative paths; neither deletes sources. Mac supports Bash3.2, rsync/ControlMaster and `--dry-run`.
-- `CurveOutputs/`, `FieldOutputs/`, and `FieldToCurve/` own their respective single-run and cross-model HPO entry points.
+- Existing `CurveOutputs/`, `FieldOutputs/`, `FieldToCurve/` and `DualOutputs/` retain their run/HPO interfaces. New study entry points, launchers and reviews belong in `studies/<Study>/`; see `studies/README.md`. Imported training helpers stay in `resources/`. Do not copy trainers or rename immutable submissions.
 - `DualOutputs/A0-HPC-Dual-test.py` owns dual runs; Trial1 is a thin preset staged with it by B1. Its HPO entry calls `MLdualHPO` for single-worker full-data search/explicit resume through B1. README owns ranges/ranking/recovery; `test_dual_contract.py` protects architecture, HPO and review contracts.
-- `FieldToProperty/A0-HPC_FieldToProperty-test.py` is the production-default true-field oracle for UT Strength/Ductility/WoF and FT K_JIC. It reuses `DUAL_DATA`, the encoder and trainer without disorder/context input. Store under `MULTI/FieldToProperty/Transformer/<label>`; use property JSON/plots, not curve loaders. Preserve exact frozen split IDs, unique-ID property joins, train-only scales and validation selection; test targets stay unevaluated. `--nsims`/`--epochs 1` are explicit debug overrides; gate new full runs through B1. See its README; do not duplicate the completed production run.
+- `FieldToProperty/A0-HPC_FieldToProperty.py` is the production true-field oracle (UT Strength/Ductility/WoF, FT K_JIC), without disorder/context. Use its README and property loader, exact split/unique-ID joins, train-only scaling and validation selection. Locked test stays unevaluated. Do not repeat the completed run because the source moved/was renamed.
 
 ## Durable Guardrails
 
@@ -45,8 +45,7 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 
 - `DualOutputs/A0-HPC-Damage-contract.py` replays only the six handoff fixtures: STATUS masks, INP identity, endpoint/frame layout and NumPy/Torch reload, not training. Use disposable B1 retention; see README. Layout matches do not prove specimen joins.
 
-- `DualOutputs/B4_Independent-followups.sh`: Case1(i) losses now use `mixed`, without correction. `FIELD_BANK_SUITE` reuses12 banks for18 new curve fits; verify completed0:0/artifacts or active afterok dependencies plus a new gate. Runtime bank checks, fixed selection and source hashes remain strict; see README.
-- `DualOutputs/B4_Dual-independence.sh` previews eight sharing cases: one8h gate, six OOF banks,24 full240h fits across seeds42/43/44 through B1. Explicit `--submit` requires user authority. The adjacent README owns cases, isolation, bank contracts and safeguards. Do not mix deferred losses/features or gradient diagnostics into this suite.
+- Named study wrappers preview unless `--submit`. Keep strict bank/seed/scaler/source checks and afterok gates; `studies/README.md` owns entry paths and each study guide owns cases/resources. Mixed loss continuation reuses12 compatible banks; do not resubmit them or mix new features into frozen comparisons.
 - `../handoffs/HANDOFFS.md` routes separate tasks; read only the relevant brief. Passing tests is not researcher sign-off. Verify saved loss classes/nonzero coefficients. Fresh `--curve-loss-ablation` baseline/source fits use the five-case `--curve-loss-suite` gate; combined variants have soft targets and differ only in location weight. Preserve fixed selection, MSE controls and historical runs. PROJECT_STATUS owns submission evidence.
 - Do not retain verified useless failed-run logs/empty outputs in the results archive. Audit and obtain exact-target cleanup authority first; a failed HPO can contain valuable resumable checkpoints and must not be erased merely for its exit status. The 4 October failed-bootstrap cleanup is complete, not a handoff task; see the adjacent DualOutputs README.
 

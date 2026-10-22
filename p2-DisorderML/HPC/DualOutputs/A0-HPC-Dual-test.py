@@ -282,8 +282,8 @@ def main(argv=None, preset=None):
     }
     metadata_path = run_dir / "run_metadata.json"
     if args.followup_study:
-        import resources.MLfollowup as followup_module
-        import resources.MLindependence as independence_module
+        import resources.MLfield_sources as followup_module
+        import resources.MLcrossfit as independence_module
         import resources.MLfield as field_module
         for module in (followup_module, independence_module, field_module):
             source_path = Path(module.__file__)
@@ -334,7 +334,7 @@ def main(argv=None, preset=None):
     }
     stage_config["curve"].update(pool=args.curve_pool, use_cls_token=args.curve_cls_token)
     if args.independence_case:
-        from resources.MLindependence import CASES
+        from resources.MLcrossfit import CASES
         independent_field, independent_curve, _ = CASES[args.independence_case]
         stage_config["field"]["independent_tasks"] = independent_field
         stage_config["curve"]["independent_tasks"] = independent_curve
@@ -387,7 +387,7 @@ def main(argv=None, preset=None):
         curve_normalizers=data.normalizers["curve"] if args.loss == "combined" else None,
     )
     if args.field_loss_variant == "sudden":
-        from resources.MLfollowup import field_objective
+        from resources.MLfield_sources import field_objective
         objective = field_objective(data, args)
     if args.base_model_json and not args.independence_case:
         from resources.MLmodels import _model_build_loss_from_config
@@ -455,8 +455,8 @@ def main(argv=None, preset=None):
     print(f"Parameters: {sum(p.numel() for p in network.parameters()):,}; active loss weights: {model.lossf.weights}", flush=True)
     started = time.monotonic()
     if args.followup_study:
-        from resources.MLfollowup import prepare_correction_bank, train_followup, field_objective
-        from resources.MLindependence import prepare_bank
+        from resources.MLfield_sources import prepare_correction_bank, train_field_sources, field_objective
+        from resources.MLcrossfit import prepare_bank
         metadata["training_mode"] = ("independent_field_correction" if args.prepare_correction_bank
                                      else "independent_field_bank" if args.prepare_field_bank
                                      else "independent_curve_fits")
@@ -466,9 +466,9 @@ def main(argv=None, preset=None):
             prepare_bank(model, "1i", args, run_dir, metadata,
                          loss_factory=(lambda d: field_objective(d, args)) if args.field_loss_variant else None)
         else:
-            train_followup(model, args, run_dir, metadata)
+            train_field_sources(model, args, run_dir, metadata)
     elif args.independence_case:
-        from resources.MLindependence import prepare_bank, train_case
+        from resources.MLcrossfit import prepare_bank, train_case
         operation = prepare_bank if args.prepare_field_bank else train_case
         operation(model, args.independence_case, args, run_dir, metadata)
     elif args.experiment == "winner_probe":

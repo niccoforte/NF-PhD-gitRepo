@@ -1,4 +1,4 @@
-"""Visual review of explicitly named strut-damage NPZs; no ODB/model access."""
+"""Damage-study visual review of named strut NPZs; no ODB/model access."""
 import argparse
 import csv
 import json
@@ -530,7 +530,7 @@ research products remain ignored by Git. No simulation, model architecture, trai
 or archive-wide discovery is part of this report.
 
 Maintained implementation: p1 `A2_DamageOUTpostProcess.py`, shared `resources/damage.py`,
-p2 `code/review_damage.py`. The [quick start](../../../p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
+p2 `HPC/studies/Damage/review_damage.py`. The [quick start](../../../p1-DisorderLatticeProperties/SIMscripts/DAMAGE.md)
 contains execution commands; the full array specification is an optional reference.
 """
     (output/"README.md").write_text(report, encoding="utf-8")

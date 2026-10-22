@@ -1,4 +1,4 @@
-"""Matched sharing comparison; reuse DUAL_DATA/DUAL_MODEL, not a second trainer.
+"""Reusable training groups and cross-fitted field banks for staged ML models.
 
 Stage-separated fits consume cross-fitted TRAIN predictions and frozen validation
 predictions. Outer test targets are never evaluated. Banks are reusable artifacts.

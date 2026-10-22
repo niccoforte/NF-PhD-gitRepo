@@ -1,7 +1,7 @@
 #!/bin/bash
 # Preview by default. Immutable source snapshot; B1 owns scratch and archiving.
 set -euo pipefail
-if [ "$#" -lt 1 ]; then echo "Usage: bash B4_Dual-independence.sh SUITE [--submit]"; exit 2; fi
+if [ "$#" -lt 1 ]; then echo "Usage: bash B4_Independence.sh SUITE [--submit]"; exit 2; fi
 suite=$1; shift
 if [[ ! "$suite" =~ ^[A-Za-z0-9_-]+$ ]]; then echo "Invalid suite label"; exit 2; fi
 submit=false
@@ -47,7 +47,7 @@ for seed in "${seeds[@]}"; do
         label=$suite-bank-$bank-s$seed
         job=$(/opt/slurm/bin/sbatch --parsable -J "$label" -t 240:0:0 \
             --dependency="afterok:$gate" --kill-on-invalid-dep=yes B1_ML-new.sh \
-            DualOutputs/A0-HPC-Dual-test.py "${common[@]}" --independence-case "$bank" --prepare-field-bank --run-label "$label")
+            studies/Independence/A0-Independence.py "${common[@]}" --independence-case "$bank" --prepare-field-bank --run-label "$label")
         job=${job%%;*}
         if [ "$bank" = 1i ]; then independent_job=$job; else shared_job=$job; fi
         printf 'bank-%s\t%s\t%s\t%s\t%s\n' "$bank" "$seed" "$job" "$gate" "$ML_SOURCE_REVISION" >> jobs.tsv
@@ -64,7 +64,7 @@ for seed in "${seeds[@]}"; do
         label=$suite-${case}p-s$seed
         job=$(/opt/slurm/bin/sbatch --parsable -J "$label" -t 240:0:0 \
             --dependency="afterok:$dependency" --kill-on-invalid-dep=yes B1_ML-new.sh \
-            DualOutputs/A0-HPC-Dual-test.py "${common[@]}" --independence-case "$case" --run-label "$label" "${options[@]}")
+            studies/Independence/A0-Independence.py "${common[@]}" --independence-case "$case" --run-label "$label" "${options[@]}")
         job=${job%%;*}
         printf '%sp\t%s\t%s\t%s\t%s\n' "$case" "$seed" "$job" "$dependency" "$ML_SOURCE_REVISION" >> jobs.tsv
     done

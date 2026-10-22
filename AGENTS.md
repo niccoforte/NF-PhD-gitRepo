@@ -38,6 +38,7 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 
 ## Editing Rules
 
+- HIGH PRIORITY: study entry points, launchers and study-specific review scripts belong in `p2-DisorderML/HPC/studies/<Study>/`; `resources/` contains imported functions/classes, not job CLIs. Use descriptive study names; production scripts must not be newly labelled `-test`. Preserve established unrelated entry points and active immutable submissions.
 - Read the script/notebook plus the shared helper it calls before changing behavior.
 - Preserve file naming and index conventions between p1 and p2. In particular, `Ductile`, `Fracture`, `UT`, `FT`, `MULTI`, `per`, `disNodes`, `disStruts`, and simulation id `0` for the periodic reference have downstream meaning.
 - Keep path overrides explicit in notebooks and scripts. Do not hide new global path constants inside shared modules.

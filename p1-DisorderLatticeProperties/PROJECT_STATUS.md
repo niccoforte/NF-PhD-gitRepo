@@ -30,7 +30,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 - Abaqus generation and export: `SIMscripts/A1_FractureToughness-Ductility.py` and the active `SIMscripts/A2_*.py` exporters.
 - Opt-in damage route: `SIMscripts/A2_DamageOUTpostProcess.py`,
-  `resources/damage.py` and p2 `code/review_damage.py`; readable products under
+  `resources/damage.py` and p2 `HPC/studies/Damage/review_damage.py`; readable products under
   `p2-DisorderML/samples/damage-audit/` (periodic) and the separate
   `p2-DisorderML/samples/damage-disordered/` comparison.
 - ML-ready processing: `code/DataProcessing.ipynb`, `code/InputsOutputs.ipynb`, `resources/data_processing.py`, and `resources/MLdata.py`.

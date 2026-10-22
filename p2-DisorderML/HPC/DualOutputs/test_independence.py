@@ -14,7 +14,7 @@ import numpy as np
 import torch
 
 from resources.MLdual import DUAL_DATA, DUAL_MODEL, DualLoss, DualStageTransformer
-from resources.MLindependence import CASES, training_groups, prepare_bank, train_case, fold_data, _fit_groups
+from resources.MLcrossfit import CASES, training_groups, prepare_bank, train_case, fold_data, _fit_groups
 
 
 def fixture(ntrain=12):
@@ -157,7 +157,7 @@ class IndependenceTests(unittest.TestCase):
             torch.testing.assert_close(value, model.model.state_dict()[k], rtol=0, atol=0)
 
     def test_preview_is_non_submitting_and_complete(self):
-        script = Path(__file__).with_name("B4_Dual-independence.sh")
+        script = Path(__file__).parents[1]/"studies/Independence/B4_Independence.sh"
         result = subprocess.run(["bash", str(script), "preview-only"], capture_output=True, text=True, check=True)
         self.assertEqual(result.stdout.count("Case "), 24)
         self.assertIn("240h", result.stdout)

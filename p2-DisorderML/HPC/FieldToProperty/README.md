@@ -1,9 +1,9 @@
 # Field-to-property experiment
 
-`A0-HPC_FieldToProperty-test.py` is the production entry point: full data,
-450 maximum epochs, early stopping52 and CUDA by default. `test` follows the
-existing HPC experiment naming convention; it is not a synthetic unit test or
-a reduced preflight. There is no separate, duplicated production/trial script.
+`A0-HPC_FieldToProperty.py` is the production entry point: full data,
+450 maximum epochs, early stopping52 and CUDA by default. The former `-test`
+suffix has been removed from the maintained production filename. There is no
+separate, duplicated production/trial script.
 
 It predicts UT Strength/Ductility/WoF and FT K_JIC from true displacement
 histories, reusing the existing encoder and trainer. Supply `--base-model-json`
@@ -14,7 +14,7 @@ physical-context channels are provided. This is an oracle diagnostic, not a
 deployable disorder-to-property surrogate.
 
 Launch through `../B1_ML-new.sh` with the HPC-relative script argument
-`FieldToProperty/A0-HPC_FieldToProperty-test.py`. A disposable preflight adds
+`FieldToProperty/A0-HPC_FieldToProperty.py`. A disposable preflight adds
 `--nsims 64 --epochs 1` and a `preflight` run label; full runs omit these debug
 overrides and retain the established240h/1GPU/12CPU/90000MB policy.
 

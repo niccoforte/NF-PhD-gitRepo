@@ -1,4 +1,4 @@
-"""Review saved Case1(i) field-source experiments without training or test access."""
+"""Input-study report: saved Case1(i) field-source results, no training or test access."""
 import argparse
 import hashlib
 import json

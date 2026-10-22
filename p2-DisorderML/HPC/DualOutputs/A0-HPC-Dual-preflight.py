@@ -77,7 +77,7 @@ def main():
         print("Case1(i) follow-up GPU/data/save/reload gate passed.", flush=True)
         return
     if args.independence_suite:
-        from resources.MLindependence import CASES
+        from resources.MLcrossfit import CASES
         # The subset gate cannot exercise full-population split validation.
         model = runner(["--experiment", "baseline", "--base-model-json", args.base_model_json,
                         "--independence-case", "3ii", "--epochs", "1",

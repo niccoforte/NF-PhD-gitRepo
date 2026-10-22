@@ -1,4 +1,4 @@
-"""Review explicit FIELDd products; no ODB access, HPC calls or model evaluation."""
+"""Damage-dataset report from FIELDd products; no ODB/HPC access or model evaluation."""
 import argparse
 import csv
 import hashlib
@@ -373,7 +373,7 @@ def review(products, output_dir, execution_json=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--product", action="append", required=True, help="Explicit strut_status_v1 FIELDd NPZ; repeat")
-    parser.add_argument("--output-dir", default=str(Path(__file__).resolve().parents[1]/"samples"/"damage-dataset"))
+    parser.add_argument("--output-dir", default=str(Path(__file__).resolve().parents[3]/"samples"/"damage-dataset"))
     parser.add_argument("--execution-json", help="Optional supplied job/status and periodic-identity record")
     args = parser.parse_args()
     records = review(args.product, args.output_dir, args.execution_json)

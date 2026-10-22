@@ -20,8 +20,8 @@ import torch
 
 from test_independence import fixture, model_for, arguments
 from resources.MLdual import DualStageTransformer, DualLoss, FieldCorrectionStage
-from resources.MLindependence import prepare_bank, _CurveInputs, _fit_groups
-from resources.MLfollowup import prepare_correction_bank, train_followup, new_corrector, field_objective, reference_model
+from resources.MLcrossfit import prepare_bank, _CurveInputs, _fit_groups
+from resources.MLfield_sources import prepare_correction_bank, train_field_sources, new_corrector, field_objective, reference_model
 
 
 class FollowupTests(unittest.TestCase):
@@ -124,7 +124,7 @@ exec bash "$@"
             baseline=model_for(data,'1i')
             meta={'run_config':{'seed':42}}
             (root/'baseline').mkdir()
-            train_followup(baseline,a,root/'baseline',meta)
+            train_field_sources(baseline,a,root/'baseline',meta)
             baseline.save(root/'baseline',metadata=meta)
             a.reference_model_json=str(root/'baseline/model.json')
             correction=model_for(data,'1i');corrector_dir=root/'correction';corrector_dir.mkdir()
@@ -148,7 +148,7 @@ exec bash "$@"
             for source in ('predicted','true','mixed','corrected','corrected_mixed'):
                 a.curve_training_source=source;a.correction_bank=str(corrector_dir)
                 fit=model_for(data,'1i');dest=root/source;dest.mkdir()
-                train_followup(fit,a,dest,{})
+                train_field_sources(fit,a,dest,{})
                 saved=fit.save(dest)
                 clone=DualStageTransformer.from_config(fit.model.get_config())
                 clone.load_state_dict(fit.model.state_dict(),strict=True)
@@ -229,8 +229,8 @@ exec bash "$@"
                 reference_model(model,a,'changed')
             a.field_bank=str(root);(root/'field_bank.npz').write_bytes(b'changed')
             destination=root/'correction';destination.mkdir()
-            with mock.patch('resources.MLfollowup.load_bank',return_value=({},{})), \
-                 mock.patch('resources.MLfollowup.prepare_bank') as nested:
+            with mock.patch('resources.MLfield_sources.load_bank',return_value=({},{})), \
+                 mock.patch('resources.MLfield_sources.prepare_bank') as nested:
                 with self.assertRaisesRegex(ValueError,'hash mismatch'):
                     prepare_correction_bank(model,a,destination,{})
                 nested.assert_not_called()
@@ -288,7 +288,7 @@ exec bash "$@"
                         self.assertFalse(set(outer['heldout_train_ids']) & set(descriptor['data']['sample_ids']['train']))
             a.curve_training_source='corrected_mixed';a.correction_bank=str(dest)
             fit=model_for(data,'1i');adapted=root/'adapted';adapted.mkdir()
-            train_followup(fit,a,adapted,{})
+            train_field_sources(fit,a,adapted,{})
             self.assertTrue((adapted/'fixed_readout_curves.npz').is_file())
             for key,value in correction.model.field_model.state_dict().items():
                 torch.testing.assert_close(fit.model.field_model.state_dict()[key],value,rtol=0,atol=0)
@@ -325,7 +325,7 @@ exec bash "$@"
         bash=shutil.which('bash')
         if bash is None:
             self.skipTest('Bash unavailable; launcher requires a shell')
-        script=Path(__file__).with_name('B4_Independent-followups.sh').read_text()
+        script=(Path(__file__).parents[1]/'studies/B4_Field-source-study.sh').read_text()
         wrapper=(Path(__file__).resolve().parents[1]/'B1_ML-new.sh').read_text()
         for directive in ('#SBATCH -n 12','#SBATCH --cpus-per-gpu=12','#SBATCH --mem-per-cpu=7500M','#SBATCH --gres=gpu:1'):
             self.assertIn(directive,wrapper)
@@ -393,7 +393,8 @@ exec bash "$@"
                     self.assertIn('240:0:0',command)
                     self.assertIn('--kill-on-invalid-dep=yes',command)
                     self.assertNotIn('--nsims',command)
-                    cli=command[command.index('DualOutputs/A0-HPC-Dual-test.py')+1:]
+                    entry='studies/Input/A0-Input.py' if study=='inputs' else 'studies/Loss/A0-Loss.py'
+                    cli=command[command.index(entry)+1:]
                     anchor_index=cli.index('--base-model-json');del cli[anchor_index:anchor_index+2]
                     parsed=parse(cli)
                     self.assertEqual(parsed.seed,int(row[1]))
