@@ -154,6 +154,7 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 |       +-- B1_ABAQUS-inp-rerun.sh
 |       +-- B2_ABAQUS-PPscratch-new.sh
 |       +-- B3_ABAQUS-transfer.sh
+|       +-- B3_ABAQUS-archive.sh
 |       +-- run-local.ps1
 |       +-- odbUpgrade.py
 |       +-- OldScriptVersions/
@@ -256,6 +257,7 @@ This folder contains the active local and HPC Abaqus workflow.
 | `B1_ABAQUS-inp-rerun.sh` | Runs existing `.inp` files and can post-process them in place. |
 | `B2_ABAQUS-PPscratch-new.sh` | Legacy archived post-processing plus explicit manifest-driven `--damage-only` batches; see `SIMscripts/DAMAGE.md`. |
 | `B3_ABAQUS-transfer.sh` | Transfers `transfer/` files and archives between QMUL HPC and local `Z:/p1/data/Ti`. |
+| `B3_ABAQUS-archive.sh` | Resumable, download-only Windows mirror of the complete HPC p1 archive into `Z:/p1/HPCarchive`; preserves relative directories, including non-Ti content. |
 | `run-local.ps1` | Local Windows launcher for Abaqus testing. |
 | `odbUpgrade.py` | ODB upgrade helper. It can delete old ODBs depending on configuration, so treat it carefully. |
 
@@ -266,6 +268,36 @@ LAT nnx unitCellSize mode material rD DIS fac distribution target initial nJobs 
 ```
 
 `OldScriptVersions/` contains historical Abaqus, UGE, and Akash-origin scripts. These are useful for provenance but should not be treated as the active workflow unless explicitly needed.
+
+#### Download the complete p1 archive to Windows
+
+Use [B3_ABAQUS-archive.sh](p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh), not the selective/consolidating B3 transfer mode. It copies the contents of `/data/SEMS-TaoLab/Niccolo-Forte/p1/` directly into `Z:/p1/HPCarchive/`: for example, remote `p1/Ti/data/...` becomes local `HPCarchive/Ti/data/...`. It does not filter file types, extract archives, change model metadata or alter existing notebook data paths.
+
+The PC already has Git Bash, Python and PuTTY. Authenticate the shared `HPC` PuTTY session and leave it open. In Git Bash:
+
+```bash
+# Offline plan only: no connection or filesystem writes
+bash /z/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh --dry-run
+
+# Start the full download; rerun the same command after an interruption
+bash /z/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh
+
+# Optional later paths/types/file-size comparison, without downloading
+bash /z/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh --check-only
+```
+
+Alternatively, launch in the background from PowerShell:
+
+```powershell
+Start-Process -WindowStyle Hidden -FilePath 'C:\Program Files\Git\bin\bash.exe' `
+  -ArgumentList 'Z:/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh' `
+  -RedirectStandardOutput 'Z:\p1\HPCarchive-download.log' `
+  -RedirectStandardError 'Z:\p1\HPCarchive-download.err.log'
+```
+
+Keep the PC awake and the p1 source unchanged until the copy and any resumes finish. The active resume marker is `Z:/p1/HPCarchive.resume.json`, outside the mirrored tree; do not delete it while an interrupted transfer needs resuming. It is removed after success. A nonempty destination without the matching marker is refused rather than blindly merged; `--check-only` can still inspect it. Client errors and verification mismatches return failure, leaving partial files for resume, not a false success. Windows-incompatible names, case collisions, symlinks and special files stop the transfer rather than being renamed or skipped; exFAT cannot preserve Unix permissions/symlinks.
+
+The script checks the complete relative tree and file sizes and detects source metadata changes during transfer; **it does not compute full content checksums**. SFTP protects transmission, but size agreement is not independent byte-for-byte verification. Keep HPC originals until separate content verification and explicit cleanup approval. Downloading alone does not release HPC quota; the script never deletes remote data. The existing `B3_ABAQUS-transfer.sh` and `Z:/p1/data/Ti` processing layout are unchanged.
 
 ### `p1-DisorderLatticeProperties/code/`
 
@@ -682,7 +714,8 @@ Common local paths:
   `samples/AGENTS.md`, not generated copies. Merge incoming Mac
   artifacts without overwriting unrelated content. PuTTY sharing transfers use
   PSCP; Windows B3 already defaults to `Z:/p2` via its OpenSSH route.
-- p1 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`
+- Full p1 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1`; dedicated Windows mirror `Z:/p1/HPCarchive`. Existing processed/local Ti data stays separate under `Z:/p1/data/Ti`.
+- p1 Ti simulation data within that archive: `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`
 - p2 HPC archive: `/data/SEMS-TaoLab/Niccolo-Forte/p2`
 
 `MLdata`, including its subfolders, contains only files directly consumed by ML

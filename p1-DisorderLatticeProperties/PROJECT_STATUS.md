@@ -4,6 +4,15 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
+- Full-p1 quota-offload download is prepared in `SIMscripts/B3_ABAQUS-archive.sh`:
+  entire HPC p1 root to `Z:/p1/HPCarchive`, not only Ti/data or transfer products.
+  The researcher will start it; no live transfer or remote cleanup was run in
+  preparation. Existing data-loading paths and the selective B3 remain unchanged.
+  Completion verifies relative paths/types/sizes, not full content hashes;
+  remote deletion requires separate verification and explicit authority.
+  Thirteen offline archive-transfer tests pass, including source-change refusal,
+  partial resume, path/name guards, free-space and final completeness checks.
+  Bash parsing passes. No live client authentication/throughput was tested.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
   aligned banks and visual report are ready for the separate ML workflow.

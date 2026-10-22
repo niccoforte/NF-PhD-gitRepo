@@ -14,6 +14,7 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 | Joint serial UT/FT training | `resources/MLdual.py` |
 | Diagnostics and run discovery | `resources/MLmetrics.py` |
 | Remote/local archive paths | p2 `HPC/B3_ML-transfer-mac.sh` and `HPC/B3_ML-transfer-windows.sh` |
+| Full p1 archive mirror | p1 `SIMscripts/B3_ABAQUS-archive.sh`: complete remote p1 contents into external `Z:/p1/HPCarchive`, preserving archive-relative paths; separate from consolidated transfer/MLdata and existing consumers. |
 
 ## Stable identity and naming
 
