@@ -46,6 +46,10 @@ on actual initial struts, with differentiably reconstructed disordered vectors.
 CNN updates are occupancy-masked and normalized by valid-neighbour count. A grid
 convolution is not a graph convolution and can mix sites across a geometric gap;
 it never claims missing material or load-bearing connections exist there.
+CNN refinement is before global attention in this screen, like the graph block;
+this is not a displacement-output CNN decoder. Additional block parameters are
+reported; common-base capacity is held fixed, not total parameter count. An
+unhelpful result at these presets does not reject an entire architecture family.
 
 `DUAL_MODEL(field_only_modes=(TASK,))` executes/trains only the selected field
 network. The saved standard container still has frozen unused stages for reload,

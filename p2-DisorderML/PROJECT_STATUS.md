@@ -20,6 +20,15 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   pass on Linux, independence8 and source12 pass locally. Changed-surface18 and
   contract97 checks are non-failing/zero failures; saved Mixed checkpoint reload
   remains unchanged. GPU scientific execution is a separate gate, not implied.
+  Locality suite submitted from immutable6bd3354: gate32886658 and16 field-only
+  fits32886659–32886674, seed42. Home manifest:
+  `/data/home/exy053/p2/MULTI/Dual/Transformer/locality-261022/jobs.tsv`.
+  The live post-submit check found gate PENDING Priority and all16 fits PENDING
+  Dependency; GPU gate success/accuracy is not yet established. Full requests
+  are240h/1GPU/12CPU/90000MB with afterok and invalid-dependency cancellation.
+  Archive labels are `MULTI/Dual/Transformer/locality-261022-<variant>-<UT|FT>-s42`.
+  Current Mixed loss-study submissions/snapshots were left untouched. Do not
+  submit this suite again; review existing IDs on continuation.
 
 - Source cleanup: named Independence/Input/Loss entry points and launchers now
   live under `HPC/studies/`, with Input/Damage Python reviews/tests moved out of
