@@ -23,6 +23,7 @@ class ArchiveTransfer(unittest.TestCase):
         self.destination = Path(self.temporary.name) / "copy with spaces"
         self.entries = {"Ti": ["d", 0, "1.0"], "Ti/empty": ["d", 0, "1.0"],
                         "Ti/.hidden": ["f", 4, "1.0"],
+                        "Ti/zero.txt": ["f", 0, "1.0"],
                         "Ti/sample [1].inp": ["f", 6, "1.0"],
                         "Al": ["d", 0, "1.0"], "Al/model.odb": ["f", 8, "1.0"]}
         self.arguments = ["--destination", str(self.destination)]
@@ -34,14 +35,30 @@ class ArchiveTransfer(unittest.TestCase):
     def client(self, command, **kwargs):
         if "-b" in command:
             self.batch = Path(command[command.index("-b") + 1]).read_text(encoding="utf-8")
-            for name, (kind, size, _) in self.entries.items():
-                if kind == "f":
-                    (self.destination / name).write_bytes(b"x" * size)
-        return subprocess.CompletedProcess(command, 0)
+            for line in self.batch.splitlines():
+                if line == "quit":
+                    continue
+                operation, remote, _, local, _ = line.split('"')
+                path = Path(local)
+                self.assertEqual(local, path.as_posix())
+                name = path.relative_to(self.destination).as_posix()
+                size = self.entries[name][1]
+                if operation.strip() == "reget":
+                    # Match the real client: resuming a nonexistent file is an error.
+                    self.assertTrue(path.is_file(), "PSFTP reget needs an existing local file")
+                    with path.open("ab") as target:
+                        target.write(b"x" * (size - path.stat().st_size))
+                else:
+                    self.assertEqual(operation.strip(), "get")
+                    self.assertFalse(path.exists() and path.stat().st_size,
+                                     "get must not overwrite an existing partial prefix")
+                    path.write_bytes(b"x" * size)
+        return types.SimpleNamespace(poll=lambda: 0, wait=lambda: 0)
 
     def invoke(self, *extra, snapshot=None, client=None):
         with patch.object(archive, "inventory", return_value=snapshot or self.entries), \
                 patch.object(archive.subprocess, "run", side_effect=client or self.client), \
+                patch.object(archive.subprocess, "Popen", side_effect=client or self.client), \
                 redirect_stdout(io.StringIO()):
             archive.main(self.arguments + list(extra))
 
@@ -62,11 +79,12 @@ class ArchiveTransfer(unittest.TestCase):
         self.assertFalse(self.destination.with_name(self.destination.name + ".resume.json").exists())
         self.assertIn("/p1/Al/model.odb", self.batch)
         self.assertIn("sample \\[1\\].inp", self.batch)
-        self.assertTrue(all(line.startswith("reget ") or line == "quit" for line in self.batch.splitlines()))
+        self.assertTrue(all(line.startswith("get ") or line == "quit" for line in self.batch.splitlines()))
+        self.assertTrue((self.destination / "Ti/zero.txt").is_file())
 
     def interrupt(self, command, **kwargs):
         if "-b" in command:
-            (self.destination / "Ti/.hidden").write_bytes(b"xx")
+            (self.destination / "Ti/.hidden").write_bytes(b"ab")
             raise subprocess.CalledProcessError(1, command)
         return subprocess.CompletedProcess(command, 0)
 
@@ -76,7 +94,46 @@ class ArchiveTransfer(unittest.TestCase):
         self.assertEqual((self.destination / "Ti/.hidden").stat().st_size, 2)
         self.assertTrue(self.destination.with_name(self.destination.name + ".resume.json").is_file())
         self.invoke()
-        self.assertEqual((self.destination / "Ti/.hidden").stat().st_size, 4)
+        self.assertEqual((self.destination / "Ti/.hidden").read_bytes(), b"abxx")
+        self.assertIn('reget "', self.batch)
+        self.assertIn('get "', self.batch)
+
+    def test_completed_file_is_not_downloaded_again(self):
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.invoke(client=self.interrupt)
+        (self.destination / "Al/model.odb").write_bytes(b"complete")
+        self.invoke()
+        self.assertNotIn("/p1/Al/model.odb", self.batch)
+        self.assertEqual((self.destination / "Al/model.odb").read_bytes(), b"complete")
+
+    def test_progress_measures_new_bytes_and_file_completion(self):
+        path = Path(self.temporary.name) / "partial"
+        path.write_bytes(b"ab")
+        process = types.SimpleNamespace(poll=lambda: 0, wait=lambda: 0)
+        output = io.StringIO()
+        with patch.object(archive.subprocess, "Popen", return_value=process), redirect_stdout(output):
+            archive.download(["psftp"], [(path, 4, 2)], 2)
+        self.assertIn("0.00%", output.getvalue())
+        self.assertIn("0/1 files complete", output.getvalue())
+        path.write_bytes(b"abxx")
+        output = io.StringIO()
+        with patch.object(archive.subprocess, "Popen", return_value=process), redirect_stdout(output):
+            archive.download(["psftp"], [(path, 4, 2)], 2)
+        self.assertIn("100.00%", output.getvalue())
+        self.assertIn("1/1 files complete", output.getvalue())
+
+    def test_interrupt_terminates_only_transfer_client(self):
+        process = unittest.mock.Mock()
+        process.poll.return_value = None
+        path = Path(self.temporary.name) / "partial"
+        path.write_bytes(b"ab")
+        with patch.object(archive.subprocess, "Popen", return_value=process), \
+                patch.object(archive.time, "sleep", side_effect=KeyboardInterrupt), \
+                redirect_stdout(io.StringIO()), self.assertRaises(KeyboardInterrupt):
+            archive.download(["psftp"], [(path, 4, 2)], 2)
+        process.terminate.assert_called_once()
+        process.wait.assert_called_once()
+        self.assertEqual(path.read_bytes(), b"ab")
 
     def test_changed_source_refuses_old_partial_prefixes(self):
         with self.assertRaises(subprocess.CalledProcessError):
@@ -139,6 +196,7 @@ class ArchiveTransfer(unittest.TestCase):
         changed["Al/model.odb"][2] = "2.0"
         with patch.object(archive, "inventory", side_effect=[self.entries, changed]), \
                 patch.object(archive.subprocess, "run", side_effect=self.client), \
+                patch.object(archive.subprocess, "Popen", side_effect=self.client), \
                 redirect_stdout(io.StringIO()):
             with self.assertRaisesRegex(RuntimeError, "remote archive changed during transfer"):
                 archive.main(self.arguments)

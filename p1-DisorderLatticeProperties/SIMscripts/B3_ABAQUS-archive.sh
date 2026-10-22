@@ -3,7 +3,7 @@
 # No upload, extraction, remote deletion, Slurm submission or archive flattening.
 set -euo pipefail
 
-exec python - "$@" <<'PY'
+exec python -u - "$@" <<'PY'
 import argparse
 import hashlib
 import json
@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 SOURCE = "/data/SEMS-TaoLab/Niccolo-Forte/p1"
 
@@ -83,6 +84,44 @@ def local_plan(destination, entries):
     return pending, remaining
 
 
+def download(command, files, remaining):
+    """Run one SFTP batch and report actual local byte progress every five seconds."""
+    process = subprocess.Popen(command)
+    finished = completed = 0
+    started = time.monotonic()
+    try:
+        while True:
+            returncode = process.poll()
+            current = 0
+            while finished < len(files):
+                path, size, offset = files[finished]
+                actual = path.stat().st_size if path.is_file() else None
+                if actual is None or actual < size:
+                    current = max(0, (actual or 0) - offset)
+                    break
+                completed += size - offset
+                finished += 1
+            received = completed + current
+            percent = 100 * received / remaining if remaining else 100 * finished / len(files)
+            rate = received / max(time.monotonic() - started, 0.001) / 1e6
+            print(f"Progress: {percent:.2f}% of remaining bytes; "
+                  f"{received / 1e9:.3f}/{remaining / 1e9:.3f} GB; "
+                  f"{finished:,}/{len(files):,} files complete; {rate:.2f} MB/s average.", flush=True)
+            if finished < len(files):
+                path, size, offset = files[finished]
+                print(f"Current file: {path} ({(offset + current) / 1e6:.2f}/{size / 1e6:.2f} MB)",
+                      flush=True)
+            if returncode is not None:
+                if returncode:
+                    raise subprocess.CalledProcessError(returncode, command)
+                return
+            time.sleep(5)
+    finally:
+        if process.poll() is None:
+            process.terminate()
+        process.wait()
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=(
         "Copy the entire HPC p1 tree into Z:/p1/HPCarchive, without an extra p1 folder. "
@@ -108,9 +147,12 @@ def main(argv=None):
 
     plink = putty_client("plink")
     psftp = putty_client("psftp")
+    print("Checking the shared HPC session, then reading the remote file inventory (may take minutes)...",
+          flush=True)
     subprocess.run([plink, "-shareexists", "-load", args.session, "-l", "exy053"], check=True)
     connection = [plink, "-batch", "-share", "-load", args.session, "-l", "exy053"]
     entries = inventory(connection)
+    print("Remote inventory received; checking existing local files...", flush=True)
     pending, remaining = local_plan(destination, entries)
     count = sum(value[0] == "f" for value in entries.values())
     total = sum(value[1] for value in entries.values() if value[0] == "f")
@@ -139,6 +181,7 @@ def main(argv=None):
         raise RuntimeError("Insufficient free space: need the remaining bytes plus 1 GiB safety margin.")
     destination.mkdir(parents=True, exist_ok=True)
     marker.write_text(json.dumps(state, indent=2), encoding="utf-8")
+    print("Preparing the local directory tree...", flush=True)
     for name, value in entries.items():
         if value[0] == "d":
             (destination / name).mkdir(parents=True, exist_ok=True)
@@ -147,13 +190,20 @@ def main(argv=None):
             batch = Path(temporary) / "download.txt"
             # Per-file reget avoids recursive reget skipping a completed subtree.
             commands = []
+            files = []
             for name in sorted(pending):
                 remote = SOURCE + "/" + name
                 remote = "".join("\\" + c if c in "[]*?\\" else c for c in remote)
-                commands.append(f'reget "{remote}" "{destination / name}"')
+                local = destination / name
+                offset = local.stat().st_size if local.exists() else 0
+                # PSFTP reget requires an existing local file; get starts missing/empty files.
+                operation = "reget" if offset else "get"
+                commands.append(f'{operation} "{remote}" "{local.as_posix()}"')
+                files.append((local, entries[name][1], offset))
             batch.write_text("\n".join(commands) + "\nquit\n", encoding="utf-8")
-            subprocess.run([psftp, "-batch", "-share", "-load", args.session,
-                            "-l", "exy053", "-b", str(batch)], check=True)
+            download([psftp, "-batch", "-share", "-load", args.session,
+                      "-l", "exy053", "-b", str(batch)], files, remaining)
+    print("Transfer finished; verifying the unchanged remote inventory and local completeness...", flush=True)
     if inventory(connection) != entries:
         raise RuntimeError("The remote archive changed during transfer. Keep HPC originals and investigate before resuming.")
     if local_plan(destination, entries)[0] or any(
@@ -167,6 +217,10 @@ def main(argv=None):
 if __name__ == "__main__":
     try:
         main()
+    except KeyboardInterrupt:
+        print("\nTransfer interrupted; partial files and the resume marker are retained. Rerun to resume.",
+              file=sys.stderr)
+        sys.exit(130)
     except (OSError, ValueError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         sys.exit(1)

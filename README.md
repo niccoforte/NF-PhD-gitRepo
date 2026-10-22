@@ -289,7 +289,21 @@ bash /z/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive
 bash /z/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh --check-only
 ```
 
-Alternatively, launch in the background from PowerShell:
+To see live progress in the same PowerShell window, run in the foreground:
+
+```powershell
+& 'C:\Program Files\Git\bin\bash.exe' 'Z:/00-PhD-gitRepo/p1-DisorderLatticeProperties/SIMscripts/B3_ABAQUS-archive.sh'
+```
+
+The initial remote inventory/local checks can take minutes. During downloads,
+progress updates every five seconds: bytes/percentage remaining for this run,
+completed-file count, average speed and the current file's downloaded size.
+Missing/empty files use `get`; nonempty partial files use `reget`; completed
+files are skipped by size. Ctrl+C stops the transfer client but leaves the shared
+PuTTY session open, retaining partial files and the resume marker. Rerun the same
+command to resume; do not run two copies against the same destination.
+
+Alternatively, launch in the background from PowerShell (progress goes to logs):
 
 ```powershell
 Start-Process -WindowStyle Hidden -FilePath 'C:\Program Files\Git\bin\bash.exe' `
