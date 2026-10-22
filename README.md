@@ -11,6 +11,8 @@ At a high level:
 
 ## Quick Start
 
+The primary checkout on this Windows machine is `Z:\00-PhD-gitRepo`. Use it for project source folders, local commands, and Python/Abaqus import hooks when replacing references to the former Documents checkout. Historical messages and records may still mention that former path.
+
 From the repository root, run:
 
 ```powershell

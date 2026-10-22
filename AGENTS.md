@@ -22,6 +22,7 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 
 ## Data And Path Conventions
 
+- Primary Windows checkout: `Z:/00-PhD-gitRepo`; use it for project sources, commands, and import hooks.
 - Local p1 data is commonly rooted at `Z:/p1/data/Ti/...`.
 - p2 saved runs belong under `Z:/p2`, outside Git, preserving archive-relative paths. No checkout may contain `data/`; other hosts require an explicit external root.
 - Reports/examples use only `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; other checkouts keep tracked guidance only. MLdata and its subfolders contain only files directly consumed by ML training/testing; retain optional info/audits/reports elsewhere only when needed, following the existing archive structure without an extra provenance tier.

@@ -108,13 +108,13 @@ to ML is a separate task. The checked FCC profiles support periodic bodies and
 the selected 20% nodal-disorder bodies, with independent original-joint and
 topology validation before ODB processing.
 
-To rebuild the report from the two existing saved products, use the existing
-environment below. It does not open an ODB. `Push-Location`/`Pop-Location` keep
+To rebuild the report from the two existing saved products, select a standard
+Python environment with the repository dependencies. It does not open an ODB. `Push-Location`/`Pop-Location` keep
 the chat project's working directory unchanged:
 
 ```powershell
-Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
-.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" --ut p2-DisorderML/samples/damage-audit/UT-periodic-damage.npz --ft p2-DisorderML/samples/damage-audit/FT-periodic-damage.npz --output-dir p2-DisorderML/samples/damage-audit
+Push-Location 'Z:\00-PhD-gitRepo'
+python -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" --ut p2-DisorderML/samples/damage-audit/UT-periodic-damage.npz --ft p2-DisorderML/samples/damage-audit/FT-periodic-damage.npz --output-dir p2-DisorderML/samples/damage-audit
 Pop-Location
 ```
 
@@ -130,9 +130,9 @@ simulation ID remains 397 or 747 in the export metadata. This command reads save
 NPZs only and does not reopen or discover ODBs:
 
 ```powershell
-Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
+Push-Location 'Z:\00-PhD-gitRepo'
 $damageAudit = 'p2-DisorderML/samples/damage-disordered'
-.\.venv311\Scripts\python.exe -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" `
+python -c "import runpy; runpy.run_path('p2-DisorderML/HPC/studies/Damage/review_damage.py', run_name='__main__')" `
   --case UT-397-maxD UT "$damageAudit/UT-397-maxD.npz" `
   --case UT-747-maxB UT "$damageAudit/UT-747-maxB.npz" `
   --case FT-747-maxB FT "$damageAudit/FT-747-maxB.npz" `
@@ -147,7 +147,7 @@ the original INP/ODB are read only. Use `--task FT`, the `Fracture-FCC-20-per-1`
 source stem and `FT-periodic-damage.npz` for the selected FT product.
 
 ```powershell
-Push-Location 'C:\Users\exy053\Documents\00-PhD-gitRepo'
+Push-Location 'Z:\00-PhD-gitRepo'
 & 'C:\SIMULIA\Commands\abaqus.bat' python -c "import runpy; runpy.run_path('p1-DisorderLatticeProperties/SIMscripts/A2_DamageOUTpostProcess.py', run_name='__main__')" `
   --odb 'Z:/p1/data/Ti/disNodes/0.2/FCC/sims/Ductile-FCC-20-per-1.odb' `
   --inp 'Z:/p1/data/Ti/disNodes/0.2/FCC/sims/Ductile-FCC-20-per-1.inp' `

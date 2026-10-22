@@ -80,6 +80,7 @@ Important meanings:
 
 ## How To Work Here
 
+- Windows examples in `DAMAGE.md` run from the primary `Z:/00-PhD-gitRepo` checkout with the selected standard Python environment; ODB extraction still requires Abaqus Python.
 - Use Abaqus Python for real execution of scripts that touch `mdb`, `session`, or `openOdb`.
 - Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed` from the repository root. Its Python result is syntax-only for Abaqus-dependent files and does not prove Abaqus API behavior.
 - Damage checks: run the focused damage/status tests through unittest discovery; run `test_damage_odb.py --npz PATH` in Abaqus Python for independent every-frame raw STATUS and parent failure/known-mask comparisons. It accepts full-audit and STATUS-only schemas; only full audits require SDEG spot checks. Raw FIELDu validation matches INP instance names case-insensitively, as Abaqus does, and rejects ambiguous case collisions. `DAMAGE.md` owns commands and schemas. Syntax validation is not a substitute for live read-only checks.
