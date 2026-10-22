@@ -47,17 +47,18 @@ Input suite `independent-inputs-261015` completed; do not resubmit it.
 Its18 October report selects `corrected_mixed` by fixed four-output validation
 MSE ratio (.7437907 versus P .7569784). All1,167 files are SHA256-verified locally;
 see `../samples/field-input-study/README.md` for modest per-output gains and the
-true-field diagnostic. The researcher now authorises the selected-policy loss
-study; its adapted42-job route adds newly cross-fitted correctors for changed
-generators, and keeps corrector MSE fixed. Windows runs now live in
+true-field diagnostic. The22 October cost review and researcher decision now
+select `mixed` (Predicted+True) for continued work, without correction. The
+original numerical selection remains evidence, not the active policy. Windows runs live in
 `Z:/p2` (user relocation), never checkout `data/`; generated reports belong only
 in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`, not Documents/OneDrive copies.
 Use the selected deployable input policy for the loss study, not automatically
-raw predicted-only training. Set `LOSS_CURVE_SOURCE=corrected_mixed` and
-`INPUT_SUITE=independent-inputs-261015`; raw-P defaults remain controls only.
-The selected route has12 field banks→12 new nested correction banks→12 adapted
-curve fits, plus6 frozen-pipeline curve-loss fits. Suite `independent-losses-261018`
-was submitted18 October from92d844f: gate32471749 and42 production32471750–32471791.
+raw predicted-only training. Set `LOSS_CURVE_SOURCE=mixed`,
+`INPUT_SUITE=independent-inputs-261015`, `FIELD_BANK_SUITE=independent-losses-261018`.
+Reuse its12 compatible field banks; submit only12 adapted MSE curve fits plus6
+frozen-raw-field curve-loss fits under `independent-losses-261022-mixed`, with a
+new disposable Mixed gate. Obsolete corrected-source loss jobs were cancelled
+and their incompatible outputs removed; never reuse them as Mixed controls.
 See PROJECT_STATUS and the compiled input-study report for live-check evidence;
 do not resubmit completed or already queued work. True-field oracle evaluation cannot supply
 unavailable deployment inputs. Loss coefficients remain provisional fixed presets,
@@ -152,8 +153,9 @@ use field supervision first and assess both a fixed curve readout and subsequent
 curve adaptation separately. Out-of-fold generators/scalers must not train on
 their held-out specimens; final validation/test are never corrector training data.
 Nested OOF correction, fixed-curve diagnostics and corrected-source adaptation
-are implemented; GPU/accuracy validation remains pending. No guarantee that missing
-fracture information can be reconstructed.
+are implemented and evaluated in the completed input study. The cost-aware
+decision does not retain correction in the active pipeline. No guarantee that
+missing fracture information can be reconstructed.
 
 Full available user/assistant histories of **Assess unified ML model feasibility**
 (`019efa77-a47f-7693-9e6e-f606f5fc784f`), **Summarize GNN chat changes**

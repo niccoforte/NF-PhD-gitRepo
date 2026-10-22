@@ -87,33 +87,28 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   Code --cost-evidence rechecks six saved fits and emits three figures, tables
   and source hashes; it runs no model or SSH query. Eight completed custom-loss
   banks match original controls' data/IDs/architecture/training/folds on HPC.
-  All12 field banks and three existing Mixed controls are reusable; a clean
-  no-correction continuation needs18 new curve-only fits plus its execution
-  gate, not a repeat of field-bank training. The current launcher does not yet
-  skip existing banks: reuse-aware submission needs explicit implementation/
-  approval. Snapshot11:34 BST:20 completed,8 running,14 pending. No jobs,
-  defaults, checkpoints or historical selection files were changed by this
-  recommendation; switching/cancelling remains a user decision.
+  The researcher authorised switching to Mixed on22 October. All12 field banks
+  and three existing Mixed controls are reusable. The launcher now supports
+  FIELD_BANK_SUITE, validating completed artifacts/active dependencies before
+  submission, without repeating field training. Twelve follow-up tests pass,
+  including the18-job reuse dependency graph. Historical selection is unchanged.
 
-- Selected-policy loss suite `independent-losses-261018` was submitted18 October
-  from immutable source92d844f: gate32471749, then42 full jobs32471750–32471791.
-  Explicit source `corrected_mixed`, input suite `independent-inputs-261015`.
-  Twelve custom generator banks feed12 NEW nested correction banks and12 adapted
-  MSE curve fits; six separate combined-curve fits reuse original frozen winning
-  generators/correctors. Nested generators inherit fold-local custom losses;
-  correctors retain MSE. Reference compatibility is checked before nested fitting,
-  with a bounded changed-generator hash exception and recorded source hashes.
-  All fits retain seeds42/43/44, split42, max450 epochs, stopping52 and full
-  240h/1GPU/12CPU/90000MB requests. Coefficients remain fixed starting presets.
-  The64-sample/one-epoch gate does not exercise full-population split validation.
-  Twelve follow-up, eight independence,14 field-loss,10 sudden and four report
-  tests pass; changed-surface16 and contract87 checks are non-failing/zero failed.
-  Gate completed0:0 in15m33s on an A100; all18 small fit/save/reload routes passed.
-  Its scratch was removed; no preflight archive exists. At20:32 BST all42 full jobs
-  are queued:18 gate dependencies satisfied,24 await upstream banks. No new accuracy
-  results exist yet. All43 resource/account/partition requests and all42 dependency edges
-  were verified. Manifest: home suite `jobs.tsv` and report `loss-study-jobs.tsv`.
-  Production progress needs a later live check; do not duplicate these submissions.
+- Active loss policy is Predicted+True (`mixed`), Case1(i), no corrector.
+  Reuse all12 `independent-losses-261018-bank-<variant>-s<seed>` jobs from
+  immutable92d844f: eight completed banks verified against original data/IDs,
+  architecture/training/folds; four seed44 banks remain active. Their source and
+  home manifest must remain available until pending consumers finish.
+  The30 obsolete corrected-source loss jobs are superseded:17 active jobs were
+  cancelled and their incompatible archive/scratch/home-log artifacts removed.
+  Completed original input-study comparisons remain scientific comparison evidence.
+  Replacement `independent-losses-261022-mixed` is prepared for18 curve-only fits:
+  four field variants × three seeds, plus two curve losses × three seeds.
+  Same-seed Mixed controls supply fixed readouts. Each deployment uses raw
+  predicted fields; training samples predicted/true50/50. All fits retain
+  split42, seeds42/43/44, max450 epochs/stopping52 and240h/1GPU/12CPU/90000MB.
+  No custom-loss coefficients, selection rules or locked-test boundaries change.
+  A new disposable Mixed GPU gate and unfinished-bank afterok dependencies are
+  required. Submission/GPU completion still needs recording below.
   **HIGH PRIORITY manual task:** researcher personally reviews remote home,
   scratch and archive ordering/conventions; automated checks do not complete it.
 
@@ -154,8 +149,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   existing Windows **Improve ML Accuracy** task via handoffs/HANDOFF-DAMAGE.md.
   The full four-bank corpus above replaces the old six-fixture coverage limit;
   no damage DATA/MODEL loader/head or trained accuracy result exists yet.
-  Preserve Case1(i), the selected corrected_mixed policy and ongoing42-job loss
-  suite. Reconcile its current queue/results before a separate explicit damage
+  Preserve Case1(i), the selected mixed policy and its loss-study continuation.
+  Reconcile its current queue/results before a separate explicit damage
   experiment; do not repeat extraction, delivery or completed replay31976809.
   The handback starts no job or scheduled follow-up.
 

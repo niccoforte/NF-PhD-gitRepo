@@ -343,10 +343,23 @@ exec bash "$@"
                 for role,name in [('bank-1i','field_bank.json'),('1ip','model.json')]:
                     f=base/f'independence-261013-r1-{role}-s{seed}'/name
                     f.parent.mkdir();f.write_text('{}')
-                for role,names in [('correction',('correction_bank.json','model.json')),('corrected_mixed',('model.json',))]:
+                for role,names in [('correction',('correction_bank.json','model.json')),('corrected_mixed',('model.json',)),('mixed',('model.json',))]:
                     for name in names:
                         f=base/f'winning-inputs-{role}-s{seed}'/name
                         f.parent.mkdir(exist_ok=True);f.write_text('{}')
+            reused=home/'MULTI/Dual/Transformer/reused-losses';reused.mkdir(parents=True)
+            bank_rows=['role\tseed\tjob_id\tdependency\tsource_revision']
+            for si,seed in enumerate((42,43,44)):
+                for vi,variant in enumerate(('spatial','temporal','both','sudden')):
+                    job=800+si*4+vi
+                    bank_rows.append(f'bank-{variant}\t{seed}\t{job}\t-\told-revision')
+                    if seed!=44:
+                        dest=base/f'reused-losses-bank-{variant}-s{seed}';dest.mkdir()
+                        for name in ('field_bank.json','field_bank.npz','model.mdl','model_data.json'):
+                            (dest/name).touch()
+            (reused/'jobs.tsv').write_text('\n'.join(bank_rows)+'\n')
+            sacct=root/'sacct';sacct.write_text('#!/bin/bash\ncase "$4" in 808|809|810|811) echo "PENDING|0:0";; *) echo "COMPLETED|0:0";; esac\n')
+            squeue=root/'squeue';squeue.write_text('#!/bin/bash\necho "$3"\n')
             counter=root/'counter';counter.write_text('100')
             calls=root/'calls'
             stub=root/'sbatch'
@@ -354,11 +367,15 @@ exec bash "$@"
                 f'printf "%s\\t" "$n" "$@" >> "{calls.as_posix()}"\nprintf "\\n" >> "{calls.as_posix()}"\necho "$n"\n')
             local=root/'launch.sh'
             local.write_text(script.replace('/opt/slurm/bin/sbatch',f'bash "{stub.as_posix()}"')
+                                   .replace('/opt/slurm/bin/sacct',f'bash "{sacct.as_posix()}"')
+                                   .replace('/opt/slurm/bin/squeue',f'bash "{squeue.as_posix()}"')
                                    .replace('/data/home/exy053/p2',home.as_posix()))
             env=dict(os.environ,REPO_ROOT=repo.as_posix(),ARCHIVE_ROOT=archive.as_posix())
             for suite,study,source,count in [('inputs','inputs','predicted',15),('losses-P','losses','predicted',30),
-                                             ('losses-CM','losses','corrected_mixed',42)]:
-                env.update(LOSS_CURVE_SOURCE=source,INPUT_SUITE='winning-inputs')
+                                             ('losses-CM','losses','corrected_mixed',42),
+                                             ('losses-mixed-reuse','losses','mixed',18)]:
+                reuse=suite=='losses-mixed-reuse'
+                env.update(LOSS_CURVE_SOURCE=source,INPUT_SUITE='winning-inputs',FIELD_BANK_SUITE='reused-losses' if reuse else '')
                 before=counter.read_text()
                 preview=subprocess.run([bash,str(local),suite,study],env=env,capture_output=True,text=True,check=True)
                 self.assertEqual(counter.read_text(),before)
@@ -388,9 +405,18 @@ exec bash "$@"
                     else:
                         for variant in ('spatial','temporal','both','sudden'):
                             upstream='correction-'+variant if source.startswith('corrected') else 'bank-'+variant
-                            self.assertEqual(selected[variant][3],selected[upstream][2])
+                            if reuse:
+                                self.assertNotIn(upstream,selected)
+                                vi=('spatial','temporal','both','sudden').index(variant)
+                                self.assertEqual(selected[variant][3],gate+(f':{808+vi}' if seed=='44' else ''))
+                            else:
+                                self.assertEqual(selected[variant][3],selected[upstream][2])
                             fit=commands[selected[variant][2]]
                             self.assertEqual(fit[fit.index('--curve-training-source')+1],source)
+                            if reuse:
+                                self.assertNotIn('--correction-bank',fit)
+                                self.assertIn(f'reused-losses-bank-{variant}-s{seed}',' '.join(fit))
+                                self.assertIn(f'winning-inputs-mixed-s{seed}/model.json',' '.join(fit))
                             if source.startswith('corrected'):
                                 correction=selected['correction-'+variant]
                                 self.assertEqual(correction[3],selected['bank-'+variant][2])
@@ -403,6 +429,10 @@ exec bash "$@"
                             self.assertIn(f'independence-261013-r1-bank-1i-s{seed}',' '.join(fit))
                             if source.startswith('corrected'):
                                 self.assertIn(f'winning-inputs-correction-s{seed}',' '.join(fit))
+                if reuse:
+                    reused_rows=(home/f'MULTI/Dual/Transformer/{suite}/reused-banks.tsv').read_text().splitlines()
+                    self.assertEqual(len(reused_rows),13)
+                    self.assertTrue(all('--prepare-field-bank' not in commands[r[2]] for r in rows[1:]))
 
     def test_cm_preflight_routes_each_loss_through_selected_source(self):
         preflight=runpy.run_path(str(Path(__file__).with_name('A0-HPC-Dual-preflight.py')))['main']

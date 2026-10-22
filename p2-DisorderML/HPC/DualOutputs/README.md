@@ -49,7 +49,8 @@ Locked test is untouched. There is no architecture HPO or change to legacy defau
 ```bash
 # Preview only. Run inputs first; explicit --submit queues through B1.
 bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-inputs-NEW inputs
-LOSS_CURVE_SOURCE=corrected_mixed INPUT_SUITE=independent-inputs-261015 \
+LOSS_CURVE_SOURCE=mixed INPUT_SUITE=independent-inputs-261015 \
+  FIELD_BANK_SUITE=independent-losses-261018 \
   bash p2-DisorderML/HPC/DualOutputs/B4_Independent-followups.sh independent-losses-NEW losses
 ```
 
@@ -124,26 +125,34 @@ training is cheaper and slightly better for the UT curve alone. True-trained
 curves on true validation fields remain a separate diagnostic, never deployment.
 See canonical `samples/field-input-study/README.md` and its `selection.json`.
 
-Explicitly set `LOSS_CURVE_SOURCE=corrected_mixed` and
-`INPUT_SUITE=independent-inputs-261015` for the selected run. The existing raw-P
-default remains available for controls; it is not the selected next-study setup.
-The selected suite has42 full jobs plus one disposable8h gate:
+The cost-aware review and subsequent researcher decision supersede that numerical
+selection for continued training: use **Predicted+True (`mixed`)**, without a
+corrector. Correction gave only small/mixed accuracy gains at much greater cost;
+the original input comparison and its selection file remain measured evidence.
+
+Set `LOSS_CURVE_SOURCE=mixed`, `INPUT_SUITE=independent-inputs-261015` and
+`FIELD_BANK_SUITE=independent-losses-261018` to reuse the12 compatible custom-loss
+banks. Their field training never used a corrector or curve supervision. The new
+suite `independent-losses-261022-mixed` has18 full jobs plus one disposable8h gate:
 
 | Production work | Jobs | Dependency/source |
 | --- | ---: | --- |
-| Custom-loss OOF field banks |12| Four losses × three seeds; after gate |
-| Newly nested-cross-fitted correctors |12| After their matching changed generator |
-| Adapted MSE curve fits |12| Matching new corrector;50/50 corrected/true training |
-| Combined curve loss, location off/on |6| Original frozen winning field/correction pipeline |
+| Existing custom-loss OOF field banks |0 new| Retain12 banks from18 October |
+| Adapted MSE curve fits |12| Matching raw bank;50/50 predicted/true training |
+| Combined curve loss, location off/on |6| Original raw field banks;50/50 predicted/true training |
 
-Nested generator fits inherit the same custom field loss and fold-local scales as
-their parent bank; corrector training retains MSE, isolating the generator loss.
-Correction manifests bind to the actual new generator bank. Frozen reference
-curve readouts come from the same-seed winning input-policy model. A bank-hash
+The launcher validates all12 reused jobs before submission: completed0:0 requires
+bank arrays/checkpoint/DATA sidecar; running/pending banks become afterok
+dependencies in addition to the new gate. `reused-banks.tsv` records that mapping.
+The runner still verifies IDs, scales, architecture, training and loss provenance.
+Do not pass preflight artifacts as banks. Without `FIELD_BANK_SUITE`, the raw-source
+route creates30 new jobs; this is unnecessary for the present continuation.
+
+Frozen reference curve readouts come from the same-seed `mixed` input model. A bank-hash
 difference is allowed only for explicitly changed-generator field-loss comparisons;
 seed/data/scaler/model/policy checks remain strict and run before costly fitting.
-For curve-loss comparisons, original generator/corrector state equality is checked.
-The64-sample/one-epoch GPU gate exercises all selected source/loss/correction paths,
+For curve-loss comparisons, original generator state equality is checked.
+The64-sample/one-epoch GPU gate exercises all selected source/loss paths,
 diagnostics and reload, not full-population split validation or accuracy.
 
 Reuse normalized masked-MSE field and MSE-curve controls under that policy. Test field changes
@@ -157,7 +166,7 @@ separately, with independently retrained OOF banks and final generators:
   magnitude weighting. It uses training targets only and needs no inference weights.
 
 Each variant then fits independent MSE curve models using the selected source
-policy and its appropriate OOF/true/corrected fields. Also evaluate the winning
+policy and its OOF predicted/true fields. Also evaluate the winning
 baseline's frozen curve readout on the new fields; this separates
 field improvement from downstream adaptation. Fit structured-loss jump scales and
 normalizers inside each fold. Selection remains the unchanged physical RMSE ratio,
@@ -167,8 +176,9 @@ combined in these initial comparisons.
 Separately, freeze the selected baseline field pipeline and compare `CombinedCurveLoss` with
 peak-location weight0 versus corrected soft/soft weight0.02 (beta20); both retain
 other existing curve terms/weights. The matched source-policy MSE run is the third
-control. "Unchanged baseline fields" means identical upstream model/correction
-weights and field arrays within this curve-loss comparison, not necessarily raw P.
+control. "Unchanged baseline fields" means identical upstream model weights and
+raw predicted field arrays within this curve-loss comparison. All deployment
+evaluations use predicted fields; true-field substitutions remain diagnostics.
 
 The current runner's explicit curve-test preset is MSE1, zone-MSE0.5,
 derivative0.05, peak-height0.25, work0.10 and peak-location0/0.02; soft beta20 and

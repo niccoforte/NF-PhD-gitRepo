@@ -15,6 +15,7 @@ anchor=$base/HPO/dual-joint-hpo1/best/model.json
 control=${CONTROL_SUITE:-independence-261013-r1}
 loss_source=${LOSS_CURVE_SOURCE:-predicted}
 input_suite=${INPUT_SUITE:-}
+reuse_suite=${FIELD_BANK_SUITE:-}
 if [ "$study" = inputs ]; then loss_source=predicted; fi
 case "$loss_source" in predicted|true|mixed|corrected|corrected_mixed) ;; *) echo "Invalid LOSS_CURVE_SOURCE: $loss_source" >&2; exit 2;; esac
 corrected=false
@@ -22,20 +23,28 @@ corrected=false
 if [ "$study" = losses ] && [ "$loss_source" != predicted ]; then
     [[ "$input_suite" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "Non-P losses require INPUT_SUITE naming the winning input study." >&2; exit 2; }
 fi
+if [ -n "$reuse_suite" ]; then
+    [[ "$reuse_suite" =~ ^[A-Za-z0-9_-]+$ && "$reuse_suite" != "$suite" && "$study" = losses && "$corrected" = false ]] || {
+        echo "FIELD_BANK_SUITE requires a distinct existing loss-bank suite and an uncorrected source." >&2; exit 2;
+    }
+fi
 submit_dir=/data/home/exy053/p2/MULTI/Dual/Transformer/$suite
+reuse_dir=/data/home/exy053/p2/MULTI/Dual/Transformer/$reuse_suite
 echo "Case1(i), $study, seeds42/43/44; reuse $control baseline banks/results."
 echo "One8h disposable GPU gate; every full job240h/1GPU/12CPU/90000MB through B1."
 if [ "$study" = inputs ]; then
     echo "15 full jobs: three nested-correction banks and12 curve fits."
     echo "Sources: true, mixed, corrected, corrected_mixed; raw predicted control reused."
 else
-    if [ "$corrected" = true ]; then
+    if [ -n "$reuse_suite" ]; then
+        echo "18 full jobs: twelve adapted MSE fits and six curve-loss fits; reuse twelve banks from $reuse_suite."
+    elif [ "$corrected" = true ]; then
         echo "42 full jobs: twelve field banks, twelve NEW nested correction banks, twelve adapted MSE fits, six curve-loss fits."
     else
         echo "30 full jobs: twelve field banks, twelve adapted MSE fits, six curve-loss fits."
     fi
     echo "Explicit loss curve source: $loss_source; input suite: ${input_suite:-raw-P control}."
-    echo "Frozen readout: same-seed winning input-policy model; curve losses reuse its original frozen field/correction banks."
+    echo "Frozen readout: same-seed selected input-policy model; curve losses reuse its original field pipeline."
     echo "Field losses: spatial, temporal, both, sudden. Curve losses: combined_no_location, combined_soft."
 fi
 reference_for_seed() {
@@ -44,6 +53,30 @@ reference_for_seed() {
     else
         reference=$base/$control-1ip-s$seed/model.json
     fi
+}
+reused_bank() {
+    local variant=$1 state row
+    bank=$base/$reuse_suite-bank-$variant-s$seed
+    dependency=$gate
+    if [ "$submit" != true ]; then
+        dependency=$gate:reused-bank-$variant-s$seed
+        return
+    fi
+    reused_job=$(awk -F '\t' -v role="bank-$variant" -v seed="$seed" '$1==role && $2==seed {print $3}' "$reuse_dir/jobs.tsv")
+    [[ "$reused_job" =~ ^[0-9]+$ ]] || { echo "Missing/ambiguous bank job: $variant seed$seed" >&2; exit 1; }
+    row=$(/opt/slurm/bin/sacct -n -X -j "$reused_job" --format=State,ExitCode --parsable2)
+    state=${row%%|*}
+    case "$state" in
+        COMPLETED)
+            [ "$row" = 'COMPLETED|0:0' ] || exit 1
+            for artifact in field_bank.json field_bank.npz model.mdl model_data.json; do test -f "$bank/$artifact"; done
+            ;;
+        RUNNING|PENDING|CONFIGURING)
+            [ "$(/opt/slurm/bin/squeue -h -j "$reused_job" -o %i)" = "$reused_job" ] || exit 1
+            dependency=$gate:$reused_job
+            ;;
+        *) echo "Cannot reuse bank job $reused_job: $row" >&2; exit 1;;
+    esac
 }
 if [ "$submit" = true ]; then
 test -f "$anchor"; test ! -e "$submit_dir"
@@ -56,6 +89,15 @@ for seed in 42 43 44; do
         test -f "$base/$input_suite-correction-s$seed/model.json"
     fi
 done
+if [ -n "$reuse_suite" ]; then
+    test -f "$reuse_dir/jobs.tsv"
+    # Validate all twelve before queuing anything. Runtime load_bank additionally
+    # checks IDs, scales, architecture, training settings and loss provenance.
+    gate=validation
+    for seed in 42 43 44; do
+        for variant in spatial temporal both sudden; do reused_bank "$variant"; done
+    done
+fi
 test -z "$(find "$base" -maxdepth 1 -name "$suite-*" -print -quit)"
 mkdir -p "$submit_dir/source"
 git -C "$repo" archive HEAD | tar -x -C "$submit_dir/source"
@@ -64,6 +106,9 @@ export REPO_ROOT=$submit_dir/source ML_CODE_DIR=$submit_dir/source/p2-DisorderML
 export ML_SOURCE_REVISION=$(git -C "$repo" rev-parse HEAD) ARCHIVE_ROOT=$archive
 cd "$submit_dir"
 printf 'role\tseed\tjob_id\tdependency\tsource_revision\n' > jobs.tsv
+if [ -n "$reuse_suite" ]; then
+    printf 'role\tseed\tjob_id\tbank\n' > reused-banks.tsv
+fi
 gate=$(/opt/slurm/bin/sbatch --parsable -J "$suite-preflight" -t 8:0:0 B1_ML-new.sh \
     DualOutputs/A0-HPC-Dual-preflight.py --followup-suite "$study" --loss-curve-source "$loss_source" \
     --base-model-json "$anchor" --run-label "$suite-preflight")
@@ -105,9 +150,16 @@ for seed in 42 43 44; do
     else
         source_options=(--curve-training-source "$loss_source")
         for variant in spatial temporal both sudden; do
-            launch bank-$variant "$gate" --prepare-field-bank --field-loss-variant "$variant"
-            dependency=$last_job
-            bank=$base/$suite-bank-$variant-s$seed
+            if [ -n "$reuse_suite" ]; then
+                reused_bank "$variant"
+                if [ "$submit" = true ]; then
+                    printf '%s\t%s\t%s\t%s\n' "bank-$variant" "$seed" "$reused_job" "$bank" >> reused-banks.tsv
+                fi
+            else
+                launch bank-$variant "$gate" --prepare-field-bank --field-loss-variant "$variant"
+                dependency=$last_job
+                bank=$base/$suite-bank-$variant-s$seed
+            fi
             correction_options=()
             if [ "$corrected" = true ]; then
                 launch correction-$variant "$dependency" --field-bank "$bank" --prepare-correction-bank \
