@@ -59,6 +59,9 @@ Reuse its12 compatible field banks; submit only12 adapted MSE curve fits plus6
 frozen-raw-field curve-loss fits under `independent-losses-261022-mixed`, with a
 new disposable Mixed gate. Obsolete corrected-source loss jobs were cancelled
 and their incompatible outputs removed; never reuse them as Mixed controls.
+Submitted from20474b3: gate32868320 and18 full fits32868321–32868338. Their
+afterok dependencies protect the gate and unfinished banks; check current status
+before continuing, not another submission. PROJECT_STATUS owns latest evidence.
 See PROJECT_STATUS and the compiled input-study report for live-check evidence;
 do not resubmit completed or already queued work. True-field oracle evaluation cannot supply
 unavailable deployment inputs. Loss coefficients remain provisional fixed presets,

@@ -107,8 +107,14 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   predicted fields; training samples predicted/true50/50. All fits retain
   split42, seeds42/43/44, max450 epochs/stopping52 and240h/1GPU/12CPU/90000MB.
   No custom-loss coefficients, selection rules or locked-test boundaries change.
-  A new disposable Mixed GPU gate and unfinished-bank afterok dependencies are
-  required. Submission/GPU completion still needs recording below.
+  Submitted from immutable20474b3: disposable Mixed gate32868320 and18 full
+  jobs32868321–32868338. All19 resource requests and18 source/dependency settings
+  verified; full fits wait for gate success and, for four seed44 variants, their
+  matching bank jobs. At submission eight banks completed, three running and one
+  pending; new gate queued. GPU gate completion/accuracy remain unverified.
+  Manifest: samples/field-input-study/loss-study-jobs.tsv and
+  loss-study-reused-banks.tsv, copied from the new home suite. Twelve focused
+  follow-up tests and ten changed-surface checks pass, zero failures.
   **HIGH PRIORITY manual task:** researcher personally reviews remote home,
   scratch and archive ordering/conventions; automated checks do not complete it.
 
