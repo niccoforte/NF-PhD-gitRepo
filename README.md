@@ -188,6 +188,7 @@ Do not set these `origin` push URLs globally, because that would affect unrelate
 |       +-- CurveOutputs/
 |       +-- FieldOutputs/
 |       +-- FieldToCurve/
+|       +-- FieldToProperty/
 |       +-- DualOutputs/
 |           +-- A0-HPC-Dual-test.py
 |           +-- test_dual_contract.py
@@ -414,7 +415,7 @@ true/predicted-source combined fits. It does not submit jobs. Keep the establish
 MSE source controls and use fresh labels for the four new full runs.
 
 The true-field **property** diagnostic is
-`HPC/FieldToCurve/A0-HPC_FieldToProperty-test.py`, using the existing dual encoder
+`HPC/FieldToProperty/A0-HPC_FieldToProperty-test.py`, using the existing dual encoder
 and legacy trainer without a new model framework. It predicts archived UT
 Strength/Ductility/WoF and FT K_JIC directly from true field histories, with no
 disorder or physical-context inputs. Pass `--base-model-json` (architecture only)
@@ -425,6 +426,9 @@ and validation-only selection. Results use `MULTI/FieldToProperty/Transformer/`:
 `metrics.json`, an agreement figure and logarithmic loss plot. B3 accepts that
 relative path unchanged. These are property results, not loadable curve results;
 the probe is not a deployable disorder-only surrogate or an optimisation loop.
+Its `-test` filename is an experiment convention, not a reduced run: this is
+the production entry point. The [FieldToProperty guide](p2-DisorderML/HPC/FieldToProperty/README.md)
+distinguishes it from the explicit64-pair/one-epoch preflight.
 
 Current worked comparisons and the bounded thickness-provenance finding are in
 `p2-DisorderML/samples/accuracy-continuation/README.md`. Its linked
@@ -676,6 +680,7 @@ This folder contains the QMUL HPC/Slurm training and HPO workflow.
 | `FieldOutputs/A0-HPC_Field-CrossModelHPO.py` | Cross-model HPO entry point for field surrogates. |
 | `FieldToCurve/A0-HPC_FieldToCurve-test.py` | Production-oriented Transformer single-run entry point for field-input to curve-output models. |
 | `FieldToCurve/A0-HPC_FieldToCurve-CrossModelHPO.py` | Cross-model HPO entry point for field-to-curve surrogates. |
+| `FieldToProperty/A0-HPC_FieldToProperty-test.py` | Production-default true-field to archived-property oracle; separate from curve prediction. |
 
 Important HPC conventions:
 

@@ -40,6 +40,30 @@ geometry/source and permitted-split proof; locked-test evaluation remains exclud
 
 ## Case 1(i): input and custom-loss studies
 
+### Where the production study code lives
+
+The same production Python entry point routes these studies; separate copied
+Python trainers per suite would duplicate the DATA/model/training contracts.
+The historical `DualOutputs` directory also hosts the independent Case1(i) route;
+its location does not imply shared weights or joint training.
+
+| Study | Submission script | Production Python route | Shared implementation |
+| --- | --- | --- | --- |
+| Eight-case independence | [B4_Dual-independence.sh](B4_Dual-independence.sh) | [A0-HPC-Dual-test.py](A0-HPC-Dual-test.py), `--independence-case` | [MLindependence.py](../../../resources/MLindependence.py) |
+| Field-input/source study | [B4_Independent-followups.sh](B4_Independent-followups.sh) `SUITE inputs` | Same runner, `--followup-study inputs` | [MLfollowup.py](../../../resources/MLfollowup.py) |
+| Custom-loss study | Same follow-up launcher, `SUITE losses` | Same runner, `--followup-study losses` | MLfollowup.py and [MLfield.py](../../../resources/MLfield.py) |
+| Field-to-property | Standard B1 workflow | [Own production entry point](../FieldToProperty/A0-HPC_FieldToProperty-test.py) | Existing encoder/trainer; [guide](../FieldToProperty/README.md) |
+
+`-test.py` is the existing experiment-entry naming convention, not a one-epoch
+restriction. `A0-HPC-Dual-preflight.py` and `test_*.py` are the separate GPU gate
+and synthetic regression checks. Shell launchers choose resources/dependencies;
+Python/shared modules perform training. Exact per-job arguments and revision are
+recorded in the home `jobs.tsv` and immutable source snapshot.
+
+Active labels `independent-inputs-*` and `independent-losses-*` identify both the
+independent architecture and study; they are not another independence comparison.
+Do not rename existing jobs/archives to make prettier labels or resubmit them.
+
 The next studies retain fully independent UT/FT models and separately trained
 field/curve stages. They reuse the completed `independence-261013-r1` banks and
 Case1(i) controls, the same 7,137/793/881 specimen split, seeds42/43/44, HPO-derived

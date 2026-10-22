@@ -18,24 +18,26 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Case 1(i) follow-ups
 
-### Damage handback — bounded execution first
+### Damage handback — full-bank ML integration next
 
-Integrated the researcher-authorised Damage Modeling handback from7166de8/7b59d7f.
-Read `HANDOFF-DAMAGE.md` for the six exact fixtures; do not repeat the local ODB
-audit or load other briefs. First check hashes, original INP identity, binary
-STATUS parent/known masks, endpoint remapping, recorded frames and save/reload in
-the cluster environment. No damage head, loss, training corpus or bulk extraction
-is authorised. These six files are five unique task responses from three designs.
-Do not join numeric397/747 to saved predictions without original-geometry/source
-and permitted-split proof. Leave the locked test untouched. Consumer-layout replay
-is distinct from DATA/MODEL damage integration. Preserve completed input-study
-evidence and its immutable sources; later damage-supervised work needs an explicit
-coverage/model/loss decision and the selected input policy.
-The bounded B1 check31976809 completed0:0 on16 October (source aa1d2e0), with
-all six fixtures passing CUDA layout/reload checks. Do not duplicate it. Preserve its home result, then
-prioritise exact-target removal of its temporary fixture/source copies once no
-active consumer needs them. Review `../samples/damage-hpc-contract/README.md`;
-CPU replay passed; the successful home log now contains GPU evidence.
+`HANDOFF-DAMAGE.md` is the completed dataset handback FROM Damage Modeling TO
+this Accuracy task. All four allD banks are delivered locally and on HPC; label
+extraction, building, transfers and the old six-fixture replay are closed work.
+Do not repeat them or treat the diagnostic fixtures as the training population.
+
+- [ ] Add a masked native-strut damage consumer, exact specimen/geometry joins,
+  aligned frame0 slicing and save/reload checks against the actual MULTI banks.
+- [ ] Confirm the first isolated ML experiment: auxiliary binary strut-fracture
+  outputs alongside displacement, independent UT/FT generators, unchanged
+  Case1(i)/Mixed curve route. Define train-only class balancing and damage loss
+  weight before fitting; report damage accuracy separately from field benefit.
+- [ ] Prepare its matched control, TRAIN-only OOF fields, GPU execution gate and
+  later full jobs. Do not add it to the frozen current loss study. No new ODB
+  processing, corrector or true-future-damage inference input is needed.
+
+Use the full-bank masks and exact existing split, never frame/strut-level splits.
+The handback alone is not a trained loader/head or damage accuracy result; the
+new consumer/experiment still needs implementation and a defined training plan.
 
 The user selected Case1(i) for the next source and custom-loss studies. Prepare
 the input study first, with predicted/true/mixed and corrected/mixed-corrected
@@ -70,9 +72,17 @@ not established optima; the run README records their exact values and provenance
 ### Current decision suite and imported deferred ideas (12 October)
 
 This remains the active detailed checklist, not a completed/disposable brief.
-Performance takes priority over sharing. The user accepted the proposed 2% field
-RMSE non-inferiority margin on BOTH tasks, with local-motion and curve safeguards;
-their numerical tolerances still need specifying before final model selection.
+Performance takes priority over sharing. Initial screening now allows no more
+than2% relative deterioration in each of FOUR global RMSEs: UT/FT fields and
+UT/FT curves, separately, on identical validation specimens. It is not a final
+fracture-quality verdict. Require similar/improved fracture-sensitive results:
+signed local motion, timing/sign/path proxies, curve peaks, postpeak/ductility
+and work using established definitions. Compare fixed, separately reported
+loss components under identical train-fitted scales, NOT weighted training-loss
+totals whose coefficients differ across ablations. Keep event counts, seed
+variation and global errors visible; damage path/onset metrics follow the new
+consumer. Numerical local tolerances remain to agree. This review rule does not
+retroactively change frozen checkpoint/HPO selection or active job losses.
 The user confirmed the following revised numbering. Local implementation is now
 in `resources/MLindependence.py`, the existing dual runner/preflight and
 `HPC/DualOutputs/B4_Dual-independence.sh`. The original jobs failed at the split-ID
@@ -124,6 +134,24 @@ loss trials are completed evidence, not experiments never tried. New runs must
 use the matched population/configuration. Detachment is covered by staged versus
 end-to-end controls; an online stop-gradient fit is optional only if scheduling
 needs separating from gradient effects. Do not combine all changes at once.
+
+### Locality/attention checklist — owned here, after current loss comparisons
+
+- [ ] Degree-only nodal context as a cheap independent baseline: degree/8, absent
+  FT nodes masked. Degree is used internally in loss/message averaging and the
+  crack-face definition, but is NOT an explicit input channel now.
+- [ ] Retest existing pre-field-attention LocalFieldGraph on the winning
+  independent architecture; optionally test a small gated residual contribution.
+- [ ] Adjacency-function attention: add a learned per-head bias to attention
+  logits using the validated task-specific initial graph. Retain global
+  attention, FT absence and initial crack-crossing exclusions. Compare adjacency
+  alone before adding relative edge geometry or graph distance; no extra tokens,
+  dense per-node neighbour-ID vector or future-damage topology leakage.
+- [ ] Masked CNN/local decoder remains a separate later candidate, not implemented.
+
+Keep these predictive-accuracy comparisons in this chat; Tokenisation owns
+motif discovery, not their accuracy verdict. No new handoff/chat is needed.
+Do not bundle degree, GNN, attention bias, CNN and damage into one experiment.
 
 **13 October priority clarification:** equal normalized MSE is an architecture
 control, not a verdict against custom losses. After selecting the sharing setup,

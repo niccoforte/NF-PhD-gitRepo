@@ -4,6 +4,28 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Current review priorities:2% global-RMSE screening applies separately to UT/FT
+  fields AND curves, backed by fixed fracture-motion/peak/postpeak/work metrics,
+  event counts and seed variability. Weighted training-loss totals are not
+  comparable when coefficients differ. Frozen selections/jobs are unchanged.
+  The Accuracy checklist owns separate degree, LocalFieldGraph, additive
+  adjacency-attention and CNN candidates; none is silently enabled by this review.
+
+- Damage's completed full-bank handback has been read and reconciled here.
+  All four allD banks exist in local upstream MLdata. Next is a new masked
+  native-strut consumer and isolated auxiliary-damage ML experiment, not another
+  ODB export/bank build/fixture replay. Confirm first-head/loss setup before
+  training; keep Case1(i), Mixed, exact splits and the active loss study intact.
+
+- FieldToProperty's existing production entry point now lives in its own
+  HPC/FieldToProperty/ folder, retaining the -test.py filename and full450-epoch
+  defaults. Tests/current commands follow the new path; saved snapshots and
+  MULTI/FieldToProperty archives retain their original provenance. No new
+  property run or duplicated trainer is implied by the move. The relocated
+  entry point passes its synthetic ID-join/train/save/reload regression on the
+  existing HPC Python environment; changed-surface9 and contract87 checks are
+  non-failing/zero failed. Local Torch/Optuna imports are unavailable, not tested.
+
 - Mac checkout backlog is included in the authorized repository synchronization:
   the pending dual-notebook cells and saved outputs, field-review metadata and
   crack-topology regression assertions are preserved alongside the latest remote
@@ -255,7 +277,14 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - Accuracy continuation reconciled the current code with latest annotations, without loading other handoff briefs. B3 downloaded eleven completed matched-suite archives: six original runs plus recovery detach/winner_probe/curve_predicted/curve_true/ft_region. At 18:25 BST on 4 October residual30326584/true_field30326586 remained RUNNING; no duplicates submitted. Eight completed joint runs share exact 7137/793/881 IDs. Scores: baseline .863022, crack_face .807569, local_graph .902120, partial .841817, private .827576, late_frame .865194, detach .866487, ft_region .809125. Single-seed validation only; ft_region is a fixed geometric prior, NOT dynamic sudden-motion weighting. Fresh true-field curve fit reaches RMSE UT1.639/FT3039.064 on true fields versus predicted-source fit UT4.360/FT6678.813 on predicted fields; substitution degrades either. Two-curve scores are not comparable to four-output selection. Human plots/evidence: samples/accuracy-continuation/README.md. Existing notebooks/user edits preserved.
 - Explicit soft/soft peak loss implemented with saved mode and historical hard-target fallback; hard peak reporting and peak-height terms unchanged. No existing experiment/HPO changed; the new corrected-loss submission is recorded above. Automatic activity weights remain distinct from sudden/non-affine anomaly weights and excluded from the matched suite. Tokenisation plan reconciled with actual correlation-PCA/KMeans prototype; other handoffs retained untouched. samples/accuracy-continuation/test-guide.md covers all 31 current dual checks with expected/observed assertions, tolerances and limits; measured mask-leakage/gradient counterexamples and affine illustrations accompany it. All 31 dual and 14 field tests pass; changed-surface validator 17 non-failing/zero failed. First validator attempt timed out importing under concurrent load; thread-limited retry passed. Notebook comparison integration remains pending; existing dirty notebooks preserved.
-- Direct property oracle test submitted through B1 after user confirmed UT Strength/Ductility/WoF and FT K_JIC. Runner: HPC/FieldToCurve/A0-HPC_FieldToProperty-test.py; immutable source47fabb9, published to both Git hosts and deployed to clean HPC checkout. Preflight30367256 (64 pairs/one epoch/4h) and full30367272 (450 maximum epochs/early-stop52/240h) both PENDING at18:25 BST; full requires afterok:30367256 and kill-on-invalid-dep. Both request andrena/pilot_andrena, 1GPU/12CPU/90000MB. Submission is NOT GPU-success or accuracy evidence. Home snapshot: /data/home/exy053/p2/MULTI/FieldToProperty/Transformer/field-property-261004/source; archive root /data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/FieldToProperty/Transformer, labels field-property-preflight-261004 and field-property-261004. Reuses dual encoder plus legacy trainer, true fields only, no disorder/context channels, exact frozen split-ID check, training-only normalization, validation-only scoring. Every frozen ID has an archived property row. Preserve separate FieldToProperty artifact identity; no general curve-loader support claimed. Do not submit duplicate jobs. Verified temporary Git transport bundle removed after deployment; snapshot is required by queued jobs and must remain.
+- Direct property oracle30367272 and preflight30367256 completed0:0; full run
+  took55m23s, gate1m45s. Existing report: samples/accuracy-continuation/field-to-property.md.
+  Production runner is now HPC/FieldToProperty/A0-HPC_FieldToProperty-test.py;
+  original immutable47fabb9/source paths remain provenance, not current commands.
+  Archive: MULTI/FieldToProperty/Transformer/field-property-261004. True fields
+  predict UT Strength/Ductility/WoF and FT K_JIC; exact7137/793/881 IDs and
+  unique-ID property joins are verified. Only validation was evaluated. This is
+  not disorder-only accuracy, a curve checkpoint or an outstanding production run.
 - Authorised bounded thickness follow-up completed: 33 ML-included specimen pairs/66 INPs across 11 batches. Every input CSV coordinate matches exactly; all UT800/FT788 initial field coordinates match INP labels within 5e-7 mm, with matching stems/source basenames. Early sampled batches6538720/6538745 have varying per-task thickness (FT~.412 versus UT~.402); all nine later sampled batches have identical UT/FT thickness across the three inspected specimens in each batch, with small between-batch variation. Sampled1000/1001 contrast agrees with archived unconditional versus if-None assignment, consistent with first-UT thickness reuse. Caveats: batch6892743 B1 says initial1901 despite INPs1001–1100; merged Windows source paths cannot prove exact ODB provenance. No claim of dataset-wide change point, actual density or error effect. No data/model/feature/job changes. Human report and hashed row evidence: samples/accuracy-continuation/thickness-provenance.md/.json; next analysis requires separate scope. Original home bundle/p2-code-transfer check was clean.
 
 - Selective recovery verified 4 October after SSH reconnection: `dual-recovery-261004`, immutable source `0b9215e`. Preflight 30326583 COMPLETED 0:0 in 9m05s on sbg23, all thirteen checkpoint/prediction/metrics/log archives verified; winner_probe 30326588 COMPLETED 0:0 in 2m43s with field-source diagnostics archived. At approximately 15:47 BST residual 30326584, ft_region 30326585, true_field 30326586, detach 30326587, curve_predicted 30326589 and curve_true 30326590 were RUNNING with advancing epochs. Full requests remain 240 hours, one GPU, 12 CPUs, 90,000 MB, andrena/pilot_andrena. Six successful original runs were not repeated. sbg10 is administratively drained for modules; no claim of its repair, no model/loss changes or environment installation needed. Local 29 dual-contract tests and changed-surface/guidance validation passed. README owns IDs, paths and evidence; inspect existing jobs, never resubmit blindly. Accuracy brief preserves controlled-gallery, feature-bundle restraint and scale-aware pin-tolerance requirements. Keep SSH master running; broken pipe cause remains unproven, no SSH config changes made.

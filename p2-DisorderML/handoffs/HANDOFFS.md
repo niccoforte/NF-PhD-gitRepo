@@ -15,12 +15,12 @@ submissions, bulk processing, optimisation searches or material cleanup."
 | Proposed Physics/strain feasibility | [HANDOFF-PHYSICS-STRAIN.md](HANDOFF-PHYSICS-STRAIN.md) | True-field strain/coupling audits before any new physics loss; no bulk exports |
 
 The existing Tokenisation chat uses [TOKENIZATION_NEXT_STEPS.md](TOKENIZATION_NEXT_STEPS.md).
-It owns motif discovery, not the predictive local-graph ablation or field-loss
+It owns motif discovery, not predictive degree/GNN/adjacency-attention/CNN accuracy ablations or field-loss
 implementation. Physics/strain work warrants a separate iterative task; no chat
 has been created or messaged by writing its brief.
 
-All files are beside this index in:
-/Users/niccoloforte/Desktop/Code/NF-PhD-gitRepo/p2-DisorderML/handoffs/
+All files are beside this index in the selected checkout's `p2-DisorderML/handoffs/`
+(currently `Z:/00-PhD-gitRepo/p2-DisorderML/handoffs/`).
 
 For Improve ML Accuracy, append its brief path after your remaining annotations;
 its own unfinished work still applies. For the other tasks, start separate chats

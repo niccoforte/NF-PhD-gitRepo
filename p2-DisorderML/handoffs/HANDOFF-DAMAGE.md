@@ -1,6 +1,6 @@
 # Damage Modeling -> Improve ML Accuracy: completed FCC dataset handback
 
-Updated 19 October 2026. From **Damage Modeling**
+Dataset handback19 October; receiving ML workflow reconciled22 October 2026. From **Damage Modeling**
 (01a13c9f-c95e-7ff1-854f-a3b2f4fbea6c) to the existing Windows
 **Improve ML Accuracy** task (bc645215-a354-451c-93f7-540e7d36d3dc).
 
@@ -77,13 +77,14 @@ preserved; no broad archive/data reorganisation is required.
 Current PROJECT_STATUS supersedes historical queue/hold statements:
 
 - Case1(i) uses independent UT/FT models and separate field/curve training.
-  The completed input study selected `corrected_mixed`: corrected plus true
-  50/50 curve-training inputs, with deployable predicted/corrected inputs.
-- The selected-policy loss suite `independent-losses-261018` is already
-  submitted: gate 32471749 and 42 production jobs32471750-32471791, immutable
-  source 92d844f. These are recorded submissions, not a fresh live-state check.
-  Reconcile their latest manifest/results/queue in the receiving task; do not
-  repeat submissions, revive the older 30-job draft or alter frozen jobs.
+  The22 October cost-aware decision selects `mixed`:50/50 predicted/true curve
+  training and predicted-only deployment, without correction. The original
+  corrected_mixed numerical input-study result remains comparison evidence.
+- The active loss continuation is `independent-losses-261022-mixed`: gate32868320
+  and18 curve jobs32868321–32868338, reusing12 compatible18 October field banks
+  from92d844f. Submitted curve source is20474b3. These are submission records,
+  not a fresh live-state check. Reconcile PROJECT_STATUS/queue/results; do not
+  restart banks, revive cancelled corrected-source jobs or alter frozen runs.
 - Put damage in that task's checklist as a separate follow-on with an unchanged
   matched control. Preserve the selected input policy, split 42, seeds 42/43/44,
   fixed field/curve selection and locked-test safeguards. Do not silently fold
@@ -98,8 +99,8 @@ Receiving work:
    replay does not validate a new full-population training consumer.
 2. Define the isolated damage prediction/supervision experiment and control,
    including strut readout, loss, train-only class balancing and selection.
-   If new field generators are fitted, regenerate required TRAIN-only OOF/nested
-   correction banks; do not reuse corrections tied to changed generators.
+   If new field generators are fitted, regenerate their required TRAIN-only OOF
+   fields. The current Mixed route has no correction bank to regenerate or reuse.
 3. Follow the receiving task's authorised preview/immutable-source/GPU-gate
    workflow before full training. Use current resource policy and its actual
    job schedule. This handoff creates no new job count or automatic monitor.

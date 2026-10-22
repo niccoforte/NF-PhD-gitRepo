@@ -1,4 +1,4 @@
-"""True-field oracle diagnostic; reuses the dual encoder and legacy trainer.
+"""Production-default true-field property diagnostic (450 epochs, full data).
 
 This predicts archived properties, not curves. It is not a disorder-only
 surrogate and its checkpoint must not be opened with a curve-results loader.
