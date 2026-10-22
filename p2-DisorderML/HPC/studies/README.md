@@ -11,7 +11,7 @@ sources, job names and archive paths are not renamed by this source cleanup.
 | [Input](Input/README.md) | `A0-Input.py`, `B4_Input.sh` | `review_field_inputs.py`; Mixed selected on cost/accuracy |
 | [Loss](Loss/README.md) | `A0-Loss.py`, `B4_Loss.sh` | Active Mixed continuation; no adoption verdict yet |
 | [Damage](Damage/README.md) | Bank builder and completed dataset reviews | New field/damage training study agreed, not implemented |
-| [Locality](Locality/README.md) | No training entry point yet | Isolated degree/GNN/CNN/attention experiments planned |
+| [Locality](Locality/README.md) | `A0-Locality.py`, `B4_Locality.sh` | Isolated field-only screen; execution in PROJECT_STATUS |
 
 `B4_Field-source-study.sh` contains shared Input/Loss submission mechanics; their
 small named wrappers supply the study. The Python presets reuse the established

@@ -31,12 +31,62 @@ as the primary success metric or silently apply cumulative maximum.
 
 Predicted damage **is an output at inference**. True future damage is never an
 input or an instruction to delete connections. First-stage damage feedback is
-not part of this experiment. Keep the current loss study untouched.
+not part of this first isolated experiment. Both heads read a SHARED field
+representation; damage loss backpropagates through it, so damage already affects
+the learned displacement representation. An explicit predicted-damage-to-field
+refinement path is a stronger, separately testable coupling, not a prerequisite
+for auxiliary supervision. Keep the current loss study untouched.
 Confirm useful candidates across42/43/44, then construct training-only OOF
 fields and fit unchanged Predicted+True curves. A later, separate curve-input
-comparison may test predicted displacement+predicted damage; true-field/true-
-damage fits are oracle diagnostics, not deployable results. Do not pay for
+comparison is an explicit TODO AFTER reviewing the field/damage screen: test
+predicted displacement+predicted damage; true-field/true-damage fits are oracle
+diagnostics, not deployable results. Do not pay for
 OOF/curve retraining before the field-only screen shows a useful result.
+
+## STATUS / SDEG / both — supervisor-requested extension, data audit first
+
+The delivered full-corpus allD banks are STATUS-only. The older bounded damage
+audit contains section/IP SDEG observations, but that is not a full aligned SDEG
+training bank. Do not silently relabel its `strut_damage` as pure SDEG: the old
+reducer overrides verified STATUS failure to1, so that target mixes the variables.
+No new ODB export, schema change or bulk reprocessing is started by this plan.
+
+Retain displacement as the common main target, then compare auxiliary
+**STATUS only**, **SDEG only**, and **both**, plus displacement-only control.
+Same independent field architecture, specimens, masks and stopping criterion.
+For both-target runs hold the total auxiliary coefficient fixed, initially split
+equally between separately normalized binary and continuous losses. This avoids
+confounding more information with simply doubling auxiliary influence. Existing
+weak/strong0.1/1 comparisons remain distinct coefficient checks.
+
+Candidate continuous target: max OBSERVED SDEG across section/integration points,
+then constituent elements of each strut. It describes a local degradation
+hotspot, NOT whole-strut stiffness, average damage, or proof of rupture. A plain
+mean can dilute one severely damaged element among many intact elements. Maximum
+can instead overemphasize surface hotspots and depends on sampling/mesh; inspect
+its relation to STATUS and use the actual element-to-strut map, never fixed groups.
+
+Before fitting: inspect representative UT/FT histories for nonzero intermediate
+values, lead time before STATUS failure, missing points/deleted elements and
+mesh sampling. If20-frame sampling mostly yields0/1, continuity supplies little
+extra supervision. For a pure SDEG target, missing values stay unknown/censored;
+do not use STATUS to invent terminal SDEG=1, carry values, or treat missing as0.
+Strict maximum requires complete observations; incomplete observed maxima are
+lower bounds, not exact targets. Choose/save the completeness rule before bulk
+export. Initially mask incomplete targets rather than adding a censored loss.
+
+Use masked, normalized continuous regression for SDEG; retain a valid whole-field
+term and inspect nonzero-damage errors so an all-zero regressor cannot look good.
+Class-balanced BCE addresses binary rarity; it does NOT make accuracy a useful
+fracture metric. Precision measures false-fracture burden, recall measures missed
+fractures, PR-AUC measures their threshold trade-off, onset/path measures timing/
+location, and reversal counts test irreversible-history consistency. These metrics
+evaluate results; only loss balancing changes gradients during training.
+
+Verdict: SDEG is a worthwhile complementary-target hypothesis, not automatically
+better because continuous. Judge primarily whether it improves displacement
+fracture behaviour, separately from whether SDEG itself is well predicted.
+Reference: [Abaqus ductile-metal damage evolution](https://docs.software.vt.edu/abaqusv2025/English/SIMACAEMATRefMap/simamat-c-damageevolductile.htm).
 
 ## Existing report contracts
 

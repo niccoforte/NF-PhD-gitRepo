@@ -22,6 +22,7 @@ REQUIRED_FILES = (
     "p1-DisorderLatticeProperties/code/AGENTS.md",
     "p2-DisorderML/AGENTS.md",
     "p2-DisorderML/PROJECT_STATUS.md",
+    "p2-DisorderML/WINNER.md",
     "p2-DisorderML/HPC/AGENTS.md",
     "p2-DisorderML/code/AGENTS.md",
     "p3-DisorderIcingMitigation/AGENTS.md",

@@ -1,7 +1,8 @@
-# Locality study — preparation only
+# Locality study — isolated field screen
 
 Goal: improve independent Case1(i) **field** prediction with one change at a
-time. There is no implemented locality study runner or submitted job yet.
+time. `A0-Locality.py` and `B4_Locality.sh` implement the screen; PROJECT_STATUS
+records actual submission/execution, never infer it from this guide.
 The current loss study continues unchanged. Locality has no logical dependency
 on its completion: use the unchanged masked-MSE baseline to isolate architecture,
 then test combinations only after each intervention has evidence.
@@ -11,6 +12,9 @@ split and train-only scaling, width384 / eight heads / three layers, original
 11 context channels, full U1/U2 histories. Separate UT and FT training, seed42,
 up to450 epochs/patience52. No OOF banks or curve retraining in this first screen.
 Confirm promising variants across42/43/44; report parameter count and cost.
+The fresh control is fitted in the same field-only protocol for matched runtime
+and initialization. Eight variants × two tasks =16 final-generator fits, not
+sixteen cross-fitted banks. Existing studies are not rerun or altered.
 
 | Variant | Change from control |
 | --- | --- |
@@ -20,7 +24,7 @@ Confirm promising variants across42/43/44; report parameter count and cost.
 | Gated GNN | Same block with a small learned residual gate; compare directly to existing block |
 | Adjacency attention | Add learned per-head bias for initially connected pairs; retain global non-edge attention |
 | Geometry attention | Adjacency bias plus projected relative direction/length; compare directly to adjacency-only |
-| Masked CNN, one block | Canonical reference-grid 3×3 residual block; occupancy/disorder retained, absent sites masked |
+| Masked CNN, one block | Canonical reference-grid depthwise3×3 + pointwise residual block; absent sites masked |
 | Masked CNN, two blocks | Same grid/channel contract, two blocks instead of one |
 
 CNN site mapping must be a verified one-to-one reference-coordinate embedding,
@@ -34,8 +38,32 @@ fracture information by itself. Current spatial loss degree balancing does not
 mean degree is an input or attention is graph-aware. Pre-attention graph messages,
 attention-score bias and CNNs are distinct experiments; do not bundle them.
 
-Before submission: implement opt-in modules/serialization, validate topology,
-masking and isolated toggles, CPU regressions and one disposable GPU gate. Then
-use normal B1 resources/staging. No blanket HPO, combined redesign or gradient
+Plain encoder weights initialize identically before the intervention. Degree's
+new context column starts with zero projection; other common parameters are
+unchanged. Gated graph starts at sigmoid(-3), about0.047. Adjacency and geometry
+bias start at0; global non-edge attention remains available. Geometry bias acts
+on actual initial struts, with differentiably reconstructed disordered vectors.
+CNN updates are occupancy-masked and normalized by valid-neighbour count. A grid
+convolution is not a graph convolution and can mix sites across a geometric gap;
+it never claims missing material or load-bearing connections exist there.
+
+`DUAL_MODEL(field_only_modes=(TASK,))` executes/trains only the selected field
+network. The saved standard container still has frozen unused stages for reload,
+but **no curve or other-task predictions/metrics are exported**. Checkpoint
+selection is the same task's physical validation-MSE/train-mean-MSE ratio. Save
+field/motion metrics, truths/predictions/masks, training time, active parameter
+count, peak GPU memory, log losses and UT/full or FT/crack-tip examples with
+signed error. There is no scalar combined curve score in this screen.
+
+Preview: `bash p2-DisorderML/HPC/studies/Locality/B4_Locality.sh SUITE`.
+Explicit `--submit` snapshots clean source and queues one disposable8h GPU gate
+plus16 full240h/1GPU/12CPU/90000MB jobs through B1 with afterok dependencies.
+The gate first checks full-data IDs/scalers, then all16 one-epoch/64-specimen
+training/diagnostic/reload cases. Its successful scratch is removed, no archive
+is kept, and its successful home log remains. `test_locality.py` protects opt-ins,
+mask invariance, common weights, gradients, reload and field-only scope. CPU
+contracts do not demonstrate GPU success or improved real-data accuracy.
+
+No blanket HPO, combined redesign or gradient
 instrumentation is implied. Selection prioritizes field fracture-motion accuracy,
 with global-RMSE safeguards; curves are checked only for retained candidates.

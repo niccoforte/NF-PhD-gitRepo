@@ -21,9 +21,10 @@ It has not been dispatched automatically. New submissions require explicit scope
   strut consumer/head, field-only control, damage-only, auxiliary coefficients
   0.1/1; seed42,450 epochs/patience52, execution/reload gate. No initial OOF or
   curve fits; no true future damage input or inferred topology deletion.
-- [ ] Implement the isolated field Locality screen in `HPC/studies/Locality/`:
+- [x] Implement the isolated field Locality screen in `HPC/studies/Locality/`:
   degree-only, existing/gated local graph, adjacency/relative-geometry attention,
-  one/two-block masked CNN. One change at a time; no automatic submissions.
+  one/two-block masked CNN. Latest researcher green light authorizes the screen;
+  check PROJECT_STATUS for actual gate/submission before repeating anything.
 - [ ] Confirm promising field candidates across42/43/44, then generate their
   OOF banks and retrain Predicted+True curves. Evaluate frozen readouts too.
 - [ ] On the selected independent architecture, retain separate FT crack-tip
@@ -39,8 +40,14 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 Case1(i)+Predicted+True is the current practical policy, not proof that its fields
 are sufficiently accurate or that every optional implemented feature helps.
-Future damage-to-curve inputs remain a distinct oracle/deployable comparison;
-do not bundle them with the first auxiliary-output test. Existing Tokenisation,
+Future damage-to-curve inputs are a TODO AFTER the field/damage screen; do not
+bundle them with the first auxiliary-output test. A supervisor also requested
+STATUS-only versus SDEG-only versus combined auxiliary targets. Full delivered
+banks contain STATUS only; inspect bounded SDEG availability/aggregation before
+any new export. Do not call the old STATUS-overridden strut severity pure SDEG.
+The Damage study guide owns the proposed fair loss-budget/unknown-mask comparison.
+Both auxiliary heads already update shared field representations; explicit
+predicted-damage feedback remains a separate architecture test. Existing Tokenisation,
 physics/strain and optimisation handoffs own those deferred directions. Output
 PCA/autoencoder remains conditional on a demonstrated compression need.
 Numerical fracture-metric acceptance tolerances remain unagreed; show fixed
@@ -189,7 +196,8 @@ implementation/gate is ready; combine winning changes only in a later test.
   attention, FT absence and initial crack-crossing exclusions. Compare adjacency
   alone before adding relative edge geometry or graph distance; no extra tokens,
   dense per-node neighbour-ID vector or future-damage topology leakage.
-- [ ] Masked CNN/local decoder remains a separate later candidate, not implemented.
+- [ ] Evaluate the implemented one/two-block masked CNN variants in the isolated
+  Locality screen. Implementation is complete, not an established accuracy gain.
 
 Keep these predictive-accuracy comparisons in this chat; Tokenisation owns
 motif discovery, not their accuracy verdict. No new handoff/chat is needed.

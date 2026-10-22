@@ -2,7 +2,7 @@
 
 This paper folder is the machine-learning and optimization layer of the PhD repository. It uses ML surrogates to map nodal disorder in 2D FCC lattice geometries to mechanical response, then uses those surrogates and diagnostics to guide design decisions. Keep edits tied to that workflow.
 
-Read `PROJECT_STATUS.md` only for planning, continuation, or handoff work; it records changing priorities and target runs without duplicating these durable rules.
+Read `PROJECT_STATUS.md` for continuation priorities. `WINNER.md` is the accepted model/configuration authority: update it from saved evidence whenever the accepted winner changes, including inputs, masks, transforms, losses, sources, hyperparameters, splits/seeds and provenance. Experiments are not automatic promotions.
 
 ## Repository Relationship
 

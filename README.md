@@ -346,6 +346,9 @@ The path resolver maps that style of call into local `Z:/p1/data/Ti/...` folders
 
 ### `p2-DisorderML/code/`
 
+The accepted model/configuration is recorded in [p2 WINNER.md](p2-DisorderML/WINNER.md),
+kept current from saved evidence whenever the accepted winner changes.
+
 Notebooks remain here. Study-specific Python entry points, launchers, review
 generators and their tests live in [HPC/studies/](p2-DisorderML/HPC/studies/README.md),
 grouped by Independence, Input, Loss, Damage and Locality. Shared imported

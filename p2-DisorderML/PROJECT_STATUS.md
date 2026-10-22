@@ -4,6 +4,23 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- `WINNER.md` is now the maintained accepted-configuration record: Case1(i),
+  Mixed without correction, full saved architecture/training/features/provenance.
+  HPO settings were inherited from dual-joint-hpo1, not independently retuned.
+  Locality now has opt-in degree, graph/gated graph, adjacency/geometry bias and
+  masked CNN modules plus a field-only trainer scope and named study entry/launcher.
+  It has not yet established real-data accuracy benefits; submission evidence
+  must be checked below. Existing loss jobs and saved default models are unchanged.
+  Damage-to-curve inputs are deferred until the field/damage review. STATUS/SDEG/
+  combined supervision is a planned extension requiring a bounded continuous-
+  target audit; full current allD banks are STATUS-only, no new ODB export begun.
+  Validation: nine new locality tests pass locally and in Linux CPU staging,
+  including real FCC topology, gradients, absent-node invariance, common initial
+  weights and field-only train/diagnostic/figure/reload. Existing31 dual contracts
+  pass on Linux, independence8 and source12 pass locally. Changed-surface18 and
+  contract97 checks are non-failing/zero failures; saved Mixed checkpoint reload
+  remains unchanged. GPU scientific execution is a separate gate, not implied.
+
 - Source cleanup: named Independence/Input/Loss entry points and launchers now
   live under `HPC/studies/`, with Input/Damage Python reviews/tests moved out of
   code/. Imported cross-fitting/source helpers are descriptively named

@@ -18,6 +18,9 @@ artifacts are external `Z:/p2/MULTI/Dual/Transformer/`.
 
 ## Current practical configuration
 
+The complete maintained winner record is [WINNER.md](../../../WINNER.md).
+This overview must remain consistent with it; unreviewed studies do not promote a winner.
+
 Verified from `independent-inputs-261015-mixed-s42/model.json`, not inferred from
 the earlier Trial1 deck. UT/FT parameters and field/curve training are independent.
 

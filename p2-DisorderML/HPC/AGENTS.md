@@ -10,7 +10,7 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 - B3 Windows defaults to external `Z:/p2`; Mac requires explicit external `LOCAL_ROOT`. Both reject Git-contained destinations and preserve relative paths; neither deletes sources. Mac supports Bash3.2, rsync/ControlMaster and `--dry-run`.
 - Existing `CurveOutputs/`, `FieldOutputs/`, `FieldToCurve/` and `DualOutputs/` retain their run/HPO interfaces. New study entry points, launchers and reviews belong in `studies/<Study>/`; see `studies/README.md`. Imported training helpers stay in `resources/`. Do not copy trainers or rename immutable submissions.
 - `DualOutputs/A0-HPC-Dual-test.py` owns dual runs; Trial1 is a thin preset staged with it by B1. Its HPO entry calls `MLdualHPO` for single-worker full-data search/explicit resume through B1. README owns ranges/ranking/recovery; `test_dual_contract.py` protects architecture, HPO and review contracts.
-- `FieldToProperty/A0-HPC_FieldToProperty.py` is the production true-field oracle (UT Strength/Ductility/WoF, FT K_JIC), without disorder/context. Use its README and property loader, exact split/unique-ID joins, train-only scaling and validation selection. Locked test stays unevaluated. Do not repeat the completed run because the source moved/was renamed.
+- `FieldToProperty/A0-HPC_FieldToProperty.py` is the true-field property oracle, not a curve run. Its guide owns targets and controls; preserve ID joins, train-only scaling and locked test. Do not repeat it because its source moved.
 
 ## Durable Guardrails
 
@@ -43,7 +43,7 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 
 ## Validation
 
-- `DualOutputs/A0-HPC-Damage-contract.py` replays only the six handoff fixtures: STATUS masks, INP identity, endpoint/frame layout and NumPy/Torch reload, not training. Use disposable B1 retention; see README. Layout matches do not prove specimen joins.
+- `studies/Locality/` screens degree/GNN/CNN/attention one change at a time, field-only. Preserve exact control IDs/scalers, MSE selection and no curve exports; its guide owns the disposable16-case GPU gate and production budget. Read WINNER.md before choosing the control.
 
 - Named study wrappers preview unless `--submit`. Keep strict bank/seed/scaler/source checks and afterok gates; `studies/README.md` owns entry paths and each study guide owns cases/resources. Mixed loss continuation reuses12 compatible banks; do not resubmit them or mix new features into frozen comparisons.
 - `../handoffs/HANDOFFS.md` routes separate tasks; read only the relevant brief. Passing tests is not researcher sign-off. Verify saved loss classes/nonzero coefficients. Fresh `--curve-loss-ablation` baseline/source fits use the five-case `--curve-loss-suite` gate; combined variants have soft targets and differ only in location weight. Preserve fixed selection, MSE controls and historical runs. PROJECT_STATUS owns submission evidence.

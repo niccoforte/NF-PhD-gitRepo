@@ -14,6 +14,13 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Production and debug policy
 
+- `studies/Locality/B4_Locality.sh` previews16 independent field-only fits.
+  Explicit --submit uses a clean immutable source, one8h all-case GPU gate and
+  sixteen240h B1 afterok jobs. Preserve current resource policy, MSE controls,
+  exact reference IDs/scalers, no OOF banks or curve fits, saved locality configs,
+  reload and field/motion/error figures. The gate checks full-data identities
+  before its64-sample/one-epoch cases. PROJECT_STATUS owns actual execution.
+
 - `DualOutputs/A0-HPC-Damage-contract.py` is not a trainer. For a justified new check, package only the explicit NPZ/INP pairs and saved consumer descriptor, pin the manifest SHA256, stage immutable code, and use a B1 `preflight` label with `--require-cuda`. Keep only successful home logs, not archive outputs; remove temporary local/home fixtures, replay exports and source staging after success/no active dependency. No permanent fixture bundle is required. No specimen join or binary interpolation follows from matching layout.
 
 - `studies/Input/B4_Input.sh SUITE` and `studies/Loss/B4_Loss.sh SUITE` preview Case1(i) source/loss studies; only `--submit` queues. They call shared `studies/B4_Field-source-study.sh`. Current loss policy is `LOSS_CURVE_SOURCE=mixed INPUT_SUITE=independent-inputs-261015`, without correction. `FIELD_BANK_SUITE=independent-losses-261018` reuses12 production banks via their home jobs.tsv and queues only12 adapted MSE fits plus6 curve-loss fits. Completed banks require0:0/artifacts; active banks become afterok dependencies alongside the new gate. Runtime IDs/scales/config/loss checks remain strict. Preserve disposable8h gates, full240h/1GPU/12CPU/90000MB, immutable snapshots and source hashes. B1 stages study presets with their relative layout and the common Dual runner; no copied trainer. README owns presets/interpretation. The64-sample gate does not exercise the full-population split guard.

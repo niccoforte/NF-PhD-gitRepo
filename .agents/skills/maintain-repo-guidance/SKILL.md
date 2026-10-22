@@ -22,6 +22,7 @@ Treat current human and agent instructions as part of the implementation, not as
 - Update `README.md` whenever a human needs the changed setup, structure, command, workflow, file role, or limitation. Selective reading never relaxes this update requirement.
 - Update the relevant skill when its trigger, procedure, script, reference, validation, or dependency changes.
 - Update `PROJECT_STATUS.md` only when the current objective, authoritative working surface, verified state, blocker, decision, external requirement, or next task changes. Do not copy durable rules into it.
+- For an accepted p2 model change, update `p2-DisorderML/WINNER.md` from saved evidence, including the full configuration, feature/mask/normalization and training/evaluation source contracts, provenance and selection limits. Do not promote an unreviewed experiment.
 - Add an `AGENTS.md` when a new subtree has a distinct workflow, risk boundary, or validation contract.
 - Keep scientific claims evidence-led. Use `Decision required` or `To be confirmed` when the repository does not establish the answer.
 

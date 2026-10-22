@@ -816,7 +816,7 @@ class LocalFieldGraph(nn.Module):
     here. Geometry is initial/disordered, never the predicted displacement.
     """
 
-    def __init__(self, d_model, coords, edges, geometry_mean, geometry_scale):
+    def __init__(self, d_model, coords, edges, geometry_mean, geometry_scale, gate_init=None):
         super().__init__()
         self.config = _json_safe(dict(coords=coords, edges=edges,
                                      geometry_mean=geometry_mean, geometry_scale=geometry_scale))
@@ -832,6 +832,9 @@ class LocalFieldGraph(nn.Module):
             self.register_buffer(f"edges_{mode}", pairs)
         self.message = nn.Sequential(nn.Linear(2*d_model+3, d_model), nn.GELU(), nn.Linear(d_model, d_model))
         self.norm = nn.LayerNorm(d_model)
+        self.gate = nn.Parameter(torch.tensor(float(gate_init))) if gate_init is not None else None
+        if gate_init is not None:
+            self.config["gate_init"] = float(gate_init)
 
     def forward(self, tokens, geometry, mode, mask):
         pairs = getattr(self, f"edges_{mode}")
@@ -846,7 +849,8 @@ class LocalFieldGraph(nn.Module):
         msg = msg.masked_fill(~valid.unsqueeze(-1), 0.)
         aggregate = torch.zeros_like(tokens).index_add(1, dst, msg)
         degree = tokens.new_zeros((*tokens.shape[:2], 1)).index_add(1, dst, valid.unsqueeze(-1).to(tokens.dtype))
-        return (tokens+self.norm(aggregate/degree.clamp_min(1))).masked_fill(~mask.unsqueeze(-1), 0.)
+        gain = self.gate.sigmoid() if self.gate is not None else 1.
+        return (tokens+gain*self.norm(aggregate/degree.clamp_min(1))).masked_fill(~mask.unsqueeze(-1), 0.)
 
 
 class DualTaskTransformer(nn.Module):
@@ -880,6 +884,7 @@ class DualTaskTransformer(nn.Module):
         private_layers=0,
         local_graph=None,
         modes=DUAL_MODES,
+        locality=None,
     ):
         super().__init__()
         self.modes = tuple(modes)
@@ -984,6 +989,24 @@ class DualTaskTransformer(nn.Module):
         nn.init.normal_(self.task_embedding.weight, mean=0.0, std=0.02)
         if self.cls_token is not None:
             nn.init.normal_(self.cls_token, mean=0.0, std=0.02)
+        self.set_locality(locality)
+
+    def set_locality(self, config):
+        self.locality_config = _json_safe(config)
+        self.attention_bias, self.local_refinement = None, None
+        if config is None:
+            return
+        if self.pool != "node" or self.use_cls_token or self.private_layers or self.local_graph is not None:
+            raise ValueError("Locality screen requires the plain field stage; isolate changes.")
+        from resources.MLlocality import InitialEdgeBias, MaskedGridRefinement
+        options = dict(config)
+        kind = options.pop("kind")
+        if kind in ("adjacency", "geometry"):
+            self.attention_bias = InitialEdgeBias(self.n_heads, relative=kind == "geometry", **options)
+        elif kind == "cnn":
+            self.local_refinement = MaskedGridRefinement(self.d_model, **options)
+        else:
+            raise ValueError("Unknown locality kind: "+kind)
 
     def _tokenize(self, mode, values):
         tokenizer = self.tokenizer if self.shared_tokenizer else self.tokenizer[mode]
@@ -1021,7 +1044,7 @@ class DualTaskTransformer(nn.Module):
         return self.context_projection(features)
 
     def forward(self, inputs, task_features=None, node_masks=None):
-        tokens, masks = [], []
+        tokens, masks, attention_biases = [], [], []
         batch_size = None
         for task_index, mode in enumerate(self.modes):
             values = _mode_value(inputs, mode, "inputs") if isinstance(inputs, Mapping) else inputs
@@ -1054,6 +1077,10 @@ class DualTaskTransformer(nn.Module):
 
             if self.local_graph is not None:
                 task_tokens = self.local_graph(task_tokens, masked_values, mode, mask)
+            if self.local_refinement is not None:
+                task_tokens = self.local_refinement(task_tokens, mask)
+            if self.attention_bias is not None:
+                attention_biases.append(self.attention_bias(masked_values, mode, mask))
 
             if self.use_cls_token:
                 cls = self.cls_token.expand(batch_size, -1, -1) + self.task_embedding(task_id).unsqueeze(1)
@@ -1071,7 +1098,11 @@ class DualTaskTransformer(nn.Module):
 
         stacked_tokens = torch.cat(tokens, dim=0)
         stacked_mask = torch.cat(masks, dim=0)
-        encoded = self.encoder(stacked_tokens, src_key_padding_mask=~stacked_mask) if self.encoder is not None else stacked_tokens
+        if attention_biases:
+            from resources.MLlocality import encode_with_edge_bias
+            encoded = encode_with_edge_bias(self.encoder, stacked_tokens, torch.cat(attention_biases))
+        else:
+            encoded = self.encoder(stacked_tokens, src_key_padding_mask=~stacked_mask) if self.encoder is not None else stacked_tokens
         encoded_by_task = dict(zip(self.modes, encoded.split(batch_size, dim=0)))
         if self.task_encoders is not None:
             encoded_by_task = {mode: self.task_encoders[mode](encoded_by_task[mode], src_key_padding_mask=~mask)
@@ -1117,6 +1148,7 @@ class DualTaskTransformer(nn.Module):
             "head_hidden_mult": self.head_hidden_mult,
             "private_layers": self.private_layers,
             "local_graph": self.local_graph.config if self.local_graph is not None else None,
+            **({"locality": self.locality_config} if self.locality_config is not None else {}),
         }
 
 
@@ -1398,6 +1430,7 @@ class DUAL_MODEL:
         selection_metric=None,
         true_curve_weight=0.0,
         curve_only_source=None,
+        field_only_modes=None,
     ):
         if not isinstance(model, DualStageTransformer):
             raise TypeError("DUAL_MODEL requires a DualStageTransformer.")
@@ -1419,6 +1452,18 @@ class DUAL_MODEL:
         if curve_only_source is not None and self.true_curve_weight:
             raise ValueError("Do not combine curve-only source comparisons with auxiliary true-field supervision.")
         self.curve_only_source = curve_only_source
+        self.field_only_modes = tuple(field_only_modes) if field_only_modes is not None else None
+        if self.field_only_modes is not None:
+            if (not self.field_only_modes or len(set(self.field_only_modes)) != len(self.field_only_modes)
+                    or any(m not in DUAL_MODES for m in self.field_only_modes) or curve_only_source is not None
+                    or self.true_curve_weight):
+                raise ValueError("Field-only scope requires valid tasks and no curve-training route.")
+            self.lossf.weights = {"field": {m: float(m in self.field_only_modes) for m in DUAL_MODES},
+                                  "curve": {m: 0. for m in DUAL_MODES}}
+            self.model.requires_grad_(False)
+            stage = self.model.field_model
+            for mode in self.field_only_modes:
+                (stage.tasks[mode] if hasattr(stage, "tasks") else stage).requires_grad_(True)
         if curve_only_source is not None:
             self.model.field_model.requires_grad_(False)
             self.lossf.weights["field"] = {mode: 0. for mode in DUAL_MODES}
@@ -1572,6 +1617,13 @@ class DUAL_MODEL:
         return self
 
     def _predict_batch(self, batch):
+        if self.field_only_modes is not None:
+            fields = {m: torch.zeros_like(batch["field"][m]) for m in DUAL_MODES}
+            stage = self.model.field_model
+            for mode in self.field_only_modes:
+                module = stage.tasks[mode] if hasattr(stage, "tasks") else stage
+                fields[mode] = module(batch["geometry"], batch["task_features"], batch["node_mask"])[mode]
+            return {"field": fields, "curve": {m: torch.zeros_like(batch["curve"][m]) for m in DUAL_MODES}}
         if self.curve_only_source is None:
             return self.model(batch["geometry"], batch["task_features"], batch["node_mask"])
         with torch.no_grad():
@@ -1679,7 +1731,9 @@ class DUAL_MODEL:
                 "curve_lr_factor": self.curve_lr_factor,
                 "true_curve_weight": self.true_curve_weight,
                 "curve_only_source": self.curve_only_source,
-                "selection_metric": ("fixed curve validation score" if self.curve_only_source else "fixed dual validation score") if self.selection_metric else "joint loss",
+                **({"field_only_modes": self.field_only_modes} if self.field_only_modes is not None else {}),
+                "selection_metric": ("fixed field validation score" if self.field_only_modes else
+                    "fixed curve validation score" if self.curve_only_source else "fixed dual validation score") if self.selection_metric else "joint loss",
                 "best_epoch": self.best_epoch,
                 "best_loss": self.best_loss,
             },
@@ -1722,10 +1776,10 @@ class DUAL_MODEL:
         result = self.predict(eval_split)
         arrays = {"sample_ids": np.asarray(result["sample_id"])}
         summaries = {"field": {}, "curve": {}}
-        for mode in DUAL_MODES:
+        for mode in (self.field_only_modes or DUAL_MODES):
             present = self.data.node_masks[mode]
             arrays[f"{mode}_node_mask"] = present
-            for kind in ("field", "curve"):
+            for kind in (("field",) if self.field_only_modes else ("field", "curve")):
                 inverse = getattr(self.data, f"inverse_{kind}")
                 pred = inverse(mode, result["prediction"][kind][mode])
                 truth = inverse(mode, result["truth"][kind][mode])
@@ -1774,6 +1828,7 @@ class DUAL_MODEL:
         np.savez(results_dir / "predictions.npz", **arrays)
         metrics = {
             "kind": "dual-stage-transformer", "version": 1,
+            **({"prediction_scope": {"kinds": ["field"], "modes": self.field_only_modes}} if self.field_only_modes else {}),
             "evaluation_split": eval_split, "prediction_space": "physical",
             "field_layout": "sample,node,frame*component", "node_index_base": 0,
             "best_epoch": self.best_epoch, "best_validation_loss": self.best_loss,
