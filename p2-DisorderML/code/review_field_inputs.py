@@ -11,8 +11,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from resources.MLmetrics import load_dual_diagnostics, plot_field_sample
-
 
 POLICIES = ("predicted", "true", "mixed", "corrected", "corrected_mixed")
 LABELS = {"predicted": "Predicted only", "true": "True only", "mixed": "Predicted + true",
@@ -213,6 +211,8 @@ def plot_comparisons(rows, extra, scores, out):
 
 
 def galleries(root, suite, control, winner, out):
+    from resources.MLmetrics import load_dual_diagnostics, plot_field_sample
+
     chosen = run_path(root, suite, control, winner, 42)
     baseline = run_path(root, suite, control, "predicted", 42)
     for mode in ("UT", "FT"):
@@ -306,6 +306,181 @@ def followup_section(out):
     return lines
 
 
+def corrector_changes(rows):
+    """Paired per-seed RMSE changes; negative means the corrector improves error."""
+    selected = rows[rows.policy.isin(("mixed", "corrected_mixed"))]
+    keys = ["seed", "kind", "mode"]
+    if selected.duplicated(["policy", *keys]).any():
+        raise ValueError("Duplicate correction comparison cell.")
+    pairs = selected.pivot(index=keys, columns="policy", values="rmse")
+    if set(pairs.columns) != {"mixed", "corrected_mixed"} or pairs.isna().any().any():
+        raise ValueError("Both policies need every paired seed/output.")
+    if not np.isfinite(pairs.to_numpy()).all() or (pairs <= 0).any().any():
+        raise ValueError("Comparison errors must be finite and positive.")
+    pairs["rmse_change_percent"] = 100 * (pairs.corrected_mixed / pairs.mixed - 1)
+    return pairs.reset_index()
+
+
+def corrector_costs(evidence, suite, control):
+    """Measured one-GPU allocation hours, including common field-bank preparation."""
+    jobs = {item["name"]: item for item in evidence["accounting"]}
+    if len(jobs) != len(evidence["accounting"]):
+        raise ValueError("Scheduler snapshot has duplicate job names.")
+    result = []
+    for seed in (42, 43, 44):
+        row = {"seed": seed}
+        for key, name in {
+            "field_bank_h": f"{control}-bank-1i-s{seed}",
+            "mixed_curve_h": f"{suite}-mixed-s{seed}",
+            "correction_h": f"{suite}-correction-s{seed}",
+            "corrected_curve_h": f"{suite}-corrected_mixed-s{seed}",
+        }.items():
+            job = jobs[name]
+            if job["state"] != "COMPLETED" or "gres/gpu=1" not in job["allocated_tres"].split(","):
+                raise ValueError("Cost comparison requires completed one-GPU jobs.")
+            if job["elapsed_seconds"] <= 0:
+                raise ValueError("Completed job elapsed time must be positive.")
+            row[key] = job["elapsed_seconds"] / 3600
+        row["mixed_total_h"] = row["field_bank_h"] + row["mixed_curve_h"]
+        row["corrected_followup_h"] = row["correction_h"] + row["corrected_curve_h"]
+        row["corrected_total_h"] = row["field_bank_h"] + row["corrected_followup_h"]
+        result.append(row)
+    return pd.DataFrame(result)
+
+
+def review_correction_cost(root, suite, control, out, evidence_path):
+    """Recheck six saved validation fits; no field forwards, training or scheduler writes."""
+    rows = pd.read_csv(out / "per-run-metrics.csv")
+    extra = pd.read_csv(out / "additional-metrics.csv")
+    evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
+    paired = corrector_changes(rows)
+    if set(paired.seed) != {42, 43, 44} or len(paired) != 12:
+        raise ValueError("The cost review requires three seeds and all four outputs.")
+    costs = corrector_costs(evidence, suite, control)
+    reference, parameters, source_hashes = {}, {}, {}
+    for policy in ("mixed", "corrected_mixed"):
+        for seed in (42, 43, 44):
+            path = run_path(root, suite, control, policy, seed)
+            metrics = json.loads((path / "results/metrics.json").read_text())
+            data = json.loads((path / "model_data.json").read_text())
+            model = json.loads((path / "model.json").read_text())
+            if metrics["evaluation_split"] != "val" or metrics["run_config"]["seed"] != seed:
+                raise ValueError("Only matching saved validation results are allowed.")
+            parameters[policy] = model["metadata"]["parameter_counts"]
+            for key in ("normalizers", "node_masks", "reference_task_features"):
+                value = hashlib.sha256(json.dumps(data[key], sort_keys=True).encode()).hexdigest()
+                reference.setdefault(key, value)
+                if reference[key] != value:
+                    raise ValueError("Input/normalization contracts differ.")
+            expected_ids = data["sample_ids"]["val"]
+            reference.setdefault("ids", expected_ids)
+            verify_ids(expected_ids, reference["ids"])
+            for kind, mode in TASKS:
+                cached = rows.query("policy == @policy and seed == @seed and kind == @kind and mode == @mode").iloc[0]
+                diag = metrics["diagnostics"][kind][mode]
+                if not np.isclose(cached.rmse, diag["rmse"], rtol=2e-6):
+                    raise ValueError("Cached RMSE differs from its original run.")
+                if not np.isclose(cached.baseline, diag[f"mean_{kind}_baseline_rmse"], rtol=1e-8):
+                    raise ValueError("Training-mean baseline differs.")
+                table = pd.read_csv(path / f"results/{mode}_val_{kind}_{'motion' if kind == 'field' else 'sample_metrics'}.csv")
+                verify_ids(table.sample_id, expected_ids)
+                if kind == "field":
+                    values = {k: table[k].mean() for k in ("local_jump_nrmse_percent", "temporal_nrmse_percent", "activity_node_jaccard")}
+                else:
+                    with np.load(path / "results/predictions.npz", allow_pickle=False) as a:
+                        verify_ids(a["sample_ids"], expected_ids)
+                        y, p = a[f"{mode}_val_curve_truth"], a[f"{mode}_val_curve_outputs"]
+                        if not np.isclose(np.sqrt(np.mean((p.astype(float)-y)**2)), cached.rmse, rtol=2e-6):
+                            raise ValueError("Curve arrays disagree with saved RMSE.")
+                        span = np.ptp(a[f"{mode}_curve_x_values"])
+                    values = {"peak_height_error_percent": 100*abs(table.peak_error).mean()/abs(table.true_peak).mean(),
+                              "peak_location_error_percent": 100*abs(table.peak_x_error).mean()/span,
+                              "work_error_percent": 100*abs(table.energy_error).mean()/abs(table.true_energy).mean()}
+                for metric, value in values.items():
+                    saved = extra.query("policy == @policy and seed == @seed and mode == @mode and metric == @metric").value.iloc[0]
+                    if not np.isclose(value, saved, rtol=2e-6):
+                        raise ValueError("Auxiliary diagnostic differs from saved source tables.")
+            source_hashes[path.name] = hashlib.sha256((path / "results/metrics.json").read_bytes()).hexdigest()
+
+    paired.to_csv(out / "correction-paired-changes.csv", index=False)
+    costs.to_csv(out / "correction-training-costs.csv", index=False)
+    colors = ("#277f81", "#c67538")
+    fig, axes = plt.subplots(2, 2, figsize=(10, 6.7), constrained_layout=True)
+    for ax, (kind, mode) in zip(axes.flat, TASKS):
+        values = paired.query("kind == @kind and mode == @mode")
+        ax.barh(0, values.rmse_change_percent.mean(), color=colors[0] if values.rmse_change_percent.mean() < 0 else colors[1], alpha=.55, height=.35)
+        for i, item in enumerate(values.itertuples()):
+            ax.scatter(item.rmse_change_percent, (i-1)*.10, color="#243746", s=38)
+            ax.annotate(str(item.seed), (item.rmse_change_percent, (i-1)*.10), xytext=(4, 5), textcoords="offset points", fontsize=9)
+        ax.axvline(0, color="grey", lw=1)
+        ax.set(title=f"{mode} {kind}: mean {values.rmse_change_percent.mean():+.2f}%", yticks=[], ylim=(-.35,.35),
+               xlim=(-3.1,1.3), xlabel="RMSE change from adding corrector (%)")
+        ax.grid(axis="x", alpha=.2)
+    fig.suptitle("Corrected + true versus predicted + true\nNegative = lower error; labels = training seeds, not confidence intervals")
+    fig.savefig(out / "correction-performance.png", dpi=170); plt.close(fig)
+
+    mean = costs.drop(columns="seed").mean()
+    fig, axes = plt.subplots(1, 2, figsize=(11, 5.3), constrained_layout=True)
+    for ax, include_bank in zip(axes, (False, True)):
+        for x, policy in enumerate(("mixed", "corrected_mixed")):
+            segments = [("Shared field bank", mean.field_bank_h if include_bank else 0., "#8fa6bd"),
+                        ("Nested correction", mean.correction_h if policy == "corrected_mixed" else 0., colors[1]),
+                        ("Curve fit", mean.mixed_curve_h if policy == "mixed" else mean.corrected_curve_h, colors[0])]
+            bottom = 0.
+            for label, height, color in segments:
+                ax.bar(x, height, bottom=bottom, color=color, width=.55, label=label if x == 1 else None)
+                if height: ax.text(x,bottom+height/2,f"{height:.1f} h",ha="center",va="center",fontsize=10)
+                bottom += height
+            ax.text(x,bottom+1,f"{bottom:.1f} h",ha="center",fontweight="bold")
+        ax.set(xticks=[0,1],xticklabels=["Predicted\n+ true","Corrected\n+ true"],ylabel="Mean allocated GPU-hours per seed",
+               title="Follow-up after shared field bank" if not include_bank else "Complete field + curve training",ylim=(0,95))
+        ax.grid(axis="y",alpha=.15); ax.set_axisbelow(True)
+    axes[1].legend(loc="upper left",fontsize=8)
+    fig.suptitle("Measured training cost, not inference latency or queue wait")
+    fig.savefig(out / "correction-training-cost.png", dpi=170); plt.close(fig)
+
+    fig, axes = plt.subplots(2, 3, figsize=(12, 6.7), constrained_layout=True)
+    metrics = ("local_jump_nrmse_percent","peak_location_error_percent","work_error_percent")
+    titles = ("Jump RMSE / target jump RMS (%)","Peak-location MAE / loading span (%)","Work MAE / mean true work (%)")
+    for row, mode in enumerate(("UT","FT")):
+        for ax, metric, title in zip(axes[row], metrics, titles):
+            for i, policy in enumerate(("mixed","corrected_mixed")):
+                values=extra.query("policy == @policy and mode == @mode and metric == @metric").value
+                ax.bar(i,values.mean(),color=colors[i],alpha=.7)
+                ax.scatter(i+np.linspace(-.09,.09,3),values,color="#243746",s=18,zorder=3)
+                ax.text(i,values.max()*1.05,f"{values.mean():.2f}%",ha="center",fontsize=9)
+            ax.set(title=f"{mode}: {title}",xticks=[0,1],xticklabels=["Predicted\n+ true","Corrected\n+ true"])
+            ax.set_ylim(0,ax.get_ylim()[1]*1.16); ax.grid(axis="y",alpha=.15); ax.set_axisbelow(True)
+    fig.suptitle("Local-motion and curve safeguards: lower is better; dots = three seeds")
+    fig.savefig(out / "correction-safeguards.png",dpi=170); plt.close(fig)
+
+    allocation = {item["job_id"]: item for item in evidence["accounting"]}
+    queue = {item["job_id"]: item for item in evidence["queue"]}
+    jobs = pd.read_csv(out / "loss-study-jobs.tsv",sep="\t")
+    counts = {}
+    used_h = {}
+    for item in jobs[jobs.role != "preflight"].itertuples():
+        record=queue.get(item.job_id,allocation.get(item.job_id))
+        if record is None: raise ValueError("Scheduler evidence omits a study job.")
+        state=record["state"]
+        category="field banks" if item.role.startswith("bank-") else "correction banks" if item.role.startswith("correction-") else "curve-loss fits" if item.role.startswith("combined_") else "adapted curve fits"
+        counts.setdefault(category,{"COMPLETED":0,"RUNNING":0,"PENDING":0})
+        counts[category][state]+=1
+        used_h[category]=used_h.get(category,0.)+allocation.get(item.job_id,{}).get("elapsed_seconds",0)/3600
+    summary=dict(checked_at=evidence["queue_checked_at"],parameters=parameters,source_metrics_sha256=source_hashes,
+                 scheduler_evidence_sha256=hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
+                 source_summary_sha256={p:hashlib.sha256((out/p).read_bytes()).hexdigest() for p in ("per-run-metrics.csv","additional-metrics.csv","selection.json")},
+                 mean_paired_rmse_change=paired.groupby(["kind","mode"]).rmse_change_percent.mean().to_dict(),
+                 full_training_ratio=mean.corrected_total_h/mean.mixed_total_h,
+                 followup_training_ratio=mean.corrected_followup_h/mean.mixed_curve_h,
+                 extra_gpu_hours_all_seeds=float((costs.corrected_total_h-costs.mixed_total_h).sum()),
+                 study_counts=counts,study_allocated_gpu_hours=used_h)
+    summary["mean_paired_rmse_change"]={"_".join(k):v for k,v in summary["mean_paired_rmse_change"].items()}
+    (out/"correction-cost-summary.json").write_text(json.dumps(summary,indent=2),encoding="utf-8")
+    print(json.dumps(summary,indent=2))
+    return summary
+
+
 def review(root, suite, control, out):
     out.mkdir(parents=True, exist_ok=True)
     rows, extra, checks, sources = collect(root, suite, control)
@@ -324,8 +499,10 @@ def review(root, suite, control, out):
     selected["relative_change"] = [100 * (r.rmse / baseline.loc[(r.seed, r.kind, r.mode)] - 1) for r in selected.itertuples()]
     changes = selected.groupby(["kind", "mode"]).relative_change.mean()
     true_skills = extra.query("policy == 'true' and metric == 'true_field_curve_skill'").groupby("mode").value.mean()
+    cost_review = out / "correction-cost.md"
+    selection_title = "Original fixed-score winner" if cost_review.exists() else "Selected next-study pipeline"
     text = ["# Field-input study: completed validation comparison", "",
-            f"**Selected next-study pipeline: {LABELS[winner]}.** It has the lowest fixed four-output score ({decision['score']:.6f}) across seeds 42/43/44.", "",
+            f"**{selection_title}: {LABELS[winner]}.** It has the lowest fixed four-output score ({decision['score']:.6f}) across seeds 42/43/44.", "",
             "Case 1(i) remains four independently trained UT/FT field/curve models. The selected correction option adds two independently trained residual field refiners; it does not restore joint UT/FT training.", "",
             "## Main result", "", "Skill = 100 × (1 − model RMSE / training-mean baseline RMSE). Higher is better; zero means the mean predictor. Entries are mean ± sample SD across three seeds, not confidence intervals.", "",
             "| Curve training source | UT field skill | FT field skill | UT curve skill | FT curve skill |",
@@ -363,6 +540,8 @@ def review(root, suite, control, out):
              *followup_section(out),
              "## Verification and limits", "", "All 18 saved validation evaluations (five candidates plus frozen-readout correction, three seeds) are checked for identical specimen IDs/order, training-fitted scalers, masks, truths, baseline denominators and recomputed physical RMSE. Raw/corrected fields remain identical across corresponding curve-source fits. [Validation checks](validation.txt) and [selection receipt](selection.json) record the rule and source runs.", "",
              "The split is 7,137 train / 793 validation / 881 locked test. No locked-test targets, inference, new training, FEA or ODB exports are used by this review. Selection on these same validation results is exploratory; three seeds are not a final generalization guarantee. Raw archives are under " + f"`{root}`.", ""]
+    if cost_review.exists():
+        text[2:2] = [f"**Cost-aware follow-up:** the [performance/runtime review]({cost_review.resolve().as_posix()}) recommends Predicted + True for future work. Original accuracy selection and the submitted corrected-source study below are preserved; no job policy is changed by that recommendation.", ""]
     receipt = out / "transfer-verification.json"
     if receipt.exists():
         transfer = json.loads(receipt.read_text(encoding="utf-8"))
@@ -378,5 +557,10 @@ if __name__ == "__main__":
     parser.add_argument("--suite", default="independent-inputs-261015")
     parser.add_argument("--control", default="independence-261013-r1")
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--cost-evidence", type=Path,
+                        help="Build only the correction-cost figures/summary from supplied scheduler evidence and existing verified review tables.")
     options = parser.parse_args()
-    review(options.root, options.suite, options.control, options.output_dir)
+    if options.cost_evidence:
+        review_correction_cost(options.root, options.suite, options.control, options.output_dir, options.cost_evidence)
+    else:
+        review(options.root, options.suite, options.control, options.output_dir)

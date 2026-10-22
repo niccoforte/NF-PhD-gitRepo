@@ -20,8 +20,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - Artifact navigation now reflects the restored Mac samples and current Z: data.
   Canonical `Z:/00-PhD-gitRepo/p2-DisorderML/samples/README.md` covers11 folders,
-  37 Markdown documents including itself, seven root guides and nine restored
-  helper scripts. All36 other report documents are linked. External
+  38 Markdown documents including itself, seven root guides and nine restored
+  helper scripts. All37 other report documents are linked. External
   `Z:/p2/README.md` catalogues all65 direct dual runs/banks, individual studies,
   30 HPO databases, property probes and historical material, with report links.
   The two INP-based example helpers require explicit --inp-root and default
@@ -77,6 +77,23 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   True-trained/true-input curves give50.69% UT and43.53% FT skill, but that diagnostic
   is not deployable; true-only training deploys poorly on predicted fields.
   No locked-test targets were evaluated. Case1(i) independence remains unchanged.
+
+- Cost-aware input review (22 October): samples/field-input-study/correction-cost.md
+  recommends Predicted+True for future accuracy work, not automatically adopting
+  the original four-output score winner. Adding correction changes paired RMSE
+  UTfield−0.57%,FTfield−1.95%,UTcurve+0.19%,FTcurve−0.28%, with small/mixed local
+  and peak/work changes. Slurm-measured complete training averages29.31 versus
+  81.04 GPU-h/seed; follow-up after common banks6.77 versus58.50 (2.76x/8.65x).
+  Code --cost-evidence rechecks six saved fits and emits three figures, tables
+  and source hashes; it runs no model or SSH query. Eight completed custom-loss
+  banks match original controls' data/IDs/architecture/training/folds on HPC.
+  All12 field banks and three existing Mixed controls are reusable; a clean
+  no-correction continuation needs18 new curve-only fits plus its execution
+  gate, not a repeat of field-bank training. The current launcher does not yet
+  skip existing banks: reuse-aware submission needs explicit implementation/
+  approval. Snapshot11:34 BST:20 completed,8 running,14 pending. No jobs,
+  defaults, checkpoints or historical selection files were changed by this
+  recommendation; switching/cancelling remains a user decision.
 
 - Selected-policy loss suite `independent-losses-261018` was submitted18 October
   from immutable source92d844f: gate32471749, then42 full jobs32471750–32471791.

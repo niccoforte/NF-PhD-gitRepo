@@ -60,6 +60,31 @@ class InputReviewTests(unittest.TestCase):
             expected = f"![Test figure](<{(Path(directory) / 'test.png').resolve().as_posix()}>)\n[Evidence](selection.json)"
             self.assertEqual(review.absolute_figure_links(source, Path(directory)), expected)
 
+    def test_corrector_changes_use_paired_seeds_and_reject_missing_cells(self):
+        pairs = review.corrector_changes(self.rows())
+        self.assertEqual(len(pairs), 12)
+        self.assertTrue((abs(pairs.rmse_change_percent - 60) < 1e-9).all())
+        rows = self.rows()
+        bad = rows[~((rows.policy == "mixed") & (rows.seed == 42) & (rows.kind == "curve") & (rows["mode"] == "UT"))]
+        with self.assertRaises(ValueError):
+            review.corrector_changes(bad)
+
+    def test_costs_include_correction_once_and_shared_bank_in_both_pipelines(self):
+        jobs = []
+        for seed in (42, 43, 44):
+            for name, hours in ((f"control-bank-1i-s{seed}", 1),
+                                (f"input-mixed-s{seed}", 2),
+                                (f"input-correction-s{seed}", 3),
+                                (f"input-corrected_mixed-s{seed}", 2)):
+                jobs.append(dict(name=name, state="COMPLETED", allocated_tres="cpu=12,gres/gpu=1", elapsed_seconds=hours*3600))
+        costs = review.corrector_costs(dict(accounting=jobs), "input", "control")
+        self.assertTrue((costs.mixed_total_h == 3).all())
+        self.assertTrue((costs.corrected_total_h == 6).all())
+        self.assertTrue((costs.corrected_followup_h == 5).all())
+        jobs[0]["state"] = "RUNNING"
+        with self.assertRaises(ValueError):
+            review.corrector_costs(dict(accounting=jobs), "input", "control")
+
 
 if __name__ == "__main__":
     unittest.main()
