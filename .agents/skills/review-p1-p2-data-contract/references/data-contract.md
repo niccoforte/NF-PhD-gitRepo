@@ -16,6 +16,12 @@ Use only the section relevant to the changed boundary. Confirm details in code b
 | Remote/local archive paths | p2 `HPC/B3_ML-transfer-mac.sh` and `HPC/B3_ML-transfer-windows.sh` |
 | Full p1 archive mirror | p1 `SIMscripts/B3_ABAQUS-archive.sh`: complete remote p1 contents into external `Z:/p1/HPCarchive`, preserving archive-relative paths; separate from consolidated transfer/MLdata and existing consumers. |
 
+For archived raw/execution records, map `/data/SEMS-TaoLab/Niccolo-Forte/p1/<relative>`
+to `Z:/p1/HPCarchive/<relative>`. Do not replace existing consolidated local MLdata
+paths or change HPC p2/MLdata. Keep original source paths in immutable provenance.
+If remote p1 is removed, restore required raw subsets before any future HPC
+re-export; existing producer output defaults are not current read dependencies.
+
 ## Stable identity and naming
 
 - `Ductile`/`UT`: uniaxial or ductile branch.

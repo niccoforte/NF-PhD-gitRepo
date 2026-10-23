@@ -4,21 +4,22 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- Full-p1 quota-offload download is prepared in `SIMscripts/B3_ABAQUS-archive.sh`:
-  entire HPC p1 root to `Z:/p1/HPCarchive`, not only Ti/data or transfer products.
-  The researcher's initial attempt stopped before downloading any files because
-  PSFTP `reget` cannot create missing local files. The corrected script uses
-  `get` for fresh/empty files and `reget` for partials, with live byte/file/speed
-  progress and safe interruption. The existing resume marker/directory tree can
-  be reused; the researcher will restart the full download. Existing data-loading
-  paths and the selective B3 remain unchanged; no remote cleanup was performed.
-  Completion verifies relative paths/types/sizes, not full content hashes;
-  remote deletion requires separate verification and explicit authority.
-  Sixteen offline archive-transfer tests pass, including missing/empty/complete
-  files, prefix-preserving partial resume, progress, interrupted-client cleanup,
-  source-change refusal, path/name guards, free-space and completeness checks.
-  Bash parsing passes. One bounded 70 KB native-client download/resume matched
-  the HPC source SHA-256; this is not full-archive or throughput validation.
+- The full p1 archive is downloaded to `Z:/p1/HPCarchive`. Read-only comparison
+  confirmed all 212,198 files / 995,745,698,879 bytes and directory/type/size
+  agreement with `/data/SEMS-TaoLab/Niccolo-Forte/p1` on 23 October 2026.
+  The requested quick content check matched SHA-256 for 160 complete files and
+  1 MiB head/middle/tail chunks from 36 larger files: zero mismatches/errors,
+  371,540,157 bytes read per copy. Deterministic seed 20261023 covered all 156
+  defined disorder/lattice/UT-FT/file-type strata; it is not a full-file checksum
+  proof for the whole archive. Source files were unchanged during their reads.
+  The checked live p2 jobs use p2 MLdata/field banks, not the p1 raw archive;
+  MLdata contains no symlinks into p1. No active p1 job was listed.
+  Z: still reports filesystem Warning/Full Repair Needed and DirtyBitSet=True;
+  the physical USB disk reports Healthy/Online. No independent second full
+  backup was verified, no filesystem repair was run and no HPC data was deleted.
+  Transfer confidence, filesystem integrity and single-drive loss remain separate
+  questions. The researcher retains the deletion decision; the sample is not
+  automatic cleanup authority. Existing loaders and selective B3 paths stay unchanged.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
   aligned banks and visual report are ready for the separate ML workflow.

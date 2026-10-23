@@ -10,6 +10,15 @@ The researcher additionally authorised the existing FCC dataset:9,000 UT and
 files and MLdata banks. No new FEA, ODB upgrade, other lattice or ML architecture
 change is included.
 
+The complete original job tree is also preserved under `Z:/p1/HPCarchive/Ti/data/`,
+including `disNodes/0.2/FCC/damage-261016/execution.tar.gz` and its `bank-reports/`.
+Use these explicit local paths to revisit archived records. Original HPC paths
+in saved NPZ/JSON/manifests remain provenance, not paths to rewrite. If the remote
+p1 archive is removed later, the HPC batch commands below require restoring
+their needed raw files first; they are not a request to repeat completed extraction.
+Current ML training reads independent banks in HPC `p2/MLdata`, while existing
+local loaders continue to use the consolidated `Z:/p1/data/Ti/.../MLdata` tree.
+
 ## Existing FCC dataset: STATUS-only route
 
 `A2_DamageOUTpostProcess.py --status-only` reuses the checked mapper and exports

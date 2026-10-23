@@ -71,6 +71,14 @@ Important meanings:
 
 ## HPC Rules
 
+- The preserved full archive is `Z:/p1/HPCarchive`: map an original HPC p1-relative
+  path directly beneath it, e.g. `p1/Ti/data/...` -> `HPCarchive/Ti/data/...`.
+  This is not the consolidated `Z:/p1/data/Ti` processing tree. Use explicit local
+  paths when revisiting archived ODB/INP/execution files. Keep original paths in
+  saved provenance; do not rewrite immutable manifests or replace HPC paths with
+  Windows strings. If the researcher later removes the remote p1 archive, an HPC
+  reprocessing pass must first restore its required subset. Existing p1 producer
+  output defaults remain valid for new runs; p2 training uses its separate p2/MLdata.
 - `B1_ABAQUS-new.sh` stages scripts and `resources/` into scratch and archives to `/data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data`.
 - Preserve scratch path safety checks before deleting scratch content.
 - Preserve run configuration capture (`run_config`) and the staged `resources/` copy; archived runs need provenance.

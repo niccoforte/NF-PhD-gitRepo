@@ -319,6 +319,16 @@ Keep the PC awake and the p1 source unchanged until the copy and any resumes fin
 
 The script checks the complete relative tree and file sizes and detects source metadata changes during transfer; **it does not compute full content checksums**. SFTP protects transmission, but size agreement is not independent byte-for-byte verification. Keep HPC originals until separate content verification and explicit cleanup approval. Downloading alone does not release HPC quota; the script never deletes remote data. The existing `B3_ABAQUS-transfer.sh` and `Z:/p1/data/Ti` processing layout are unchanged.
 
+For later local access, an original `/data/SEMS-TaoLab/Niccolo-Forte/p1/<relative>`
+record is at `Z:/p1/HPCarchive/<relative>`. This includes the completed FCC damage
+pass's `Ti/data/disNodes/0.2/FCC/damage-261016/execution.tar.gz` and `bank-reports/`.
+Do not rewrite original source paths inside archived provenance, or repoint
+existing consolidated MLdata loaders at the full archive. Current HPC training
+uses separate `p2/MLdata` and p2 field banks. If remote p1 is removed later, future
+HPC reprocessing must restore the needed raw subset first; p1 producer defaults
+remain valid destinations for new runs. A representative checksum spot check is
+not a complete checksum proof or protection against losing the only local drive.
+
 ### `p1-DisorderLatticeProperties/code/`
 
 This folder contains notebooks for data conversion, mechanics inspection, validation, and exploratory analysis.

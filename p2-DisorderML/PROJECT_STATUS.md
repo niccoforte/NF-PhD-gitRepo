@@ -124,6 +124,10 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   run folder's bank-reports/, outside both MLdata folders. Each MLdata
   folder retains its 19 NPZ/CSV inputs, with unchanged bank hashes. The full
   processing archive is /data/SEMS-TaoLab/Niccolo-Forte/p1/Ti/data/disNodes/0.2/FCC/damage-261016.
+  Its preserved full-tree local copy is
+  Z:/p1/HPCarchive/Ti/data/disNodes/0.2/FCC/damage-261016, including execution.tar.gz
+  and bank-reports/. Original saved source paths remain provenance; current
+  training reads p2/MLdata/field banks independently of that raw p1 archive.
   The follow-up was deleted at the researcher request and was not recreated.
   Other lattices, new FEA and ML architecture/training integration remain outside
   this completed data-processing task.
