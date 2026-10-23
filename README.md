@@ -37,6 +37,17 @@ On Windows, `-OnlyPython` and `-OnlyAbaqus` select one interpreter. Pass `-remov
 
 The root `requirements.txt` is set up for a standard local Python environment, including CPU PyTorch wheels. The GPU/HPC machine-learning environment is managed separately by `p2-DisorderML/HPC/B0_ML-env-setup.sh`.
 
+For an isolated Windows Python environment, create it once in the primary checkout, activate it, and select the Python-only setup:
+
+```powershell
+Set-Location 'Z:\00-PhD-gitRepo'
+python -m venv .venv311
+. .\.venv311\Scripts\Activate.ps1
+.\setup-Windows.ps1 -OnlyPython
+```
+
+On later sessions, activate the existing environment; creation is unnecessary. The setup script uses the `python` selected on `PATH`; it does not create or activate a virtual environment itself. Recreate virtual environments when relocating a checkout, since installed launchers and editable imports can retain absolute paths. Generated caches and package metadata are rebuilt rather than copied. Abaqus uses its separate interpreter and setup.
+
 ## Agent Guidance And Repo Skills
 
 The independent-model accuracy follow-ups are documented in
