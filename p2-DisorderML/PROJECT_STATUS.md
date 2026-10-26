@@ -27,7 +27,9 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   unchanged. All10 locality regressions pass on HPC. Replacement immutable
   e598b61: gate33395469 and16 field-only fits33395470–33395485, seed42.
   Home manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/locality-261026-r1/jobs.tsv`.
-  Last26 October check: gate PENDING Priority, full jobs PENDING Dependency.
+  Gate completed0:0 in12m44s; full-data identities and all16 GPU train/diagnostic/
+  reload cases passed. Successful preflight scratch deleted, no archive created.
+  Last26 October check: UT control RUNNING;15 full jobs queued Priority/Resources.
   Full requests240h/1GPU/12CPU/90000MB; afterok/invalid-dependency cancellation.
   Labels: `MULTI/Dual/Transformer/locality-261026-r1-<variant>-<UT|FT>-s42`.
   Old terminal failed scratch/home source/logs removed; no old archive existed.
@@ -45,6 +47,11 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   location does not beat no-location on reported hard locations at this setting.
   Keep the accepted Mixed MSE baseline; no automatic loss promotion. Running
   locality sources and successful archives are preserved.
+  Validation: five report regressions pass, all21 saved comparisons reproduce
+  physical metrics/IDs/contracts, and Linux changed-surface validation reports
+  nine non-failing/zero failed. Nine inline figure links and Markdown tables
+  checked; plots visually reviewed. Existing unrelated WINNER formatting edit
+  is preserved uncommitted.
 
 - Source cleanup: named Independence/Input/Loss entry points and launchers now
   live under `HPC/studies/`, with Input/Damage Python reviews/tests moved out of
