@@ -1,8 +1,10 @@
 # Repository Agent Context
 
-This repository is organized by PhD paper folder with one shared Python package. Start with this file, then read the nearest nested `AGENTS.md` before editing inside a paper folder.
+Work is grouped by PhD paper with shared Python resources. Read this file and the
+nearest nested `AGENTS.md` before editing a paper folder.
 
-For planning, continuation, or handoff work, also read that paper's `PROJECT_STATUS.md`. It contains changing work state; durable rules belong in `AGENTS.md` and reusable procedures belong in `.agents/skills/`.
+For planning/continuation/handoffs, read the paper's `PROJECT_STATUS.md` for changing
+state. Durable rules belong in `AGENTS.md`; reusable procedures in `.agents/skills/`.
 
 ## Repository Map
 
@@ -55,10 +57,10 @@ For planning, continuation, or handoff work, also read that paper's `PROJECT_STA
 Keeping human and agent guidance current is a completion requirement for every repository-changing task.
 
 - Before editing, read this file, every applicable `AGENTS.md` down to the affected directory, and any matching repo skill under `.agents/skills/`.
-- Use this file's repository map and cross-folder workflow as the minimum project context. Also consult the relevant `README.md` sections when the task is unfamiliar, crosses papers or shared resources, or affects human setup, navigation, commands, workflows, interpretation, or maintenance. Read the full README for repository-wide onboarding or restructuring, or whenever the relevant scope is unclear.
+- Use this file's map/workflow as minimum context. Read relevant README sections for unfamiliar, cross-paper/shared-resource work or changed human workflows; read the full README for repository-wide onboarding/restructuring or unclear scope.
 - Read `PROJECT_STATUS.md` for planning, continuation, or handoff tasks; update it only when the current objective, evidence, blocker, decision, or next task changes.
-- During the same change, update the closest relevant `AGENTS.md` whenever behavior, structure, paths, commands, dependencies, scientific conventions, data contracts, outputs, risks, or validation expectations change.
-- Update `README.md` whenever the changed fact affects human setup, navigation, execution, interpretation, or maintenance.
+- Update the nearest `AGENTS.md` for changed behavior, structure, paths, commands, dependencies, science, data contracts, outputs, risks or validation.
+- Update `README.md` for changed human setup, navigation, execution, interpretation or maintenance.
 - Update the relevant `SKILL.md`, scripts, references, and `agents/openai.yaml` whenever a reusable workflow or its discovery metadata changes.
 - Add an `AGENTS.md` when a new subtree develops a distinct workflow, risk boundary, or validation contract.
 - Edit current guidance in place. Do not leave stale statements or append routine dated change logs; Git history is the change log.
@@ -71,6 +73,13 @@ Use `validate-repo-change` to select proportionate checks, `review-p1-p2-data-co
 `.github/workflows/guidance-integrity.yml` runs the changed-surface validator on GitHub.com pushes and pull requests. Its job is skipped before runner allocation on the QMUL Enterprise mirror, whose runner-backed jobs are currently cancelled. Keep local validation authoritative when remote Actions are unavailable.
 
 Checkout and Python setup use Node 24-based v7 actions to avoid deprecated action runtimes.
+
+## Research References
+
+Capture verified sources used in retained work before handoff/archive, following
+[README](README.md#retained-research-references) and ZoteroLibraryManager's workflow.
+Import eligible sources or persist pending writes in its private intake; exclude
+speculative/abandoned reading. The manager owns sorting. Keep private state out of Git.
 
 ## Analysis Deliverables
 

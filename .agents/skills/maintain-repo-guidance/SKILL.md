@@ -31,6 +31,9 @@ Edit current guidance in place. Do not append routine dated change logs or dupli
 ## Completion gate
 
 1. Review the final diff file by file and map each implementation change to its affected guidance.
+   Capture verified sources actually used in retained work through the root
+   Research References rule; verify Zotero identities or persist pending writes
+   in the configured private intake before handoff/archive.
 2. Run:
 
    ```powershell

@@ -94,6 +94,16 @@ The `review-p1-p2-data-contract` skill treats the boundary like an internal API:
 
 `update-repo.ps1` is a legacy manual multi-checkout workflow, not a setup or validation command. It runs pulls, broad staging, commits, pushes, and an SSH login against hard-coded local, OneDrive, `Z:`, and QMUL HPC locations. Do not run it without explicitly reviewing and confirming every target; whether it should be retired or redesigned is `Decision required`.
 
+## Retained Research References
+
+Capture sources when they are actually used in retained methods, code, analyses,
+reports or presentations, before their chat is archived. Follow
+[ZoteroLibraryManager's reference workflow](https://github.com/niccoforte/ZoteroLibraryManager/blob/main/docs/retained-reference-capture.md)
+for verification, live-library deduplication, collection placement and one private
+shared intake. Preserve what each source supports for manuscript writing. Pending
+entries are not completed imports; speculative and abandoned reading stays out.
+Library/intake contents remain private and outside this public repository.
+
 ## Git Remotes And Dual Push
 
 Complete repository changes by validating, committing and pushing the intended
