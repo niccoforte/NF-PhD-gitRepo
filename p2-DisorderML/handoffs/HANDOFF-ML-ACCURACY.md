@@ -8,15 +8,17 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
-## Current priority order (22 October; supersedes older next-step wording)
+## Current priority order (26 October; supersedes older next-step wording)
 
 - [x] Finish the source-layout cleanup and verification: named entry points and
   reviews under `HPC/studies/<Study>/`, imported helpers in resources; keep
   FieldToProperty's production rename and all active frozen job sources intact.
-- [ ] Finish/review `independent-losses-261022-mixed` and its twelve retained
-  banks; download completed results and compile the human comparison. Select
-  by fixed fracture-sensitive metrics plus global RMSE/seed safeguards, not
-  tunable training totals. Dynamic weighting is implemented, not yet adopted.
+- [x] Review `independent-losses-261022-mixed` and its twelve retained banks:
+  all30 folders downloaded/SHA256 verified; `samples/loss-study/README.md`
+  contains the three-seed comparison and nine figures. UT spatial and FT sudden
+  are task-specific candidates; FT spatial fails the global-error safeguard.
+  Neither combined curve preset is a universal winner. Dynamic weighting is
+  tested, not adopted; keep the accepted baseline pending researcher review.
 - [ ] Implement the approved independent Damage field-only screen: exact native
   strut consumer/head, field-only control, damage-only, auxiliary coefficients
   0.1/1; seed42,450 epochs/patience52, execution/reload gate. No initial OOF or
@@ -25,6 +27,9 @@ It has not been dispatched automatically. New submissions require explicit scope
   degree-only, existing/gated local graph, adjacency/relative-geometry attention,
   one/two-block masked CNN. Latest researcher green light authorizes the screen;
   check PROJECT_STATUS for actual gate/submission before repeating anything.
+- [ ] Review replacement Locality gate33395469 and16 dependents33395470–33395485
+  before any resubmission. It repairs bounded preflight holdouts only; full
+  production splits are unchanged. The original failed suite was cleaned up.
 - [ ] Confirm promising field candidates across42/43/44, then generate their
   OOF banks and retrain Predicted+True curves. Evaluate frozen readouts too.
 - [ ] On the selected independent architecture, retain separate FT crack-tip
@@ -41,11 +46,13 @@ It has not been dispatched automatically. New submissions require explicit scope
 Case1(i)+Predicted+True is the current practical policy, not proof that its fields
 are sufficiently accurate or that every optional implemented feature helps.
 Future damage-to-curve inputs are a TODO AFTER the field/damage screen; do not
-bundle them with the first auxiliary-output test. A supervisor also requested
-STATUS-only versus SDEG-only versus combined auxiliary targets. Full delivered
-banks contain STATUS only; inspect bounded SDEG availability/aggregation before
-any new export. Do not call the old STATUS-overridden strut severity pure SDEG.
-The Damage study guide owns the proposed fair loss-budget/unknown-mask comparison.
+bundle them with the first auxiliary-output test. Full delivered banks contain
+STATUS only. The26 October original-INP check supports prioritizing STATUS:
+Ti softening is deliberately very short; SDEG measures degradation, not preceding
+plasticity. Defer SDEG-only/both and new exports unless bounded observations
+show useful intermediate information. Do not call the old STATUS-overridden
+severity pure SDEG. The Damage guide owns the training-only balancing convention,
+four-arm STATUS screen and deferred fair loss-budget/unknown-mask comparison.
 Both auxiliary heads already update shared field representations; explicit
 predicted-damage feedback remains a separate architecture test. Existing Tokenisation,
 physics/strain and optimisation handoffs own those deferred directions. Output

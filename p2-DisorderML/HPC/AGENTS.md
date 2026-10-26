@@ -27,6 +27,9 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
   manifests, needed audits and log copies beside results in the existing run layout.
 
 - Active entry points are production-oriented: full data and realistic training budgets by default. Small datasets, short epochs/trials, and CPU execution must be explicit debug overrides.
+- Locality's bounded debug subsets disable extrema-forced splitting to keep
+  holdouts nonempty; full-data identity checks and production retain the saved
+  extrema-aware split. Do not change production splitting to repair a smoke run.
 - Do not change Slurm partition, account, license, CPU, memory, or time policy without the user's target cluster policy.
 - Preserve explicit scratch cleanup guards and verify every archive, resume, transfer, or cleanup target before use.
 - B1 must retain scratch and return failure if copying run outputs or job logs to the archive fails, even when Python training succeeded.

@@ -20,6 +20,23 @@ strong changes the coefficient, not the labels or fracture severity. Log both
 raw and weighted terms. Fit balancing on training labels only, with bounded
 weights; exact balancing convention must be recorded before fitting.
 
+Decision26 October: use the observed TRAIN-only positive fraction p separately
+for UT and FT, with r=min((1-p)/p,1000). The masked binary loss is
+`BCEWithLogits(pos_weight=r) / ((1-p)+r*p)`, averaged over observed entries.
+Save p, counts, r, cap and denominator in the checkpoint; reject a training
+population with no positive or no negative examples. This boosts missed rare
+fractures without changing labels, oversampling validation or hiding false
+fractures. Its expected weight is one, keeping auxiliary coefficients0.1/1
+interpretable. The cap is a stability preset, not an HPO optimum.
+
+For damage-only model selection use validation average precision (PR-AUC), with
+balanced BCE as a tie-break; joint runs retain field selection. Report the
+fixed0.5 operating point plus a validation-selected F1 threshold, and freeze
+that threshold before any locked-test evaluation. Weighted logits are not
+automatically calibrated failure probabilities. Report precision, recall,
+predicted/actual positive fractions, onset/path and reversals alongside AP;
+do not silently repair histories. A high intact-label accuracy is insufficient.
+
 Add a symmetric endpoint/initial-edge-geometry MLP head on native struts, not
 new attention tokens. Join by exact specimen ID and initial geometry; drop only
 frame0 from21 stored frames, preserving20-frame masks and short UT histories.
@@ -43,7 +60,7 @@ predicted displacement+predicted damage; true-field/true-damage fits are oracle
 diagnostics, not deployable results. Do not pay for
 OOF/curve retraining before the field-only screen shows a useful result.
 
-## STATUS / SDEG / both — supervisor-requested extension, data audit first
+## SDEG — deferred after the Ti material check,26 October
 
 The delivered full-corpus allD banks are STATUS-only. The older bounded damage
 audit contains section/IP SDEG observations, but that is not a full aligned SDEG
@@ -51,8 +68,34 @@ training bank. Do not silently relabel its `strut_damage` as pure SDEG: the old
 reducer overrides verified STATUS failure to1, so that target mixes the variables.
 No new ODB export, schema change or bulk reprocessing is started by this plan.
 
+The researcher clarified that damage evolution is deliberately abrupt after
+plastic deformation. Verified original UT/FT specimen8701 INPs both contain
+ductile initiation0.102268 at triaxiality1/3, followed by tabular degradation
+from D=0 to1 over effective plastic displacement0.001mm (not global strain).
+They are in `Z:/p1/HPCarchive/Ti/data/disNodes/0.2/FCC/10605572/zip/`, with
+the original hashes recorded in `samples/field-loss-review/README.md`.
+SDEG is degradation, not accumulated plastic deformation. With only20 retained
+loading frames it may contribute little intermediate-state information beyond
+STATUS. Section-point degradation and whole-element deletion still differ, so
+equivalence has not been demonstrated. This bounded INP check is not a census.
+
+The existing [periodic audit](../../../samples/damage-audit/README.md) confirms
+why they are not identical:109 UT struts have an active, positively degraded
+surface at some saved frame;33 subsequently fracture and76 remain active at the
+last frame. Its FT example has no such observed precursor. One UT surface is
+almost fully degraded while its parent remains intact. Thus SDEG could still
+describe UT section-level degradation, but a maximum would not be a strut-failure
+label. These two files cannot establish its value across the training corpus.
+
+Proceed with the four STATUS screen arms above; no explicit damage-to-field
+feedback. They distinguish learning fracture itself from improving displacement
+through weak/strong shared-representation supervision. The architecture and
+consumer are still to implement/gate; no STATUS learning jobs have been submitted.
+Do not bulk-export SDEG now. The following comparison is a deferred option only
+if an existing bounded audit shows useful intermediate values/lead time.
+
 Retain displacement as the common main target, then compare auxiliary
-**STATUS only**, **SDEG only**, and **both**, plus displacement-only control.
+STATUS only, SDEG only, and both, plus displacement-only control.
 Same independent field architecture, specimens, masks and stopping criterion.
 For both-target runs hold the total auxiliary coefficient fixed, initially split
 equally between separately normalized binary and continuous losses. This avoids
@@ -83,9 +126,9 @@ fractures, PR-AUC measures their threshold trade-off, onset/path measures timing
 location, and reversal counts test irreversible-history consistency. These metrics
 evaluate results; only loss balancing changes gradients during training.
 
-Verdict: SDEG is a worthwhile complementary-target hypothesis, not automatically
-better because continuous. Judge primarily whether it improves displacement
-fracture behaviour, separately from whether SDEG itself is well predicted.
+Verdict: prioritize STATUS; continuity alone is insufficient reason to add SDEG.
+If reconsidered, judge primarily whether it improves displacement fracture
+behaviour, separately from whether SDEG itself is well predicted.
 Reference: [Abaqus ductile-metal damage evolution](https://docs.software.vt.edu/abaqusv2025/English/SIMACAEMATRefMap/simamat-c-damageevolductile.htm).
 
 ## Existing report contracts

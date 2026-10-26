@@ -11,24 +11,40 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   masked CNN modules plus a field-only trainer scope and named study entry/launcher.
   It has not yet established real-data accuracy benefits; submission evidence
   must be checked below. Existing loss jobs and saved default models are unchanged.
-  Damage-to-curve inputs are deferred until the field/damage review. STATUS/SDEG/
-  combined supervision is a planned extension requiring a bounded continuous-
-  target audit; full current allD banks are STATUS-only, no new ODB export begun.
+  Damage-to-curve inputs are deferred until the field/damage review. Prioritize
+  the four-arm STATUS screen, with train-only capped/normalized positive weights
+  specified in its study guide. Defer SDEG/both: original Ti INPs show very short
+  post-initiation softening, and SDEG is not plastic strain. No new ODB export.
   Validation: nine new locality tests pass locally and in Linux CPU staging,
   including real FCC topology, gradients, absent-node invariance, common initial
   weights and field-only train/diagnostic/figure/reload. Existing31 dual contracts
   pass on Linux, independence8 and source12 pass locally. Changed-surface18 and
   contract97 checks are non-failing/zero failures; saved Mixed checkpoint reload
   remains unchanged. GPU scientific execution is a separate gate, not implied.
-  Locality suite submitted from immutable6bd3354: gate32886658 and16 field-only
-  fits32886659–32886674, seed42. Home manifest:
-  `/data/home/exy053/p2/MULTI/Dual/Transformer/locality-261022/jobs.tsv`.
-  The live post-submit check found gate PENDING Priority and all16 fits PENDING
-  Dependency; GPU gate success/accuracy is not yet established. Full requests
-  are240h/1GPU/12CPU/90000MB with afterok and invalid-dependency cancellation.
-  Archive labels are `MULTI/Dual/Transformer/locality-261022-<variant>-<UT|FT>-s42`.
-  Current Mixed loss-study submissions/snapshots were left untouched. Do not
-  submit this suite again; review existing IDs on continuation.
+  The original Locality gate32886658 failed before training because extrema
+  forcing exhausted the64-sample debug holdouts;16 dependents never started.
+  Corrected bounded-only splitting leaves full production identity/scaling
+  unchanged. All10 locality regressions pass on HPC. Replacement immutable
+  e598b61: gate33395469 and16 field-only fits33395470–33395485, seed42.
+  Home manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/locality-261026-r1/jobs.tsv`.
+  Last26 October check: gate PENDING Priority, full jobs PENDING Dependency.
+  Full requests240h/1GPU/12CPU/90000MB; afterok/invalid-dependency cancellation.
+  Labels: `MULTI/Dual/Transformer/locality-261026-r1-<variant>-<UT|FT>-s42`.
+  Old terminal failed scratch/home source/logs removed; no old archive existed.
+  Do not duplicate the replacement suite or interpret submission as GPU success.
+
+- The12 retained loss banks and18 Mixed loss comparisons all completed0:0.
+  All30 downloaded to external `Z:/p2`;1,530 files/41.3GB match remote SHA256.
+  `HPC/studies/Loss/review_loss_study.py` owns validation-only reporting to
+  `samples/loss-study/`: nine inline figures,793 identical validation IDs,
+  train-only OOF partitions, scalers/masks/truth/physical-RMSE checks. UT spatial
+  reduces global RMSE1.47% and local-jump ratio69.97→67.87%; FT spatial worsens
+  global RMSE123.12%, including centered error. FT sudden is a modest candidate:
+  local-jump20.19→19.84%, timing3.60→3.53 intervals, global RMSE+0.82%.
+  Neither curve combined preset consistently improves overall accuracy; soft
+  location does not beat no-location on reported hard locations at this setting.
+  Keep the accepted Mixed MSE baseline; no automatic loss promotion. Running
+  locality sources and successful archives are preserved.
 
 - Source cleanup: named Independence/Input/Loss entry points and launchers now
   live under `HPC/studies/`, with Input/Damage Python reviews/tests moved out of

@@ -32,3 +32,12 @@ training totals. Report normalized RMSE, local signed motion/jump timing,
 curve peaks/postpeak/work and seed variability. Loss histories use log axes.
 Dynamic weighting is implemented and being tested, not an adopted improvement.
 See `../../DualOutputs/README.md` for exact component presets and provenance.
+
+`review_loss_study.py` reviews the completed three-seed Mixed continuation and
+its reused banks, without training or locked-test evaluation. Run from the repo
+root; defaults read external `Z:/p2/MULTI/Dual/Transformer` and write the ignored
+`samples/loss-study/README.md` with inline figures. It verifies identities,
+scalers, truths, masks, physical metrics, frozen curve-loss fields and train-only
+OOF partitions. Report global/local/peak/work trade-offs and seed variability;
+curve examples retain signed-error bars, fields truth/prediction/error with FT
+crack-tip zooms, and grouped losses log axes. Tests protect matching and masking.
