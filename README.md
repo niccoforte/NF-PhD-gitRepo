@@ -103,6 +103,8 @@ for verification, live-library deduplication, collection placement and one priva
 shared intake. Preserve what each source supports for manuscript writing. Pending
 entries are not completed imports; speculative and abandoned reading stays out.
 Library/intake contents remain private and outside this public repository.
+Borderline candidates require an explicit author decision before addition;
+an accepted source awaiting write access is a different state.
 
 ## Git Remotes And Dual Push
 

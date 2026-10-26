@@ -78,8 +78,8 @@ Checkout and Python setup use Node 24-based v7 actions to avoid deprecated actio
 
 Capture verified sources used in retained work before handoff/archive, following
 [README](README.md#retained-research-references) and ZoteroLibraryManager's workflow.
-Import eligible sources or persist pending writes in its private intake; exclude
-speculative/abandoned reading. The manager owns sorting. Keep private state out of Git.
+Import clear inclusions; ask before borderline additions. Persist pending writes
+privately; exclude speculative/abandoned reading. The manager owns sorting.
 
 ## Analysis Deliverables
 
