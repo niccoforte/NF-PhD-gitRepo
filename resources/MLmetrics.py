@@ -4646,3 +4646,475 @@ def _postprocess_slug(text, default="figure"):
     text = "".join(ch if ch.isalnum() or ch in ["-", "_", "."] else "-" for ch in text)
     text = "-".join(part for part in text.split("-") if part)
     return text[:96] if text else default
+
+
+# =============================================================================
+# Export-ready comparisons from explicit physical data
+# =============================================================================
+
+def _comparison_style(font_size, text_color="#0B3353"):
+    """Local typography shared by the opt-in comparison figures below."""
+    if not np.isfinite(font_size) or font_size <= 0:
+        raise ValueError("font_size must be positive and finite.")
+    return {
+        "font.family": "Arial", "font.size": font_size,
+        "axes.labelsize": font_size, "axes.titlesize": font_size,
+        "xtick.labelsize": font_size, "ytick.labelsize": font_size,
+        "legend.fontsize": font_size, "svg.fonttype": "none",
+        "text.color": text_color, "axes.labelcolor": text_color,
+        "xtick.color": text_color, "ytick.color": text_color,
+        "figure.facecolor": "white", "axes.facecolor": "white",
+        "savefig.facecolor": "white",
+    }
+
+
+def plot_mechanical_tradeoffs(
+    properties, periodic_id=0, highlight_id=None, figsize_mm=(270, 170),
+    font_size=25, point_size=11, *, xlim=None, ylim=None, xticks=None,
+    yticks=None, color_ticks=None,
+):
+    """Plot every individual design's ductility, initiation toughness and strength.
+
+    ``properties`` is a DataFrame indexed by unique design IDs, with physical
+    ``Ductility``, ``K_JIC`` and ``Strength`` columns. Each property is divided
+    by that of ``periodic_id``; only that reference row is excluded from the
+    population points. No filtering, fitting, binning or averaging is applied.
+    ``highlight_id`` optionally marks one existing design. Axis limits/ticks
+    are caller choices; omitted limits retain Matplotlib's full-data extent.
+
+    Returns ``(figure, axes, colorbar)`` without saving or showing it. The
+    caller chooses the output path/format and may close the figure after export.
+    """
+    from matplotlib.lines import Line2D
+    from matplotlib.ticker import FormatStrFormatter
+
+    columns = ["Ductility", "K_JIC", "Strength"]
+    if not isinstance(properties, pd.DataFrame) or not properties.index.is_unique:
+        raise ValueError("properties must be a DataFrame with unique design IDs.")
+    if any(name not in properties for name in columns) or periodic_id not in properties.index:
+        raise ValueError("Required property columns and periodic_id must be present.")
+    values = properties.loc[:, columns].astype(float)
+    reference = values.loc[periodic_id]
+    if not np.isfinite(values.to_numpy()).all() or (reference == 0).any():
+        raise ValueError("Properties must be finite and periodic denominators nonzero.")
+    normalized = values.div(reference)
+    population = normalized.drop(index=periodic_id)
+    if population.empty:
+        raise ValueError("At least one non-periodic design is required.")
+    if highlight_id is not None and highlight_id not in normalized.index:
+        raise ValueError("highlight_id must select an existing design.")
+    if not np.isfinite(point_size) or point_size <= 0:
+        raise ValueError("point_size must be positive and finite.")
+    size = np.asarray(figsize_mm, dtype=float)
+    if size.shape != (2,) or not np.isfinite(size).all() or (size <= 0).any():
+        raise ValueError("figsize_mm must contain two positive finite dimensions.")
+
+    style = _comparison_style(font_size, text_color="black")
+    style.update({"axes.linewidth": 1.1, "axes.spines.top": True,
+                  "axes.spines.right": True, "xtick.major.size": 5,
+                  "ytick.major.size": 5, "xtick.major.width": 1,
+                  "ytick.major.width": 1, "mathtext.fontset": "dejavusans"})
+    with plt.rc_context(style):
+        fig = plt.figure(figsize=size / 25.4)
+        ax = fig.add_axes([0.142, 0.215, 0.655, 0.715])
+        cax = fig.add_axes([0.835, 0.215, 0.026, 0.715])
+        points = ax.scatter(
+            population.Ductility, population.K_JIC, c=population.Strength,
+            cmap="viridis", vmin=float(population.Strength.min()),
+            vmax=float(population.Strength.max()), s=point_size,
+            edgecolors="none", alpha=0.9, rasterized=False, zorder=2,
+        )
+        ax.axvline(1, color="#6F7780", ls=(0, (4, 4)), lw=1, zorder=1)
+        ax.axhline(1, color="#6F7780", ls=(0, (4, 4)), lw=1, zorder=1)
+        ax.scatter([1], [1], marker="*", s=300, c="black", edgecolors="white",
+                   linewidths=0.8, zorder=6)
+        handles = [Line2D([], [], linestyle="none", marker="*", color="black",
+                          markersize=16, label="Periodic")]
+        if highlight_id is not None:
+            chosen = normalized.loc[highlight_id]
+            ax.scatter([chosen.Ductility], [chosen.K_JIC], marker="o", s=250,
+                       facecolors="none", edgecolors="#002B49", linewidths=2.7, zorder=7)
+            handles.append(Line2D([], [], linestyle="none", marker="o", color="#002B49",
+                                  markerfacecolor="none", markeredgewidth=2.5,
+                                  markersize=12, label="Example"))
+        if xlim is not None:
+            ax.set_xlim(xlim)
+        if ylim is not None:
+            ax.set_ylim(ylim)
+        if xticks is not None:
+            ax.set_xticks(xticks)
+        if yticks is not None:
+            ax.set_yticks(yticks)
+        ax.xaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+        ax.yaxis.set_major_formatter(FormatStrFormatter("%.1f"))
+        ax.set_xlabel("Normalised ductility", labelpad=9)
+        ax.set_ylabel(r"Normalised $K_{JIC}$", labelpad=8)
+        ax.legend(handles=handles, loc="lower right", frameon=True, framealpha=0.93,
+                  borderpad=0.25, labelspacing=0.25, handletextpad=0.25)
+        colorbar = fig.colorbar(points, cax=cax)
+        if color_ticks is not None:
+            colorbar.set_ticks(color_ticks)
+        colorbar.ax.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
+        colorbar.set_label("Normalised strength", rotation=90, labelpad=9)
+    return fig, ax, colorbar
+
+
+def plot_curve_comparison_panels(panels, figsize_mm=(275, 110), font_size=25):
+    """Compare selected individual simulation/prediction curves and residual bars.
+
+    ``panels`` is an ordered sequence (or ordered mapping) of dictionaries with
+    ``x``, ``truth``, ``prediction``, ``label``, ``xlabel`` and ``ylabel``. The
+    three arrays must be finite 1D arrays of equal length, with strictly
+    increasing ``x``. They must already use the intended physical display units;
+    no unit conversion, ranking or specimen selection is hidden in the plotter.
+    Optional ``color`` controls the panel title's task colour.
+
+    Grey bars start at zero and show ``abs(truth-prediction)`` on the same y axis
+    as the two curves, using width ``(max(x)-min(x))/len(x)`` and alpha 0.25.
+    They are individual residual magnitudes, not variability or uncertainty.
+    Returns ``(figure, axes)`` without saving/showing or modifying the inputs.
+    """
+    from matplotlib.lines import Line2D
+    from matplotlib.patches import Patch
+    from matplotlib.ticker import MaxNLocator
+
+    panels = list(panels.values()) if isinstance(panels, dict) else list(panels)
+    if not panels:
+        raise ValueError("At least one curve panel is required.")
+    size = np.asarray(figsize_mm, dtype=float)
+    if size.shape != (2,) or not np.isfinite(size).all() or (size <= 0).any():
+        raise ValueError("figsize_mm must contain two positive finite dimensions.")
+    prepared = []
+    for panel in panels:
+        if any(key not in panel for key in ("x", "truth", "prediction", "label", "xlabel", "ylabel")):
+            raise ValueError("Each curve panel requires data arrays and explicit axis/task labels.")
+        x, truth, prediction = [np.asarray(panel[key], dtype=float)
+                                for key in ("x", "truth", "prediction")]
+        if (x.ndim != 1 or x.size < 2 or truth.shape != x.shape or prediction.shape != x.shape
+                or not np.isfinite(np.concatenate((x, truth, prediction))).all()
+                or not (np.diff(x) > 0).all()):
+            raise ValueError("Curve arrays must be finite, aligned and 1D, with increasing x.")
+        prepared.append((panel, x, truth, prediction))
+
+    simulation_color, prediction_color = "#205D82", "#D5600D"
+    style = _comparison_style(font_size)
+    style.update({"axes.edgecolor": "#6B7280", "xtick.color": "#344054",
+                  "ytick.color": "#344054", "axes.spines.top": False,
+                  "axes.spines.right": False})
+    with plt.rc_context(style):
+        fig, axes = plt.subplots(1, len(prepared), figsize=size / 25.4,
+                                 layout="constrained", squeeze=False)
+        axes = axes[0]
+        for ax, (panel, x, truth, prediction) in zip(axes, prepared):
+            error = np.abs(truth - prediction)
+            width = (float(x.max()) - float(x.min())) / len(x)
+            ax.bar(x, error, width=width, alpha=0.25, label="Error", color="gray")
+            ax.plot(x, truth, color=simulation_color, linewidth=2.5,
+                    label="Simulation", zorder=3)
+            ax.plot(x, prediction, color=prediction_color, linewidth=2.5,
+                    linestyle="--", label="Prediction", zorder=4)
+            ax.set_xlim(float(x[0]) - width / 2, float(x[-1]) + width / 2)
+            ymax = max(float(truth.max()), float(prediction.max()), float(error.max()))
+            ymin = min(float(truth.min()), float(prediction.min()), 0.0)
+            span = ymax - ymin or 1.0
+            ax.set_ylim(ymin - 0.025 * span, ymax + 0.045 * span)
+            ax.set_title(panel["label"], color=panel.get("color", "#0B3353"), pad=8)
+            ax.set_xlabel(panel["xlabel"], labelpad=7)
+            ax.set_ylabel(panel["ylabel"], labelpad=7)
+            ax.xaxis.set_major_locator(MaxNLocator(nbins=4))
+            ax.yaxis.set_major_locator(MaxNLocator(nbins=4))
+            ax.tick_params(length=5, width=1.2, pad=5)
+            ax.grid(color="#D9DEE5", linewidth=0.7, alpha=0.32)
+            for spine in ax.spines.values():
+                spine.set_linewidth(1.2)
+        handles = [Line2D([], [], color=simulation_color, lw=2.5, label="Simulation"),
+                   Line2D([], [], color=prediction_color, lw=2.5, ls="--", label="Prediction"),
+                   Patch(facecolor="gray", alpha=0.25, label="Error")]
+        fig.legend(handles=handles, loc="outside upper center", ncols=3, frameon=False,
+                   handlelength=1.7, columnspacing=1.0, handletextpad=0.5)
+    return fig, axes
+
+
+def prepare_beam_plot_geometry(beam_map, canonical_coords, node_mask, *, coordinate_tolerance=1e-5):
+    """Align a verified initial beam map to the saved ML canonical node order.
+
+    ``beam_map`` is the array dictionary returned by
+    ``resources.damage.fcc_map`` (or an equally verified map with that schema).
+    Its audit canonical order is not assumed to be the ML order. Coordinates
+    must use the same physical units. The caller supplies the saved task's
+    initial ``node_mask``; it must exactly match mapped canonical presence.
+
+    Returns ``node_coords``, ``edges`` and ``beam_paths`` suitable for one panel
+    of :func:`plot_lattice_field_comparison`. Paths use every native FE segment
+    in parent-chain order. Missing, disconnected or non-bijective maps fail;
+    no interpolation across empty cells, nearest-neighbour topology inference,
+    raw-data reload or evolving material/damage mask is introduced.
+    """
+    from scipy.spatial import cKDTree
+
+    required = ("canonical_xy", "canonical_node_present", "canonical_endpoint",
+                "endpoint_node_label", "endpoint_xy0", "node_label", "node_xy0",
+                "element_connectivity", "parent_strut_index", "chain_order")
+    if any(key not in beam_map for key in required):
+        raise ValueError("A complete verified initial beam-map array dictionary is required.")
+    source = np.asarray(beam_map["canonical_xy"], dtype=float)
+    target = np.asarray(canonical_coords, dtype=float)
+    present = np.asarray(beam_map["canonical_node_present"], dtype=bool)
+    mask = np.asarray(node_mask, dtype=bool)
+    if (source.ndim != 2 or source.shape[1] != 2 or source.shape != target.shape
+            or source.shape[0] == 0 or present.shape != (len(source),)
+            or mask.shape != (len(target),) or not np.isfinite(source).all()
+            or not np.isfinite(target).all() or not np.isfinite(coordinate_tolerance)
+            or coordinate_tolerance <= 0):
+        raise ValueError("Canonical coordinates and node masks must have matching finite shapes.")
+    distance, source_to_saved = cKDTree(target).query(source)
+    if distance.max() > coordinate_tolerance or len(np.unique(source_to_saved)) != len(source):
+        raise ValueError("Beam-map and saved canonical coordinates require a bijection in the same units.")
+    mapped_presence = np.zeros(len(target), dtype=bool)
+    mapped_presence[source_to_saved] = present
+    if not np.array_equal(mapped_presence, mask):
+        raise ValueError("Saved node_mask disagrees with the initial beam-map presence.")
+    endpoint = np.asarray(beam_map["canonical_endpoint"])
+    endpoint_labels = np.asarray(beam_map["endpoint_node_label"])
+    labels = np.asarray(beam_map["node_label"])
+    xy0 = np.asarray(beam_map["node_xy0"], dtype=float)
+    connectivity = np.asarray(beam_map["element_connectivity"])
+    parent = np.asarray(beam_map["parent_strut_index"])
+    order = np.asarray(beam_map["chain_order"])
+    endpoint_xy = np.asarray(beam_map["endpoint_xy0"], dtype=float)
+    integer_arrays = (endpoint, endpoint_labels, labels, connectivity, parent, order)
+    if (not all(np.issubdtype(a.dtype, np.integer) for a in integer_arrays)
+            or endpoint.ndim != 2 or endpoint.shape[1] != 2 or not endpoint.size
+            or endpoint.min() < 0 or endpoint.max() >= len(source)
+            or endpoint_labels.shape != endpoint.shape or endpoint_xy.shape != (*endpoint.shape, 2)
+            or labels.ndim != 1 or len(np.unique(labels)) != len(labels)
+            or xy0.shape != (len(labels), 2) or not np.isfinite(xy0).all()
+            or not np.isfinite(endpoint_xy).all() or connectivity.ndim != 2
+            or connectivity.shape[1] != 2 or parent.shape != (len(connectivity),)
+            or order.shape != parent.shape or not parent.size
+            or parent.min() < 0 or parent.max() >= len(endpoint)):
+        raise ValueError("Initial beam-map endpoint, node and FE-chain arrays are inconsistent.")
+    if "strut_present" in beam_map and not np.asarray(beam_map["strut_present"], dtype=bool).all():
+        raise ValueError("Use the complete initial beam map, not an evolving material mask.")
+    edges = source_to_saved[endpoint]
+    if not mask[edges].all():
+        raise ValueError("Initial beam connectivity includes absent canonical nodes.")
+    lookup = dict(zip(labels.tolist(), xy0))
+    actual = np.full_like(target, np.nan)
+    paths = []
+    for index, (edge, ends) in enumerate(zip(edges, endpoint_labels)):
+        selected = np.flatnonzero(parent == index)
+        if not len(selected) or not np.array_equal(np.sort(order[selected]), np.arange(len(selected))):
+            raise ValueError("Every parent beam requires a complete, unique FE-chain order.")
+        selected = selected[np.argsort(order[selected])]
+        cursor = int(ends[0])
+        path = [cursor]
+        for pair in connectivity[selected]:
+            if pair[0] == cursor:
+                cursor = int(pair[1])
+            elif pair[1] == cursor:
+                cursor = int(pair[0])
+            else:
+                raise ValueError("Native FE chain is disconnected from its declared endpoint.")
+            path.append(cursor)
+        if cursor != ends[1] or len(set(path)) != len(path) or any(label not in lookup for label in path):
+            raise ValueError("Native FE chain has missing nodes, loops or inconsistent endpoints.")
+        points = np.asarray([lookup[label] for label in path])
+        if not np.allclose(points[[0, -1]], endpoint_xy[index], atol=coordinate_tolerance, rtol=0):
+            raise ValueError("Mapped beam endpoints disagree with the native mesh coordinates.")
+        for saved_index, position in zip(edge, points[[0, -1]]):
+            if np.isfinite(actual[saved_index]).all() and not np.allclose(
+                    actual[saved_index], position, atol=coordinate_tolerance, rtol=0):
+                raise ValueError("One saved node maps to inconsistent physical joint positions.")
+            actual[saved_index] = position
+        paths.append(points)
+    if not np.isfinite(actual[mask]).all():
+        raise ValueError("The initial beam map does not cover every present saved node.")
+    return {"node_coords": actual, "edges": edges, "beam_paths": paths}
+
+
+def plot_lattice_field_comparison(
+    panels, figsize_mm=(275, 185), font_size=28, *, metric_font_size=25,
+    minimum_stroke_pt=0.65, interpolation_step=0.35, coordinate_tolerance=1e-5,
+):
+    """Show nodal fields along verified initial beam paths, never across voids.
+
+    Each ordered panel dictionary contains ``truth``/``prediction`` 1D node
+    arrays, ``node_coords`` (N,2) in that same node order, integer ``edges``
+    (E,2), and ``beam_paths``: E native mesh coordinate arrays of shape (L,2),
+    including both edge endpoints. Supply explicit physical ``beam_width`` and
+    a task ``label``. Optional keys are ``valid_mask`` (N,), ``color``, ``xlim``,
+    ``ylim``, ``value_limit``, ``error_limit``, ``overall_rmse``, ``rmse_format``
+    and ``units``. Scalar/coordinate/width units must already be consistent.
+
+    Callers must obtain connectivity from verified specimen geometry (for
+    example ``resources.damage.fcc_map``), then align its canonical node order
+    with the saved prediction order. This function validates path endpoints,
+    not simulation identity. Invalid/nonfinite endpoints omit their whole beam.
+    No STATUS/deformation mask, inferred neighbours or cross-cell triangulation
+    is applied. Scalars are linearly interpolated by arc length between the
+    saved endpoint values; the initial native beam geometry remains unchanged.
+
+    Simulation and Prediction share a symmetric scale. Error is signed
+    Prediction minus Simulation with its own scale; explicit scale limits
+    smaller than visible material/nodal extrema are rejected. A cropped view
+    does not require its colour scale to include nodes outside that view.
+    ``overall_rmse`` is an
+    optional caller-supplied aggregate, not a metric calculated from this slice.
+    A minimum display stroke can exceed physical width for legibility; it is
+    not a material-thickness/damage prediction. Returns ``(figure, axes)``.
+    """
+    from matplotlib.collections import PolyCollection
+    from matplotlib.colors import Normalize
+    from matplotlib.cm import ScalarMappable
+
+    panels = list(panels.values()) if isinstance(panels, dict) else list(panels)
+    if not panels:
+        raise ValueError("At least one field panel is required.")
+    size = np.asarray(figsize_mm, dtype=float)
+    positive = (metric_font_size, interpolation_step, coordinate_tolerance)
+    if (size.shape != (2,) or not np.isfinite(size).all() or (size <= 0).any()
+            or not all(np.isfinite(v) and v > 0 for v in positive)
+            or not np.isfinite(minimum_stroke_pt) or minimum_stroke_pt < 0):
+        raise ValueError("Dimensions, font sizes and interpolation tolerances must be finite and positive.")
+    prepared = []
+    for panel in panels:
+        required = ("truth", "prediction", "node_coords", "edges", "beam_paths", "beam_width", "label")
+        if any(key not in panel for key in required):
+            raise ValueError("Field panels require explicit aligned fields, beam geometry, width and label.")
+        truth, prediction = [np.asarray(panel[key], dtype=float) for key in ("truth", "prediction")]
+        coords = np.asarray(panel["node_coords"], dtype=float)
+        edges = np.asarray(panel["edges"])
+        mask = np.asarray(panel.get("valid_mask", np.ones(truth.shape, bool)), dtype=bool)
+        if (truth.ndim != 1 or prediction.shape != truth.shape or coords.shape != (truth.size, 2)
+                or mask.shape != truth.shape or edges.ndim != 2 or edges.shape[1] != 2
+                or not np.issubdtype(edges.dtype, np.integer) or not edges.size
+                or edges.min() < 0 or edges.max() >= truth.size or (edges[:, 0] == edges[:, 1]).any()):
+            raise ValueError("Field arrays, masks, coordinates and integer edge indices must align.")
+        if len({tuple(sorted(edge)) for edge in edges.tolist()}) != len(edges):
+            raise ValueError("Beam edges must be unique.")
+        width = float(panel["beam_width"])
+        if not np.isfinite(width) or width <= 0:
+            raise ValueError("beam_width must be positive and finite.")
+        mask = mask & np.isfinite(truth) & np.isfinite(prediction) & np.isfinite(coords).all(axis=1)
+        paths = list(panel["beam_paths"])
+        if len(paths) != len(edges):
+            raise ValueError("Exactly one native beam path is required per edge.")
+        valid_paths = []
+        for edge, points in zip(edges, paths):
+            xy = np.asarray(points, dtype=float)
+            if xy.ndim != 2 or xy.shape[1] != 2 or len(xy) < 2 or not np.isfinite(xy).all():
+                raise ValueError("Native beam paths must be finite coordinate arrays of shape (L,2).")
+            if not mask[edge].all():
+                continue
+            if np.allclose(xy[[0, -1]], coords[edge], atol=coordinate_tolerance, rtol=0):
+                pass
+            elif np.allclose(xy[[-1, 0]], coords[edge], atol=coordinate_tolerance, rtol=0):
+                xy = xy[::-1]
+            else:
+                raise ValueError("Native beam path endpoints do not match the aligned node coordinates.")
+            lengths = np.linalg.norm(np.diff(xy, axis=0), axis=1)
+            if not (lengths > 0).all():
+                raise ValueError("Native beam path segments must have nonzero length.")
+            valid_paths.append((edge, xy, lengths))
+        if not valid_paths:
+            raise ValueError("No beams have valid field values at both endpoints.")
+        values = (truth, prediction, prediction - truth)
+        maxima = (float(np.abs(np.concatenate((truth[mask], prediction[mask]))).max()),
+                  float(np.abs(values[2][mask]).max()))
+        limits = []
+        for key, maximum in zip(("value_limit", "error_limit"), maxima):
+            limit = float(panel.get(key, max(maximum, 1e-12)))
+            if not np.isfinite(limit) or limit <= 0:
+                raise ValueError(f"{key} must be positive and finite.")
+            limits.append(limit)
+        prepared.append((panel, values, valid_paths, width, limits))
+
+    with plt.rc_context(_comparison_style(font_size)):
+        fig = plt.figure(figsize=size / 25.4, dpi=300)
+        width_pt, height_pt = size / 25.4 * 72
+        reference_width = 275 / 25.4 * 72
+        reference_row_height = 185 / 25.4 * 72 / 2
+        row_height = height_pt / len(prepared)
+        scale_y = row_height / reference_row_height
+        centers = np.array([150 / reference_width, 0.5, 1 - 150 / reference_width])
+        axes = np.empty((len(prepared), 3), dtype=object)
+        for row, (panel, values, paths, width, limits) in enumerate(prepared):
+            base = height_pt - (row + 1) * row_height
+            all_xy = np.vstack([xy for _, xy, _ in paths])
+            span = np.ptp(all_xy, axis=0)
+            padding = np.maximum(span * 0.02, width)
+            xlim = panel.get("xlim", (all_xy[:, 0].min() - padding[0], all_xy[:, 0].max() + padding[0]))
+            ylim = panel.get("ylim", (all_xy[:, 1].min() - padding[1], all_xy[:, 1].max() + padding[1]))
+            if (not np.isfinite([*xlim, *ylim]).all() or xlim[0] >= xlim[1] or ylim[0] >= ylim[1]):
+                raise ValueError("Field xlim/ylim must be finite increasing pairs.")
+            for col, (center, title) in enumerate(zip(centers, ("Simulation", "Prediction", "Error"))):
+                ax = fig.add_axes([center - 109 / reference_width,
+                                   (base + 55 * scale_y) / height_pt,
+                                   218 / reference_width, 145 * scale_y / height_pt])
+                axes[row, col] = ax
+                ax.set_xlim(xlim); ax.set_ylim(ylim)
+                ax.set_aspect("equal"); ax.set_axis_off()
+                fig.text(center, (base + 232 * scale_y) / height_pt, title,
+                         fontsize=font_size, ha="center", va="baseline")
+            fig.text(34 / reference_width, (base + 127.5 * scale_y) / height_pt,
+                     panel["label"], rotation=90, va="center", ha="center",
+                     fontsize=font_size, color=panel.get("color", "#0B3353"))
+            if panel.get("overall_rmse") is not None:
+                metric = float(panel["overall_rmse"])
+                if not np.isfinite(metric) or metric < 0:
+                    raise ValueError("overall_rmse must be nonnegative and finite.")
+                number = format(metric, panel.get("rmse_format", ".3g"))
+                label = f"Overall RMSE: {number} {panel.get('units', '')}".rstrip()
+                fig.text(centers[2], (base + 207 * scale_y) / height_pt, label,
+                         fontsize=metric_font_size, ha="center", va="baseline")
+            for x, length, bound in ((106, 328, limits[0]), (530, 199, limits[1])):
+                sm = ScalarMappable(norm=Normalize(-bound, bound), cmap="coolwarm")
+                cax = fig.add_axes([x / reference_width, (base + 39 * scale_y) / height_pt,
+                                    length / reference_width, 7 * scale_y / height_pt])
+                cb = fig.colorbar(sm, cax=cax, orientation="horizontal")
+                cb.set_ticks([-bound, 0, bound])
+                cb.set_ticklabels([f"{-bound:.2g}", "0", f"{bound:.2g}"])
+                cb.ax.tick_params(labelsize=font_size, pad=3, length=3)
+        fig.canvas.draw()
+        for row, (panel, values, paths, physical_width, limits) in enumerate(prepared):
+            for col, (ax, scalar) in enumerate(zip(axes[row], values)):
+                axis_width_pt = ax.get_window_extent().width / fig.dpi * 72
+                display_width = max(physical_width, minimum_stroke_pt * np.diff(ax.get_xlim())[0] / axis_width_pt)
+                polygons, colors = [], []
+                for edge, xy, lengths in paths:
+                    cumulative = np.r_[0, np.cumsum(lengths)]
+                    for j, (p0, p1) in enumerate(zip(xy[:-1], xy[1:])):
+                        vector, length = p1 - p0, lengths[j]
+                        normal = np.array([-vector[1], vector[0]]) / length * display_width / 2
+                        steps = max(2, int(np.ceil(length / interpolation_step)))
+                        for k in range(steps):
+                            t0, t1 = k / steps, (k + 1) / steps
+                            a, b = p0 + t0 * vector, p0 + t1 * vector
+                            fraction = (cumulative[j] + (t0 + t1) / 2 * length) / cumulative[-1]
+                            colors.append((1 - fraction) * scalar[edge[0]] + fraction * scalar[edge[1]])
+                            polygons.append([a - normal, b - normal, b + normal, a + normal])
+                limit = limits[1] if col == 2 else limits[0]
+                polygon_array = np.asarray(polygons)
+                color_array = np.asarray(colors)
+                xmin, xmax = ax.get_xlim()
+                ymin, ymax = ax.get_ylim()
+                visible = ((polygon_array[:, :, 0].max(axis=1) >= xmin)
+                           & (polygon_array[:, :, 0].min(axis=1) <= xmax)
+                           & (polygon_array[:, :, 1].max(axis=1) >= ymin)
+                           & (polygon_array[:, :, 1].min(axis=1) <= ymax))
+                if not visible.any():
+                    raise ValueError("The selected viewport contains no valid beam material.")
+                connected = np.unique(np.asarray([edge for edge, _, _ in paths]).ravel())
+                coords = np.asarray(panel["node_coords"])[connected]
+                inside = ((coords[:, 0] >= xmin) & (coords[:, 0] <= xmax)
+                          & (coords[:, 1] >= ymin) & (coords[:, 1] <= ymax))
+                displayed = np.r_[color_array[visible], scalar[connected[inside]]]
+                if np.abs(displayed).max() > limit + 1e-9:
+                    raise ValueError("Colour limits must include all visible material and nodal extrema.")
+                ax.add_collection(PolyCollection(
+                    polygons, array=np.asarray(colors), cmap="coolwarm",
+                    norm=Normalize(-limit, limit), linewidth=0,
+                    antialiased=False, rasterized=True,
+                ))
+    return fig, axes

@@ -23,7 +23,7 @@ below expose imported functions/classes. Do not add job entry points here.
 - `MLfunc.py` owns training loops, curve/field losses, HPO helpers, activation diagnostics, and older ML plotting helpers.
 - `MLfield.py` owns opt-in signed displacement-difference losses, physical jump scales and specimen-specific localisation weights. Automatic edges use the existing periodic FCC connectivity and initial FT cut; other lattices require validated explicit edges.
 - `MLlocality.py` owns opt-in initial-edge attention bias and occupancy-masked reference-grid refinement. Preserve common base weights and historical descriptors; no future-damage graph. `DUAL_MODEL.field_only_modes` skips unused task/curve execution and exports only trained field results; save/restore that scope through MLmetrics. See studies/Locality for controls.
-- `MLmetrics.py` owns saved-run loading, curve/field diagnostics, plotting, HPO summaries, and post-processing helpers.
+- `MLmetrics.py` owns saved-run loading, curve/field diagnostics, plotting, HPO summaries, and post-processing helpers. Export comparisons take explicit physical data, masks and geometry; existing viewer defaults are unchanged. Use `prepare_beam_plot_geometry` to align a verified `damage.fcc_map` with saved nodes: audit order differs from ML order.
 - `tokenization.py` owns the output-informed tokenization prototype for recurring disorder motifs.
 - `utilities.py` contains file renaming, Abaqus `.inp` editing, and backup-deletion helpers. Treat these as operational scripts, not general-purpose library functions.
 
