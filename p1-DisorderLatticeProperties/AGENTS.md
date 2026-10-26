@@ -37,6 +37,13 @@ In practical terms:
   every old companion filename still exists after exact content deduplication.
   Preserve original exports while auditing calculations. PSC sizes and accepted
   convergence criteria remain fixed; PSC is deferred from the validation review.
+- Native validation analysis is an opt-in route in `code/validation_*.py`, with
+  original ODBs/exports preserved and results under `Validation/audit`. The
+  README documents commands, four exact modal/compliance controls, 48 native
+  history checks and remaining modulus/event-definition limits. Do not apply
+  those changes to shared p1/p2 defaults or promote worksheet sensitivity values
+  without resolving the active lattice review. The former HPC validation folder
+  was deleted by the researcher; do not recreate its relocation notice.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
 - For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.
 - Keep active p1 scripts and notebooks lean. Remove abandoned approaches, stale cells, obsolete helper paths, and superseded experiments as work progresses.

@@ -356,15 +356,51 @@ The user-curated Ti validation subset is an explicit exception: its useful
 local/HPC results are consolidated in `Z:/p1/sims/Ti/Validation`. Start with that
 folder's `README.md` and `case-index.csv`; `file-manifest.json` maps former paths,
 exact duplicate references and cleanup decisions. The old
-`HPCarchive/Ti/validation` directory holds only a relocation notice. Density cases
+`HPCarchive/Ti/validation` directory was deleted by the researcher. Density cases
 use `{l_mm}/{nominal_density}/`; retained reference executions sit beneath
 `reference-local` or `reference-hpc`. Repeated CPU executions are not independent
 specimens. Their compact curve/log evidence is retained where full repeated
 ODBs were superseded by a complete/longer representative with an identical input.
-Original numerical exports remain preserved; corrected calculations are pending.
+Original numerical exports remain preserved. The native calculation audit below
+is additive; saved paper values have not been replaced by sensitivity controls.
 Historical whole-mirror inventories predate this local curation. Do not rerun
 the full mirror just to restore discarded validation scratch or CPU repeats.
 PSC is unchanged and deferred from the current validation review.
+
+The maintained validation audit is in `p1-DisorderLatticeProperties/code/`:
+
+```powershell
+# Read-only ODB extraction; no upgrade, padding or original export rewrite:
+& 'C:/SIMULIA/Commands/abaqus.bat' python p1-DisorderLatticeProperties/code/validation_history_audit.py --density-campaign --histories-only
+# Existing detailed field/energy checks are documented in Validation/audit/history.
+# Prepare exact-input modal + elastic-compliance controls (does not submit):
+python p1-DisorderLatticeProperties/code/validation_modal.py prepare --stiffness
+# The run action submits local linear controls; use only when new jobs are intended.
+python p1-DisorderLatticeProperties/code/validation_modal.py run --cpus 2
+& 'C:/SIMULIA/Commands/abaqus.bat' python p1-DisorderLatticeProperties/code/validation_modal.py extract
+python p1-DisorderLatticeProperties/code/validation_modal.py plot
+python p1-DisorderLatticeProperties/code/validation_calculations.py
+# Optional --workbook PATH adds a read-only FTval saved-value reconciliation.
+python -m unittest discover -s p1-DisorderLatticeProperties/code -p test_validation_calculations.py
+```
+
+Forty-eight density-campaign tri/kagome/hex fracture histories were recovered;
+modal/compliance controls cover four exact specimens only. Butterworth order 2
+uses DC startup and `2 fn`; order 4, held-pin and zero-phase controls expose
+sensitivity. Offline filtering cannot recover aliased integration-step output.
+Zero-phase through-deletion and intact-prefix variants are explicitly distinct.
+Force-only and matched U/RF causal variants expose phase-pairing sensitivity.
+Fixed last-intact/deletion endpoints remain separate from method-specific peaks.
+Negative plastic area produces unavailable KJ, never clipped zero. Initial
+compliance and modulus choices are independent controls, not fits to Hsieh.
+Shared `resources` defaults and p2 datasets are unchanged. The effective-modulus
+and section-failure definition questions remain for the active lattice review.
+The canonical workbook has one additive `Validation audit` sheet; all original
+sheet/chart/drawing parts and original cell values/formulas are preserved.
+Its backup and integration receipt are in `Validation/audit`. `ValConvPlots`
+links these native controls and omits missing/negative-area saved KJ points.
+Read [the validation report](p2-DisorderML/samples/p1-validation/README.md)
+for measured effects, source inconsistencies and limits.
 
 ### `p1-DisorderLatticeProperties/code/`
 

@@ -10,6 +10,13 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - `SIMresults.ipynb` is for quick local/transfer result inspection and mechanical-property calculation from output CSVs.
 - `StiffnessMatrix.ipynb` handles analytical/simulation stiffness matrices, isotropy checks, and effective-property calculations.
 - `ContinuumPlots.ipynb` and `ValConvPlots.ipynb` support displacement-field visualization, material/validation plots, mesh/refinement checks, and convergence/validation figures.
+- `validation_history_audit.py` reads indexed density-campaign ODBs without upgrade,
+  retaining actual times, NaNs/validity, monitored STATUS and named ALLKE/ALLIE.
+  `validation_modal.py` explicitly prepares/runs local exact-input eigenproblems
+  and 1 N elastic-compliance controls; preparing/extracting is not submission.
+  `validation_calculations.py` compares native/old-CSV moving averages, causal
+  Butterworth and labelled sensitivities under `Validation/audit`; `--workbook`
+  reconciles FTval read-only. The README owns commands and coverage.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 
@@ -36,5 +43,16 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - Preserve processed CSV row/index alignment. Dropping failed outputs must keep matching input, output, frequency, and manifest records aligned.
 - Keep the periodic reference row (`sim_id == 0`) intact unless the task is explicitly about removing or changing the reference.
 - Do not silently change smoothing thresholds, fracture-index logic, stiffness fits, effective-property formulas, or outlier rules. These are scientific assumptions, not formatting details.
+- The validation-only audit fixes last-intact/deletion endpoints across filters;
+  method-dependent peaks are secondary. Do not clip negative Apl, invent STATUS
+  after termination, borrow a cutoff from another specimen, or promote a modulus
+  sensitivity to paper truth. Zero-phase intact-prefix and through-deletion
+  controls have different edge information and doubled-pass attenuation.
+  Unit-load C0 is initial elastic compliance, not post-yield unloading compliance.
+  Force-only and matched U/RF causal filters remain labelled controls; matching
+  their phases does not resolve the demonstrated hex80 negative work.
+  Shared calculation/export defaults and p2 products remain outside this route.
+  `ValConvPlots` preserves source values but excludes incomplete saved FT rows and
+  KJ<KI (negative-area) points. PSC criteria/sizes stay fixed and deferred.
 - If changing field-output handling, preserve sample ids, frame values, node labels, node coordinates, components, valid masks, and main-body node filtering.
 - Keep notebook configuration cells explicit for `LAT`, `nnx`, `dN`, `dis`, `path_add`, `mechMode`, and output type. Avoid hidden module-level state.

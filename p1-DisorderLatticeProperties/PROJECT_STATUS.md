@@ -29,10 +29,25 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   ODBs were superseded by selected complete/longer runs with identical INPs;
   their distinct exported curves and diagnostic logs remain. Exact file
   duplicates, solver scratch/restart files and unexecuted script-only cases were
-  removed. No HPC remote file, workbook result, figure, physical model or
-  calculation code was changed. Audit the validation export/calculation chain
-  next; the effective-modulus override, missing-history semantics, plastic work
-  and Hsieh figure/table normalisations remain unresolved. PSC is deferred and
+  removed. The researcher deleted the former HPC validation folder entirely.
+  The subsequent native audit recovered all 48 tri/kagome/hex density-campaign
+  fracture histories: 8,788 genuine load samples and 19,576,675 STATUS records,
+  zero actual unknown/nonbinary STATUS. Fifteen histories are short; one has a
+  genuinely NaN post-deletion tail. All source ODB hashes/size/mtime are unchanged.
+  Eight exact-input modal and four 1 N elastic-compliance controls completed
+  locally. Causal Butterworth changes fixed-endpoint/static-compliance KJ by
+  about -0.6% to -1.5% in three cases; the 3 mm/.16 hex case still has negative
+  apparent plastic work under causal filtering. It must remain unresolved.
+  Four detailed cases stay below 5% KE/IE over the final half of pre-deletion
+  loading; hex startup and deletion energy are separately documented.
+  The canonical workbook now has an additive Validation audit sheet and a
+  verified original backup/receipt; all original cells/charts remain unchanged.
+  ValConvPlots links audit controls and omits missing/negative-area saved points.
+  Shared exporters/calculations, physical models and p2 datasets were not changed.
+  Effective-modulus selection, hexagonal section-versus-element initiation,
+  compliance/filter-edge sensitivity and Hsieh source normalisations remain open.
+  Table 1 and dimensional Fig. 10 favour an 8a/932 MPa interpretation over 8b,
+  as a labelled inference; original digitisation was preserved. PSC is deferred and
   supervisor-agreed specimen sizes/convergence criteria remain fixed.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
@@ -52,6 +67,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 - Validation and mechanics notebooks are identified in `code/AGENTS.md`; which one is current is `To be confirmed`.
 - Ti validation inputs/results: `Z:/p1/sims/Ti/Validation/README.md` and
   `case-index.csv`; use `file-manifest.json` for historical-path resolution.
+- Validation audit: `code/validation_history_audit.py`, `validation_modal.py`,
+  `validation_calculations.py`; native/solver/control evidence under the external
+  collection's `audit/`; readable report in `p2-DisorderML/samples/p1-validation/`.
+  The canonical OneDrive workbook's Validation audit sheet is a sensitivity view,
+  not replacement paper values. Resolve the active lattice review before promotion.
 
 ## Last Verified State
 

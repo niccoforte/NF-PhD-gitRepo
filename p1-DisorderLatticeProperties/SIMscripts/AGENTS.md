@@ -74,7 +74,7 @@ Important meanings:
 - The user-curated validation subset now lives at `Z:/p1/sims/Ti/Validation`,
   not `HPCarchive/Ti/validation`. Its file manifest maps every original local/HPC
   path to retained content or an explicit cleanup decision. The old archive
-  directory contains a relocation notice. Historical full-mirror counts refer
+  directory was subsequently deleted by the researcher. Historical full-mirror counts refer
   to the pre-curation snapshot; do not restore discarded validation scratch or
   CPU-repeat ODBs merely to make those counts match. Remote originals were not
   modified by this local consolidation. Captured scripts under validation
