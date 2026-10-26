@@ -4,7 +4,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- The full p1 archive is downloaded to `Z:/p1/HPCarchive`. Read-only comparison
+- The full p1 archive was downloaded to `Z:/p1/HPCarchive`. Read-only comparison
   confirmed all 212,198 files / 995,745,698,879 bytes and directory/type/size
   agreement with `/data/SEMS-TaoLab/Niccolo-Forte/p1` on 23 October 2026.
   The requested quick content check matched SHA-256 for 160 complete files and
@@ -20,6 +20,20 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Transfer confidence, filesystem integrity and single-drive loss remain separate
   questions. The researcher retains the deletion decision; the sample is not
   automatic cleanup authority. Existing loaders and selective B3 paths stay unchanged.
+- The researcher subsequently authorised Ti validation consolidation into
+  `Z:/p1/sims/Ti/Validation`. Its catalogue and manifest preserve the former paths,
+  source checksums and retention decisions. The 23 October full-mirror counts
+  describe the historical snapshot, not the tree after this local curation.
+  The retained collection contains 101 ODBs and 740 original files, with every
+  retained file verified by full SHA-256 after relocation. Eighteen repeated-CPU
+  ODBs were superseded by selected complete/longer runs with identical INPs;
+  their distinct exported curves and diagnostic logs remain. Exact file
+  duplicates, solver scratch/restart files and unexecuted script-only cases were
+  removed. No HPC remote file, workbook result, figure, physical model or
+  calculation code was changed. Audit the validation export/calculation chain
+  next; the effective-modulus override, missing-history semantics, plastic work
+  and Hsieh figure/table normalisations remain unresolved. PSC is deferred and
+  supervisor-agreed specimen sizes/convergence criteria remain fixed.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
   aligned banks and visual report are ready for the separate ML workflow.
@@ -36,6 +50,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   `p2-DisorderML/samples/damage-disordered/` comparison.
 - ML-ready processing: `code/DataProcessing.ipynb`, `code/InputsOutputs.ipynb`, `resources/data_processing.py`, and `resources/MLdata.py`.
 - Validation and mechanics notebooks are identified in `code/AGENTS.md`; which one is current is `To be confirmed`.
+- Ti validation inputs/results: `Z:/p1/sims/Ti/Validation/README.md` and
+  `case-index.csv`; use `file-manifest.json` for historical-path resolution.
 
 ## Last Verified State
 

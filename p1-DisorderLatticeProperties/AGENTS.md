@@ -27,6 +27,16 @@ In practical terms:
 
 ## How To Work Here
 
+- The consolidated Ti validation collection is `Z:/p1/sims/Ti/Validation`.
+  Its `README.md`, `case-index.csv` and `file-manifest.json` define retained cases,
+  exact duplicate references and original-path mappings. Density runs use
+  `{l_mm}/{nominal_density}/`; older useful runs are in `reference-local` and
+  `reference-hpc` beneath those directories. HPC CPU variants are executions of
+  the same input, not independent specimens. Some retain only curves/logs and
+  point to a selected representative ODB. Read the index rather than assuming
+  every old companion filename still exists after exact content deduplication.
+  Preserve original exports while auditing calculations. PSC sizes and accepted
+  convergence criteria remain fixed; PSC is deferred from the validation review.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
 - For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.
 - Keep active p1 scripts and notebooks lean. Remove abandoned approaches, stale cells, obsolete helper paths, and superseded experiments as work progresses.

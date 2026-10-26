@@ -352,6 +352,20 @@ HPC reprocessing must restore the needed raw subset first; p1 producer defaults
 remain valid destinations for new runs. A representative checksum spot check is
 not a complete checksum proof or protection against losing the only local drive.
 
+The user-curated Ti validation subset is an explicit exception: its useful
+local/HPC results are consolidated in `Z:/p1/sims/Ti/Validation`. Start with that
+folder's `README.md` and `case-index.csv`; `file-manifest.json` maps former paths,
+exact duplicate references and cleanup decisions. The old
+`HPCarchive/Ti/validation` directory holds only a relocation notice. Density cases
+use `{l_mm}/{nominal_density}/`; retained reference executions sit beneath
+`reference-local` or `reference-hpc`. Repeated CPU executions are not independent
+specimens. Their compact curve/log evidence is retained where full repeated
+ODBs were superseded by a complete/longer representative with an identical input.
+Original numerical exports remain preserved; corrected calculations are pending.
+Historical whole-mirror inventories predate this local curation. Do not rerun
+the full mirror just to restore discarded validation scratch or CPU repeats.
+PSC is unchanged and deferred from the current validation review.
+
 ### `p1-DisorderLatticeProperties/code/`
 
 This folder contains notebooks for data conversion, mechanics inspection, validation, and exploratory analysis.
