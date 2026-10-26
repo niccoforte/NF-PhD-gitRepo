@@ -164,6 +164,25 @@ class LocalityTests(unittest.TestCase):
         args = parser(["--reference-model-json", "model.json", "--run-label", "test"])
         self.assertEqual((args.epochs, args.nsims, args.mode, args.variant), (450, None, "UT", "control"))
 
+    def test_tiny_preflight_disables_extrema_forcing_not_production(self):
+        from types import SimpleNamespace
+        runner = runpy.run_path(str(Path(__file__).with_name("A0-Locality.py")))
+        from resources.MLdata import _data_range_split_indices, split_data
+        import pandas as pd
+        # Every specimen is an extreme in at least one feature: the old smoke
+        # setting cannot leave nonempty validation and test partitions.
+        values = pd.DataFrame(np.eye(64))
+        force = _data_range_split_indices(values)
+        self.assertEqual(set(force), set(values.index))
+        bad = split_data(values, values, values, split=.9, random_state=42, force_train_idx=force)
+        self.assertEqual((len(bad[1][0]), len(bad[2][0])), (0, 0))
+        good = split_data(values, values, values, split=.9, random_state=42)
+        self.assertTrue(all(len(group[0]) > 0 for group in good))
+        for size, expected in ((None, True), (64, False)):
+            with patch("resources.MLdual.DUAL_DATA.from_files") as factory:
+                runner["load_data"](SimpleNamespace(data_path="HPC", nsims=size))
+                self.assertEqual(factory.call_args.kwargs["range_split"], (expected, False))
+
     def test_real_runner_saves_fields_motion_figures_and_reload(self):
         runner = runpy.run_path(str(Path(__file__).with_name("A0-Locality.py")))
         with tempfile.TemporaryDirectory() as folder:

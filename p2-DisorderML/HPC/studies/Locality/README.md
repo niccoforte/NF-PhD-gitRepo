@@ -68,6 +68,12 @@ is kept, and its successful home log remains. `test_locality.py` protects opt-in
 mask invariance, common weights, gradients, reload and field-only scope. CPU
 contracts do not demonstrate GPU success or improved real-data accuracy.
 
+The 22 October gate failed before training: forcing feature extrema into the
+64-specimen debug training partition exhausted its holdouts. Bounded runs now
+disable that forcing; the full-data gate and production retain the exact saved
+extrema-aware split. The regression exercises both paths. Restart with a fresh
+suite label after checking the previous jobs; never alter their frozen source.
+
 No blanket HPO, combined redesign or gradient
 instrumentation is implied. Selection prioritizes field fracture-motion accuracy,
 with global-RMSE safeguards; curves are checked only for retained candidates.

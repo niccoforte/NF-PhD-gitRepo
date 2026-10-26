@@ -38,7 +38,9 @@ def parse_args(argv=None):
 def load_data(args):
     from resources.MLdual import DUAL_DATA
     return DUAL_DATA.from_files(path=args.data_path, nsims=args.nsims, split_frac=.9,
-        split_seed=42, range_split=(True, False), load_split=False, save_split=False,
+        # Extrema forcing can consume every tiny debug holdout. Production
+        # retains the exact reference split; bounded cases use ordinary splits.
+        split_seed=42, range_split=(args.nsims is None, False), load_split=False, save_split=False,
         LAT="FCC", nnx=20, dis="disNodes", dN=.2, d_data="in", freq=False,
         field_input_config={"components": ("U1", "U2"), "drop_frame0": True, "layout": "auto"})
 
