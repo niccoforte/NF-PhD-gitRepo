@@ -47,3 +47,9 @@ exact specimen/native-edge/frame joins, endpoint errors and signed strut motion,
 plus the larger FT box/tip region. True damage defines evaluation regions only;
 it never becomes predictor input or training weights. Preserve event counts and
 do not equate these specific fracture endpoints with every node in the FT box.
+
+`review_true_curve_losses.py` checks the three historical true-field shared-curve
+fits (MSE/no-location/soft-location) for identical architecture, optimizer/source
+settings, splits, normalization and saved truths. Report true-field RMSE and
+peak/work trade-offs separately from independent Mixed deployment; do not call
+these historical shared-encoder results a completed Case1(i) custom-loss oracle.

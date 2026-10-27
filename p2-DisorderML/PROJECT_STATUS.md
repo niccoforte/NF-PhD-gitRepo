@@ -5,7 +5,8 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 ## Active implementation
 
 - 27 October: all16 Locality production jobs33395470–33395485 completed0:0;
-  downloaded to external Z:/p2. `samples/locality-study/README.md` reports the
+  downloaded to external Z:/p2;288 files/4.54GB match HPC SHA256.
+  `samples/locality-study/README.md` reports the
   matched field-only screen: CNN2 global RMSE−2.39% UT/−12.47% FT, with local-jump
   ratios69.76→67.91% and20.92→16.97%. Single seed42: retain as confirmation
   candidate, not an accepted winner or demonstrated downstream curve improvement.
@@ -15,7 +16,18 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   This refines, rather than replaces, the whole-field trade-off. No loss promoted.
   STATUS consumer/head/trainer and named launcher are implemented with tests;
   `samples/status-study/README.md` contains its preliminary protocol/schematic.
-  Check actual GPU gate/submission below before claiming learning results.
+  Submitted immutable633dbba: gate33533900 and eight240h/1GPU/12CPU/90000MB
+  fits33533901–33533908; home `p2/MULTI/Damage/Transformer/status-261027/jobs.tsv`.
+  Full UT/FT ID/initial-geometry/frame alignment passed; training-only positive
+  weights54.314/839.768 (cap1000), prevalences1.8079%/0.11894%. Gate completed0:0
+  in7m30s; all eight GPU train/export/reload cases passed. All eight production
+  fits RUNNING at the27 October check; accuracy remains pending. Gate scratch removed,
+  no gate archive retained; home log is the execution record.
+  Six STATUS regressions,31 dual contracts and10 locality regressions pass;
+  Linux contract validation111 non-failing/zero failed. The historical true-field
+  shared-curve custom-loss comparison is verified in `samples/loss-study/true-field-curves.md`:
+  combined presets worsen global error even with true fields; not a new Case1(i)
+  oracle result. Accepted Mixed MSE configuration remains unchanged.
 
 - `WINNER.md` is now the maintained accepted-configuration record: Case1(i),
   Mixed without correction, full saved architecture/training/features/provenance.

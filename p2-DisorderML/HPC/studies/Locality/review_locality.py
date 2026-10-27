@@ -14,6 +14,20 @@ VARIANTS=("control","degree","graph","gated_graph","adjacency","geometry","cnn1"
 LABELS=("Control","Degree","GNN","Gated GNN","Adjacency","Edge geometry","CNN1","CNN2")
 
 
+def verify_download(root,manifest):
+    files,total,runs=0,0,set()
+    for line in manifest.read_text(encoding="utf-8-sig").splitlines():
+        expected,name=line.split("  ",1);path=(root/name).resolve()
+        if not path.is_relative_to(root.resolve()):raise ValueError("Download path escapes result root")
+        h=hashlib.sha256()
+        with path.open("rb") as stream:
+            for chunk in iter(lambda:stream.read(4194304),b""):h.update(chunk)
+        if h.hexdigest()!=expected:raise ValueError("Checksum mismatch: "+name)
+        files+=1;total+=path.stat().st_size;runs.add(Path(name).parts[0])
+    if len(runs)!=16:raise ValueError("Expected all sixteen Locality runs")
+    return dict(files=files,bytes=total,runs=len(runs),sha256="all matched")
+
+
 def collect(root,suite):
     rows=[];contracts={}
     for mode in ("UT","FT"):
@@ -84,7 +98,11 @@ def main(argv=None):
     p.add_argument("--root",type=Path,default=Path("Z:/p2/MULTI/Dual/Transformer"))
     p.add_argument("--suite",default="locality-261026-r1")
     p.add_argument("--out",type=Path,default=Path(__file__).resolve().parents[3]/"samples/locality-study")
+    p.add_argument("--download-manifest",type=Path)
     a=p.parse_args(argv);a.out.mkdir(parents=True,exist_ok=True)
+    if a.download_manifest:
+        receipt=verify_download(a.root,a.download_manifest)
+        (a.out/"download-verification.json").write_text(json.dumps(receipt,indent=2));print(receipt,flush=True)
     table=collect(a.root,a.suite);figures(table,a.root,a.suite,a.out)
     text=["# Locality: independent field predictions\n\n**All16 production fits completed successfully. CNN2 is the strongest confirmation candidate for both tasks; it is not yet a multi-seed winner.** No curves or OOF banks were trained in this screen.\n\n",
         "The experiment keeps the saved793 validation specimens, train-fitted scaling, field architecture384/8/3, MSE, seed42 and stopping policy fixed. Each intervention is separate. Control is freshly trained in this same protocol; compare against it, not older independently timed runs.\n\n",

@@ -14,6 +14,13 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Production and debug policy
 
+- `studies/Damage/B4_Damage.sh SUITE [--submit]` screens control/STATUS-only/
+  auxiliary0.1/auxiliary1 independently for UT/FT: eight450-epoch final fits,
+  one disposable8h full-alignment/eight-case GPU gate, eight240h B1 dependents.
+  No OOF, curves, SDEG export or feedback; output `MULTI/Damage/Transformer`.
+  `MLdamage.py` preserves native IDs/edges/frames/masks and its explicit loader;
+  the study guide owns balancing/selection. Read PROJECT_STATUS before retrying.
+
 - `studies/Locality/B4_Locality.sh` previews16 independent field-only fits.
   Explicit --submit uses a clean immutable source, one8h all-case GPU gate and
   sixteen240h B1 afterok jobs. Preserve current resource policy, MSE controls,

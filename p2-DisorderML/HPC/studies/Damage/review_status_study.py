@@ -21,7 +21,7 @@ def schematic(out):
     box(3,3,2.4,1.4,"One field Transformer\n384 channels,8 heads\n3 encoder layers")
     box(6.1,4.5,2.5,1.1,"Nodal displacement head\nU1/U2 ×20 frames")
     box(6.1,1.8,2.5,1.6,"Native strut readout\nTake latent nodes i,j\nmean + absolute difference\n+ initial edge geometry")
-    box(9.2,2,3.3,1.2,"Shared small MLP per strut\n20 STATUS logits\nNo extra attention tokens")
+    box(9.2,2,3.3,1.2,"One MLP shared across struts\n20 fracture logits per strut\nD=1 means broken")
     box(9.2,4.5,3.3,1.1,"Masked displacement MSE\nAll present valid nodes",color="#e8efdc")
     box(9.2,.3,3.3,1.1,"Masked class-balanced BCE\nTRAIN-derived weights",color="#f5e6d7")
     arrow((2.4,3.7),(3,3.7));arrow((5.4,4.1),(6.1,5));arrow((5.4,3.3),(6.1,2.6));arrow((8.6,5.05),(9.2,5.05));arrow((8.6,2.6),(9.2,2.6));arrow((10.85,2),(10.85,1.4))
@@ -38,6 +38,7 @@ def main(argv=None):
     p.add_argument("--root",type=Path,default=Path("Z:/p2/MULTI/Damage/Transformer"))
     p.add_argument("--suite",default="status-261027")
     p.add_argument("--jobs",type=Path,help="Optional actual jobs.tsv; no inferred scheduler state")
+    p.add_argument("--execution-note",help="Explicit dated scheduler observation; not an automatic live check")
     a=p.parse_args(argv);a.out.mkdir(parents=True,exist_ok=True);schematic(a.out)
     text=["# STATUS learning: preliminary study report\n\n**This is the experiment protocol, not an accuracy result.** Dataset extraction is complete. Learning outcomes will be added from completed production archives; queued jobs and a successful preflight do not establish predictive quality.\n\n",
         f"![STATUS and displacement architecture](<{(a.out/'status-architecture.png').resolve().as_posix()}>)\n\n",
@@ -46,13 +47,14 @@ def main(argv=None):
         "The STATUS-only arm retains the same nodal encoder but does not train or report displacement predictions. Controls are freshly fitted in the same consumer so trainer/selection differences cannot silently favour an intervention. Common encoder initialization is identical per task; adding the strut head uses a separate RNG stream.\n\n",
         "## How one strut is predicted\n\nFor native strut i–j, gather both final nodal vectors. Concatenate their mean, absolute difference, and three initial-geometry quantities: length/specimen span and sin(2θ), cos(2θ). Reversing endpoints gives the same representation. The same small MLP reads every strut and returns20 logits. It creates no new attention tokens. Geometry comes from the actual initial disordered specimen; true future damage is never provided.\n\n",
         "In the auxiliary arms, displacement and STATUS losses both update the nodal encoder. This is the initial linkage being tested. Predicted STATUS is not yet fed back into a second refinement pass and does not remove connections. UT and FT have separate encoders, heads, optimizers and training losses.\n\n",
-        "## Labels and rare fractures\n\nA strut is broken if at least one constituent element has verified STATUS=0. Unknown entries remain masked, initial FT gaps are absent geometry, and frame0 is dropped consistently. IDs, native-to-canonical endpoints, retained frames and sample initial coordinates must match before training. Short UT histories remain unknown after their observed prefix.\n\n",
+        "## Labels and rare fractures\n\nThe predicted binary label is D=1 for broken, derived from Abaqus STATUS; it is not raw STATUS=1 (intact). A strut is broken if at least one constituent element has verified STATUS=0. Unknown entries remain masked, initial FT gaps are absent geometry, and frame0 is dropped consistently. IDs, native-to-canonical endpoints, retained frames and sample initial coordinates must match before training. Short UT histories remain unknown after their observed prefix.\n\n",
         "From TRAIN only, let p be the fraction of known broken entries. Set r=min((1−p)/p,1000). Use BCEWithLogits(pos_weight=r), divided by (1−p)+r p. This gives rare missed fractures more influence while keeping the expected weight near one; λ then controls auxiliary influence. The cap and coefficients are fixed presets. No validation/test statistics fit the balancing.\n\n",
         "## How success will be judged\n\nReport average precision against the prevalence reference, precision/recall, missed and false fractures, predicted positive fraction, strut-path overlap, onset interval error and broken→intact reversals. Report fixed threshold0.5 plus the F1-maximizing validation threshold. The latter is an optimistic validation diagnostic, frozen before any future test evaluation; weighted logits are not calibrated failure probabilities. Never silently apply cumulative maximum.\n\n",
         "Auxiliary benefit requires improved displacement, especially fracture-event/jump metrics, with global RMSE safeguards. Accurate STATUS and better displacement are distinct outcomes. Confirm useful arms on seeds43/44 before expensive OOF generation or curve training. Loss histories are logarithmic.\n\n",
         "## Execution and results\n\nOne disposable8h all-arm GPU preflight, then eight240h/1GPU/12CPU/90000MB jobs through home→scratch→archive. Successful preflight keeps only its home log. Run outputs use `MULTI/Damage/Transformer/<suite>-<arm>-<UT|FT>-s42`; STATUS checkpoints have their own explicit versioned reader, while exported field arrays follow the existing diagnostic contract.\n\n"]
     if a.jobs:
         jobs=pd.read_csv(a.jobs,sep="\t");text += ["Submitted job IDs below are a receipt, not a live status check.\n\n",jobs.to_markdown(index=False),"\n\n"]
+    if a.execution_note:text += [a.execution_note+"\n\n"]
     rows=[]
     for mode in ("UT","FT"):
         for variant in ("control","damage","weak","strong"):

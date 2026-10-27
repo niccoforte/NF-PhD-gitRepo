@@ -8,7 +8,7 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
-## Current priority order (26 October; supersedes older next-step wording)
+## Current priority order (27 October; supersedes older next-step wording)
 
 - [x] Finish the source-layout cleanup and verification: named entry points and
   reviews under `HPC/studies/<Study>/`, imported helpers in resources; keep
@@ -19,23 +19,34 @@ It has not been dispatched automatically. New submissions require explicit scope
   are task-specific candidates; FT spatial fails the global-error safeguard.
   Neither combined curve preset is a universal winner. Dynamic weighting is
   tested, not adopted; keep the accepted baseline pending researcher review.
-- [ ] Implement the approved independent Damage field-only screen: exact native
+- [x] Implement and submit the independent Damage field-only screen: exact native
   strut consumer/head, field-only control, damage-only, auxiliary coefficients
   0.1/1; seed42,450 epochs/patience52, execution/reload gate. No initial OOF or
-  curve fits; no true future damage input or inferred topology deletion.
+  curve fits; no true future damage input or inferred topology deletion. Gate
+  33533900 and eight dependents33533901–33533908 use immutable633dbba; inspect
+  actual status before any retry. Preliminary schematic/protocol: samples/status-study/.
 - [x] Implement the isolated field Locality screen in `HPC/studies/Locality/`:
   degree-only, existing/gated local graph, adjacency/relative-geometry attention,
   one/two-block masked CNN. Latest researcher green light authorizes the screen;
   check PROJECT_STATUS for actual gate/submission before repeating anything.
-- [ ] Review replacement Locality gate33395469 and16 dependents33395470–33395485
-  before any resubmission. It repairs bounded preflight holdouts only; full
-  production splits are unchanged. The original failed suite was cleaned up.
+- [x] Review/download all16 completed Locality fits33395470–33395485. Report:
+  samples/locality-study/. CNN2 is the strongest single-seed candidate in both
+  tasks; no curve benefit or multi-seed promotion has been established.
 - [ ] Confirm promising field candidates across42/43/44, then generate their
   OOF banks and retrain Predicted+True curves. Evaluate frozen readouts too.
 - [ ] On the selected independent architecture, retain separate FT crack-tip
   box weighting, Gaussian frame weights (width0.15/0.25, amplitude1/3), task-wise
   residual fields and static crack-face ablations. Do not re-run completed
   matched losses unless another specific controlled question requires it.
+- [ ] If revisiting spatial loss, first assess task-specific coefficients/scales
+  using final generators only. FT's tested0.1 coefficient strongly worsens global
+  fields and its broader tip box, despite slight gains at actual STATUS onset
+  endpoints. Do not spend on fresh OOF banks before a useful field-only result.
+- [x] Check the existing historical true-field custom-curve-loss comparison:
+  samples/loss-study/true-field-curves.md. Same shared curve architecture/split,
+  one seed; custom presets worsen overall RMSE even with true fields. It is not
+  a completed independent Case1(i) oracle comparison. Retain that matched
+  independent test as a later decision, not a reason to repeat old shared runs.
 - [ ] Keep maintained notebooks/metrics aligned with retained changes, including
   the interactive field viewer, UT/full and FT/zoom truth/prediction/error,
   curve error bars, fixed local-motion/peak/work metrics and log-scale losses.
@@ -59,6 +70,25 @@ physics/strain and optimisation handoffs own those deferred directions. Output
 PCA/autoencoder remains conditional on a demonstrated compression need.
 Numerical fracture-metric acceptance tolerances remain unagreed; show fixed
 metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
+
+### Proposed isolated follow-up counts — described, not submitted
+
+Use one explicitly frozen independent field control per task, seed42, original
+MSE/split/scalers/budget. Do not silently change the control to CNN2 before its
+confirmation. First screen final generators only; no OOF or curve retraining.
+
+| Question | New fits | One change per fit |
+| --- | ---: | --- |
+| Static crack face | 2 | UT/FT each add initial_crack_face only; zero-init new projection column, unchanged common weights. FT26 retained nodes; UT all-zero feature is a null control. |
+| Residual field coordinates | 2 | UT/FT separately predict training-mean residuals with per-node/frame/component scale and0.1 pooled-scale floor; evaluate physical reconstruction. |
+| FT crack-tip emphasis | 2 | FT only: inside A1 CrRegMESH box weights2/4 versus outside1, normalized to specimen valid-entry mean1. Same box/features; no target-event weighting. |
+| Gaussian frame emphasis | 8 | UT/FT × amplitude1/3 × width0.15/0.25, center0.5 nominal loading coordinate. Baseline1 retained; weights normalized over valid entries. No regional/event weighting. |
+
+Total14 new seed42 fits plus two reused matched controls. All other settings
+fixed:384/8/3, batch2, AdamW,450 maximum epochs/patience52. Report global and
+confirmed STATUS-event errors, FT box and local-motion timing/sign, cost and
+parameter counts. Confirm worthwhile isolated variants across seeds43/44 before
+combining changes; only then pay for OOF banks and Mixed curve adaptation.
 
 ## Cleanup
 
