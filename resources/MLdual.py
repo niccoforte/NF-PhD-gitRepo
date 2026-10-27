@@ -1043,7 +1043,9 @@ class DualTaskTransformer(nn.Module):
             raise ValueError(f"{mode} task features must have shape {expected}, got {tuple(features.shape)}.")
         return self.context_projection(features)
 
-    def forward(self, inputs, task_features=None, node_masks=None):
+    def forward(self, inputs, task_features=None, node_masks=None, return_node_features=False):
+        if return_node_features and self.pool != "node":
+            raise ValueError("Node features are only exposed by a node-output stage.")
         tokens, masks, attention_biases = [], [], []
         batch_size = None
         for task_index, mode in enumerate(self.modes):
@@ -1108,11 +1110,13 @@ class DualTaskTransformer(nn.Module):
             encoded_by_task = {mode: self.task_encoders[mode](encoded_by_task[mode], src_key_padding_mask=~mask)
                                for mode, mask in zip(self.modes, masks)}
 
-        outputs = {}
+        outputs, node_features = {}, {}
         for mode, task_encoded, mask in zip(self.modes, encoded_by_task.values(), masks):
             node_mask = mask[:, 1:] if self.use_cls_token else mask
             if self.pool == "node":
                 representation = task_encoded[:, 1:, :] if self.use_cls_token else task_encoded
+                if return_node_features:
+                    node_features[mode] = representation.masked_fill(~node_mask.unsqueeze(-1), 0.)
                 output = self.heads[mode](representation)
                 output = output.masked_fill(~node_mask.unsqueeze(-1), 0.0)
             elif self.pool == "cls":
@@ -1123,7 +1127,7 @@ class DualTaskTransformer(nn.Module):
                 pooled = (node_encoded * weights).sum(dim=1) / weights.sum(dim=1).clamp_min(1.0)
                 output = self.heads[mode](pooled)
             outputs[mode] = output
-        return outputs
+        return (outputs, node_features) if return_node_features else outputs
 
     def get_config(self):
         return {

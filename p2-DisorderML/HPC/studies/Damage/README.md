@@ -9,7 +9,16 @@ original INP elements to parent struts and reduces STATUS with unknown masks;
 `damage_data.py` aligns additive allD banks with existing field identities.
 These reusable modules serve p1 and p2; they are not competing ML models.
 
-## Agreed next experiment (not implemented/submitted)
+## Independent STATUS screen
+
+`A0-Damage.py` trains one arm/task; `B4_Damage.sh SUITE [--submit]` previews or
+submits eight seed42 final-generator fits behind one disposable8h GPU gate.
+Production uses240h/1GPU/12CPU/90000MB. `resources/MLdamage.py` contains the
+reusable consumer/head/loss/trainer; existing DATA/MODEL/DUAL checkpoints remain
+unchanged. STATUS has explicit version1 `load_status_model`, while field results
+retain standard arrays and MLmetrics diagnostics. `review_status_study.py`
+builds the preliminary report and PNG/SVG architecture schematic in samples.
+Actual job IDs and GPU success belong in PROJECT_STATUS, not this plan.
 
 Independent UT/FT Case1(i) field generators, width384/eight heads/three layers,
 unchanged geometry/context, saved split and masked field MSE. First seed42,
@@ -90,7 +99,7 @@ label. These two files cannot establish its value across the training corpus.
 Proceed with the four STATUS screen arms above; no explicit damage-to-field
 feedback. They distinguish learning fracture itself from improving displacement
 through weak/strong shared-representation supervision. The architecture and
-consumer are still to implement/gate; no STATUS learning jobs have been submitted.
+consumer are implemented; check PROJECT_STATUS for actual GPU gate/submission.
 Do not bulk-export SDEG now. The following comparison is a deferred option only
 if an existing bounded audit shows useful intermediate values/lead time.
 

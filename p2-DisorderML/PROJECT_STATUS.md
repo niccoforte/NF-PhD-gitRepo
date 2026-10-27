@@ -4,6 +4,19 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- 27 October: all16 Locality production jobs33395470–33395485 completed0:0;
+  downloaded to external Z:/p2. `samples/locality-study/README.md` reports the
+  matched field-only screen: CNN2 global RMSE−2.39% UT/−12.47% FT, with local-jump
+  ratios69.76→67.91% and20.92→16.97%. Single seed42: retain as confirmation
+  candidate, not an accepted winner or demonstrated downstream curve improvement.
+  Actual STATUS onset-window review in `samples/loss-study/fracture-regions.md`
+  shows UT spatial improves endpoint/relative-motion RMSE3.25%/4.02%; FT spatial
+  improves these1.07%/0.47% while worsening the larger crack-tip box35.25%.
+  This refines, rather than replaces, the whole-field trade-off. No loss promoted.
+  STATUS consumer/head/trainer and named launcher are implemented with tests;
+  `samples/status-study/README.md` contains its preliminary protocol/schematic.
+  Check actual GPU gate/submission below before claiming learning results.
+
 - `WINNER.md` is now the maintained accepted-configuration record: Case1(i),
   Mixed without correction, full saved architecture/training/features/provenance.
   HPO settings were inherited from dual-joint-hpo1, not independently retuned.

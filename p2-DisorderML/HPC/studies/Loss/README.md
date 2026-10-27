@@ -30,7 +30,7 @@ Coefficients are controlled presets, not HPO-selected optima.
 Judge fixed global and fracture-sensitive quantities, not differently weighted
 training totals. Report normalized RMSE, local signed motion/jump timing,
 curve peaks/postpeak/work and seed variability. Loss histories use log axes.
-Dynamic weighting is implemented and being tested, not an adopted improvement.
+Dynamic weighting has been tested, not adopted as a universal improvement.
 See `../../DualOutputs/README.md` for exact component presets and provenance.
 
 `review_loss_study.py` reviews the completed three-seed Mixed continuation and
@@ -41,3 +41,9 @@ scalers, truths, masks, physical metrics, frozen curve-loss fields and train-onl
 OOF partitions. Report global/local/peak/work trade-offs and seed variability;
 curve examples retain signed-error bars, fields truth/prediction/error with FT
 crack-tip zooms, and grouped losses log axes. Tests protect matching and masking.
+
+`review_fracture_regions.py` adds retrospective confirmed-STATUS onset windows:
+exact specimen/native-edge/frame joins, endpoint errors and signed strut motion,
+plus the larger FT box/tip region. True damage defines evaluation regions only;
+it never becomes predictor input or training weights. Preserve event counts and
+do not equate these specific fracture endpoints with every node in the FT box.

@@ -77,3 +77,9 @@ suite label after checking the previous jobs; never alter their frozen source.
 No blanket HPO, combined redesign or gradient
 instrumentation is implied. Selection prioritizes field fracture-motion accuracy,
 with global-RMSE safeguards; curves are checked only for retained candidates.
+
+`review_locality.py` reads the completed16 saved field fits and checks common
+IDs/scalers/masks/targets plus reproduced physical errors. It writes the canonical
+`samples/locality-study/README.md`: per-task changes, local-jump safeguards,
+training cost, logarithmic histories and saved UT/full or FT/zoom error examples.
+One seed screens candidates; confirmation is required before default promotion.

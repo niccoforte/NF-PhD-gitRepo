@@ -54,6 +54,12 @@ below expose imported functions/classes. Do not add job entry points here.
 
 ## ML Data And Model Rules
 
+- `MLdamage.py` owns the opt-in independent STATUS consumer, symmetric native
+  strut readout, train-only balanced BCE and version1 STATUS checkpoints. It
+  joins allD IDs/endpoints/initial geometry/frames without changing DATA/DUAL
+  schemas. `DualTaskTransformer(return_node_features=True)` exposes the same
+  node latents in one encoder call; default outputs/state names are unchanged.
+  Unknown labels stay masked; true future damage never enters inference.
 - `DATA(path=0, ...)` is the legacy Akash-data path; `DATA(path=1, ...)` resolves local `Z:/p1/data/Ti/...`; `DATA(path="HPC", ...)` resolves the cluster p2 data root; explicit paths are accepted.
 - `DATA` appends or expects `MLdata` depending on context. Post-processing helpers normalize paths that already point to an `MLdata` folder.
 - Curve models may use flattened or node-shaped inputs. Field models must preserve node structure and use node-compatible models such as GNN/GCN/GAT/Transformer.

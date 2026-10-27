@@ -11,6 +11,10 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 - Existing `CurveOutputs/`, `FieldOutputs/`, `FieldToCurve/` and `DualOutputs/` retain their run/HPO interfaces. New study entry points, launchers and reviews belong in `studies/<Study>/`; see `studies/README.md`. Imported training helpers stay in `resources/`. Do not copy trainers or rename immutable submissions.
 - `DualOutputs/A0-HPC-Dual-test.py` owns dual runs; Trial1 is a thin preset staged with it by B1. Its HPO entry calls `MLdualHPO` for single-worker full-data search/explicit resume through B1. README owns ranges/ranking/recovery; `test_dual_contract.py` protects architecture, HPO and review contracts.
 - `FieldToProperty/A0-HPC_FieldToProperty.py` is the true-field property oracle, not a curve run. Its guide owns targets and controls; preserve ID joins, train-only scaling and locked test. Do not repeat it because its source moved.
+- `studies/Damage/A0-Damage.py` / `B4_Damage.sh` own the isolated eight-fit STATUS
+  screen in `MULTI/Damage/Transformer`; the guide specifies arms, masks, balanced
+  loss and selection. Its disposable GPU gate verifies full data alignment first.
+  STATUS uses an explicit checkpoint reader, not DUAL reload.
 
 ## Durable Guardrails
 
@@ -52,9 +56,15 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 - `../handoffs/HANDOFFS.md` routes separate tasks; read only the relevant brief. Passing tests is not researcher sign-off. Verify saved loss classes/nonzero coefficients. Fresh `--curve-loss-ablation` baseline/source fits use the five-case `--curve-loss-suite` gate; combined variants have soft targets and differ only in location weight. Preserve fixed selection, MSE controls and historical runs. PROJECT_STATUS owns submission evidence.
 - Do not retain verified useless failed-run logs/empty outputs in the results archive. Audit and obtain exact-target cleanup authority first; a failed HPO can contain valuable resumable checkpoints and must not be erased merely for its exit status. The 4 October failed-bootstrap cleanup is complete, not a handoff task; see the adjacent DualOutputs README.
 
-- The dual test runner's `--experiment` prepares one-change baseline/crack-face/local-graph/encoder-sharing/interface/residual/localisation comparisons. `--base-model-json` uses a shared non-graph dual configuration anchor, not its weights; fixed split seed 42 and unchanged balanced selection make variants comparable. Parameter counts and split hashes are mandatory. Run local checks first, then an authorised B1 GPU preflight before full jobs; preparation is not submission. See DualOutputs README for exact semantics and deferred work.
-- `DualOutputs/B4_Dual-experiments.sh` previews unless `--submit`; use fresh labels and immutable clean sources through B1. Defaults cover13 modes; recovery `--variants` must not repeat successes and curve fits require winner_probe. See the workflow reference for node-targeted gates. Record jobs.tsv dependencies; curve-only selection uses two curves, joint selection four. No test development or source-HPO changes.
-- The separate opt-in `--variants baseline,sudden` pair uses a two-case `--sudden-suite` GPU gate. Gain1 changes only specimen-specific displacement weighting; spatial/temporal penalties stay zero, selection stays fixed. Default thirteen-mode suite is unchanged. CPU contracts are in `DualOutputs/test_sudden_weighting.py`; passing them is not GPU or accuracy evidence. Preserve source snapshots, 240-hour full requests and B1 collection.
+- Historical dual experiments retain split42, fixed selection, parameter/split
+  records and B1 gates. `--base-model-json` anchors configuration, not weights;
+  consult DualOutputs README before using its experiment/recovery modes.
+- `B4_Dual-experiments.sh` previews unless `--submit`; recovery must not repeat
+  successes. Keep immutable sources and jobs.tsv. Curve-only selection uses two
+  curves, joint selection four; do not change source HPOs or develop on test.
+- Optional `baseline,sudden` uses its own two-case gate: gain1 changes only
+  target weighting, derivative penalties stay zero. Preserve the default suite,
+  CPU contracts, source snapshots and240h full requests; see DualOutputs README.
 
 - Preserve existing approved trial, test and HPO entry points unless the user explicitly requests their removal. Loss ablations use `FieldOutputs/A0-HPC_Field-lossTrial.py` (exact archived UT/FT architecture/training presets) and `DualOutputs/A0-HPC-Dual-lossTrial.py` (Trial 1 capacity). B1 stages their existing runner dependencies. Choose `--field-loss-variant baseline|spatial|temporal|both`; `weighted` additionally requires an explicit positive gain and follows evidence-based variant selection. Defaults remain full data/450 epochs, validation-only selection, and the existing resource policy. No damage/strain export or architecture/HPO extension is implied.
 - Independent ablations select checkpoints by unchanged normalised validation MSE; dual ablations use the unchanged balanced physical validation score. Always use unique run labels. Save field-loss components, motion diagnostics and paired true/predicted-field curve checks alongside standard results. Different single/dual populations must not be treated as a matched comparison.

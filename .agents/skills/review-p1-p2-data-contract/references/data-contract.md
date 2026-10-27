@@ -90,6 +90,12 @@ re-export; existing producer output defaults are not current read dependencies.
   initial topology/geometry/grid buffers, not future damage. Degree adds one
   fresh-model context channel; never attach it to an old checkpoint.
 
+- STATUS screen: `MLdamage.align_status_bank` maps native `edge_index` through
+  saved field-to-canonical indices, verifies exact IDs/initial coordinates/frame
+  schedules, and slices off frame0 from D and masks together. No test fitting or
+  unknown-state imputation. Version1 `independent-status-field` checkpoints use
+  `load_status_model`; field-result arrays retain existing MLmetrics keys. New
+  runs live at `MULTI/Damage/Transformer`, separate from shared DUAL checkpoints.
 - Local RUN_ROOT is external `Z:/p2`; other hosts must set an external root explicitly. No checkout may contain `data/`. Generated p2 reports/samples live only in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`. Preserve archive-relative paths and saved scientific metadata; update operational links, never bulk-rewrite original checkpoint/source provenance.
 
 - Case1(i) follow-ups retain standard prediction keys. Version1 `correction_bank.json/npz` records nested TRAIN-only IDs, data/scaler fingerprint, seed and source-bank hash. `FieldCorrectionStage` saves `base_stage` plus `correction_stage` configs and reloads through `_task_stage`; old configs omit them. Standard results use raw/corrected predicted deployment fields; separate physical `*_source_curves`/`fixed_readout_curves` probes never replace them. Field-bank manifests additionally record active loss variant/coefficients; absent fields preserve old MSE banks. No p1/export/filter contract changes.
