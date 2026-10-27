@@ -82,6 +82,14 @@ re-export; existing producer output defaults are not current read dependencies.
 
 ## Saved-run boundary
 
+- FieldVariations reuses field-only dual containers and standard result keys.
+  FT crack-face adds a zero-initialized fresh context column; residual coordinates
+  fit one task's train-only node/frame/component mean/variation with0.1 scale
+  floor and retain explicit affine inverse. Frame priors use recorded index,
+  fixed weights have specimen-valid mean1. Keep physical selection unchanged;
+  compare physical reconstructions within floating precision, not normalized
+  values or byte-identical arrays after a changed affine inverse. No p1 exports.
+
 - Opt-in locality screens save the standard dual descriptor/container with
   `training.field_only_modes`; MLmetrics restores that scope. Only the trained
   field task executes and only its field arrays/metrics are exported; results

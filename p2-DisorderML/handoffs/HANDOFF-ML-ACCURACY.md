@@ -34,10 +34,11 @@ It has not been dispatched automatically. New submissions require explicit scope
   tasks; no curve benefit or multi-seed promotion has been established.
 - [ ] Confirm promising field candidates across42/43/44, then generate their
   OOF banks and retrain Predicted+True curves. Evaluate frozen readouts too.
-- [ ] On the selected independent architecture, retain separate FT crack-tip
-  box weighting, Gaussian frame weights (width0.15/0.25, amplitude1/3), task-wise
-  residual fields and static crack-face ablations. Do not re-run completed
-  matched losses unless another specific controlled question requires it.
+- [x] Implement the authorised13-fit FieldVariations screen: FT-only crack-face,
+  UT/FT residual targets, FT-only box2/4, UT/FT Gaussian amplitude1/3 × width0.15/0.25.
+  Gaussian coordinate is retained time-frame index, highest at the central two
+  frames, positive at start/end. Reuse the plain Locality control, no CNN or
+  combined changes. Check PROJECT_STATUS for execution before repeating jobs.
 - [ ] If revisiting spatial loss, first assess task-specific coefficients/scales
   using final generators only. FT's tested0.1 coefficient strongly worsens global
   fields and its broader tip box, despite slight gains at actual STATUS onset
@@ -71,7 +72,7 @@ PCA/autoencoder remains conditional on a demonstrated compression need.
 Numerical fracture-metric acceptance tolerances remain unagreed; show fixed
 metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
 
-### Proposed isolated follow-up counts — described, not submitted
+### Authorised isolated field variations
 
 Use one explicitly frozen independent field control per task, seed42, original
 MSE/split/scalers/budget. Do not silently change the control to CNN2 before its
@@ -79,12 +80,12 @@ confirmation. First screen final generators only; no OOF or curve retraining.
 
 | Question | New fits | One change per fit |
 | --- | ---: | --- |
-| Static crack face | 2 | UT/FT each add initial_crack_face only; zero-init new projection column, unchanged common weights. FT26 retained nodes; UT all-zero feature is a null control. |
+| Static crack face | 1 | FT only: initial_crack_face; zero-init new projection column, unchanged common weights. FT26 retained nodes; omit unnecessary UT null fit. |
 | Residual field coordinates | 2 | UT/FT separately predict training-mean residuals with per-node/frame/component scale and0.1 pooled-scale floor; evaluate physical reconstruction. |
 | FT crack-tip emphasis | 2 | FT only: inside A1 CrRegMESH box weights2/4 versus outside1, normalized to specimen valid-entry mean1. Same box/features; no target-event weighting. |
-| Gaussian frame emphasis | 8 | UT/FT × amplitude1/3 × width0.15/0.25, center0.5 nominal loading coordinate. Baseline1 retained; weights normalized over valid entries. No regional/event weighting. |
+| Gaussian frame emphasis | 8 | UT/FT × amplitude1/3 × width0.15/0.25, center0.5 retained-frame index. Baseline1 retained; weights normalized over valid entries. No regional/event weighting. |
 
-Total14 new seed42 fits plus two reused matched controls. All other settings
+Total13 new seed42 fits plus two reused matched controls. All other settings
 fixed:384/8/3, batch2, AdamW,450 maximum epochs/patience52. Report global and
 confirmed STATUS-event errors, FT box and local-motion timing/sign, cost and
 parameter counts. Confirm worthwhile isolated variants across seeds43/44 before
@@ -107,19 +108,19 @@ this Accuracy task. All four allD banks are delivered locally and on HPC; label
 extraction, building, transfers and the old six-fixture replay are closed work.
 Do not repeat them or treat the diagnostic fixtures as the training population.
 
-- [ ] Add a masked native-strut damage consumer, exact specimen/geometry joins,
+- [x] Add a masked native-strut damage consumer, exact specimen/geometry joins,
   aligned frame0 slicing and save/reload checks against the actual MULTI banks.
 - [x] Agree the first isolated ML experiment: field-only control, damage-only,
   and auxiliary binary strut-fracture loss0.1/1 on independent UT/FT generators.
   Class balancing fits train only; report damage accuracy separately from field benefit.
-- [ ] Prepare its matched control and GPU execution gate, then final-generator
+- [x] Prepare its matched control and GPU execution gate, then final-generator
   pilot. OOF fields/curve retraining follow only for useful candidates. Do not
   add it to the frozen current loss study. No new ODB
   processing, corrector or true-future-damage inference input is needed.
 
 Use the full-bank masks and exact existing split, never frame/strut-level splits.
-The handback alone is not a trained loader/head or damage accuracy result; the
-new consumer/experiment still needs implementation and a defined training plan.
+The consumer/experiment is implemented and submitted; the handback alone was
+not accuracy evidence. Review the completed learning arms before promotion.
 
 The user selected Case1(i) for the next source and custom-loss studies. Prepare
 the input study first, with predicted/true/mixed and corrected/mixed-corrected
@@ -257,10 +258,10 @@ Correction to the earlier verdict: fixed FT crack-tip-box weighting is a valid,
 user-approved physical region priority, not leakage/cheating or a rejected idea.
 Keep outside-region supervision and whole-field/inside/outside reporting. Dynamic
 sample-specific weighting is a separate comparison, not a compulsory replacement.
-Gaussian frame weights are newly requested, not implemented: propose positive
+Gaussian frame weights are implemented in the isolated FieldVariations screen:
 1 + a*exp(-0.5*((q-0.5)/sigma)^2), mean-normalised over valid entries, with q the
-verified normalised loading coordinate. Start widths sigma .15/.25 and amplitudes
-a 1/3 against uniform weighting. Check training-side event timing before claiming
+retained frame index scaled0–1. Widths sigma .15/.25 and amplitudes
+a 1/3 compare to uniform weighting. Check training-side event timing before claiming
 the midpoint is typical; retain positive tail weights and per-frame reporting.
 Do not mix Gaussian/regional/sudden weights in the first comparisons.
 

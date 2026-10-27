@@ -1,5 +1,6 @@
 """Protect paired comparisons, identity checks and physical masking."""
 import importlib.util
+import runpy
 from pathlib import Path
 import unittest
 import tempfile
@@ -12,6 +13,19 @@ spec.loader.exec_module(review)
 
 
 class LossReviewTests(unittest.TestCase):
+    def test_regional_mean_skill_uses_same_mask_and_known_edges(self):
+        regional=runpy.run_path(str(Path(__file__).with_name("review_fracture_regions.py")))
+        truth=np.arange(24,dtype=float).reshape(2,2,3,2)+1
+        mean=np.zeros((2,3,2));valid=np.ones_like(truth,dtype=bool)
+        valid[0,0,0]=False
+        nodes=np.ones((2,2,3),bool);events=np.ones((2,3,1),bool)
+        result=regional["measure_regions"](np.zeros_like(truth),truth,valid,nodes,events,
+            np.array([[0,1]]),mean,"UT",np.array([[0,0],[1,1]]))
+        self.assertTrue(all(abs(r["skill_percent"])<1e-10 for r in result))
+        exact=regional["measure_regions"](truth,truth,valid,nodes,events,
+            np.array([[0,1]]),mean,"UT",np.array([[0,0],[1,1]]))
+        self.assertTrue(all(abs(r["skill_percent"]-100)<1e-10 for r in exact))
+
     def test_identity_requires_unique_matching_order(self):
         review.verify_ids([1, 2], ["1", "2"])
         for values in ([2, 1], [1, 1], [1]):

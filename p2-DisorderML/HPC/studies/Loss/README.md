@@ -47,6 +47,11 @@ exact specimen/native-edge/frame joins, endpoint errors and signed strut motion,
 plus the larger FT box/tip region. True damage defines evaluation regions only;
 it never becomes predictor input or training weights. Preserve event counts and
 do not equate these specific fracture endpoints with every node in the FT box.
+The main report embeds narrow-versus-broad fracture figures/tables. Global and
+regional scores include RMSE skill against a training-only mean; reconstruct
+that mean from allFIELD IDs and reproduce its saved global error first. Zero
+skill means the average output, negative means worse. Keep variation/collapse
+ratios separate: matching output spread does not establish correct predictions.
 
 `review_true_curve_losses.py` checks the three historical true-field shared-curve
 fits (MSE/no-location/soft-location) for identical architecture, optimizer/source

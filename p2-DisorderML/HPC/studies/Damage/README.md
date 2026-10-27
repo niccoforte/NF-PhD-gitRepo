@@ -142,6 +142,11 @@ Reference: [Abaqus ductile-metal damage evolution](https://docs.software.vt.edu/
 
 ## Existing report contracts
 
+Learning reports include field RMSE skill only when the saved baseline is
+verified `train_mean_field`; STATUS-only has no trained field score. Damage
+metrics use their own prevalence/precision-recall reference, not a displacement
+mean. Neither a constant intact output nor correct output spread proves skill.
+
 - `review_damage_dataset.py` reviews explicit STATUS-only FIELDd products and optional supplied corpus evidence for the FCC dataset report. Selected figures do not establish whole-corpus completion; preserve task/sample identities, unknown masks and complete binary legends. Verify spacing with the full eight-panel suite. It opens no ODB, makes no HPC/archive queries and trains no model. `test_damage_dataset_review.py` checks completion, identity, membership and checksum gates synthetically; run `python -m unittest discover -s p2-DisorderML/HPC/studies/Damage -p test_damage_dataset_review.py -v` from the root.
 
 The `corpus_summary` docstring specifies optional `--execution-json` / `corpus_evidence` schema `fcc_status_corpus_review_v1`: pinned manifest/code hashes, attempts, ordered existing `required_ids`, exact `excluded_ids`, verified transfer rows and four bank proofs. Its producer must reconcile actual files first. Missing attempts become pending in `corpus-attempts.csv`; terminal exceptions retain reasons. Raw frame counts must be positive, not necessarily21: preserve short histories and their last observed endpoints; summary JSON/prose expose frame-count histograms, short-source IDs and required-source counts. Bank axes remain21; reconcile absent sample-frame and observed/total unknown-state counts against each bank's actual source prefixes, and display padding explicitly. `skipped_valid` may reuse selected validation only with matching identity, filename, checksum and code. Never treat excluded-product presence as validation or bank success as raw-corpus completion.

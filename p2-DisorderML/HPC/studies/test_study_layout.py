@@ -48,7 +48,9 @@ class StudyLayoutTests(unittest.TestCase):
             (scripts/"DualOutputs").mkdir(parents=True)
             (scripts/"DualOutputs/A0-HPC-Dual-test.py").write_text(
                 "import json\ndef main(args):\n    print(json.dumps(args))\n", encoding="utf-8")
-            for name in ("Input", "Loss", "Independence"):
+            (scripts/"studies/Locality").mkdir(parents=True)
+            (scripts/"studies/Locality/A0-Locality.py").write_text("# shared final generator\n")
+            for name in ("Input", "Loss", "Independence", "FieldVariations"):
                 directory = scripts/"studies"/name
                 directory.mkdir(parents=True)
                 source = directory/f"A0-{name}.py"
@@ -66,12 +68,17 @@ class StudyLayoutTests(unittest.TestCase):
                 staged = scratch/"studies"/name/source.name
                 self.assertTrue(staged.exists())
                 self.assertTrue((scratch/"resources/proof.txt").exists())
+                if name=="FieldVariations":
+                    self.assertTrue((scratch/"studies/Locality/A0-Locality.py").is_file())
+                    continue
                 args = ["--independence-case", "1i"] if name == "Independence" else []
                 output = subprocess.run([sys.executable, str(staged), *args], check=True, capture_output=True, text=True)
                 self.assertIn("--experiment", json.loads(output.stdout))
 
     def test_notebook_folder_has_no_study_python(self):
-        self.assertEqual(list((HPC.parent/"code").glob("*.py")), [])
+        # The maintained general figure-export regression is not a study CLI.
+        self.assertEqual([p.name for p in (HPC.parent/"code").glob("*.py")
+                          if p.name!="test_figure_exports.py"], [])
 
     def test_production_property_name(self):
         self.assertTrue((HPC/"FieldToProperty/A0-HPC_FieldToProperty.py").is_file())

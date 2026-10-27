@@ -83,3 +83,9 @@ IDs/scalers/masks/targets plus reproduced physical errors. It writes the canonic
 `samples/locality-study/README.md`: per-task changes, local-jump safeguards,
 training cost, logarithmic histories and saved UT/full or FT/zoom error examples.
 One seed screens candidates; confirmation is required before default promotion.
+Report TRAIN-mean-relative skill and output-variation ratios for every variant,
+plus actual STATUS-onset endpoint/strut errors for control/CNN1/CNN2. The report
+reconstructs the mean from train IDs only and verifies its global baseline.
+Show train and validation losses together on log axes; selected best epochs,
+not overfit tails, supply saved predictions. `run(...,configure=...)` also serves
+the named FieldVariations entry point; the default Locality CLI is unchanged.

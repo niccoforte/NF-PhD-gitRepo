@@ -4,6 +4,17 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- 27 October continuation: reports now show per-variant TRAIN-mean RMSE skill,
+  output-variation ratios and actual STATUS fracture-window skill on the same
+  validation entries. Main Loss report embeds narrow-event versus broader-box
+  results. Locality CNN2 improves confirmed endpoints/strut-motion4.41%/5.79% UT,
+  13.22%/13.56% FT at seed42; remains a confirmation candidate. UT train/validation
+  histories show overfitting, including the control; best saved epochs are used.
+  FieldVariations implements13 authorised independent seed42 fits, with FT-only
+  crack-face/box, UT/FT residual targets and8 Gaussian-frame fits. Uses unchanged
+  plain controls, no CNN/derivative/damage mixing. Execution gate/submission next;
+  current STATUS production source remains untouched. Accepted winner unchanged.
+
 - 27 October: all16 Locality production jobs33395470–33395485 completed0:0;
   downloaded to external Z:/p2;288 files/4.54GB match HPC SHA256.
   `samples/locality-study/README.md` reports the

@@ -113,7 +113,12 @@ def plot_results(model, results, mode):
     fig.tight_layout(); fig.savefig(results/"field-examples.png", dpi=160); plt.close(fig)
 
 
-def run(args):
+def run(args, *, configure=None, study="locality", source_paths=()):
+    """Shared final-generator execution; an intervention returns an optional loss.
+
+    Check the unchanged data contract before attaching an isolated intervention.
+    Named study entry points own their presets; this routine owns training/export.
+    """
     import numpy as np
     import torch
     from resources import MLdual, MLlocality
@@ -142,18 +147,19 @@ def run(args):
     # model weights start identically in every variant (degree column starts0).
     with torch.random.fork_rng():
         torch.manual_seed(args.seed+100)
-        MLlocality.configure_field_locality(network, data, args.variant)
+        objective = (configure(network, data, args) if configure is not None else
+                     MLlocality.configure_field_locality(network, data, args.variant))
     data.to_json(directory/"model_data.json")
     training = descriptor["training"]
     batch = args.batch or training["batch"]
     score = DualValidationScore(data)
     def selection(pred, true, masks):
         return {"selection_score": score(pred, true, masks)["selection_field_"+args.mode]}
-    model = DUAL_MODEL(network, DualLoss(), data=data, opt=training["opt"],
+    model = DUAL_MODEL(network, objective if objective is not None else DualLoss(), data=data, opt=training["opt"],
         batch=batch, lr=training["lr"], scheduler=training["scheduler"], grad_clip=training["grad_clip"],
         curve_lr_factor=training["curve_lr_factor"], device="cuda" if torch.cuda.is_available() else "cpu",
         selection_metric=selection, field_only_modes=(args.mode,))
-    metadata = dict(study="locality", variant=args.variant, mode=args.mode, run_config=vars(args),
+    metadata = dict(study=study, variant=args.variant, mode=args.mode, run_config=vars(args),
         device=str(model.device), torch=str(torch.__version__), numpy=np.__version__,
         gpu_name=torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         source_revision=os.environ.get("ML_SOURCE_REVISION"), slurm_job_id=os.environ.get("SLURM_JOB_ID"),
@@ -161,7 +167,7 @@ def run(args):
         run_layout=dict(task="MULTI", output_kind="Dual", model="Transformer", run_name=label),
         scope="One independent field generator; no OOF or curve training/evaluation",
         source_hashes={Path(p).name: hashlib.sha256(Path(p).read_bytes()).hexdigest()
-                       for p in (__file__, MLdual.__file__, MLlocality.__file__)})
+                       for p in (__file__, MLdual.__file__, MLlocality.__file__, *source_paths)})
     torch.manual_seed(args.seed)
     started = time.monotonic()
     model.train(args.epochs, verbose=1,
@@ -183,7 +189,7 @@ def run(args):
                                    reloaded._predict_batch(batch_values)["field"][args.mode], rtol=1e-5, atol=1e-6)
     metadata.update(status="complete", checkpoint_reload="passed")
     (directory/"run_metadata.json").write_text(json.dumps(_json_safe(metadata), indent=2))
-    print("LOCALITY_RUN_OK", args.variant, args.mode, directory, flush=True)
+    print(study.upper()+"_RUN_OK", args.variant, args.mode, directory, flush=True)
     return model
 
 

@@ -14,6 +14,13 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Production and debug policy
 
+- `studies/FieldVariations/B4_FieldVariations.sh SUITE [--submit]` screens13
+  independent final fields: FT crack-face, UT/FT residual coordinates, FT box2/4,
+  UT/FT Gaussian amplitude1/3 × width0.15/0.25. Reuse Locality plain controls;
+  one disposable13-case8h GPU gate,13 afterok240h fits. No OOF, curves or CNN.
+  B1 also stages the Locality common runner; its default CLI is unchanged.
+  The study guide owns exact priors and saved physical-selection contract.
+
 - `studies/Damage/B4_Damage.sh SUITE [--submit]` screens control/STATUS-only/
   auxiliary0.1/auxiliary1 independently for UT/FT: eight450-epoch final fits,
   one disposable8h full-alignment/eight-case GPU gate, eight240h B1 dependents.

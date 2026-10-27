@@ -61,7 +61,10 @@ def main(argv=None):
             path=a.root/f"{a.suite}-{variant}-{mode}-s42"
             if (path/"run_metadata.json").exists() and json.loads((path/"run_metadata.json").read_text()).get("status")=="complete":
                 m=json.loads((path/"results/metrics.json").read_text());d=m.get("damage",{}).get("fixed_05",{})
-                rows.append(dict(task=mode,arm=variant,field_rmse=m["diagnostics"]["field"].get(mode,{}).get("rmse"),average_precision=d.get("average_precision"),recall=d.get("recall"),precision=d.get("precision")))
+                field=m["diagnostics"]["field"].get(mode,{})
+                skill=100*field["skill_vs_mean_field_rmse"] if field.get("mean_field_baseline_source")=="train_mean_field" else None
+                rows.append(dict(task=mode,arm=variant,field_skill_vs_train_mean_percent=skill,
+                    field_rmse=field.get("rmse"),average_precision=d.get("average_precision"),recall=d.get("recall"),precision=d.get("precision")))
     if rows:text += [pd.DataFrame(rows).to_markdown(index=False),"\n"]
     else:text += ["**No completed production learning results are available in this local report yet.**\n"]
     (a.out/"README.md").write_text("".join(text),encoding="utf-8");print("REPORT",a.out/"README.md")

@@ -203,6 +203,7 @@ def collect(root):
 
 
 def comparison_plots(rows, extra, sources, banks, out):
+    mean_predictor_plots(rows,out)
     fig, axes = plt.subplots(2, 2, figsize=(13, 8), sharex=True)
     for ax, (kind, mode) in zip(axes.flat, TASKS):
         for x, variant in enumerate(VARIANTS[1:]):
@@ -260,6 +261,20 @@ def comparison_plots(rows, extra, sources, banks, out):
         ax.set(ylabel="Recorded training runtime (hours)", xticks=range(len(variants)), xticklabels=[s.replace(" ", "\n") for s in labels], title=title)
         ax.tick_params(axis="x", labelsize=7)
     fig.tight_layout(); fig.savefig(out/"curve-fit-cost.png", dpi=170); plt.close(fig)
+
+
+def mean_predictor_plots(rows,out):
+    fig,axes=plt.subplots(2,2,figsize=(13,8))
+    for ax,(kind,mode) in zip(axes.flat,TASKS):
+        for x,variant in enumerate(VARIANTS):
+            values=rows[(rows.variant==variant)&(rows.kind==kind)&(rows["mode"]==mode)].skill_percent
+            ax.bar(x,values.mean(),color="#377f95" if values.mean()>0 else "#c57860",alpha=.8)
+            ax.errorbar(x,values.mean(),yerr=values.std(),color="black",capsize=3)
+            ax.scatter(x+np.linspace(-.12,.12,len(values)),values,color="black",s=10)
+        ax.axhline(0,color="black",lw=.8);ax.set(title=f"{mode} {kind}",ylabel="RMSE reduction vs TRAIN mean (%)",
+            xticks=range(len(VARIANTS)),xticklabels=[v.replace(" ","\n") for v in LABELS]);ax.tick_params(axis="x",labelsize=7);ax.grid(axis="y",alpha=.2)
+    fig.suptitle("How much is learned beyond the average output?\nHigher is better; zero=mean predictor, negative=worse; whiskers=seed SD")
+    fig.tight_layout();fig.savefig(out/"mean-predictor-skill.png",dpi=170);plt.close(fig)
 
 
 def galleries(root, rows, out):
@@ -332,6 +347,8 @@ def loss_histories(root, out):
 
 
 def write_report(root, out, rows, extra, sources, banks, checks):
+    rows=rows.copy()
+    rows["mse_skill_percent"]=100*(1-(1-rows.skill_percent/100)**2)
     def figure(name, caption): return f"\n![{caption}](<{(out/name).resolve().as_posix()}>)\n"
     text = ["# Independent custom-loss study\n", "Case1(i): four separately trained Transformers; **Predicted + True** curve training, predicted-field inference. Seeds42/43/44, identical793 validation specimens. No locked-test evaluation.\n",
         "## What changed\n", "| Variant | Field objective | Curve objective |\n|---|---|---|\n| Control | Masked MSE | MSE |\n| Spatial | MSE +0.1 signed neighbour-motion loss | MSE |\n| Temporal | MSE +0.1 adjacent-frame increment loss | MSE |\n| Both | MSE +0.1 each | MSE |\n| Sudden weighting | Specimen/node/frame target weighting, gain1; no added derivative terms | MSE |\n| Combined curve | Frozen control fields | Combined loss, location disabled |\n| Soft location | Same frozen control fields | Same combined loss +0.02 soft/soft location, beta20 |\n",
@@ -350,6 +367,40 @@ def write_report(root, out, rows, extra, sources, banks, checks):
         v = rows.query("variant == 'control' and kind == @kind and mode == @mode").skill_percent
         skills.append(f"{mode} {kind}: {v.mean():.2f}%")
     text.append("MSE-control RMSE reductions versus the training-mean predictor: **"+"; ".join(skills)+"**. Higher is better;100% would mean zero error,0% no improvement over the mean, and a negative value worse than that reference. These are not percentages of maximum displacement or force.\n")
+    text += ["## Beyond a mean-output prediction\n",
+        "TRAIN means are fitted per node/frame/component for fields and per curve point for curves, then evaluated on the same validation specimens and masks. RMSE skill=100×(1−RMSEmodel/RMSEmean). MSE skill=100×(1−(RMSEmodel/RMSEmean)²); these have different numerical values. Tables and plots lead with RMSE skill. A model that always returns the average has0 skill. Positive skill does not imply that all fracture paths are recovered.\n",
+        "| Variant | UT field skill | FT field skill | UT curve skill | FT curve skill |\n|---|---:|---:|---:|---:|\n"]
+    for variant,label in zip(VARIANTS,LABELS):
+        values=[]
+        for kind,mode in TASKS:
+            v=rows[(rows.variant==variant)&(rows.kind==kind)&(rows["mode"]==mode)].skill_percent
+            values.append(f"{v.mean():.2f} ± {v.std():.2f}%")
+        text.append("| "+label+" | "+" | ".join(values)+" |\n")
+    text += [figure("mean-predictor-skill.png","RMSE skill relative to a training-only mean output"),
+        "The companion metrics also retain the across-specimen variation ratio (prediction standard deviation / truth standard deviation, averaged over output locations). Zero means constant predictions;1 means matched spread, not necessarily correct specimens. This is a complementary collapse diagnostic, not a replacement for mean-relative accuracy.\n"]
+    if "collapse_ratio" in rows:
+        text += ["| Variant | UT field spread | FT field spread | UT curve spread | FT curve spread |\n|---|---:|---:|---:|---:|\n"]
+        for variant,label in zip(VARIANTS,LABELS):
+            values=[rows[(rows.variant==variant)&(rows.kind==kind)&(rows["mode"]==mode)].collapse_ratio.mean() for kind,mode in TASKS]
+            text.append("| "+label+" | "+" | ".join(f"{v:.2f}" for v in values)+" |\n")
+    regional=out/"status-fracture-regions.csv"
+    if regional.exists():
+        regions=pd.read_csv(regional)
+        text += ["## Confirmed fracture versus the surrounding field\n",
+            "Actual STATUS labels define retrospective validation regions only. Fracture endpoints are the two nodes of a verified intact→failed strut at onset ±1 retained frame. The connected-pair metric compares their signed relative motion. The FT box contains all present nodes in the larger A1 crack-tip refinement region across valid frames. These overlap: they are different scales, not disjoint partitions. Means/seed SD below compare the identical region to the same-seed MSE control.\n",
+            figure("status-fracture-regions.png","Narrow fracture-event gains and broader FT field deterioration"),
+            "| Change | UT fracture endpoints | UT fracturing-strut motion | FT fracture endpoints | FT fracturing-strut motion | FT larger box |\n|---|---:|---:|---:|---:|---:|\n"]
+        keys=(("UT","STATUS onset endpoints ±1 frame"),("UT","STATUS onset strut relative motion ±1 frame"),
+              ("FT","STATUS onset endpoints ±1 frame"),("FT","STATUS onset strut relative motion ±1 frame"),("FT","FT crack-tip box"))
+        for variant,label in zip(VARIANTS[1:5],LABELS[1:5]):
+            values=[regions[(regions.variant==variant)&(regions["mode"]==m)&(regions.region==r)].change_percent for m,r in keys]
+            text.append("| "+label+" | "+" | ".join(f"{v.mean():+.2f}% ({v.std():.2f})" for v in values)+" |\n")
+        text += ["\n**FT spatial:** about1.07% lower endpoint error and0.47% lower relative-motion error at confirmed fracture events, versus35.25% worse in the larger box and123.12% worse globally. The small event gain does not justify the broader error.\n",
+            "| Variant | UT fracture endpoint skill vs TRAIN mean | FT fracture endpoint skill vs TRAIN mean | FT box skill vs TRAIN mean |\n|---|---:|---:|---:|\n"]
+        for variant,label in zip(VARIANTS[:5],LABELS[:5]):
+            values=[regions[(regions.variant==variant)&(regions["mode"]==m)&(regions.region==r)].skill_percent for m,r in (keys[0],keys[2],keys[4])]
+            text.append("| "+label+" | "+" | ".join(f"{v.mean():.2f} ± {v.std():.2f}%" for v in values)+" |\n")
+        text += ["\n[Definitions, physical RMSE, denominators, counts and hypotheses](fracture-regions.md). TRAIN-only regional means are reconstructed from the delivered field bank and must reproduce the saved global baseline; validation events never fit the mean.\n"]
     text += ["**Verdict:** retain the existing Mixed MSE baseline. Spatial is a modest UT-specific candidate, not a common UT/FT improvement. Spatial and both strongly deteriorate FT absolute fields at the tested0.1 coefficient. Temporal is inconsistent for UT and worsens FT; sudden weighting is close to the baseline with mixed seed-level effects. Neither combined curve formulation consistently improves global curve accuracy. Inspect the peak/work table before deciding whether a specialized curve objective warrants retuning. No new loss is a universal winner.\n",
         "The lower FT curve error for spatial/both does not rescue their poor FT field accuracy. Curve models were freshly adapted, so this is not curve-gradient interference with fields: all four models train independently. A curve reads particular patterns rather than the unweighted field average. The frozen-readout comparison tests sensitivity to the changed field source; these results alone do not identify a causal mechanism.\n"]
     text += ["## Absolute position versus local motion\n", "A spatial-difference loss is insensitive to a common displacement offset. The diagnostic below splits squared error into each specimen/frame/component's mean nodal error and the residual after removing that mean. Their **squared** values add to whole-field MSE. This is an explanation tool, not a correction applied to predictions, and does not establish a causal training mechanism.\n",

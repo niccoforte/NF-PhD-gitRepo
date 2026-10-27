@@ -12,6 +12,7 @@ sources, job names and archive paths are not renamed by this source cleanup.
 | [Loss](Loss/README.md) | `A0-Loss.py`, `B4_Loss.sh` | Completed Mixed continuation; `review_loss_study.py` checks fixed accuracy/cost metrics |
 | [Damage](Damage/README.md) | `A0-Damage.py`, `B4_Damage.sh`; completed dataset tools | Independent STATUS screen; `review_status_study.py` explains head/loss protocol |
 | [Locality](Locality/README.md) | `A0-Locality.py`, `B4_Locality.sh` | Isolated field-only screen; execution in PROJECT_STATUS |
+| [Field variations](FieldVariations/README.md) | `A0-FieldVariations.py`, `B4_FieldVariations.sh` |13 FT-feature/residual/box/Gaussian final fits; common Locality training/export |
 
 `B4_Field-source-study.sh` contains shared Input/Loss submission mechanics; their
 small named wrappers supply the study. The Python presets reuse the established

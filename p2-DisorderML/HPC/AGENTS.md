@@ -50,7 +50,7 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 
 ## Validation
 
-- `studies/Locality/` screens degree/GNN/CNN/attention one change at a time, field-only. Preserve exact control IDs/scalers, MSE selection and no curve exports; its guide owns the disposable16-case GPU gate and production budget. Read WINNER.md before choosing the control.
+- Locality and FieldVariations screen one field change per fit, preserving control IDs, physical selection and field-only exports. Their guides own cases/gates/budgets. FieldVariations reuses Locality's runner; B1 stages both. Read WINNER.md before choosing controls.
 
 - Named study wrappers preview unless `--submit`. Keep strict bank/seed/scaler/source checks and afterok gates; `studies/README.md` owns entry paths and each study guide owns cases/resources. Mixed loss continuation reuses12 compatible banks; do not resubmit them or mix new features into frozen comparisons.
 - `../handoffs/HANDOFFS.md` routes separate tasks; read only the relevant brief. Passing tests is not researcher sign-off. Verify saved loss classes/nonzero coefficients. Fresh `--curve-loss-ablation` baseline/source fits use the five-case `--curve-loss-suite` gate; combined variants have soft targets and differ only in location weight. Preserve fixed selection, MSE controls and historical runs. PROJECT_STATUS owns submission evidence.
