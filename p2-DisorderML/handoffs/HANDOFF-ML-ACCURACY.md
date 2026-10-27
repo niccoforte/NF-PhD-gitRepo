@@ -43,11 +43,18 @@ It has not been dispatched automatically. New submissions require explicit scope
   using final generators only. FT's tested0.1 coefficient strongly worsens global
   fields and its broader tip box, despite slight gains at actual STATUS onset
   endpoints. Do not spend on fresh OOF banks before a useful field-only result.
+  Proposed FT coefficients0.001/0.003/0.01 versus existing0/0.1 evidence; no
+  redesign until the balance question is answered. These are not submitted.
 - [x] Check the existing historical true-field custom-curve-loss comparison:
   samples/loss-study/true-field-curves.md. Same shared curve architecture/split,
   one seed; custom presets worsen overall RMSE even with true fields. It is not
   a completed independent Case1(i) oracle comparison. Retain that matched
   independent test as a later decision, not a reason to repeat old shared runs.
+- [ ] If peak errors still warrant loss changes after improving fields: MSE plus
+  one train-scaled peak-height OR soft-location term, with other custom terms
+  disabled. Isolate it with independent true-field inputs before Mixed deployment.
+  Retire the unchanged full combined preset from immediate repeats; legacy loss
+  classes/checkpoints remain valid. No new curve-loss job is implied.
 - [ ] Keep maintained notebooks/metrics aligned with retained changes, including
   the interactive field viewer, UT/full and FT/zoom truth/prediction/error,
   curve error bars, fixed local-motion/peak/work metrics and log-scale losses.

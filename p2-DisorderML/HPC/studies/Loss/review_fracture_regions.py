@@ -5,6 +5,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
 import numpy as np
 import pandas as pd
 
@@ -70,7 +71,7 @@ def measure_regions(pred,truth,valid,nodes,event,edges,mean,mode,xy):
 def region_figures(table,out):
     """Show the narrow event gain beside the broader FT cost, not on another page."""
     variants=list(dict.fromkeys(table.variant))
-    fig,axes=plt.subplots(1,2,figsize=(14,4.8))
+    fig,axes=plt.subplots(1,2,figsize=(14,5.4))
     regions=("STATUS onset endpoints ±1 frame","STATUS onset strut relative motion ±1 frame","FT crack-tip box","Whole field")
     labels=("Fracture endpoints","Fracturing-strut relative motion","Larger crack-tip box","Whole field")
     for ax,mode in zip(axes,("UT","FT")):
@@ -81,10 +82,15 @@ def region_figures(table,out):
                 if values.empty:continue
                 ax.errorbar(x+(offset-1.5)*.12,values.mean(),yerr=values.std() if len(values)>1 else None,
                     marker="o",capsize=3,color=plt.get_cmap("tab10")(offset),label=label if x==0 else None)
-        ax.axhline(0,color="black",lw=.8);ax.set(title=mode,yscale="symlog",yticks=[-5,-2,0,2,5,10,30,100],
-            ylabel="RMSE change vs matched MSE (%)\nSymmetric-log scale; lower is better",
-            xticks=range(len(variants)),xticklabels=variants)
-        ax.tick_params(axis="x",labelsize=8);ax.grid(alpha=.2);ax.legend(fontsize=8)
+        ax.axhline(0,color="black",lw=.8)
+        label="RMSE change vs matched MSE (%)\nLower is better"
+        if table[table["mode"]==mode].change_percent.abs().max()>20:
+            ax.set_yscale("symlog",linthresh=5);ax.set_yticks([-5,0,5,10,30,100])
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda value,pos:f"{value:g}"))
+            label+="; symmetric-log beyond ±5%"
+        ax.set(title=mode,ylabel=label,xticks=range(len(variants)),xticklabels=variants)
+        ax.tick_params(axis="x",labelsize=8);ax.grid(alpha=.2)
+        ax.legend(fontsize=8,loc="upper center",bbox_to_anchor=(.5,-.13),ncol=2)
     fig.suptitle("Actual fracture events versus the surrounding field\nSame specimens/masks; points=seed means, whiskers=seed SD")
     fig.tight_layout();fig.savefig(out/"status-fracture-regions.png",dpi=170);plt.close(fig)
 

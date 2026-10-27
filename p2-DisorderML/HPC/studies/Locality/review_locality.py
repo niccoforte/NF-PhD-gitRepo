@@ -54,6 +54,9 @@ def collect(root,suite):
             diag=metrics["diagnostics"]["field"][mode]
             if not np.isclose(rmse,diag["rmse"],rtol=3e-6):raise ValueError("Saved RMSE does not reproduce")
             if diag["mean_field_baseline_source"]!="train_mean_field":raise ValueError("Require TRAIN-fitted mean")
+            baseline=diag["mean_field_baseline_rmse"]
+            if not np.isfinite(baseline) or baseline<=0 or not np.isclose(baseline,contracts.setdefault((mode,"baseline"),baseline),rtol=1e-8):raise ValueError("Mean-field denominator changed")
+            if not np.isclose(diag["skill_vs_mean_field_rmse"],1-rmse/baseline,atol=1e-7):raise ValueError("Mean-relative skill differs")
             motion=pd.read_csv(path/f"results/{mode}_val_field_motion.csv")
             rows.append(dict(mode=mode,variant=variant,rmse=rmse,skill=100*diag["skill_vs_mean_field_rmse"],
                 local_jump=motion.local_jump_nrmse_percent.mean(),timing=motion.jump_interval_mae.mean(),

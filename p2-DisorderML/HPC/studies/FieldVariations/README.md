@@ -46,3 +46,6 @@ Save physical predictions/masks, mean-relative skill, local motion metrics,
 training/runtime metadata, log losses and truth/prediction/error views (UT full,
 FT crack-tip). Retrospective STATUS-event review follows completion. Confirm
 promising variants across seeds43/44 before combining or generating OOF banks.
+`review_field_variations.py --jobs PATH --execution-note TEXT` renders the
+preliminary protocol, actual submission receipt and temporal-weight profiles
+to canonical `samples/field-variations/`; it does not invent completed results.

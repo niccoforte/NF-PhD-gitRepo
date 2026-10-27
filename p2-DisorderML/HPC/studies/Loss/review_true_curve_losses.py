@@ -37,6 +37,10 @@ def main(argv=None):
                 if contract.setdefault(mode,digest)!=digest:raise ValueError("Curve targets differ")
                 error=np.sqrt(np.mean((pred.astype(float)-y)**2));diag=m["diagnostics"]["curve"][mode]
                 if not np.isclose(error,diag["rmse"],rtol=3e-6):raise ValueError("RMSE differs")
+                baseline=diag["mean_curve_baseline_rmse"]
+                if diag.get("mean_curve_baseline_source")!="train_mean_curve" or not np.isfinite(baseline) or baseline<=0:
+                    raise ValueError("Require a verified positive TRAIN-mean curve baseline")
+                if not np.isclose(diag["skill_vs_mean_curve_rmse"],1-error/baseline,atol=1e-7):raise ValueError("Mean-relative skill differs")
                 t=pd.read_csv(run/f"results/{mode}_val_curve_sample_metrics.csv")
                 rows.append(dict(label=label,mode=mode,rmse=error,skill=100*diag["skill_vs_mean_curve_rmse"],
                     peak_height_percent=100*abs(t.peak_error).mean()/abs(t.true_peak).mean(),
