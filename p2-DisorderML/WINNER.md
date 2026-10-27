@@ -156,7 +156,7 @@ against the SAME training-mean predictor, higher is better):
 | FT curve from predicted fields | 19.06 ± 0.96% |
 
 These are not confidence intervals or percentages of maximum load/displacement.
-The fixed four-output normalized-MSE score is0.751884. UT curves remain close
+The fixed four-output normalized-MSE score is 0.751884. UT curves remain close
 to the mean predictor; the configuration is a baseline for improvement, not
 evidence that fracture prediction is solved. No locked-test performance is claimed.
 
