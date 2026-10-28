@@ -100,6 +100,8 @@ def render_results(root,suite,data_root,out,table,regions):
         "**Next:** confirm promising candidates on seeds 43/44. The stronger prior CNN2 candidate remains the more useful architectural confirmation. Do not combine changes or regenerate expensive OOF banks until their individual effects are established.\n\n",
         "[Full metrics and provenance](metrics.csv) · [Fracture counts, physical errors and denominators](fracture-metrics.csv) · [Frame metrics](frame-metrics.csv) · [Download verification](download-verification.json). One seed, validation only; locked test untouched.\n"]
     (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(out/"README.md",table[["variant","path"]].to_dict("records"))
     (out/"example-selection.json").write_text(json.dumps(examples,indent=2))
     print(table[["mode","variant","change_percent","skill_percent","hours"]].to_string(index=False))
 

@@ -1,5 +1,33 @@
 # Custom-loss study
 
+## Independent MSE versus MAE/Smooth-L1 field screen
+
+`A0-RobustFieldLoss.py` / `B4_RobustFieldLoss.sh` fit final field generators only:
+fresh masked MSE, masked MAE, Smooth-L1 beta0.1 and beta1, separately for UT/FT,
+seed42: eight fits plus one disposable eight-case GPU gate. Capacity384/8/3,
+original features/IDs/scalers,450 epochs/patience52 and fixed physical MSE
+selection stay unchanged. Each production fit requests240h/1GPU/12CPU/90000MB.
+Do not combine CNN, spatial, temporal, STATUS or dynamic weights in this screen.
+
+Residuals remain in the accepted train-fitted standardized field coordinates.
+Beta is a standardized residual magnitude, not mm. Smooth-L1 is e²/(2 beta)
+inside beta and |e|−beta/2 outside, so it is Huber-shaped but has a beta-dependent
+overall scale relative to the conventional Huber definition. There is no new
+train-fitted threshold, target-dependent weight or loss-component coefficient.
+Different weighted objective totals cannot rank methods. Log objective histories
+and fixed validation errors, label them distinctly, and use the same masks.
+
+Use existing Locality's field-only runner/reload through B1. Archives remain
+`MULTI/Dual/Transformer/<suite>-<variant>-<mode>-s42`, recording the actually
+trained task. `MaskedRobustFieldLoss` serializes kind/beta/reduction/eps; historical
+MSE descriptors retain their class/default. Future promotion requires global,
+confirmed-fracture, jump/sign/timing and TRAIN-mean/variation checks, then seed
+confirmation before expensive OOF banks or curve training.
+
+```bash
+bash p2-DisorderML/HPC/studies/Loss/B4_RobustFieldLoss.sh robust-fields-261028 [--submit]
+```
+
 `A0-Loss.py` selects the Case1(i) isolated loss implementation;
 `B4_Loss.sh SUITE [--submit]` is its production launcher. For the current policy:
 

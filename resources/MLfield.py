@@ -7,6 +7,37 @@ Temporal terms match recorded-frame increments, not velocities.
 import numpy as np
 import torch
 from torch import nn
+from resources.MLfunc import MaskedFieldMSELoss
+
+
+class MaskedRobustFieldLoss(MaskedFieldMSELoss):
+    """Masked MAE or Smooth-L1 on unchanged standardized displacement targets.
+
+    beta is in standardized residual units, not physical millimetres. Smooth-L1
+    is quadratic e²/(2 beta) inside beta, and |e|-beta/2 outside. No spatial,
+    temporal or target-event weighting is added.
+    """
+    def __init__(self, kind="mae", beta=1., reduction="mean", eps=1e-8):
+        super().__init__(reduction=reduction, eps=eps)
+        if kind not in ("mae", "smooth_l1") or beta <= 0 or not np.isfinite(beta):
+            raise ValueError("Require MAE/Smooth-L1 and a positive finite beta")
+        self.kind, self.beta = kind, float(beta)
+
+    def get_config(self):
+        return dict(kind=self.kind,beta=self.beta,reduction=self.reduction,eps=self.eps)
+
+    def forward(self, pred, target, mask=None):
+        if pred.shape != target.shape:
+            raise ValueError("Field prediction/target shapes differ")
+        valid=torch.isfinite(target)
+        if mask is not None:
+            valid &= torch.broadcast_to(torch.as_tensor(mask,device=target.device,dtype=torch.bool),target.shape)
+        if torch.any(valid & ~torch.isfinite(pred)):
+            raise FloatingPointError("Nonfinite prediction at a valid field target")
+        error=(torch.where(valid,pred,0.)-torch.where(valid,target,0.)).abs()
+        values=error if self.kind=="mae" else torch.where(error<self.beta,error.square()/(2*self.beta),error-.5*self.beta)
+        total=torch.where(valid,values,0.).sum()
+        return total if self.reduction=="sum" else total/valid.sum().clamp_min(self.eps)
 
 
 def field_loss_weights(variant, spatial=0.1, temporal=0.1, gain=0.):

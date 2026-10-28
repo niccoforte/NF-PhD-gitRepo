@@ -18,6 +18,96 @@ def figure(out, name, caption):
     return f"\n![{caption}](<{(Path(out)/name).resolve().as_posix()}>)\n\n"
 
 
+def prediction_variation_section(entries,out):
+    """Saved predictions only; return a dedicated, accuracy-independent section.
+
+    Match IDs/truths for each output within a study. Average pointwise ratios
+    of across-specimen standard deviations, excluding nearly constant truth
+    locations only for this diagnostic. Never change archived collapse metrics.
+    """
+    rows=[];contracts={};out=Path(out)
+    for entry in entries:
+        path=Path(entry["path"])
+        with np.load(path/"results/predictions.npz",allow_pickle=False) as z:
+            for mode in ("UT","FT"):
+                for kind in ("field","curve"):
+                    if kind not in entry.get("kinds",("field","curve")):continue
+                    key=f"{mode}_val_{kind}_outputs"
+                    if key not in z:continue
+                    y=z[f"{mode}_val_{kind}_truth"].astype(float);p=z[key].astype(float)
+                    valid=np.isfinite(y)
+                    if kind=="field":
+                        valid &= z[f"{mode}_val_field_mask"].astype(bool)
+                        valid &= z[f"{mode}_node_mask"].astype(bool)[None,:,None]
+                    if p.shape!=y.shape or np.any(valid & ~np.isfinite(p)):
+                        raise ValueError("Invalid variation inputs: "+str(path))
+                    digest=hashlib.sha256()
+                    for value in (np.asarray(z["sample_ids"]).astype(str),valid):
+                        digest.update(np.ascontiguousarray(value).tobytes())
+                    contract=contracts.setdefault((mode,kind),(digest.hexdigest(),np.where(valid,y,0.).astype(np.float32)))
+                    tolerance=max(float(np.max(np.abs(contract[1])))*8*np.finfo(np.float32).eps,1e-7)
+                    if contract[0]!=digest.hexdigest() or not np.allclose(np.where(valid,y,0.),contract[1],rtol=0,atol=tolerance):
+                        raise ValueError("Variation comparisons require aligned IDs, truths and masks: "+str(path))
+                    # Residual-target reconstruction can differ by float32
+                    # rounding; use one verified common truth for all spreads.
+                    y=contract[1]
+                    count=valid.sum(0)
+                    def std(a):
+                        mean=np.where(valid,a,0.).sum(0)/np.maximum(count,1)
+                        return np.sqrt(np.where(valid,(a-mean)**2,0.).sum(0)/np.maximum(count,1))
+                    sy,sp=std(y),std(p)
+                    eligible=(count>=2)&(sy>max(float(sy.max())*1e-6,1e-12))
+                    rows.append(dict(mode=mode,kind=kind,variant=entry["variant"],
+                        seed=entry.get("seed",42),ratio=float(np.mean(sp[eligible]/sy[eligible])) if eligible.any() else np.nan,
+                        eligible_locations=int(eligible.sum()),total_locations=int(sy.size),
+                        mean_prediction_truth_bias=float(np.mean((p-y)[valid])),path=str(path)))
+    if not rows:
+        return "## Prediction variation and collapse\n\nNot applicable: no saved regression predictions in this report.\n\n"
+    table=pd.DataFrame(rows);table.to_csv(out/"prediction-variation.csv",index=False)
+    kinds=[k for k in ("field","curve") if (table.kind==k).any()]
+    fig,axes=plt.subplots(len(kinds),2,figsize=(15,5*len(kinds)),squeeze=False)
+    for row,kind in enumerate(kinds):
+        for ax,mode in zip(axes[row],("UT","FT")):
+            part=table[(table.kind==kind)&(table["mode"]==mode)]
+            if part.empty:ax.set_axis_off();continue
+            for index,(variant,group) in enumerate(part.groupby("variant",sort=False)):
+                values=group.ratio.to_numpy();ax.scatter(index+np.linspace(-.09,.09,len(values)),values,s=36,color="#477a9b")
+                ax.plot([index-.2,index+.2],[np.nanmean(values)]*2,color="#215b64",lw=3)
+            names=list(part.variant.drop_duplicates())
+            ax.axhline(1,color="black",linestyle="--",label="Equal specimen spread")
+            ax.set(title=f"{mode} {kind}",xticks=range(len(names)),xticklabels=names,
+                ylabel="Mean predicted / true specimen standard deviation")
+            ax.tick_params(axis="x",rotation=35,labelsize=10);ax.tick_params(axis="y",labelsize=11)
+            ax.set_ylim(bottom=0);ax.grid(axis="y",alpha=.2);ax.legend(fontsize=10)
+    fig.suptitle("Prediction variation: zero means constant across specimens; one does not establish accuracy",fontsize=16)
+    fig.tight_layout();fig.savefig(out/"prediction-variation.png",dpi=170);plt.close(fig)
+    return ("## Prediction variation and collapse\n\n"
+        "This measures specimen-to-specimen output spread separately from TRAIN-mean accuracy. "
+        "Zero indicates the same output for every specimen; values below one indicate compressed variation. "
+        "A value near one can still describe inaccurate predictions, misplaced fracture paths or incorrect specimen ordering. "
+        "Dots are seeds; short bars show their mean, not a confidence interval. "
+        "Nearly constant truth locations are excluded only from this diagnostic (relative1e-6/absolute1e-12); "
+        "all accuracy metrics keep their original masks. Unknown field entries remain masked. "
+        "STATUS-only models have no displacement output and are evaluated separately by precision–recall.\n\n"
+        +figure(out,"prediction-variation.png","Across-specimen predicted versus true variation")
+        +"[Values, eligible locations and provenance](prediction-variation.csv).\n\n")
+
+
+def insert_variation_section(report,entries):
+    """Place the diagnostic after the global TRAIN-mean block; avoid repeats."""
+    import re
+    report=Path(report);text=report.read_text(encoding="utf-8")
+    text=re.sub(r"## Prediction variation and collapse\n.*?(?=\n## |\Z)","",text,flags=re.S)
+    # Superseded inline spread plots are replaced by the dedicated common view.
+    text=re.sub(r"!\[[^\]]*\]\(<[^>]*(?:/diversity|/output-variation)\.png>\)\s*","",text)
+    headings=list(re.finditer(r"^## .+$",text,re.M))
+    mean=next((i for i,h in enumerate(headings) if "global" in h.group().lower() and "mean" in h.group().lower()),None)
+    if mean is None:raise ValueError("Report needs a global TRAIN-mean section before collapse diagnostics")
+    end=headings[mean+1].start() if mean+1<len(headings) else len(text)
+    section=prediction_variation_section(entries,report.parent)
+    report.write_text(text[:end].rstrip()+"\n\n"+section+text[end:],encoding="utf-8")
+
+
 def submission_note(out,filename,title):
     path=Path(out)/filename
     if not path.exists():return ""

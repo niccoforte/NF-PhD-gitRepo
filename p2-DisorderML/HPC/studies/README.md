@@ -9,7 +9,7 @@ sources, job names and archive paths are not renamed by this source cleanup.
 | --- | --- | --- |
 | [Independence](Independence/README.md) | `A0-Independence.py`, `B4_Independence.sh` | Completed; `review_sharing_study.py`, Case1(i) selected |
 | [Input](Input/README.md) | `A0-Input.py`, `B4_Input.sh` | `review_field_inputs.py`; Mixed selected on cost/accuracy |
-| [Loss](Loss/README.md) | `A0-Loss.py`, `B4_Loss.sh`; `A0-CurveTerms.py`, `B4_CurveTerms.sh`; `A0-SpatialBalance.py`, `B4_SpatialBox.sh` | Completed Mixed review; new independent true-field term attribution and FT-box spatial screens. Loss guide owns cases and explicit curve-only loader. |
+| [Loss](Loss/README.md) | `A0-Loss.py`, `B4_Loss.sh`; `A0-CurveTerms.py`, `B4_CurveTerms.sh`; `A0-SpatialBalance.py`, `B4_SpatialBox.sh` | Completed Mixed review; independent true-field terms, FT-box spatial and MAE/Smooth-L1 field screens. Loss guide owns cases and explicit curve-only loader. |
 | [Damage](Damage/README.md) | `A0-Damage.py`, `B4_Damage.sh`; completed dataset tools | Completed STATUS screen; `review_status_study.py` compares field/fracture/AP/cost |
 | [Locality](Locality/README.md) | `A0-Locality.py`, `B4_Locality.sh` | Isolated field-only screen; execution in PROJECT_STATUS |
 | [Field variations](FieldVariations/README.md) | `A0-FieldVariations.py`, `B4_FieldVariations.sh` | Completed13-fit screen; `review_field_variations.py` checks global/STATUS-region/mean/cost |

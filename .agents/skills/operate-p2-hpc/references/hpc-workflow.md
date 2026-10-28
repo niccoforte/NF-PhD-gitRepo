@@ -206,5 +206,7 @@ Loss/A0-CurveTerms.py archives one task under FieldToCurve with an explicit
 curve-only loader; it trains and validates on true fields. B4_CurveTerms.sh and
 B4_SpatialBox.sh own disposable afterok gates and immutable sources. Their Loss
 README owns cases/coefficient choices. FT-box masks affect only spatial edges;
-global MSE/scalers/selection remain fixed. Do not reuse a shared-encoder oracle
+global MSE/scalers/selection remain fixed. RobustFieldLoss's named entry/launcher
+uses the same final-generator runner and an eight-case disposable gate; fixed
+physical MSE selection must not become MAE/Huber-dependent. Do not reuse a shared-encoder oracle
 as the independent curve control or treat a preflight as scientific evidence.

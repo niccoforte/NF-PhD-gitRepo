@@ -466,6 +466,8 @@ def refresh_visual_report(root,suite,control,out,data_root=Path("Z:/p1/data/Ti/d
         "Predicted-only uses training-only OOF fields; true-only uses true fields for curve training; Mixed samples one entire field source with probability0.5. Corrected-only and corrected-Mixed use nested OOF refiners and remain comparison evidence, not current workflow. No in-training predictions substitute for OOF inputs.\n\n",
         "[Global metrics](per-run-metrics.csv) · [Actual fracture metrics](confirmed-fracture-regions.csv) · [Curve regions](curve-region-metrics.csv) · [Original selection](selection.json) · [Validation checks](validation.txt). Locked test unchanged; no new training/inference/export in this review.\n"]
     (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(out/"README.md",runs)
     print("REFRESHED_REPORT",out/"README.md",flush=True)
 
 

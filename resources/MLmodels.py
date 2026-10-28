@@ -2236,7 +2236,7 @@ def _model_loss_to_config(lossf):
         }
 
     class_name = lossf.__class__.__name__
-    if class_name == "StructuredFieldLoss":
+    if class_name in ("StructuredFieldLoss", "MaskedRobustFieldLoss"):
         return {"class": class_name, "params": lossf.get_config()}
     if isinstance(lossf, nn.MSELoss):
         return {"class": "MSELoss", "params": {"reduction": lossf.reduction}}
@@ -2394,8 +2394,9 @@ def _model_build_loss_from_config(loss_config):
         MaskedFieldMSELoss,
     )
 
-    from resources.MLfield import StructuredFieldLoss
+    from resources.MLfield import StructuredFieldLoss, MaskedRobustFieldLoss
     builders = {
+        "MaskedRobustFieldLoss": MaskedRobustFieldLoss,
         "StructuredFieldLoss": StructuredFieldLoss,
         "CombinedCurveLoss": CombinedCurveLoss,
         "QuantileLoss": QuantileLoss,

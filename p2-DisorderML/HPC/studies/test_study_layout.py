@@ -50,8 +50,8 @@ class StudyLayoutTests(unittest.TestCase):
                 "import json\ndef main(args):\n    print(json.dumps(args))\n", encoding="utf-8")
             (scripts/"studies/Locality").mkdir(parents=True)
             (scripts/"studies/Locality/A0-Locality.py").write_text("# shared final generator\n")
-            for name in ("Input", "Loss", "Independence", "FieldVariations", "SpatialBalance", "CurveTerms"):
-                study = "Loss" if name in ("SpatialBalance", "CurveTerms") else name
+            for name in ("Input", "Loss", "Independence", "FieldVariations", "SpatialBalance", "CurveTerms", "RobustFieldLoss"):
+                study = "Loss" if name in ("SpatialBalance", "CurveTerms", "RobustFieldLoss") else name
                 directory = scripts/"studies"/study
                 directory.mkdir(parents=True, exist_ok=True)
                 source = directory/f"A0-{name}.py"
@@ -69,7 +69,7 @@ class StudyLayoutTests(unittest.TestCase):
                 staged = scratch/"studies"/study/source.name
                 self.assertTrue(staged.exists())
                 self.assertTrue((scratch/"resources/proof.txt").exists())
-                if name in ("FieldVariations", "SpatialBalance", "CurveTerms"):
+                if name in ("FieldVariations", "SpatialBalance", "CurveTerms", "RobustFieldLoss"):
                     self.assertTrue((scratch/"studies/Locality/A0-Locality.py").is_file())
                     continue
                 args = ["--independence-case", "1i"] if name == "Independence" else []

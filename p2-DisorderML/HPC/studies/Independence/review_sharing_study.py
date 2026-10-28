@@ -111,6 +111,8 @@ def refresh(root,out,data_root):
         figure(out,"curve-regions.png","Target peak/post-peak windows versus control and TRAIN mean; separate from spatial STATUS regions"),
         "[Global metrics](per-run-metrics.csv) · [Confirmed fracture entries/denominators](confirmed-fracture-regions.csv) · [Motion/curve metrics](local-and-curve-metrics.csv) · [Provenance](provenance.json) · [Original validation checks](validation.txt). No retraining or inference.\n"]
     (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(out/"README.md",runs)
     print("REPORT",out/"README.md",flush=True)
 
 

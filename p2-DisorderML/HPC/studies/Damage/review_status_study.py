@@ -217,7 +217,10 @@ def render_results(root,suite,data_root,out,fields,regions,damage,cost):
         "[Field metrics and provenance](field-metrics.csv) · [Actual fracture errors/counts](fracture-metrics.csv) · [Damage thresholds, AP, timing and reversals](damage-metrics.csv) · [All-eight training costs](all-training-costs.csv) · [Download verification](download-verification.json). No locked-test evaluation or ODB re-export.\n"]
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(out,"balance-jobs.tsv","STATUS balance and UT confirmation"))
-    (out/"README.md").write_text("".join(text),encoding="utf-8");(out/"example-selection.json").write_text(json.dumps(examples,indent=2))
+    (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(out/"README.md",fields[["variant","path"]].to_dict("records"))
+    (out/"example-selection.json").write_text(json.dumps(examples,indent=2))
     print(fields[["mode","variant","change_percent","skill_percent","hours"]].to_string(index=False))
     print(damage[damage.threshold_policy=="fixed_05"][["mode","variant","average_precision","precision","recall"]].to_string(index=False))
 

@@ -160,6 +160,12 @@ The fixed four-output normalized-MSE score is 0.751884. UT curves remain close
 to the mean predictor; the configuration is a baseline for improvement, not
 evidence that fracture prediction is solved. No locked-test performance is claimed.
 
+Original context-channel benefits have not been individually established by
+matched independent ablations. Physical motivation is not attribution evidence.
+Raw present=1 at every participating node is distinct from the required absence
+mask; degree, when enabled, is computed separately from UT/FT initial topology.
+See samples/input-feature-audit/README.md for the current evidence and proposal.
+
 No degree/crack-face addition, GNN/CNN/attention bias, dynamic or Gaussian/region
 weighting, derivative field loss, residual target, correction or damage head is
 enabled in this configuration. Available code and submitted studies are not

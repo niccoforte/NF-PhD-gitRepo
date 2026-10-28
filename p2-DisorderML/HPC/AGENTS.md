@@ -50,7 +50,7 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 
 ## Validation
 
-- Loss/README.md owns independent curve-term/regional-spatial gates, fixed MSE selection and explicit curve-only loaders.
+- Loss/README.md owns curve-term/regional/MAE-Smooth-L1 gates, fixed MSE selection and explicit loss/model reload.
 
 - Locality/FieldVariations and named confirmation/balance launchers isolate field changes; preserve IDs, physical selection and field-only exports. Their guides own cases/gates/budgets. FieldVariations reuses Locality's runner; B1 stages both. Read WINNER.md before choosing controls.
 

@@ -105,29 +105,45 @@ PCA/autoencoder remains conditional on a demonstrated compression need.
 Numerical fracture-metric acceptance tolerances remain unagreed; show fixed
 metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
 
-### Seminar follow-up,28 October — deferred, not new job authority
+### Latest input/seminar decisions
 
-- Compare field MAE/Huber versus MSE as isolated alternatives only after the
-  current loss/locality evidence; evaluate fracture jumps/signs and extremes.
-  L1 estimates conditional medians, not a guarantee of sharper fracture paths;
-  it also reduces the influence of large errors that can matter mechanically.
-- RNOs learn causal constitutive history with latent internal variables. Current
-  attention is spatial over800 nodes, while20 times are output channels.
-  A spatial encoder + recurrent/continuous-time decoder is a future comparator
-  if loading-path/time-resolution generalisation becomes a requirement, not an
-  immediate Transformer replacement. Fixed Ti/BC data cannot establish general
-  constitutive learning or arbitrary temporal resolution. Source:
-  https://arxiv.org/abs/2210.17443 (Liu et al.,2023,JMPS178:105329).
-- Do not infer macro stress from average strain alone: the current common
-  loading can make the average nearly identical while local fracture differs.
-  Retain displacement localisation/damage summaries for any later true-field
-  information-content diagnostic; no force reconstruction is authorised.
-- Do not impose Ku=F across plastic fracture dynamics from nodal translations
-  alone. Beam rotations, material/history/damage and inertial terms are missing.
-  An equilibrium/PINN study first needs a correct residual and identifiable state;
-  loss-of-fit to true FEA fields must be checked before model training.
-- Pretraining/fine-tuning is a conditional future option if training families or
-  experimental data expand, not a reason to revive cancelled joint sharing.
+- [ ] MAE/Smooth-L1 field-only screen authorised: fresh MSE/MAE/beta0.1/beta1,
+  UT/FT, seed42. Eight final fits, no CNN/STATUS/derivative/OOF/curve changes.
+  Same physical selection and train standardization; named Loss guide/receipts
+  own submission. Optional code is not an adopted accuracy improvement.
+- [ ] Original physical-context contribution remains untested individually.
+  Feature audit in samples/input-feature-audit/ separates raw presence from
+  mandatory operational masks, task-specific BCs and redundant tip coordinates.
+  Proposed9 changed fits+2 controls after field-architecture confirmation;
+  no feature-submission authority from this recommendation request.
+- [ ] Retain FT gated-GNN/relative-geometry confirmation as lower priority than
+  CNN2. Degree is task-specific and off. Do not combine unconfirmed candidates.
+- [ ] All predictive report generators place variation/collapse below global
+  TRAIN-mean plots; show spread separately from accuracy and keep classification
+  metrics for STATUS-only. AcademicWriting owns reusable report order.
+- Abandon the seminar's average-strain→macro-stress, beam-stress reconstruction
+  and Ku=F proposals per the author's explicit decision. Do not revive them as
+  pending PINN tasks. This does not cancel separately authorised damage work.
+- Defer RNO/operator architecture changes. If needed later, compare an unchanged
+  spatial encoder with direct20-frame, GRU, and continuous-time recurrent
+  decoders, each task independently and fixed full-history evaluation. Start
+  six seed42 fits; confirm improvements across seeds. No new exports, arbitrary
+  time-resolution or loading-path claims from the current20-frame dataset.
+  FNO/Geo-FNO and graph-kernel alternatives require explicit initial geometry,
+  FT occupancy/topology and local detail; no periodic physical BC assumption.
+  Primary reading: Liu et al.RNO https://arxiv.org/abs/2210.17443;
+  Li et al.Geo-FNO https://www.jmlr.org/papers/v24/23-0064.html;
+  graph kernels https://arxiv.org/abs/2003.03485 and multi-level kernels
+  https://arxiv.org/abs/2006.09535. PINO's PDE-residual machinery
+  https://arxiv.org/abs/2111.03794 does not resolve our missing valid fracture
+  residual; the abandoned Ku=F/stress reconstruction is not revived by PINO.
+
+- Pretraining means common lattice representation followed by specimen-sensitive
+  fine-tuning; it does not imply per-test-specimen training. Prefer a later verified-early-response→full-history curriculum versus
+  scratch at matched total updates. Masked independent random disorder may
+  teach mainly a mean, while fixed topology can be memorised. One periodic
+  specimen cannot teach the range of fracture behaviour.
+  Deferred, not submitted; preserve all held-out specimens.
 
 ### Authorised isolated field variations
 

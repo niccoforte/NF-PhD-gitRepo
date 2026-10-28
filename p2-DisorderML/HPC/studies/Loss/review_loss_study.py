@@ -402,6 +402,8 @@ def write_report(root, out, rows, extra, sources, banks, checks):
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(out,"spatial-balance-jobs.tsv","FT spatial coefficients"))
     (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(out/"README.md",[dict(variant=v,seed=s,path=run_path(root,v,s)) for v in VARIANTS for s in (42,43,44)])
     rows.to_csv(out/"metrics.csv",index=False);extra.to_csv(out/"safeguards.csv",index=False)
     sources.to_csv(out/"runs.csv",index=False);banks.to_csv(out/"field-banks.csv",index=False)
     (out/"verification.json").write_text(json.dumps(dict(checks=checks,evaluation="val",run_count=len(sources)),indent=2))

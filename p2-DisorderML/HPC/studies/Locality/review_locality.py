@@ -121,6 +121,8 @@ def main(argv=None):
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(a.out,"confirmation-jobs.tsv","CNN confirmation/depth"))
     (a.out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(a.out/"README.md",entries)
     print("REPORT",a.out/"README.md")
 
 

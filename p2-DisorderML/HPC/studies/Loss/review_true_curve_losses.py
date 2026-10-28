@@ -147,6 +147,8 @@ def deepen(root,out,table,data_root):
         "The next useful curve test, after field improvements, is MSE plus one modest term at a time with independent true-field controls, followed by Mixed/predicted-field evaluation. No curve-term learning job is submitted by this review.\n\n",
         "[Global/hard metrics](true-field-curve-losses.csv) · [Regional errors, counts and denominators](true-field-curve-regions.csv) · [Measured costs](true-field-curve-cost.csv). No inference, retraining, locked-test evaluation or upstream export.\n"]
     table.to_csv(out/"true-field-curve-losses.csv",index=False);(out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import insert_variation_section
+    insert_variation_section(out/"README.md",[dict(variant=label,seed=42,path=a.root/name,kinds=["curve"]) for name,label in zip(RUNS,LABELS)])
     print(regions[["label","mode","region","change_percent","skill_percent"]].to_string(index=False))
 
 

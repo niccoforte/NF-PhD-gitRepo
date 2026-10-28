@@ -1,5 +1,14 @@
 # p2 Implementation Status
 
+- Latest28 October continuation: five CNN confirmation jobs33731155–33731159
+  running; three earlier fits completed0:0; no new failure at check. Gates for
+  STATUS/curve terms/FT-box remain queued. Preparing the authorised eight-fit
+  field-only MSE/MAE/Smooth-L1 screen. Original context channels have no matched
+  individual attribution; proposal recorded, not submitted. The seminar's
+  average-strain/stress reconstruction and Ku=F ideas are abandoned. RNO and
+  common-lattice pretraining remain deferred; accepted winner unchanged.
+
+
 - 28 October continuation: existing CNN gate and spatial gate passed; CNN
   controlUT43/controlFT43/CNN2UT43 completed0:0; other existing fits queue for
   Priority/dependency, with no new failures at the live check. Submitted48
