@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 
 from resources.lattices import Geometry
-from validation_calculations import filter_force, fracture_metrics, fit_stiffness
+from validation_calculations import beam_conversion_modulus, filter_force, fracture_metrics, fit_stiffness
 
 
 class ValidationCalculationTests(unittest.TestCase):
@@ -73,6 +73,12 @@ class ValidationCalculationTests(unittest.TestCase):
         result = fracture_metrics(df, ff, 990, self.geom, 8000, 120)
         self.assertAlmostEqual(result["Apl_N_mm"], 0, places=8)
         np.testing.assert_allclose(ff, 120 * df, atol=1e-10)
+
+    def test_numerical_beam_modulus_has_no_second_plane_strain_correction(self):
+        c = np.array([[4., 1., 0.], [1., 4., 0.], [0., 0., 1.5]])
+        self.assertAlmostEqual(beam_conversion_modulus(c), 3.75)
+        with self.assertRaises(ValueError):
+            beam_conversion_modulus([[4, 2, 0], [1, 4, 0], [0, 0, 1.5]])
 
 
 if __name__ == "__main__":

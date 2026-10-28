@@ -1,4 +1,5 @@
 import math
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
@@ -255,10 +256,12 @@ class Geometry:
         elif self.LAT.lower() == "hex":
             A = 2/np.sqrt(3)
             
-        if t:
-            self.rD = A*(t/self.l)
-        elif rD:
-            self.t = (self.l*rD)/A
+        if t is not None:
+            self.t = t
+            self.rD = A*(np.asarray(t)/self.l)
+        elif rD is not None:
+            self.rD = rD
+            self.t = (self.l*np.asarray(rD))/A
 
     def stiffnessMatrix(self, stiffCalc=False):
         nnx = 10
@@ -484,7 +487,7 @@ def effProperties(LAT, geom, E_s=123e9, v_s=0.3, mode="stiff", C=None):
     return E, v, E_pe, v_pe
 
 
-def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti", sim=1):   
+def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path=None, sim=1):
     l = geom.l
     if mode.lower() == "unit":
         if LAT.lower() == "fcc":
@@ -526,9 +529,8 @@ def find_nodes(LAT, geom, dis, mode='lattice', stiff=False, path="Z:/p1/sims/Ti"
         Dnodes = nodes
 
     elif mode.lower() == "lattice":
-        pDir = path
-        if stiff:
-            pDir = "Z:/p1/sims/Ti/stiffMatrix"
+        pDir = os.fspath(path) if path is not None else (
+            "Z:/p1/sims/Ti/stiffMatrix" if stiff else "Z:/p1/sims/Ti")
         nodeFile = pDir + "/transfer/IN-nDuctile-" + LAT + "-" + str(geom.nnx) + "-per-1.csv"
         
         nodes_df = pd.read_csv(nodeFile, header=None, usecols=[1, 2])
@@ -578,10 +580,14 @@ def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
     radius = geom.l + geom.l*1e-3
     dummyElem = []
     count = 0
+    x_coord = nodes.shape[-1]-3 if stiff else nodes.shape[-1]-2
+    y_coord = nodes.shape[-1]-2 if stiff else nodes.shape[-1]-1
     for ii in range(len(nodes)):
-        x_coord = nodes.shape[-1]-3 if stiff else nodes.shape[-1]-2
-        y_coord = nodes.shape[-1]-2 if stiff else nodes.shape[-1]-1
-        if (LAT.lower() == "fcc" and nodes[ii][int(x_coord)])%2 == 1.0 and (nodes[ii][int(y_coord)])%2 == 1.0:
+        # FCC centres lie at half-cell coordinates; this test must not depend
+        # on whether the dimensional cell size happens to be an even integer.
+        if LAT.lower() == "fcc" and np.all(np.isclose(
+                np.mod(2*nodes[ii, [x_coord, y_coord]]/geom.l, 2),
+                1., rtol=0, atol=1e-8)):
             continue
         distance = np.sqrt(np.array(nodes[ii, int(x_coord)] - nodes[:, int(x_coord)])**2 + np.array(nodes[ii, int(y_coord)] - nodes[:, int(y_coord)])**2)
         inside = np.argwhere(distance <= radius)
@@ -627,16 +633,19 @@ def connectivity(LAT, nodes, geom, job=None, stiff=False, mode=None):
     
         delElems = []
         for ik in range(0,len(realElem)):
-            x1 = nodes[int(realElem[ik][1]-1)][1]
-            x2 = nodes[int(realElem[ik][2]-1)][1]
-            y1 = nodes[int(realElem[ik][1]-1)][2]
-            y2 = nodes[int(realElem[ik][2]-1)][2]
+            offset = 0 if stiff else 1
+            x1 = nodes[int(realElem[ik][1])-offset][x_coord]
+            x2 = nodes[int(realElem[ik][2])-offset][x_coord]
+            y1 = nodes[int(realElem[ik][1])-offset][y_coord]
+            y2 = nodes[int(realElem[ik][2])-offset][y_coord]
             midPointX = (x1+x2)/2
             midPointY = (y1+y2)/2
             point = (midPointX,midPointY)
             insideTest = insidePoint(xCrS,xCrE,point)
             if insideTest:
-                delElems.append(realElem[ik][0])
+                # Candidate element labels contain gaps after duplicate removal.
+                # np.delete consumes current row indices, not those labels.
+                delElems.append(ik)
 
         delElems = np.array(delElems, dtype=int)
         realElem = np.delete(realElem, delElems, 0)
@@ -656,7 +665,8 @@ def plot_lattice(elems, nodes, geom):
     fig, ax = plt.subplots(1,1)
     fig.set_figheight(10)
     fig.set_figwidth(10)
-    for elem, tt in zip(elems, geom.t):
+    thickness = np.broadcast_to(np.asarray(geom.t, dtype=float), (len(elems),))
+    for elem, tt in zip(elems, thickness):
         node1 = nodes[elem[1]]
         node2 = nodes[elem[2]]
         ax.plot([node1[0], node2[0]], [node1[1], node2[1]], linewidth=tt*2, c='black')
@@ -665,17 +675,17 @@ def plot_lattice(elems, nodes, geom):
 
 ### Stiffness Matrix Calculation Functions
 def edgeElems(nodes, elems, geom):
-    t_old = geom.t
-    t_new = np.array([t_old] * len(elems))
+    t_old = np.broadcast_to(np.asarray(geom.t, dtype=float), (len(elems),))
+    t_new = t_old.copy()
     min_x, max_x = min(nodes[:,0]), max(nodes[:,0])
     min_y, max_y = min(nodes[:,1]), max(nodes[:,1])
     for i, elem in enumerate(elems):
         node1 = nodes[elem[1]]
         node2 = nodes[elem[2]]
         if (node1[0] == max_x and node2[0] == max_x) or (node1[0] == min_x and node2[0] == min_x):
-            t_new[i] = t_old/2
+            t_new[i] = t_old[i]/2
         elif (node1[1] == max_y and node2[1] == max_y) or (node1[1] == min_y and node2[1] == min_y):
-            t_new[i] = t_old/2
+            t_new[i] = t_old[i]/2
     geom.t = t_new
     return geom
 
@@ -694,6 +704,9 @@ def get_ns(n0s):
     return np.array(ns)
     
 def n_values(n0):
+    n0 = np.asarray(n0, dtype=float)
+    if n0.ndim != 1 or n0.size < 2 or not np.isfinite(n0[:2]).all() or not np.any(n0[:2] != 0):
+        raise ValueError("A strut direction requires a finite nonzero in-plane vector.")
     with np.errstate(divide='ignore', invalid='ignore'):
         return np.array([np.cos(np.arctan([n0[1]/n0[0]]))[0], np.sin(np.arctan([n0[1]/n0[0]]))[0]])
 
@@ -782,11 +795,24 @@ def calc_Compliance(C):
     return np.linalg.inv(C)
 
 
-def check_isotropy(C):
-    if round(C[0][0]/C[0][1], 3) == 3.0 and round(C[0][0]/C[1][1], 3) == 1.0 and round(C[0][1]/C[2][2], 3) == 1.0:
-        return True
-    else:
+def check_isotropy(C, rtol=1e-3, atol=1e-8):
+    """Test 2D isotropic stiffness form with engineering shear strain.
+
+    This diagnostic allows arbitrary Lame parameters, checks normal/shear
+    coupling and symmetry, and does not select a geometry's material model.
+    Physical admissibility (e.g. positive stiffness) is a separate question.
+    Tolerances are applied after normalising by the largest matrix entry.
+    """
+    C = np.asarray(C, dtype=float)
+    if C.shape != (3, 3) or not np.isfinite(C).all():
         return False
+    scale = np.max(np.abs(C))
+    if scale == 0:
+        return True
+    lam, mu = C[0, 1], (C[0, 0] - C[0, 1])/2
+    isotropic = np.array([[lam+2*mu, lam, 0.],
+                          [lam, lam+2*mu, 0.], [0., 0., mu]])
+    return bool(np.allclose(C/scale, isotropic/scale, rtol=rtol, atol=atol))
 
 def calc_IsoEffProperties(C):
     iso = check_isotropy(C)
@@ -842,7 +868,7 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         fig1.set_figheight(5)
         fig1.set_figwidth(18)
 
-        ax1.set_ylabel('$(C^{dis}-C^{p})/C^{p}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax1.set_ylabel('$(C^{dis}-C^{p})/C^{p}$ (fraction)', fontsize=26, fontname="Times New Roman")
         ax1.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         # ax1.set_ylim([-0.1, 0.1])
         # ax1.set_xticks([i+1 for i in range(len(K11))])
@@ -870,7 +896,7 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         fig2.set_figheight(5)
         fig2.set_figwidth(22)
 
-        ax3.set_ylabel('$C_{22}/C_{11}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax3.set_ylabel('$C_{22}/C_{11}$ (ratio)', fontsize=26, fontname="Times New Roman")
         ax3.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         ax3.tick_params(axis='both', which='major', labelsize=20)
         ax3.tick_params(axis='both', which='minor', labelsize=20)
@@ -881,7 +907,7 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         # ax3.grid()
         ax3.legend(prop={'size':18})
 
-        ax4.set_ylabel('$C_{11}/C_{12}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax4.set_ylabel('$C_{11}/C_{12}$ (ratio)', fontsize=26, fontname="Times New Roman")
         ax4.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         ax4.tick_params(axis='both', which='major', labelsize=20)
         ax4.tick_params(axis='both', which='minor', labelsize=20)
@@ -892,7 +918,7 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         # ax4.grid()
         ax4.legend(prop={'size':18})
 
-        ax5.set_ylabel('$C_{12}/C_{33}$ [%]', fontsize=26, fontname="Times New Roman")
+        ax5.set_ylabel('$C_{12}/C_{33}$ (ratio)', fontsize=26, fontname="Times New Roman")
         ax5.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         ax5.tick_params(axis='both', which='major', labelsize=20)
         ax5.tick_params(axis='both', which='minor', labelsize=20)

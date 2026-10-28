@@ -44,6 +44,13 @@ re-export; existing producer output defaults are not current read dependencies.
 - Processed curve products and manifests are written beside the selected p1 data root.
 - Manifests must retain missing-input/output, frequency, NaN, failure-index, and final-inclusion evidence.
 - Any filename, column, index, or filtering change must be traced through `data_processing.py`, `MLdata.py`, the relevant p1 notebook, and every p2 loader using it.
+- The opt-in p1 `validation_*.py` route reads indexed native ODBs into
+  `Z:/p1/sims/Ti/Validation/audit`, preserving actual times/validity and originals.
+  `native_stored_energy.csv` is a separate optional diagnostic, with unavailable
+  channels left missing; it does not extend/rewrite processed OUT or MLdata.
+  Exact-source RVE moduli, modal cutoffs and initiation brackets do not propagate
+  into shared calcFT defaults or saved labels. FCC foundation repairs preserve
+  the canonical 10 mm UT/FT edges used by existing graph/loss consumers.
 
 ## Field boundary
 

@@ -25,8 +25,8 @@ def field_loss_weights(variant, spatial=0.1, temporal=0.1, gain=0.):
 def reference_field_edges(coords, mode="UT", present=None):
     """Reconstruct the current FCC body graph with the existing periodic algorithm.
 
-    Normalise reference coordinates to the producer's cell size 10 because its
-    parity rule is scale dependent. FT additionally applies the A1 crack cut.
+    Normalise reference coordinates to the established 10 mm producer grid to
+    preserve saved graph semantics. FT additionally applies the A1 crack cut.
     Other geometries should supply their validated edge list directly to the loss.
     """
     from resources.lattices import Geometry, connectivity, insidePoint

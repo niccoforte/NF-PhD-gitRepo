@@ -373,6 +373,8 @@ The maintained validation audit is in `p1-DisorderLatticeProperties/code/`:
 ```powershell
 # Read-only ODB extraction; no upgrade, padding or original export rewrite:
 & 'C:/SIMULIA/Commands/abaqus.bat' python p1-DisorderLatticeProperties/code/validation_history_audit.py --density-campaign --histories-only
+# Separate optional stored-energy diagnostic; original native files stay intact:
+& 'C:/SIMULIA/Commands/abaqus.bat' python p1-DisorderLatticeProperties/code/validation_history_audit.py --density-campaign --stored-energy-only
 # Existing detailed field/energy checks are documented in Validation/audit/history.
 # Prepare exact-input modal + elastic-compliance controls (does not submit):
 python p1-DisorderLatticeProperties/code/validation_modal.py prepare --stiffness
@@ -382,7 +384,20 @@ python p1-DisorderLatticeProperties/code/validation_modal.py run --cpus 2
 python p1-DisorderLatticeProperties/code/validation_modal.py plot
 python p1-DisorderLatticeProperties/code/validation_calculations.py
 # Optional --workbook PATH adds a read-only FTval saved-value reconciliation.
+# PDF extraction needs pypdf; --pdf-python may select the bundled PDF runtime.
+python p1-DisorderLatticeProperties/code/validation_benchmark.py --source-pdf 'C:/Users/exy053/OneDrive - Queen Mary, University of London/Documents/Research/00-Literature/01_Foundations_Fracture_And_Solid_Mechanics/Crack_Tip_Fields_And_R_Curves/Hsieh2020-Deshpande-FT&RcurveCellularMaterials.pdf'
+python p1-DisorderLatticeProperties/code/validation_comparison.py
+# Bending/work controls: prepare only, then review the manifest before run.
+python p1-DisorderLatticeProperties/code/validation_diagnostics.py prepare
+python p1-DisorderLatticeProperties/code/validation_queue.py check --manifest Z:/p1/sims/Ti/Validation/audit/diagnostics/serial-proposal.json
+# Explicit run action submits serial local jobs; completed jobs are not resubmitted.
+python p1-DisorderLatticeProperties/code/validation_queue.py run --manifest Z:/p1/sims/Ti/Validation/audit/diagnostics/serial-proposal.json
+& 'C:/SIMULIA/Commands/abaqus.bat' python p1-DisorderLatticeProperties/code/validation_diagnostics.py extract
+python p1-DisorderLatticeProperties/code/validation_diagnostics.py analyze
+python p1-DisorderLatticeProperties/code/validation_diagnostics.py plot
 python -m unittest discover -s p1-DisorderLatticeProperties/code -p test_validation_calculations.py
+python -m unittest discover -s p1-DisorderLatticeProperties/code -p test_validation_queue.py
+python -m unittest discover -s resources -p test_lattice_validation.py
 ```
 
 Forty-eight density-campaign tri/kagome/hex fracture histories were recovered;
@@ -394,12 +409,33 @@ Force-only and matched U/RF causal variants expose phase-pairing sensitivity.
 Fixed last-intact/deletion endpoints remain separate from method-specific peaks.
 Negative plastic area produces unavailable KJ, never clipped zero. Initial
 compliance and modulus choices are independent controls, not fits to Hsieh.
-Shared `resources` defaults and p2 datasets are unchanged. The effective-modulus
-and section-failure definition questions remain for the active lattice review.
+Four exact-source periodic B21 controls provide bending-aware conversion moduli
+only for those cases; their already modified-material 2D C gives 1/S11 directly,
+without a second plane-strain correction. An elastic NLGEOM hex80 control shows
+that geometric stiffening alone makes the initial-compliance area subtraction
+negative. Stored energy remains a diagnostic, not an automatic ASTM Jpl formula.
+Shared calculation/export defaults and p2 datasets are unchanged. Verified
+foundation fixes from `Review lattices.py` preserve canonical 10 mm graphs and
+default tri/kagome/hex/FCC unit stiffness; full/disordered RVE geometry and the
+separate square/45square orthotropic study remain outside this validation route.
 The canonical workbook has one additive `Validation audit` sheet; all original
-sheet/chart/drawing parts and original cell values/formulas are preserved.
+cell values/formulas and chart/drawing payloads are preserved.
 Its backup and integration receipt are in `Validation/audit`. `ValConvPlots`
 links these native controls and omits missing/negative-area saved KJ points.
+Fig.10 digitisation, graphical bounds and source overlays are canonical CSV/PNG
+under `Validation/audit/benchmark`; `validation_comparison.py` rebuilds the
+dimensional comparison inside ValConvPlots. Fig.10 provides 3 mm observations;
+10 mm values scaled by sqrt(10/3) are explicitly an inference. Original Fig.8
+digitisation remains intact. Solver queues checksum-deliver retained results
+before removing only marker-owned scratch, and stop on an unsuccessful job.
+A validation-wide worker lock also prevents different queues from overlapping.
+An unsettled durable `audit/serial-owner.json` blocks subsequent submissions
+after worker death until its solver processes/state have been explicitly reviewed.
+The 18 Fig.10 points are mirrored in Deshpande!A50:L73 of the existing workbook;
+only that new cell block was added. `validation_workbook_fig10.mjs` uses bundled
+Artifact Tool authoring, a current-byte backup and a lossless single-worksheet
+package transplant. It refuses occupied target rows, so routine plot refreshes
+use the CSV/Python workflow rather than reapplying the workbook integration.
 Read [the validation report](p2-DisorderML/samples/p1-validation/README.md)
 for measured effects, source inconsistencies and limits.
 

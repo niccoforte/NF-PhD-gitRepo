@@ -21,7 +21,6 @@ DEFAULT_CASES = (
     "10/0.2/Fracture-tri-70-per-1.odb",
     "10/0.2/Fracture-kagome-40-per-1.odb",
     "3/0.16/Fracture-hex-80-per-1.odb",
-    "10/0.2/Fracture-kagome-40-per-1.odb",
 )
 
 
@@ -242,6 +241,54 @@ def refresh_global_event_locations(out):
         json_dump(summary_path, rec)
 
 
+def export_stored_energy(path, out):
+    """Add native stored/dissipated energy without rewriting earlier exports.
+
+    Unknown/unrequested variables remain unavailable, never zero-filled.
+    Work minus ALLSE is only an energy diagnostic: it may include plasticity,
+    damage, kinetic and viscous effects, and is not an ASTM plastic-J formula.
+    """
+    from odbAccess import openOdb
+
+    variables = ("ALLSE", "ALLIE", "ALLKE", "ALLPD", "ALLVD", "ALLAE", "ALLDMD")
+    before = fingerprint(path)
+    case_out = out / path.parent.parent.name / path.parent.name / path.stem
+    case_out.mkdir(parents=True, exist_ok=True)
+    odb = openOdb(path=str(path), readOnly=True)
+    try:
+        regions = [(name, region) for name, region in odb.steps["Step-1"].historyRegions.items()
+                   if any(key in region.historyOutputs for key in variables)]
+        if len(regions) != 1:
+            raise ValueError("Expected one explicitly recorded energy region, found " + str(len(regions)))
+        name, region = regions[0]
+        histories = {key: list(region.historyOutputs[key].data) for key in variables
+                     if key in region.historyOutputs}
+        if any(len({t for t, value in data}) != len(data) for data in histories.values()):
+            raise ValueError("Repeated native timestamps need an explicit merge rule")
+        times = sorted(set(t for data in histories.values() for t, value in data))
+        lookup = {key: dict(data) for key, data in histories.items()}
+        rows = [[time] + [lookup.get(key, {}).get(time, float("nan")) for key in variables]
+                for time in times]
+        destination = case_out / "native_stored_energy.csv"
+        write_csv(destination, ["time_s"] + [key + "_Nmm" for key in variables], rows)
+        rec = {"source": str(path), "before": before, "read_only": True,
+               "scope": "energy histories only; no field reads or earlier CSV rewrites",
+               "region": name, "time_samples": len(times),
+               "all_recorded_time_grids_equal": all([t for t, value in data] == times for data in histories.values()),
+               "variables": {key: {"available": key in histories,
+                                    "meaning_if_unavailable": "not recorded; unknown, not zero",
+                                    "samples": len(histories.get(key, [])),
+                                    "values": numeric_summary([value for t, value in histories.get(key, [])])}
+                             for key in variables},
+               "csv": str(destination), "csv_sha256": fingerprint(destination)["sha256"],
+               "interpretation": "W minus ALLSE is an energy diagnostic only, not automatic ASTM plastic work or Jpl"}
+    finally:
+        odb.close()
+    after = fingerprint(path)
+    rec.update(after=after, source_unchanged=before == after)
+    return rec
+
+
 def audit_case(path, out, histories_only=False):
     from odbAccess import openOdb
 
@@ -382,6 +429,7 @@ def main():
     parser.add_argument("--skip-existing", action="store_true", help="do not repeat cases with a completed summary")
     parser.add_argument("--summarize-only", action="store_true", help="derive saved event/windows and figure in standard Python; no ODB access")
     parser.add_argument("--refresh-event-locations", action="store_true", help="read global STATUS labels for saved detailed cases, without repeating other fields")
+    parser.add_argument("--stored-energy-only", action="store_true", help="add separate native ALLSE/IE/KE and available dissipation histories; no fields or earlier CSV rewrites")
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     if args.summarize_only:
@@ -396,6 +444,16 @@ def main():
             cases = [r["odb"] for r in csv.DictReader(handle)
                      if r["campaign"] == "Density campaign" and r["mode"] == "Fracture"
                      and r["topology"] in ("tri", "kagome", "hex") and r["storage_status"] == "retained_odb"]
+    if args.stored_energy_only:
+        cases = [case for case in DEFAULT_CASES if case in cases] + [case for case in cases if case not in DEFAULT_CASES]
+        records = []
+        for relative in cases:
+            print("Exporting stored energy " + relative, flush=True)
+            records.append(export_stored_energy(args.root / relative, args.out))
+            json_dump(args.out / "stored-energy-summary.json", records)
+        print("Stored energies exported: " + str(len(records)) + "; source ODBs unchanged: "
+              + str(all(rec["source_unchanged"] for rec in records)), flush=True)
+        return
     errors = []
     for relative in cases:
         path = args.root / relative

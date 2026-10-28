@@ -39,10 +39,14 @@ In practical terms:
   convergence criteria remain fixed; PSC is deferred from the validation review.
 - Native validation analysis is an opt-in route in `code/validation_*.py`, with
   original ODBs/exports preserved and results under `Validation/audit`. The
-  README documents commands, four exact modal/compliance controls, 48 native
-  history checks and remaining modulus/event-definition limits. Do not apply
+  README documents commands, four exact modal/compliance and periodic B21
+  controls, 48 native histories, Fig.10 digitisation and remaining work/event
+  limits. The serial manifest queue retains checked solver results before
+  cleaning its own scratch. Do not apply
   those changes to shared p1/p2 defaults or promote worksheet sensitivity values
-  without resolving the active lattice review. The former HPC validation folder
+  without resolving the documented work/initiation limits. Verified foundation
+  repairs preserve canonical default graphs/stiffness. Square/45square belongs
+  to the later orthotropic check. The former HPC validation folder
   was deleted by the researcher; do not recreate its relocation notice.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
 - For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.

@@ -17,6 +17,16 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   `validation_calculations.py` compares native/old-CSV moving averages, causal
   Butterworth and labelled sensitivities under `Validation/audit`; `--workbook`
   reconciles FTval read-only. The README owns commands and coverage.
+- `validation_benchmark.py` digitises Hsieh Fig.10 with graphical bounds and an
+  overlay; `validation_comparison.py` joins those points to exact saved/native
+  identities. Only 3 mm is published in Fig.10; 10 mm scaling is an inference.
+  `validation_diagnostics.py` prepares/extracts exact-source B21 periodic and
+  nonlinear-work controls; `validation_queue.py` alone submits reviewed manifests
+  serially, verifies retained result hashes, then removes marker-owned scratch.
+  `validation_workbook_fig10.mjs` authors the additive Deshpande mirror with
+  Artifact Tool, backs up current bytes and verifies every existing package part
+  and cell before replacement. It refuses occupied target rows; do not rerun it
+  to overwrite an existing mirror. Canonical reference data remain the CSV.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 
@@ -51,6 +61,11 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   Unit-load C0 is initial elastic compliance, not post-yield unloading compliance.
   Force-only and matched U/RF causal filters remain labelled controls; matching
   their phases does not resolve the demonstrated hex80 negative work.
+  Geometric elastic stiffening also makes that initial-compliance subtraction
+  negative without plasticity. ALLSE comparisons remain diagnostic; do not
+  substitute W-ALLSE for ASTM Jpl. Exact-source B21 C gives conversion 1/S11
+  directly, without an additional plane-strain correction. Verified moduli and
+  cutoffs apply only to their indexed source case, never neighbouring specimens.
   Shared calculation/export defaults and p2 products remain outside this route.
   `ValConvPlots` preserves source values but excludes incomplete saved FT rows and
   KJ<KI (negative-area) points. PSC criteria/sizes stay fixed and deferred.

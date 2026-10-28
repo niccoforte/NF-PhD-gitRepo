@@ -68,10 +68,12 @@ def fit_stiffness(displacement, force, end):
 
 
 def fracture_metrics(displacement, force, index, geom, modulus, stiffness):
-    """ASTM C(T) stationary-crack work decomposition at an explicit sample.
+    """C(T) initial-linear-compliance work control at an explicit sample.
 
     index is never inferred from an arbitrary global force maximum. A negative
     Apl remains diagnostic and yields an unavailable KJ, rather than KJ<KI.
+    Geometric stiffening can invalidate the triangle even in an elastic model;
+    positive area alone does not certify this as the recoverable-work partition.
     """
     d, f = np.asarray(displacement, float), np.asarray(force, float)
     if not np.all(np.isfinite(d[:index + 1])) or not np.all(np.isfinite(f[:index + 1])):
@@ -121,7 +123,22 @@ def native_path(root, case):
     return root / "audit/history" / odb.parent / odb.stem
 
 
-def case_comparison(root, case, modal, output):
+def beam_conversion_modulus(matrix):
+    """Return 1/S11 from the numerical 2D beam constitutive tensor, once only."""
+    c = np.asarray(matrix, dtype=float)
+    if c.shape != (3, 3) or not np.all(np.isfinite(c)):
+        raise ValueError("Expected a finite 2D engineering-shear stiffness tensor")
+    scale = float(np.max(np.abs(c)))
+    if not np.allclose(c, c.T, rtol=1e-5, atol=1e-8 * scale) or np.min(np.linalg.eigvalsh(c)) <= 0:
+        raise ValueError("RVE tensor is not symmetric positive definite")
+    # This route is limited to the present approximately isotropic topologies.
+    if max(abs(c[0, 0] - c[1, 1]), abs(c[0, 2]), abs(c[1, 2]),
+           abs(c[2, 2] - .5 * (c[0, 0] - c[0, 1]))) > .001 * scale:
+        raise ValueError("An anisotropic conversion needs its own fracture calibration")
+    return float(1 / np.linalg.inv(c)[0, 0])
+
+
+def case_comparison(root, case, modal, output, rves=None):
     directory = native_path(root, case)
     rows = read_table(directory / "native_curve.csv")
     t = np.array([float(row["time_s"]) for row in rows])
@@ -154,6 +171,13 @@ def case_comparison(root, case, modal, output):
     bending = effProperties(case["topology"], geom, E_s=123000, mode="scaling")[2]
     moduli = {"current_affine": affine, "literature_scaling": bending,
               "legacy_parent_override": 123000.}
+    rve = next((record for record in (rves or []) if record["case_id"] == case["case_id"]), None)
+    if rve:
+        if (rve.get("state") != "completed_and_extracted" or not rve.get("read_only")
+                or not rve.get("source_input_hash_verified")
+                or rve["source_sha256"] != case["inp_sha256"]):
+            raise ValueError("Unverified or mismatched beam RVE: " + case["case_id"])
+        moduli["beam_rve"] = beam_conversion_modulus(rve["C_MPa"])
     variants = {"raw": f, "moving_average_twice": full_moving_average,
                 "moving_average_twice_prefix_sensitivity": np.array(smooth(smooth(f)))}
     displacement_variants = {}
@@ -230,6 +254,22 @@ def case_comparison(root, case, modal, output):
                                                        control["static_stiffness_N_mm"])})
     safe = "{}_{}_rho{}_nx{}".format(case["topology"], case["l_mm"],
                                     case["nominal_relative_density"], case["nnx"])
+    stored_path = directory / "native_stored_energy.csv"
+    if stored_path.exists():
+        stored = read_table(stored_path)
+        stored_time = np.array([float(row["time_s"]) for row in stored])
+        for answer in answers:
+            index = int(np.argmin(np.abs(stored_time - answer["endpoint_time_s"])))
+            if abs(stored_time[index] - answer["endpoint_time_s"]) > 1e-7:
+                raise ValueError("Stored energy does not share the native event time")
+            for key in ("ALLSE_Nmm", "ALLIE_Nmm", "ALLKE_Nmm", "ALLPD_Nmm", "ALLVD_Nmm", "ALLAE_Nmm", "ALLDMD_Nmm"):
+                value = float(stored[index][key])
+                answer[key] = value if np.isfinite(value) else None
+            se, ie, ke = (answer[key] for key in ("ALLSE_Nmm", "ALLIE_Nmm", "ALLKE_Nmm"))
+            answer["loading_work_minus_stored_elastic_Nmm"] = answer["work_N_mm"] - se if se is not None else None
+            answer["internal_minus_stored_elastic_Nmm"] = ie - se if ie is not None and se is not None else None
+            answer["loading_work_minus_IE_KE_Nmm"] = answer["work_N_mm"] - ie - ke if ie is not None and ke is not None else None
+            answer["stored_energy_is_diagnostic_not_ASTM_Jpl"] = True
     continuous = [{"time_s": float(t[i]), "displacement_mm": float(d[i]),
                    "legacy_displacement_mm": float(legacy_d[i]) if i < len(legacy_d) else None,
                    **{name + "_displacement_mm": float(values[i])
@@ -253,8 +293,11 @@ def case_comparison(root, case, modal, output):
                      "legacy_displacement_matches_native_prefix": bool(
                          len(legacy_d) == len(d) and np.allclose(legacy_d, d, rtol=1e-7, atol=1e-5)),
                      "legacy_force_uses_original_displacement": True,
+                     "beam_rve_job": rve["job"] if rve else None,
+                     "beam_rve_odb_sha256": rve["source_odb_sha256"] if rve else None,
+                     "stored_energy_csv_sha256": hashlib.sha256(stored_path.read_bytes()).hexdigest() if stored_path.exists() else None,
                      "moduli_are_sensitivity_controls": True,
-                     "limits": "Monitored deletion is not first section damage; modulus selection awaits lattice review. Offline filtering cannot remove pre-existing aliasing."}
+                     "limits": "Monitored deletion is not first section damage. Exact-source B21 moduli remain patch/formulation controls; other moduli are sensitivities. Initial-compliance triangles can fail under geometric stiffening. Offline filtering cannot remove pre-existing aliasing."}
 
 
 def plot_comparison(path, title, displacement, legacy_displacement, variants, deletion, stiffness_rows,
@@ -344,6 +387,8 @@ def run(root, output, workbook=None):
     output.mkdir(parents=True, exist_ok=True)
     modes = root / "audit/modal/summary.json"
     modal = json.loads(modes.read_text(encoding="utf-8")) if modes.exists() else []
+    rve_path = root / "audit/diagnostics/abaqus-rve-results.json"
+    rves = json.loads(rve_path.read_text(encoding="utf-8")) if rve_path.exists() else []
     static = root / "audit/modal/static-summary.json"
     if static.exists():
         modal += json.loads(static.read_text(encoding="utf-8"))
@@ -353,7 +398,7 @@ def run(root, output, workbook=None):
              and (native_path(root, case) / "native_curve.csv").exists()]
     results, provenance = [], []
     for case in cases:
-        values, record = case_comparison(root, case, modal, output)
+        values, record = case_comparison(root, case, modal, output, rves)
         results.extend(values)
         provenance.append(record)
     write_table(output / "comparison.csv", results)

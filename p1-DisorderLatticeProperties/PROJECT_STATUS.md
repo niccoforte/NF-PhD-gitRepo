@@ -35,19 +35,36 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   zero actual unknown/nonbinary STATUS. Fifteen histories are short; one has a
   genuinely NaN post-deletion tail. All source ODB hashes/size/mtime are unchanged.
   Eight exact-input modal and four 1 N elastic-compliance controls completed
-  locally. Causal Butterworth changes fixed-endpoint/static-compliance KJ by
-  about -0.6% to -1.5% in three cases; the 3 mm/.16 hex case still has negative
-  apparent plastic work under causal filtering. It must remain unresolved.
+  locally, followed by four periodic B21 RVEs and an exact-mesh elastic NLGEOM
+  hex80 control, all serial. The RVEs directly identify conversion 1/S11 without
+  double plane-strain correction for those four sources. Causal Butterworth
+  changes three fixed-endpoint KJ controls modestly; hex80 remains sensitive.
+  The noiseless elastic control itself gives apparent Apl=-13811 Nmm: geometric
+  stiffening invalidates the constant-initial-compliance energy subtraction.
+  All 48 native ODBs provide ALLSE/IE/KE; PD/VD/AE/DMD were not recorded. Stored
+  energy differences remain diagnostics, not replacement ASTM Jpl. One serial
+  elastoplastic unloading control and a lower-displacement follow-up completed
+  on28October. The8.10mm control passes both strain limits and gives positive
+  cycle work1989Nmm where the initial triangle gives negative2942Nmm. No job is
+  running/queued; authoritative receipts are in the two unloading queue folders.
   Four detailed cases stay below 5% KE/IE over the final half of pre-deletion
   loading; hex startup and deletion energy are separately documented.
   The canonical workbook now has an additive Validation audit sheet and a
   verified original backup/receipt; all original cells/charts remain unchanged.
+  Fig.10's18points are also mirrored in Deshpande!A50:L73; only this worksheet
+  part changed, with a separate current-byte backup/receipt and visual QA.
   ValConvPlots links audit controls and omits missing/negative-area saved points.
-  Shared exporters/calculations, physical models and p2 datasets were not changed.
-  Effective-modulus selection, hexagonal section-versus-element initiation,
-  compliance/filter-edge sensitivity and Hsieh source normalisations remain open.
-  Table 1 and dimensional Fig. 10 favour an 8a/932 MPa interpretation over 8b,
-  as a labelled inference; original digitisation was preserved. PSC is deferred and
+  Shared exporters/calculations, original physical models and p2 datasets remain
+  unchanged. All findings from Review lattices.py were reconciled; verified
+  foundational bugs were repaired with canonical tri/kagome/hex/FCC stiffness
+  and FCC saved-graph regression checks. Full/disordered RVE geometry is still
+  unresolved; square/45square belongs to later orthotropic validation.
+  Hexagonal section-versus-element initiation and recoverable work remain open.
+  Fig.10 now has 18 digitised initial/final points, graphical bounds and checked
+  overlays. Dimensional comparison is integrated into ValConvPlots: 3 mm direct,
+  10 mm explicitly scaled by sqrt(10/3). The source density-axis factor-ten
+  ambiguity and Fig.8a/8b mismatch remain visible; original digitisation is intact.
+  PSC is deferred and
   supervisor-agreed specimen sizes/convergence criteria remain fixed.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
@@ -68,10 +85,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 - Ti validation inputs/results: `Z:/p1/sims/Ti/Validation/README.md` and
   `case-index.csv`; use `file-manifest.json` for historical-path resolution.
 - Validation audit: `code/validation_history_audit.py`, `validation_modal.py`,
-  `validation_calculations.py`; native/solver/control evidence under the external
+  `validation_calculations.py`, `validation_benchmark.py`, `validation_comparison.py`,
+  `validation_diagnostics.py` and serial `validation_queue.py`; evidence under the external
   collection's `audit/`; readable report in `p2-DisorderML/samples/p1-validation/`.
   The canonical OneDrive workbook's Validation audit sheet is a sensitivity view,
-  not replacement paper values. Resolve the active lattice review before promotion.
+  not replacement paper values. Resolve work/initiation limits before promotion.
 
 ## Last Verified State
 
