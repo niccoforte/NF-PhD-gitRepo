@@ -164,3 +164,18 @@ The `corpus_summary` docstring specifies optional `--execution-json` / `corpus_e
 `corpus_complete=true` alone is ignored. Completion requires18,002 explicit unique terminal attempts, existing UT8,882/FT8,928/MULTI8,811 membership with periodic0, no unavailable required members, receipts for every successful product (including existing exclusions), and four verified banks. Bank IDs/order must equal allFIELD, local/HPC NPZ+JSON hashes must match, original/local layout member hashes must agree, and ordered source hashes must join receipts. Use `read_field_layout` hashes (normalized IDs plus shape/dtype/bytes), not ZIP-member hashes. Partial evidence stays incomplete. Corpus totals use batch validation; native ODB comparison remains limited to eight preflight products. `corpus-coverage.png` plots task-specific fracture percentages; JSON/CSV retain evidence and exceptions. Verify the rendered corpus figure alongside the selected eight-panel plots.
 
 - `review_damage.py` validates explicit supported FCC UT/FT `strut_damage_v1` NPZs and builds a conclusions-first visual report without ODB access or training. Plot binary fracture from `strut_failed`/`strut_failure_known`: purple0 for known all-active, red1 for any verified failed member, black dashed for unknown. Do not colour active surface damage grey or use optional scalar severity as the fracture target. Raw SDEG is separate diagnostic context; track whether observed active surface damage later fractures within the saved window, never extrapolate beyond it. Use --ut/--ft for the periodic pair or repeated --case LABEL TASK NPZ for a labelled suite. Keep cases/IDs explicit, retain actual geometry and select FT zooms near the saved nominal tip. Report duplicate inputs/responses without treating filenames as independent designs. Audit-canonical endpoints are not saved ML node order; keep these products separate from displacement loaders.
+
+## Authorised auxiliary-balance and UT confirmation
+
+`B4_Damage-balance.sh SUITE [--submit]` schedules six final fits: FT auxiliary
+coefficients .001/.01 at seed 42, and UT control/auxiliary1 at seeds 43/44.
+FT reuses its completed same-trainer seed-42 control; UT confirms its small
+global/stronger local effect with fresh same-seed controls. `--damage-coefficient`
+explicitly overrides only auxiliary presets and is retained in model.json and
+run configuration; default screen coefficients/checkpoints are unchanged.
+The six-case balance GPU gate checks full-bank alignment before tiny cases.
+Each production fit retains MSE+lambda balanced BCE, full masks, physical field
+selection and 450 epochs/240h/1GPU/12CPU/90000MB. No curve, SDEG, predicted-damage
+feedback or STATUS-only replacement is introduced. STATUS-only in the original
+screen intentionally has BCE only and no trained field; every auxiliary fit
+keeps displacement MSE with coefficient one.

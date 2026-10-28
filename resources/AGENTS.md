@@ -46,6 +46,11 @@ below expose imported functions/classes. Do not add job entry points here.
 - If changing a lattice definition, update node counts, connectivity assumptions, fracture crack positions, stiffness calculations, and field body-node masks together.
 - `calcUT` and `calcFT` encode current scientific definitions for ductility, strength, stiffness, work of fracture, fracture force/displacement, and toughness metrics. Do not adjust thresholds, smoothing, or fitted regions without documenting why.
 - `calc_FaW_aniso`, `calcC_mohr`, `calcC_sims`, and anisotropy helpers are used by validation/stiffness workflows. Keep units and plane-strain assumptions explicit.
+- FCC half-cell connectivity is dimensionless; canonical 10 mm graph semantics
+  remain the saved-model reference. Boundary thickness weights require floats.
+  `check_isotropy` tests general 2D engineering-shear form and does not select
+  `geom.iso`. Full/disordered stiffness geometry remains a separate unresolved
+  mutator/exporter contract; do not assume refreshing counts alone repairs it.
 
 ## Data-Processing Rules
 
@@ -62,6 +67,7 @@ below expose imported functions/classes. Do not add job entry points here.
   schemas. `DualTaskTransformer(return_node_features=True)` exposes the same
   node latents in one encoder call; default outputs/state names are unchanged.
   Unknown labels stay masked; true future damage never enters inference.
+  Explicit auxiliary coefficients are positive, saved, and keep field MSE active.
 - `DATA(path=0, ...)` is the legacy Akash-data path; `DATA(path=1, ...)` resolves local `Z:/p1/data/Ti/...`; `DATA(path="HPC", ...)` resolves the cluster p2 data root; explicit paths are accepted.
 - `DATA` appends or expects `MLdata` depending on context. Post-processing helpers normalize paths that already point to an `MLdata` folder.
 - Curve models may use flattened or node-shaped inputs. Field models must preserve node structure and use node-compatible models such as GNN/GCN/GAT/Transformer.

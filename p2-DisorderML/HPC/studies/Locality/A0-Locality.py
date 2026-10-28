@@ -9,7 +9,7 @@ import random
 import time
 
 
-VARIANTS = ("control", "degree", "graph", "gated_graph", "adjacency", "geometry", "cnn1", "cnn2")
+VARIANTS = ("control", "degree", "graph", "gated_graph", "adjacency", "geometry", "cnn1", "cnn2", "cnn3")
 
 
 def parse_args(argv=None):
@@ -26,6 +26,8 @@ def parse_args(argv=None):
     parser.add_argument("--batch", type=int, help="Explicit override; default is the saved control batch")
     parser.add_argument("--allow-cpu", action="store_true")
     parser.add_argument("--preflight", action="store_true", help="Full-data identity check, then all sixteen tiny train/reload cases")
+    parser.add_argument("--preflight-variants", nargs="+", choices=VARIANTS, default=VARIANTS,
+                        help="Explicit cases for a disposable execution gate")
     args = parser.parse_args(argv)
     if args.epochs < 1 or (args.batch is not None and args.batch < 1):
         parser.error("Epochs and batch must be positive")
@@ -203,7 +205,7 @@ def main(argv=None):
     full = argparse.Namespace(**vars(args)); full.nsims = None
     data = load_data(full); check_reference(data, descriptor, True); del data
     gc.collect()
-    for variant in VARIANTS:
+    for variant in args.preflight_variants:
         for mode in ("UT", "FT"):
             case = argparse.Namespace(**vars(args))
             case.variant, case.mode, case.epochs, case.nsims = variant, mode, 1, 64
@@ -211,7 +213,7 @@ def main(argv=None):
             run(case); gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
-    print("LOCALITY_PREFLIGHT_OK: full-data identities and16 train/diagnostic/reload cases", flush=True)
+    print(f"LOCALITY_PREFLIGHT_OK: full-data identities and {2*len(args.preflight_variants)} train/diagnostic/reload cases", flush=True)
 
 
 if __name__ == "__main__":

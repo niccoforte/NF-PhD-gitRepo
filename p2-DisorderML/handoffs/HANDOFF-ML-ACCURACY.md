@@ -10,6 +10,15 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Current priority order (28 October; supersedes older next-step wording)
 
+- [ ] Execute newly authorised CNN2 seeds43/44 controls (eight fits), CNN3 seed42
+  depth screen (two), FT spatial0/.001/.003/.01/.1 (five), FT STATUS .001/.01
+  (two) and UT control/STATUS1 seeds43/44 (four). Named study launchers now
+  prepare these isolated fits; check actual gates/job receipts before repeating.
+- [ ] Defer temporal-loss revisions until spatial balance is reviewed. Consider
+  FT-box-only spatial supervision separately, retaining whole-field MSE.
+- [ ] Curve-term attribution is outstanding: historical bundled presets do not
+  isolate derivatives/area/zones/peak terms. Keep MSE pending one-term ablations.
+
 - [x] Download/verify/review all 8 STATUS and 13 FieldVariations fits: all complete
   and reload-checked, 348 files/6.56GB matched SHA256. STATUS report is updated
   in place; FieldVariations has its own report. Main Loss report now owns global

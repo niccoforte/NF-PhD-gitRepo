@@ -14,7 +14,7 @@ from resources.MLdual import DUAL_DATA, DUAL_MODEL, DualLoss, DualStageTransform
 from resources.MLlocality import configure_field_locality, MaskedGridRefinement, InitialEdgeBias
 
 
-VARIANTS = ("control", "degree", "graph", "gated_graph", "adjacency", "geometry", "cnn1", "cnn2")
+VARIANTS = ("control", "degree", "graph", "gated_graph", "adjacency", "geometry", "cnn1", "cnn2", "cnn3")
 
 
 def fixture():

@@ -50,11 +50,12 @@ class StudyLayoutTests(unittest.TestCase):
                 "import json\ndef main(args):\n    print(json.dumps(args))\n", encoding="utf-8")
             (scripts/"studies/Locality").mkdir(parents=True)
             (scripts/"studies/Locality/A0-Locality.py").write_text("# shared final generator\n")
-            for name in ("Input", "Loss", "Independence", "FieldVariations"):
-                directory = scripts/"studies"/name
-                directory.mkdir(parents=True)
+            for name in ("Input", "Loss", "Independence", "FieldVariations", "SpatialBalance"):
+                study = "Loss" if name == "SpatialBalance" else name
+                directory = scripts/"studies"/study
+                directory.mkdir(parents=True, exist_ok=True)
                 source = directory/f"A0-{name}.py"
-                shutil.copyfile(STUDIES/name/source.name, source)
+                shutil.copyfile(STUDIES/study/source.name, source)
                 scratch = root/f"scratch-{name}"
                 scratch.mkdir()
                 variables = {
@@ -65,10 +66,10 @@ class StudyLayoutTests(unittest.TestCase):
                 # Mirror rsync's file/directory copy semantics without HPC or an rsync installation.
                 mock = 'rsync() { shift; local src=$1 dst=$2; if [[ -d "$src" ]]; then mkdir -p "$dst"; cp -R "$src". "$dst"; else cp "$src" "$dst"; fi; }\n'
                 subprocess.run([bash, "-c", "set -eu\n"+setup+"\n"+mock+block], check=True, capture_output=True, text=True)
-                staged = scratch/"studies"/name/source.name
+                staged = scratch/"studies"/study/source.name
                 self.assertTrue(staged.exists())
                 self.assertTrue((scratch/"resources/proof.txt").exists())
-                if name=="FieldVariations":
+                if name in ("FieldVariations", "SpatialBalance"):
                     self.assertTrue((scratch/"studies/Locality/A0-Locality.py").is_file())
                     continue
                 args = ["--independence-case", "1i"] if name == "Independence" else []

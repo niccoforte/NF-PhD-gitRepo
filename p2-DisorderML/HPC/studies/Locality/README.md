@@ -89,3 +89,13 @@ reconstructs the mean from train IDs only and verifies its global baseline.
 Show train and validation losses together on log axes; selected best epochs,
 not overfit tails, supply saved predictions. `run(...,configure=...)` also serves
 the named FieldVariations entry point; the default Locality CLI is unchanged.
+
+## Authorised confirmation and depth screen
+
+`B4_Locality-confirmation.sh SUITE [--submit]` previews ten final fits: control
+and CNN2 for UT/FT at seeds 43/44 (eight), plus CNN3 for UT/FT at seed 42 (two).
+Reuse completed seed-42 control/CNN2 results; CNN3 is an isolated depth screen,
+not an adopted improvement. Same reference, splits, MSE, 450-epoch ceiling and
+patience; no OOF/curves/loss/feature changes. The six-case disposable gate uses
+`--preflight-variants control cnn2 cnn3`, followed by 240h/1GPU/12CPU/90000MB fits.
+Only successful home gate logs survive; production exports retain reload checks.

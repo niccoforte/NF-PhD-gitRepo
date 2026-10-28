@@ -190,3 +190,13 @@ For dual single runs use `B1_ML-new.sh DualOutputs/A0-HPC-Dual-test.py`. Default
 - Keep HPO spaces explicit and conservative; field batches are intentionally small.
 - Cross-model transfer defaults to the whole comparison folder. A single model subfolder requires an explicit raw path or CLI selection.
 - Before resume or transfer, verify task, output token, study/run name, model set, remaining trials, source, and destination.
+
+## Independent field confirmation follow-ups
+
+The named Locality `B4_Locality-confirmation.sh`, Loss `B4_SpatialBalance.sh` and
+Damage `B4_Damage-balance.sh` preview ten/five/six final fits respectively. Each
+uses an immutable clean source, a disposable execution gate and B1 afterok
+240-hour production fits. Guides own exact arms; do not combine interventions.
+B1 stages Locality's common runner for the SpatialBalance entry just as for
+FieldVariations. Explicit damage coefficients are auxiliary-only and saved;
+historical defaults remain unchanged. No temporal/CNN/STATUS mixing or curves.

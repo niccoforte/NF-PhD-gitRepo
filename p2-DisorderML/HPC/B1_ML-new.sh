@@ -326,7 +326,7 @@ if [[ "$SCRIPT_SRC" == "$ML_CODE_DIR"/studies/* ]]; then
     SCRIPT_LOCAL=$SCRATCH_DIR/${SCRIPT_SRC#"$ML_CODE_DIR"/}
     mkdir -p "$(dirname "$SCRIPT_LOCAL")" "$SCRATCH_DIR/DualOutputs"
     rsync -av "$ML_CODE_DIR/DualOutputs/A0-HPC-Dual-test.py" "$SCRATCH_DIR/DualOutputs/"
-    if [[ "$SCRIPT_SRC" == "$ML_CODE_DIR"/studies/FieldVariations/* ]]; then
+    if [[ "$SCRIPT_SRC" == "$ML_CODE_DIR"/studies/FieldVariations/* || "$SCRIPT_SRC" == "$ML_CODE_DIR"/studies/Loss/A0-SpatialBalance.py ]]; then
         mkdir -p "$SCRATCH_DIR/studies/Locality"
         rsync -av "$ML_CODE_DIR/studies/Locality/A0-Locality.py" "$SCRATCH_DIR/studies/Locality/"
     fi

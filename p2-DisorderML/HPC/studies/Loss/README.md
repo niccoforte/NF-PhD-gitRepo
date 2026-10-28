@@ -65,3 +65,18 @@ fits (MSE/no-location/soft-location) for identical architecture, optimizer/sourc
 settings, splits, normalization and saved truths. Report true-field RMSE and
 peak/work trade-offs separately from independent Mixed deployment; do not call
 these historical shared-encoder results a completed Case1(i) custom-loss oracle.
+
+## Authorised FT spatial balance
+
+`B4_SpatialBalance.sh SUITE [--submit]` submits `A0-SpatialBalance.py`: five
+FT-only final fields with spatial coefficients 0/.001/.003/.01/.1, seed 42,
+unchanged independent plain Transformer and masked displacement MSE coefficient
+1. Temporal/localisation weights are zero. Physical train-fitted jump scales,
+valid connected pairs and degree averaging are unchanged. Fresh 0/.1 controls
+bridge the older OOF-bank trainer. The gate checks full IDs then all five tiny
+train/export/reload paths; production uses 450 epochs and 240h B1 dependents.
+Report global, actual fracture endpoint/strut and broader FT-box errors plus
+TRAIN-mean skill, raw components and cost. Temporal work is deferred until this
+spatial balance question is resolved. Regional spatial-only supervision inside
+the FT box is feasible but remains a separate proposed ablation; it is not
+included in the coefficient screen or silently combined with regional MSE.

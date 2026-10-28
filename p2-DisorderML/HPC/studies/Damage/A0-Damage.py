@@ -27,9 +27,13 @@ def parse_args(argv=None):
     p.add_argument("--run-root",type=Path,default=os.environ.get("ML_RUN_ROOT"))
     p.add_argument("--seed",type=int,default=42);p.add_argument("--epochs",type=int,default=450)
     p.add_argument("--nsims",default="all");p.add_argument("--allow-cpu",action="store_true")
+    p.add_argument("--damage-coefficient",type=float,help="Explicit auxiliary BCE weight; historical presets remain unchanged")
+    p.add_argument("--preflight-profile",choices=("screen","balance"),default="screen")
     p.add_argument("--preflight",action="store_true")
     a=p.parse_args(argv);a.nsims=None if a.nsims=="all" else int(a.nsims)
     if a.epochs<1 or (a.nsims is not None and a.nsims<1):p.error("Positive budgets required")
+    if a.damage_coefficient is not None and (a.variant not in ("weak","strong") or not np.isfinite(a.damage_coefficient) or a.damage_coefficient <= 0):
+        p.error("Positive damage-coefficient requires weak/strong auxiliary variant")
     return a
 
 
@@ -123,7 +127,8 @@ def run(args):
         if path is not None and path.exists():raise FileExistsError("Refuse overwrite: "+str(path))
     directory.mkdir(parents=True)
     training=dict(descriptor["training"])
-    trainer=StatusTrainer(network,data,status,training,args.mode,args.variant,"cuda" if torch.cuda.is_available() else "cpu")
+    trainer=StatusTrainer(network,data,status,training,args.mode,args.variant,"cuda" if torch.cuda.is_available() else "cpu",
+        damage_coefficient=args.damage_coefficient)
     metadata=dict(study="status",mode=args.mode,variant=args.variant,seed=args.seed,run_config=vars(args),
         source_revision=os.environ.get("ML_SOURCE_REVISION"),slurm_job_id=os.environ.get("SLURM_JOB_ID"),
         run_layout=dict(task="MULTI",output_kind="Damage",model="Transformer",run_name=label),
@@ -160,12 +165,15 @@ def main(argv=None):
         print("STATUS_FULL_ALIGNMENT_OK",mode,class_balance(status["train"]["target"],status["train"]["mask"]),flush=True)
         del status
     del data;gc.collect()
-    for mode in ("UT","FT"):
-        for variant in VARIANTS:
-            case=argparse.Namespace(**vars(args));case.mode=mode;case.variant=variant;case.epochs=1;case.nsims=64
-            case.run_label=f"{args.run_label}-{variant}-{mode}"
-            run(case);gc.collect();torch.cuda.empty_cache()
-    print("STATUS_PREFLIGHT_OK: full alignment and eight GPU train/export/reload cases",flush=True)
+    cases = ([(m,v,42,None) for m in ("UT","FT") for v in VARIANTS] if args.preflight_profile=="screen" else
+             [("UT",v,seed,None) for seed in (43,44) for v in ("control","strong")]+
+             [("FT","weak",42,weight) for weight in (.001,.01)])
+    for index,(mode,variant,seed,weight) in enumerate(cases):
+        case=argparse.Namespace(**vars(args));case.mode=mode;case.variant=variant;case.seed=seed
+        case.damage_coefficient=weight;case.epochs=1;case.nsims=64
+        case.run_label=f"{args.run_label}-{index}-{variant}-{mode}"
+        run(case);gc.collect();torch.cuda.empty_cache()
+    print(f"STATUS_PREFLIGHT_OK: full alignment and {len(cases)} GPU train/export/reload cases",flush=True)
 
 
 if __name__=="__main__":main()

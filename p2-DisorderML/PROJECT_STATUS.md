@@ -4,6 +4,18 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- Authorised continuation: prepare ten CNN confirmation/depth fits, five FT
+  spatial-coefficient fits and six STATUS balance/UT-confirmation fits. Each
+  changes one field factor, uses a disposable execution gate and full 240h
+  production budget. Submission/GPU checks pending; no accepted model promotion.
+  Temporal refinement and regional-only spatial loss remain deferred.
+
+- Authorised continuation: prepare ten CNN confirmation/depth fits, five FT
+  spatial-coefficient fits and six STATUS balance/UT-confirmation fits. Each
+  changes one field factor, uses a disposable execution gate and full 240h
+  production budget. Submission/GPU checks pending; no accepted model promotion.
+  Temporal refinement and regional-only spatial loss remain deferred.
+
 - 28 October: no jobs remain queued/running. STATUS 33533901–33533908 and
   FieldVariations 33563102–33563114 all completed 0:0 and passed checkpoint reload;
   gate 33563101 completed 0:0 in 10m23s. Downloaded 21 runs to external Z:/p2;

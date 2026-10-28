@@ -23,6 +23,22 @@ def network(data, variant="weak", mode="UT", edges=None):
 
 
 class StatusModelTests(unittest.TestCase):
+    def test_explicit_auxiliary_weight_keeps_field_term_and_is_saved(self):
+        data=fixture_module.fixture();rng=np.random.default_rng(7)
+        status={s:dict(target=rng.integers(0,2,(len(data.datasets[s]),3,3),dtype=np.uint8),mask=np.ones((len(data.datasets[s]),3,3),bool)) for s in ("train","val")}
+        training=dict(batch=2,lr=.001,opt=["adamw",0.],scheduler=["plateau","min",.5,2,1e-4],grad_clip=None)
+        trainer=StatusTrainer(network(data),data,status,training,"UT","weak","cpu",damage_coefficient=.001)
+        batch=next(iter(trainer.loaders["train"]))
+        total,field,damage=trainer.objective(trainer.network(batch),batch)
+        torch.testing.assert_close(total,field+.001*damage)
+        total.backward()
+        self.assertTrue(any(p.grad is not None and float(p.grad.abs().sum())>0 for p in trainer.network.stage.heads.parameters()))
+        with tempfile.TemporaryDirectory() as folder:
+            trainer.save(folder,{})
+            self.assertEqual(json.loads((Path(folder)/"model.json").read_text())["damage_coefficient"],.001)
+        with self.assertRaises(ValueError):
+            StatusTrainer(network(data,"damage"),data,status,training,"UT","damage","cpu",damage_coefficient=.001)
+
     def test_alignment_reorders_ids_and_preserves_unknown_frames(self):
         data=fixture_module.fixture();mode="UT"
         data.metadata["field_to_canonical"]={mode:np.arange(6)}

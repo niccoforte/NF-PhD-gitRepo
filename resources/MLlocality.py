@@ -142,7 +142,7 @@ def configure_field_locality(network, data, variant):
                 **({"gate_init": -3.} if variant == "gated_graph" else {}))
         elif variant in ("adjacency", "geometry"):
             stage.set_locality(dict(kind=variant, **graph))
-        elif variant in ("cnn1", "cnn2"):
+        elif variant in ("cnn1", "cnn2", "cnn3"):
             stage.set_locality(dict(kind="cnn", coords=coords, blocks=int(variant[-1])))
         else:
             raise ValueError("Unknown field locality variant: "+variant)

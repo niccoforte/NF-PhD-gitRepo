@@ -171,7 +171,7 @@ def select_threshold(probability, target, mask):
 
 class StatusTrainer:
     """Field-only experimental consumer; separate versioned checkpoint contract."""
-    def __init__(self, network, data, status, training, mode, variant, device="cuda"):
+    def __init__(self, network, data, status, training, mode, variant, device="cuda", damage_coefficient=None):
         self.network, self.data, self.mode, self.variant = network.to(device), data, mode, variant
         self.device = torch.device(device); self.training = dict(training)
         from resources.MLdualHPO import DualValidationScore
@@ -179,6 +179,10 @@ class StatusTrainer:
         self.balance = class_balance(status["train"]["target"], status["train"]["mask"])
         self.damage_loss = BalancedStatusLoss(self.balance).to(device)
         self.coefficient = dict(control=0., damage=1., weak=.1, strong=1.)[variant]
+        if damage_coefficient is not None:
+            if variant not in ("weak", "strong") or not np.isfinite(damage_coefficient) or damage_coefficient <= 0:
+                raise ValueError("An explicit positive STATUS coefficient requires an auxiliary arm")
+            self.coefficient = float(damage_coefficient)
         self.loaders = {s:DataLoader(StatusDataset(data.datasets[s], status[s]), batch_size=training["batch"],
                                     shuffle=s=="train", num_workers=0) for s in ("train","val")}
         self.history, self.best_epoch = [], None
