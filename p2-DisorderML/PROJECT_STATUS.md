@@ -2,8 +2,10 @@
 
 - 28 October continuation: existing CNN gate and spatial gate passed; CNN
   controlUT43/controlFT43/CNN2UT43 completed0:0; other existing fits queue for
-  Priority/dependency, with no new failures at the live check. Preparing48
-  independent true-field curve-term fits and four FT-box spatial fits; no
+  Priority/dependency, with no new failures at the live check. Submitted48
+  independent true-field curve-term fits33799244–33799291 after gate33799243
+  and four FT-box spatial fits33799293–33799296 after gate33799292, immutable
+  source22a6fa8. Both new gates pending scheduling at last check; no
   accepted winner change. Historical shared true-field curve report moved to
   samples/loss-study/historical-shared-true-field/README.md. Samples README is
   the interpretation index; external Z:/p2/README is the raw-artifact catalogue.
@@ -14,7 +16,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - 28 October authorised follow-ups submitted from immutable8ca82d5:
   CNN confirmation/depth: gate33731151 passed0:0 (5m39s), ten240h fits
-  33731152–33731161; first two running at check. FT spatial balance:
+  33731152–33731161; first three completed0:0 at the newer check above. FT spatial balance:
   gate33731162 passed0:0 (5m24s), five240h fits33731163–33731167.
   STATUS balance/UT confirmation: gate33731169 pending priority; six240h
   afterok fits33731170–33731175. CPU Locality/STATUS/coefficient checks and
