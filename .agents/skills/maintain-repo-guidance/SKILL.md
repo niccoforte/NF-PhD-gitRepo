@@ -28,6 +28,10 @@ Treat current human and agent instructions as part of the implementation, not as
 
 Edit current guidance in place. Do not append routine dated change logs or duplicate Git history. Remove stale statements and superseded instructions as part of the same change.
 
+The checker treats `p2-DisorderML/WINNER.md` as guidance itself. Editing its wording
+does not require a second guidance-file edit; implementation changes still require
+coverage from the relevant AGENTS, README or status file.
+
 ## Completion gate
 
 1. Review the final diff file by file and map each implementation change to its affected guidance.

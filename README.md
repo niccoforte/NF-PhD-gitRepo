@@ -82,6 +82,7 @@ python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed
 Useful broader scopes are `--scope resources`, `--scope p1`, `--scope p2`, `--scope p3`, `--scope contract`, and `--scope all`. The validator:
 
 - runs `git diff --check` and the guidance-integrity checker, which reports every effective `AGENTS.md` chain, warns above 24 KiB, and fails above 32 KiB;
+- recognises `p2-DisorderML/WINNER.md` as guidance and preserves all checker errors in failure summaries, even when size warnings are also present; CI runs regression tests for both behaviours;
 - compiles selected Python without executing it and labels Abaqus-dependent code `SYNTAX-ONLY`;
 - imports applicable `resources` modules in fresh Python processes;
 - checks notebook JSON/required structure, `bash -n`, and PowerShell parsing when those interpreters are available;

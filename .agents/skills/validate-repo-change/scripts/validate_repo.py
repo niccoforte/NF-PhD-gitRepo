@@ -120,9 +120,11 @@ def check_guidance(root: Path, base_ref: str | None) -> Result:
     if base_ref:
         command.extend(["--base-ref", base_ref])
     completed = run(command, root)
-    output = completed.stdout.strip() or completed.stderr.strip()
+    output = "\n".join(part.strip() for part in (completed.stdout, completed.stderr) if part.strip())
     status = "PASS" if completed.returncode == 0 else "FAIL"
-    return Result(status, "repository guidance", output.splitlines()[-1] if output else "No output.")
+    errors = [line for line in output.splitlines() if line.startswith("ERROR:")]
+    detail = "\n".join(errors) if errors else (output.splitlines()[-1] if output else "No output.")
+    return Result(status, "repository guidance", detail)
 
 
 def is_abaqus_path(path: str) -> bool:

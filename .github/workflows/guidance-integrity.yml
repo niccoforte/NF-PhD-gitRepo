@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
+      - name: Test guidance classification and failure diagnostics
+        run: python -B -m unittest discover -s .agents/skills/validate-repo-change/scripts -p test_guidance_validation.py
       - name: Validate changed repository surface and guidance coverage
         shell: bash
         env:

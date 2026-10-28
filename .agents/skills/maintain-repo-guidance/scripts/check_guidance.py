@@ -84,6 +84,7 @@ def is_guidance_path(path: str) -> bool:
     pure = PurePosixPath(path)
     return (
         pure.name in {"AGENTS.md", "AGENTS.override.md", "README.md", "PROJECT_STATUS.md"}
+        or path == "p2-DisorderML/WINNER.md"
         or path.startswith(".agents/skills/")
     )
 

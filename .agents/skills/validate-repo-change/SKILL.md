@@ -27,3 +27,12 @@ Run these commands from the repository root. The colocated script is non-destruc
 5. Do not install/remove Python, Abaqus, or Conda environments; submit Abaqus or Slurm jobs; transfer archives; upgrade ODBs; rename research files; or delete artifacts merely to claim validation.
 
 Report passed, failed, syntax-only, and skipped checks separately. Local or synthetic validation is not scientific validation on real data.
+
+Guidance failures must retain every `ERROR:` diagnostic from the checker, including
+stderr, so instruction-size warnings cannot hide the cause. Run the focused
+regression checks after editing guidance validation; the Guidance integrity
+workflow also runs them:
+
+```powershell
+python -B -m unittest discover -s .agents/skills/validate-repo-change/scripts -p test_guidance_validation.py
+```
