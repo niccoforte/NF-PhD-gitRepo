@@ -99,7 +99,11 @@ def prepare(args):
         # Remove it explicitly so this is an elastic eigenproblem in Standard.
         ignored = {"*damage initiation", "*damage evolution", "*plastic", "*amplitude"}
         prefix = "".join(block for block in model if keyword(block) not in ignored)
-        controls = ("released", "held", "unit_load") if args.stiffness else ("released", "held")
+        controls = getattr(args, "controls", None)
+        if controls is None:
+            controls = ("released", "held", "unit_load") if args.stiffness else ("released", "held")
+        if not controls or len(set(controls)) != len(controls) or any(control not in ("released", "held", "unit_load") for control in controls):
+            raise ValueError("Select distinct released, held or unit_load controls")
         for control in controls:
             name = "{}_{}_{}_rho{}_nx{}_{}".format(
                 "stiffness" if control == "unit_load" else "modal",
@@ -307,6 +311,7 @@ def main():
     parser.add_argument("--inp", action="append", help="Case-index-relative INP; repeatable")
     parser.add_argument("--modes", type=int, default=10)
     parser.add_argument("--stiffness", action="store_true", help="Also prepare four 1 N elastic static controls")
+    parser.add_argument("--controls", nargs="+", choices=("released", "held", "unit_load"), help="Explicit control subset; default released/held plus --stiffness")
     parser.add_argument("--abaqus", default="C:/SIMULIA/Commands/abaqus.bat")
     parser.add_argument("--cpus", type=int, default=2)
     args = parser.parse_args()

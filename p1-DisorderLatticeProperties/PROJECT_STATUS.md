@@ -20,52 +20,50 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Transfer confidence, filesystem integrity and single-drive loss remain separate
   questions. The researcher retains the deletion decision; the sample is not
   automatic cleanup authority. Existing loaders and selective B3 paths stay unchanged.
-- The researcher subsequently authorised Ti validation consolidation into
-  `Z:/p1/sims/Ti/Validation`. Its catalogue and manifest preserve the former paths,
-  source checksums and retention decisions. The 23 October full-mirror counts
-  describe the historical snapshot, not the tree after this local curation.
-  The retained collection contains 101 ODBs and 740 original files, with every
-  retained file verified by full SHA-256 after relocation. Eighteen repeated-CPU
-  ODBs were superseded by selected complete/longer runs with identical INPs;
-  their distinct exported curves and diagnostic logs remain. Exact file
-  duplicates, solver scratch/restart files and unexecuted script-only cases were
-  removed. The researcher deleted the former HPC validation folder entirely.
-  The subsequent native audit recovered all 48 tri/kagome/hex density-campaign
-  fracture histories: 8,788 genuine load samples and 19,576,675 STATUS records,
-  zero actual unknown/nonbinary STATUS. Fifteen histories are short; one has a
-  genuinely NaN post-deletion tail. All source ODB hashes/size/mtime are unchanged.
-  Eight exact-input modal and four 1 N elastic-compliance controls completed
-  locally, followed by four periodic B21 RVEs and an exact-mesh elastic NLGEOM
-  hex80 control, all serial. The RVEs directly identify conversion 1/S11 without
-  double plane-strain correction for those four sources. Causal Butterworth
-  changes three fixed-endpoint KJ controls modestly; hex80 remains sensitive.
-  The noiseless elastic control itself gives apparent Apl=-13811 Nmm: geometric
-  stiffening invalidates the constant-initial-compliance energy subtraction.
-  All 48 native ODBs provide ALLSE/IE/KE; PD/VD/AE/DMD were not recorded. Stored
-  energy differences remain diagnostics, not replacement ASTM Jpl. One serial
-  elastoplastic unloading control and a lower-displacement follow-up completed
-  on28October. The8.10mm control passes both strain limits and gives positive
-  cycle work1989Nmm where the initial triangle gives negative2942Nmm. No job is
-  running/queued; authoritative receipts are in the two unloading queue folders.
-  Four detailed cases stay below 5% KE/IE over the final half of pre-deletion
-  loading; hex startup and deletion energy are separately documented.
-  The canonical workbook now has an additive Validation audit sheet and a
-  verified original backup/receipt; all original cells/charts remain unchanged.
-  Fig.10's18points are also mirrored in Deshpande!A50:L73; only this worksheet
-  part changed, with a separate current-byte backup/receipt and visual QA.
-  ValConvPlots links audit controls and omits missing/negative-area saved points.
-  Shared exporters/calculations, original physical models and p2 datasets remain
-  unchanged. All findings from Review lattices.py were reconciled; verified
-  foundational bugs were repaired with canonical tri/kagome/hex/FCC stiffness
-  and FCC saved-graph regression checks. Full/disordered RVE geometry is still
-  unresolved; square/45square belongs to later orthotropic validation.
-  Hexagonal section-versus-element initiation and recoverable work remain open.
-  Fig.10 now has 18 digitised initial/final points, graphical bounds and checked
-  overlays. Dimensional comparison is integrated into ValConvPlots: 3 mm direct,
-  10 mm explicitly scaled by sqrt(10/3). The source density-axis factor-ten
-  ambiguity and Fig.8a/8b mismatch remain visible; original digitisation is intact.
-  PSC is deferred and
-  supervisor-agreed specimen sizes/convergence criteria remain fixed.
+- Ti validation is consolidated in `Z:/p1/sims/Ti/Validation`, with101 ODBs,
+  740 retained original files and full relocation hashes. The former HPC
+  validation folder was deleted by the researcher. Forty-eight retained
+  density-campaign tri/kagome/hex fracture histories are recovered with8,788
+  genuine samples and19,576,675 monitored STATUS records. Source fingerprints
+  are unchanged at read-only extraction. Fifteen histories are short; one has
+  a genuine NaN post-deletion tail. The audit preserves times/missingness and
+  bypasses the exporter's discarded-last-sample/artificial-zero-tail behavior.
+- The validation calculation route now brackets first tensile LE11=.1105 in
+  all48 cases and keeps whole-element deletion separate. Saved outer-section
+  damage supports reusing preceding prefixes; unsaved interior states and the
+  source's unpublished VUSFLD remain explicit limits. Selected pre-crossing
+  KE/IE is at most.2854%, not a claim about startup/post-fracture dynamics.
+- All48 exact-source periodic B21 conversion controls are available and use
+  modified-material2D conversion1/S11 once, without double plane-strain mapping.
+  Four exact elastic compliance controls are reused;44 further1N controls are
+  queued serially after the recovery queue. Exact-source QS load/unload checks
+  remain separate counterfactual histories. The tri10/.16 loading original and
+  finer numerical retry failed before the criterion and are not extrapolated.
+  A failed tri10/.13 load has a reviewed criterion-containing converged prefix.
+  The B21 Explicit plastic axial/bending probe recorded zero artificial energy.
+- Hsieh AppendixD explicitly subtracts the initial-slope triangle. That
+  calculation gives negative area even for clean pre-criterion QS hexagonal
+  states. Measured nonlinear recovery fixes recoverable-work accounting but
+  does not reproduce the published work definition; IE-SE dissipation and
+  recovery eta-J estimates remain separate from source-convention calculations.
+  Selected plots read `audit/final/validation-results.csv`; no source/paper
+  values are replaced. Kagome retains a material residual discrepancy.
+- Full Figs8a/8b/10 overlays and dimensional comparisons are integrated into
+  ValConvPlots. Fig10 provides18 digitised points with graphical bounds; only
+  3mm comparisons are direct, while10mm values require declared sqrt(l) scaling.
+  Source Fig8 normalisation and printed Fig10 density ambiguity remain visible.
+  Original digitisation is preserved. The workbook retains its additive audit
+  sheet and Deshpande!A50:L73 mirror with verified backups and no further edits.
+- All20 Review lattices.py findings are reconciled. Nine bounded foundation
+  repairs preserve canonical tri/kagome/hex/FCC properties and graph conventions.
+  Full/disordered stiffness geometry remains unresolved; exact archived inputs
+  bypass it here. Square/45square belongs to later orthotropic work. Shared
+  exporters/calculation defaults, p2 datasets and paper/PSC values are unchanged.
+  PSC and supervisor-agreed sizes/criteria remain deferred. No user code
+  clarification blocks current validation. Serial jobs remain active/queued;
+  consult external queue states/continuation plan rather than a stale count.
+  The file inventory records maintained evidence and named temporary work;
+  cleanup remains deferred until final review.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
   aligned banks and visual report are ready for the separate ML workflow.
@@ -81,12 +79,15 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   `p2-DisorderML/samples/damage-audit/` (periodic) and the separate
   `p2-DisorderML/samples/damage-disordered/` comparison.
 - ML-ready processing: `code/DataProcessing.ipynb`, `code/InputsOutputs.ipynb`, `resources/data_processing.py`, and `resources/MLdata.py`.
-- Validation and mechanics notebooks are identified in `code/AGENTS.md`; which one is current is `To be confirmed`.
+- Current validation plots are in `code/ValConvPlots.ipynb`; other mechanics
+  notebooks and their roles are identified in `code/AGENTS.md`.
 - Ti validation inputs/results: `Z:/p1/sims/Ti/Validation/README.md` and
   `case-index.csv`; use `file-manifest.json` for historical-path resolution.
 - Validation audit: `code/validation_history_audit.py`, `validation_modal.py`,
   `validation_calculations.py`, `validation_benchmark.py`, `validation_comparison.py`,
-  `validation_diagnostics.py` and serial `validation_queue.py`; evidence under the external
+  `validation_diagnostics.py`, `validation_failure_audit.py`, `validation_controls.py`,
+  `validation_work_partition.py`, `validation_results.py`, `validation_inventory.py`
+  and serial `validation_queue.py`; evidence under the external
   collection's `audit/`; readable report in `p2-DisorderML/samples/p1-validation/`.
   The canonical OneDrive workbook's Validation audit sheet is a sensitivity view,
   not replacement paper values. Resolve work/initiation limits before promotion.

@@ -401,7 +401,7 @@ python -m unittest discover -s resources -p test_lattice_validation.py
 ```
 
 Forty-eight density-campaign tri/kagome/hex fracture histories were recovered;
-modal/compliance controls cover four exact specimens only. Butterworth order 2
+modal controls cover four exact specimens. Butterworth order 2
 uses DC startup and `2 fn`; order 4, held-pin and zero-phase controls expose
 sensitivity. Offline filtering cannot recover aliased integration-step output.
 Zero-phase through-deletion and intact-prefix variants are explicitly distinct.
@@ -409,11 +409,26 @@ Force-only and matched U/RF causal variants expose phase-pairing sensitivity.
 Fixed last-intact/deletion endpoints remain separate from method-specific peaks.
 Negative plastic area produces unavailable KJ, never clipped zero. Initial
 compliance and modulus choices are independent controls, not fits to Hsieh.
-Four exact-source periodic B21 controls provide bending-aware conversion moduli
-only for those cases; their already modified-material 2D C gives 1/S11 directly,
+Exact-source periodic B21 controls cover all48 retained density cases and provide
+bending-aware conversion moduli; their modified-material 2D C gives 1/S11 directly,
 without a second plane-strain correction. An elastic NLGEOM hex80 control shows
 that geometric stiffening alone makes the initial-compliance area subtraction
 negative. Stored energy remains a diagnostic, not an automatic ASTM Jpl formula.
+`validation_failure_audit.py` verifies each native tensile-criterion bracket;
+`validation_controls.py` prepares/extracts exact-source RVE and initial-compliance
+controls. `validation_work_partition.py` separately audits IE-SE dissipation,
+records a plastic B21 zero-artificial-energy probe, and measures source-matched
+nonlinear load/unload recovery with damage-off Standard controls. These never
+overwrite or transfer a fitted correction to the original Explicit history.
+`validation_results.py` checks extraction receipts, source hashes, event indices,
+times, damage/energy eligibility and source-specific moduli. Its
+`audit/final/validation-results.csv` supplies Figs.8a/8b/10 in
+`validation_comparison.py` and the notebook. Hsieh Appendix D explicitly uses
+the initial-slope triangle; this source convention remains distinct from the
+finite-geometry eta-work estimates, with negative area shown as unavailable.
+No method is automatically size/constraint-qualified ASTM J.
+`validation_inventory.py` records retained evidence and named temporary work
+without deleting anything. Refresh the inventory before final cleanup.
 Shared calculation/export defaults and p2 datasets are unchanged. Verified
 foundation fixes from `Review lattices.py` preserve canonical 10 mm graphs and
 default tri/kagome/hex/FCC unit stiffness; full/disordered RVE geometry and the
@@ -427,7 +442,9 @@ under `Validation/audit/benchmark`; `validation_comparison.py` rebuilds the
 dimensional comparison inside ValConvPlots. Fig.10 provides 3 mm observations;
 10 mm values scaled by sqrt(10/3) are explicitly an inference. Original Fig.8
 digitisation remains intact. Solver queues checksum-deliver retained results
-before removing only marker-owned scratch, and stop on an unsuccessful job.
+before removing only marker-owned scratch. Default queues stop on failure;
+explicit independent-diagnostic manifests may allow a failed job to remain
+failed while the following independent jobs run.
 A validation-wide worker lock also prevents different queues from overlapping.
 An unsettled durable `audit/serial-owner.json` blocks subsequent submissions
 after worker death until its solver processes/state have been explicitly reviewed.

@@ -13,6 +13,7 @@ import hashlib
 import importlib.metadata
 import itertools
 import json
+import math
 from pathlib import Path
 import subprocess
 import sys
@@ -290,6 +291,59 @@ def plots(image_path, rows, output):
     plt.close(fig)
 
 
+def extract_fig8_workbook(workbook, output, pdf_python):
+    """Preserve original literal digitisation, not transformed workbook columns."""
+    extractor = """
+import json,sys,hashlib
+from pathlib import Path
+from openpyxl import load_workbook
+p=Path(sys.argv[1]);w=load_workbook(p,read_only=True,data_only=False);v=load_workbook(p,read_only=True,data_only=True)
+s,c=w['Deshpande'],v['Deshpande'];rows=[]
+for figure,indices in [('8a',range(15,33)),('8b',range(38,44))]:
+ for i in indices:
+  literal=s['F'+str(i)].value
+  if not isinstance(literal,(int,float)):raise ValueError('Expected literal digitisation in F'+str(i))
+  rows.append({'figure':figure,'workbook_row':i,'topology':c['A'+str(i)].value,
+               'relative_density':c['B'+str(i)].value,'l_mm':1000*c['C'+str(i)].value,
+               'literal_ordinate':literal,'source_cell':'Deshpande!F'+str(i),
+               'length_formula':s['C'+str(i)].value})
+material={'parent_UTS_workbook_MPa':c['C3'].value,'parent_yield_MPa':c['C4'].value,
+          'parent_E_MPa':c['C2'].value,'failure_strain':c['B6'].value,
+          'table1_RO_exponent':c['B7'].value}
+w.close();v.close();print(json.dumps({'workbook':str(p),'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'rows':rows,'material':material}))
+"""
+    result = subprocess.run([str(pdf_python), "-B", "-c", extractor, str(workbook)],
+                            check=True, capture_output=True, text=True)
+    captured = json.loads(result.stdout)
+    rows = captured.pop("rows")
+    for row in rows:
+        row["ordinate_definition"] = "K_JIC/(sigma_TS*sqrt(l_m))" if row["figure"] == "8a" else "K_JIC/sigma_TS"
+        row["ordinate_unit"] = "dimensionless" if row["figure"] == "8a" else "sqrt(m)"
+        row["abscissa_definition"] = "relative_density" if row["figure"] == "8a" else "sqrt(l_mm)"
+        row["abscissa_value"] = row["relative_density"] if row["figure"] == "8a" else math.sqrt(row["l_mm"])
+        row["source_abscissa_printed_unit"] = "dimensionless" if row["figure"] == "8a" else "sqrt(m); tick positions correspond to sqrt(mm)"
+        row["digitisation_uncertainty"] = "not recorded in original workbook"
+        row["reference_identity"] = "{}-{}-rho{}".format(row["figure"], row["topology"], row["relative_density"]) + (
+            "" if row["figure"] == "8a" else "-l{}".format(row["l_mm"]))
+        row["duplicated_length_assignment"] = row["figure"] == "8a"
+        row["sigma_TS_numeric_in_source"] = "not explicitly reported for titanium; workbook uses parent1111.79203277635MPa"
+    with (output / "fig8-original-digitisation.csv").open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    captured.update(source="Original workbook F15:F32 and F38:F43, read-only",
+                    published_pdf_sha256=PUBLISHED_SHA256, published_page=11,
+                    published_axes={"8a":"K_JIC/(sigma_TS*sqrt(l)) vs relative density",
+                                    "8b":"K_JIC/sigma_TS in sqrt(m) vs printed sqrt(l) in sqrt(m); numeric x ticks correspond to sqrt(mm)"},
+                    fig8a_unique_points=9, fig8a_workbook_rows=18, fig8b_points=6,
+                    limits=["The 3/10mm Fig8a rows repeat nine identical digitised ordinates; not independent points",
+                            "Published axes say sigma_TS; Table1/Fig10 support a yield-stress interpretation only as a separate inference",
+                            "Original Hsieh ordinates have not been renormalised or corrected",
+                            "Fig8a/8b length-factor inconsistency remains unresolved"])
+    (output / "fig8-source-provenance.json").write_text(json.dumps(captured, indent=2), encoding="utf-8")
+    return rows
+
+
 def run(args):
     pdf, output = Path(args.source_pdf).resolve(), Path(args.out).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -319,6 +373,8 @@ def run(args):
                              "No Fig.8 or p1 simulation values enter marker fits or calibration"]}
     (output / "fig10-provenance.json").write_text(json.dumps(provenance, indent=2), encoding="utf-8")
     plots(image_path, rows, output)
+    if args.workbook:
+        extract_fig8_workbook(Path(args.workbook).resolve(), output, Path(args.pdf_python))
     print(json.dumps({"points": len(rows), "csv": str(output / "fig10-digitised.csv"),
                       "max_marker_control_spread_pixels": max(
                           max(r["centre_bound_x_pixel"], r["centre_bound_y_pixel"])-1 for r in rows)}))
@@ -330,4 +386,5 @@ if __name__ == "__main__":
     parser.add_argument("--pdf-python", default=sys.executable,
                         help="Python with pypdf installed; can be the bundled PDF runtime")
     parser.add_argument("--out", default="Z:/p1/sims/Ti/Validation/audit/benchmark")
+    parser.add_argument("--workbook", help="Read-only original Deshpande Fig8 literal digitisation")
     run(parser.parse_args())

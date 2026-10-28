@@ -51,6 +51,11 @@ re-export; existing producer output defaults are not current read dependencies.
   Exact-source RVE moduli, modal cutoffs and initiation brackets do not propagate
   into shared calcFT defaults or saved labels. FCC foundation repairs preserve
   the canonical 10 mm UT/FT edges used by existing graph/loss consumers.
+  Selected validation CSVs/plots remain external audit products, not training
+  labels. They distinguish native dynamic histories from damage-off QS controls
+  and Hsieh's initial-triangle convention from dissipation/nonlinear-recovery
+  eta-J estimates. Source hashes, event brackets and invalid negative areas
+  survive this comparison boundary. An alternate work estimate is not ASTM J.
 
 ## Field boundary
 

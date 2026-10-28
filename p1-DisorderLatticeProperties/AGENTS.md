@@ -39,8 +39,8 @@ In practical terms:
   convergence criteria remain fixed; PSC is deferred from the validation review.
 - Native validation analysis is an opt-in route in `code/validation_*.py`, with
   original ODBs/exports preserved and results under `Validation/audit`. The
-  README documents commands, four exact modal/compliance and periodic B21
-  controls, 48 native histories, Fig.10 digitisation and remaining work/event
+  README documents commands, exact modal/compliance and periodic B21
+  controls, 48 native histories, Figs.8/10 digitisation and remaining work/event
   limits. The serial manifest queue retains checked solver results before
   cleaning its own scratch. Do not apply
   those changes to shared p1/p2 defaults or promote worksheet sensitivity values
@@ -48,6 +48,12 @@ In practical terms:
   repairs preserve canonical default graphs/stiffness. Square/45square belongs
   to the later orthotropic check. The former HPC validation folder
   was deleted by the researcher; do not recreate its relocation notice.
+- Selected validation plots read `audit/final/validation-results.csv`, retaining
+  native and damage-off QS histories as distinct series. Hsieh's initial-slope
+  work convention, derived plastic dissipation and measured nonlinear recovery
+  are separate calculations; a positive alternative work estimate does not
+  establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
+  records audit products and named temporary files without cleanup authority.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
 - For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.
 - Keep active p1 scripts and notebooks lean. Remove abandoned approaches, stale cells, obsolete helper paths, and superseded experiments as work progresses.

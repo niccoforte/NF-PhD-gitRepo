@@ -27,6 +27,18 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   Artifact Tool, backs up current bytes and verifies every existing package part
   and cell before replacement. It refuses occupied target rows; do not rerun it
   to overwrite an existing mirror. Canonical reference data remain the CSV.
+- `validation_failure_audit.py` binds each of the48 native tensile-strain
+  initiation brackets to saved section damage and source fingerprints.
+  `validation_controls.py` prepares/extracts exact-source B21 conversion and
+  initial-compliance controls. `validation_work_partition.py` measures matched
+  nonlinear unloading separately from native IE-SE dissipation estimates.
+  `validation_results.py` verifies extraction attestations, event indices/times,
+  undamaged prefixes and source-specific controls before writing the selected
+  comparison CSV. Hsieh Appendix D uses an initial-slope triangle: negative
+  area remains unavailable. Nonlinear recovery and dissipation eta-J estimates
+  remain distinct methods, never replacements falsely attributed to Hsieh.
+  `validation_inventory.py` inventories retained evidence and named task scratch;
+  it never deletes. Refresh it before final cleanup.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 
@@ -53,12 +65,16 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - Preserve processed CSV row/index alignment. Dropping failed outputs must keep matching input, output, frequency, and manifest records aligned.
 - Keep the periodic reference row (`sim_id == 0`) intact unless the task is explicitly about removing or changing the reference.
 - Do not silently change smoothing thresholds, fracture-index logic, stiffness fits, effective-property formulas, or outlier rules. These are scientific assumptions, not formatting details.
-- The validation-only audit fixes last-intact/deletion endpoints across filters;
+- The validation-only audit fixes tensile-criterion/deletion endpoints across filters;
   method-dependent peaks are secondary. Do not clip negative Apl, invent STATUS
   after termination, borrow a cutoff from another specimen, or promote a modulus
   sensitivity to paper truth. Zero-phase intact-prefix and through-deletion
   controls have different edge information and doubled-pass attenuation.
   Unit-load C0 is initial elastic compliance, not post-yield unloading compliance.
+  Rectangular Explicit B21 surface degradation can precede whole-element
+  deletion because section-point failure and whole-element deletion differ.
+  An outer-surface strain criterion is a source-comparison choice; do not alter
+  shared STATUS failure labels or damage laws to make them coincide.
   Force-only and matched U/RF causal filters remain labelled controls; matching
   their phases does not resolve the demonstrated hex80 negative work.
   Geometric elastic stiffening also makes that initial-compliance subtraction
