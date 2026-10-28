@@ -35,8 +35,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   KE/IE is at most.2854%, not a claim about startup/post-fracture dynamics.
 - All48 exact-source periodic B21 conversion controls are available and use
   modified-material2D conversion1/S11 once, without double plane-strain mapping.
-  Four exact elastic compliance controls are reused;44 further1N controls are
-  queued serially after the recovery queue. Exact-source QS load/unload checks
+  All48 exact elastic compliance controls are complete (4 reused,44 new).
+  All48 native cases are recalculated under the initial-triangle convention
+  alongside distinct dissipation work estimates. Eleven benchmark cases provide
+  35 current comparison rows, including10 converged QS loading prefixes and
+  3 eligible matched-recovery estimates. Exact-source QS load/unload checks
   remain separate counterfactual histories. The tri10/.16 loading original and
   finer numerical retry failed before the criterion and are not extrapolated.
   A failed tri10/.13 load has a reviewed criterion-containing converged prefix.
@@ -60,7 +63,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   bypass it here. Square/45square belongs to later orthotropic work. Shared
   exporters/calculation defaults, p2 datasets and paper/PSC values are unchanged.
   PSC and supervisor-agreed sizes/criteria remain deferred. No user code
-  clarification blocks current validation. Serial jobs remain active/queued;
+  clarification blocks current validation. The final2 auxiliary unloading jobs
+  remain active/queued;
   consult external queue states/continuation plan rather than a stale count.
   The file inventory records maintained evidence and named temporary work;
   cleanup remains deferred until final review.
