@@ -38,8 +38,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   All48 exact elastic compliance controls are complete (4 reused,44 new).
   All48 native cases are recalculated under the initial-triangle convention
   alongside distinct dissipation work estimates. Eleven benchmark cases provide
-  35 current comparison rows, including10 converged QS loading prefixes and
-  3 eligible matched-recovery estimates. Exact-source QS load/unload checks
+  37 current comparison rows, including10 converged QS loading prefixes and
+  5 eligible matched-recovery estimates. Exact-source QS load/unload checks
   remain separate counterfactual histories. The tri10/.16 loading original and
   finer numerical retry failed before the criterion and are not extrapolated.
   A failed tri10/.13 load has a reviewed criterion-containing converged prefix.
@@ -63,9 +63,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   bypass it here. Square/45square belongs to later orthotropic work. Shared
   exporters/calculation defaults, p2 datasets and paper/PSC values are unchanged.
   PSC and supervisor-agreed sizes/criteria remain deferred. No user code
-  clarification blocks current validation. The final2 auxiliary unloading jobs
-  remain active/queued;
-  consult external queue states/continuation plan rather than a stale count.
+  clarification blocks current validation. All queued auxiliary jobs are now
+  settled;7 of10 matched unloads completed,5 pass the numerical closure screen,
+  and no solver remains running/queued. Failed controls remain explicitly failed.
+  Triangular native comparisons are+0.66 to+5.38%, kagome+9.16 to+18.66% versus
+  dimensional Fig10 (10mm requires declared sqrt(length) inference). Both3mm
+  hexagonal initial-triangle values remain invalid; separate recovery estimates
+  differ by+9.17%/.16 and+13.68%/.20 from direct references. The calculation
+  audit is reproducible; universal source-method agreement is not established.
   The file inventory records maintained evidence and named temporary work;
   cleanup remains deferred until final review.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
