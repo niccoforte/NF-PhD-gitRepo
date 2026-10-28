@@ -107,10 +107,10 @@ metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
 
 ### Latest input/seminar decisions
 
-- [ ] MAE/Smooth-L1 field-only screen authorised: fresh MSE/MAE/beta0.1/beta1,
+- [x] Submit MAE/Smooth-L1 field-only screen: gate33812045, fits33812046–33812053; fresh MSE/MAE/beta0.1/beta1,
   UT/FT, seed42. Eight final fits, no CNN/STATUS/derivative/OOF/curve changes.
   Same physical selection and train standardization; named Loss guide/receipts
-  own submission. Optional code is not an adopted accuracy improvement.
+  own submission. Results/review remain outstanding; no adopted improvement.
 - [ ] Original physical-context contribution remains untested individually.
   Feature audit in samples/input-feature-audit/ separates raw presence from
   mandatory operational masks, task-specific BCs and redundant tip coordinates.
@@ -297,12 +297,13 @@ Use `HPC/studies/Locality/README.md` for the current controlled plan. The MSE
 architecture screen can run independently of loss-study completion once its
 implementation/gate is ready; combine winning changes only in a later test.
 
-- [ ] Degree-only nodal context as a cheap independent baseline: degree/8, absent
-  FT nodes masked. Degree is used internally in loss/message averaging and the
-  crack-face definition, but is NOT an explicit input channel now.
-- [ ] Retest existing pre-field-attention LocalFieldGraph on the winning
-  independent architecture; optionally test a small gated residual contribution.
-- [ ] Adjacency-function attention: add a learned per-head bias to attention
+- [x] Degree-only independent screen completed: task-specific degree/8, absent
+  FT nodes masked; optional input implemented but off in the accepted winner.
+  Single-seed UT−0.64%/FT+0.06% global RMSE; no adopted benefit.
+- [x] Retest LocalFieldGraph and gated residual independently: completed in
+  Locality. Gated FT−3.52% is a lower-priority confirmation candidate, not a winner.
+- [x] Adjacency-function attention and relative edge-geometry screen completed:
+  add a learned per-head bias to attention
   logits using the validated task-specific initial graph. Retain global
   attention, FT absence and initial crack-crossing exclusions. Compare adjacency
   alone before adding relative edge geometry or graph distance; no extra tokens,

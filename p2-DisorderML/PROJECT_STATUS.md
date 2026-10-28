@@ -2,8 +2,10 @@
 
 - Latest28 October continuation: five CNN confirmation jobs33731155–33731159
   running; three earlier fits completed0:0; no new failure at check. Gates for
-  STATUS/curve terms/FT-box remain queued. Preparing the authorised eight-fit
-  field-only MSE/MAE/Smooth-L1 screen. Original context channels have no matched
+  STATUS/curve terms/FT-box remain queued. Submitted the authorised eight-fit
+  field-only MSE/MAE/Smooth-L1 screen: gate33812045, fits33812046–33812053,
+  immutable1085892; gate pending scheduling. CPU mask/train/reload tests pass,
+  existing14 field regressions pass, Linux changed validation27 non-failing/0 failed. Original context channels have no matched
   individual attribution; proposal recorded, not submitted. The seminar's
   average-strain/stress reconstruction and Ku=F ideas are abandoned. RNO and
   common-lattice pretraining remain deferred; accepted winner unchanged.
