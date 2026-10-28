@@ -4,6 +4,27 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
+- 28 October: no jobs remain queued/running. STATUS 33533901–33533908 and
+  FieldVariations 33563102–33563114 all completed 0:0 and passed checkpoint reload;
+  gate 33563101 completed 0:0 in 10m23s. Downloaded 21 runs to external Z:/p2;
+  STATUS 114 files/2,884,162,206 bytes and variations 234/3,676,181,546 bytes all
+  match HPC SHA256. Current reports: samples/status-study/ and field-variations/.
+  STATUS auxiliary UT global gain<0.1%, confirmed endpoint gain up to 3.17%; FT
+  global errors +3.67%/+10.55% and endpoint errors +2.82%/+8.53% at 0.1/1.
+  Damage AP reaches 0.549 UT/0.904 FT, distinct from displacement benefit.
+  At selected FT checkpoints weighted damage/field loss values are 1.98×/43.82×;
+  these are not gradient ratios. Prioritize smaller loss-budget tests before
+  feedback. Variations: UT residual global−1.29%, endpoints−2.82%; FT Gaussian
+  amplitude 3/width 0.25 global−1.46%, endpoints−3.42%. FT residual worsens global
+  error 14.11% and endpoints 28.02%; static crack-face/box presets lack a general
+  benefit. One seed: no accepted winner change and no new jobs submitted.
+  Next priority remains CNN2 seed 43/44 confirmation with matched controls,
+  then smaller FT spatial coefficients; no new HPO/OOF/curve fits yet.
+  Main Loss report now includes confirmed-event and TRAIN-mean figures, actual
+  mean-field galleries, shared-scale percent-error panels, cost and log losses;
+  the separate fracture-region Markdown is merged, not a second reading route.
+  Reusable visual-report order is owned by AcademicWriting's report guidance.
+
 - 27 October continuation: reports now show per-variant TRAIN-mean RMSE skill,
   output-variation ratios and actual STATUS fracture-window skill on the same
   validation entries. Main Loss report embeds narrow-event versus broader-box
@@ -13,21 +34,20 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   FieldVariations implements13 authorised independent seed42 fits, with FT-only
   crack-face/box, UT/FT residual targets and8 Gaussian-frame fits. Uses unchanged
   plain controls, no CNN/derivative/damage mixing. Submitted immutable4ab596d:
-  gate33563101 and13 afterok240h fits33563102–33563114; home manifest
-  `p2/MULTI/Dual/Transformer/field-variations-261027/jobs.tsv`. Gate pending
-  Priority at the latest check; dependents await success, not accuracy evidence.
+  gate 33563101 and13 afterok240h fits33563102–33563114; home manifest
+  `p2/MULTI/Dual/Transformer/field-variations-261027/jobs.tsv`. All completed successfully; the current review is above.
   Five intervention and10 existing Locality tests pass on Linux;6 report and5
   staging tests pass locally, Linux contract116 non-failing/zero failed. Local
   torch import is unavailable; scientific execution is the separate GPU gate.
   Current STATUS production source remains untouched. Accepted winner unchanged.
 
-- 27 October: all16 Locality production jobs33395470–33395485 completed0:0;
+- 27 October: all16 Locality production jobs33395470–33395485 completed 0:0;
   downloaded to external Z:/p2;288 files/4.54GB match HPC SHA256.
   `samples/locality-study/README.md` reports the
   matched field-only screen: CNN2 global RMSE−2.39% UT/−12.47% FT, with local-jump
   ratios69.76→67.91% and20.92→16.97%. Single seed42: retain as confirmation
   candidate, not an accepted winner or demonstrated downstream curve improvement.
-  Actual STATUS onset-window review in `samples/loss-study/fracture-regions.md`
+  Actual STATUS onset-window review in `samples/loss-study/README.md`
   shows UT spatial improves endpoint/relative-motion RMSE3.25%/4.02%; FT spatial
   improves these1.07%/0.47% while worsening the larger crack-tip box35.25%.
   This refines, rather than replaces, the whole-field trade-off. No loss promoted.
@@ -36,7 +56,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   Submitted immutable633dbba: gate33533900 and eight240h/1GPU/12CPU/90000MB
   fits33533901–33533908; home `p2/MULTI/Damage/Transformer/status-261027/jobs.tsv`.
   Full UT/FT ID/initial-geometry/frame alignment passed; training-only positive
-  weights54.314/839.768 (cap1000), prevalences1.8079%/0.11894%. Gate completed0:0
+  weights54.314/839.768 (cap1000), prevalences1.8079%/0.11894%. Gate completed 0:0
   in7m30s; all eight GPU train/export/reload cases passed. All eight production
   fits RUNNING at the27 October check; accuracy remains pending. Gate scratch removed,
   no gate archive retained; home log is the execution record.
@@ -69,7 +89,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   unchanged. All10 locality regressions pass on HPC. Replacement immutable
   e598b61: gate33395469 and16 field-only fits33395470–33395485, seed42.
   Home manifest: `/data/home/exy053/p2/MULTI/Dual/Transformer/locality-261026-r1/jobs.tsv`.
-  Gate completed0:0 in12m44s; full-data identities and all16 GPU train/diagnostic/
+  Gate completed 0:0 in12m44s; full-data identities and all16 GPU train/diagnostic/
   reload cases passed. Successful preflight scratch deleted, no archive created.
   Last26 October check: UT control RUNNING;15 full jobs queued Priority/Resources.
   Full requests240h/1GPU/12CPU/90000MB; afterok/invalid-dependency cancellation.
@@ -77,7 +97,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   Old terminal failed scratch/home source/logs removed; no old archive existed.
   Do not duplicate the replacement suite or interpret submission as GPU success.
 
-- The12 retained loss banks and18 Mixed loss comparisons all completed0:0.
+- The12 retained loss banks and18 Mixed loss comparisons all completed 0:0.
   All30 downloaded to external `Z:/p2`;1,530 files/41.3GB match remote SHA256.
   `HPC/studies/Loss/review_loss_study.py` owns validation-only reporting to
   `samples/loss-study/`: nine inline figures,793 identical validation IDs,
@@ -198,7 +218,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   this completed data-processing task.
 
 - Input suite `independent-inputs-261015`, source c0ab41a, gate31869463 and all15
-  production jobs31869464–31869478 completed0:0 (verified18 October).
+  production jobs31869464–31869478 completed 0:0 (verified18 October).
   All1,167 archived files/30,093,577,858 bytes are downloaded to `Z:/p2/` and
   SHA256-verified. The new maintained `HPC/studies/Input/review_field_inputs.py` verifies18
   validation evaluations, identical IDs/scalers/masks/truths, recomputed physical
@@ -390,7 +410,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 - Accuracy continuation reconciled the current code with latest annotations, without loading other handoff briefs. B3 downloaded eleven completed matched-suite archives: six original runs plus recovery detach/winner_probe/curve_predicted/curve_true/ft_region. At 18:25 BST on 4 October residual30326584/true_field30326586 remained RUNNING; no duplicates submitted. Eight completed joint runs share exact 7137/793/881 IDs. Scores: baseline .863022, crack_face .807569, local_graph .902120, partial .841817, private .827576, late_frame .865194, detach .866487, ft_region .809125. Single-seed validation only; ft_region is a fixed geometric prior, NOT dynamic sudden-motion weighting. Fresh true-field curve fit reaches RMSE UT1.639/FT3039.064 on true fields versus predicted-source fit UT4.360/FT6678.813 on predicted fields; substitution degrades either. Two-curve scores are not comparable to four-output selection. Human plots/evidence: samples/accuracy-continuation/README.md. Existing notebooks/user edits preserved.
 - Explicit soft/soft peak loss implemented with saved mode and historical hard-target fallback; hard peak reporting and peak-height terms unchanged. No existing experiment/HPO changed; the new corrected-loss submission is recorded above. Automatic activity weights remain distinct from sudden/non-affine anomaly weights and excluded from the matched suite. Tokenisation plan reconciled with actual correlation-PCA/KMeans prototype; other handoffs retained untouched. samples/accuracy-continuation/test-guide.md covers all 31 current dual checks with expected/observed assertions, tolerances and limits; measured mask-leakage/gradient counterexamples and affine illustrations accompany it. All 31 dual and 14 field tests pass; changed-surface validator 17 non-failing/zero failed. First validator attempt timed out importing under concurrent load; thread-limited retry passed. Notebook comparison integration remains pending; existing dirty notebooks preserved.
-- Direct property oracle30367272 and preflight30367256 completed0:0; full run
+- Direct property oracle30367272 and preflight30367256 completed 0:0; full run
   took55m23s, gate1m45s. Existing report: samples/accuracy-continuation/field-to-property.md.
   Production runner is now HPC/FieldToProperty/A0-HPC_FieldToProperty.py;
   original immutable47fabb9/source paths remain provenance, not current commands.

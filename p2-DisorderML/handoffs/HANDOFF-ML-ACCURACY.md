@@ -8,14 +8,36 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
-## Current priority order (27 October; supersedes older next-step wording)
+## Current priority order (28 October; supersedes older next-step wording)
+
+- [x] Download/verify/review all 8 STATUS and 13 FieldVariations fits: all complete
+  and reload-checked, 348 files/6.56GB matched SHA256. STATUS report is updated
+  in place; FieldVariations has its own report. Main Loss report now owns global
+  plus actual STATUS-event comparisons and mean-field plots; no separate
+  fracture-region Markdown report. Follow root visual-report guidance.
+- [ ] First proposed execution: CNN2 and matched plain controls, UT/FT,
+  seeds 43/44 (eight final fits; reuse seed42). No new job is authorised by a
+  recommendation/report alone. Retain fixed global and confirmed-event metrics.
+- [ ] Then propose one FT spatial balance screen in the same final-only trainer:
+  coefficients 0/.001/.003/.01/.1, seed 42 (five fits, fresh 0/.1 bridge controls),
+  fixed architecture/splits/physical selection. Confirm a useful coefficient on
+  seeds 43/44 before OOF/curve adaptation. Current 0.1 is strongly overemphasised
+  relative to global FT error; this is not proof of a connectivity defect.
+- [ ] Optional: smaller FT auxiliary STATUS coefficients 0.001/0.01 against the
+  existing matched STATUS control. Current 0.1/1 give weighted BCE/field values
+  1.98×/43.82× at chosen FT checkpoints, not measured gradient ratios. Do not
+  add predicted-damage feedback until this simpler balance question is answered.
+- [ ] UT auxiliary 1 is a local candidate (endpoints−3.17%, global−0.04%), not
+  a proven null or an adopted winner; repeat with controls before promotion.
+  UT residual and FT Gaussian 3/.25 also need seeds, but gains are smaller than
+  the prior CNN2 candidate. FT residual is not supported by this independent run.
 
 - [x] Finish the source-layout cleanup and verification: named entry points and
   reviews under `HPC/studies/<Study>/`, imported helpers in resources; keep
   FieldToProperty's production rename and all active frozen job sources intact.
 - [x] Review `independent-losses-261022-mixed` and its twelve retained banks:
   all30 folders downloaded/SHA256 verified; `samples/loss-study/README.md`
-  contains the three-seed comparison and nine figures. UT spatial and FT sudden
+  contains the three-seed comparison and integrated global/local visual review. UT spatial and FT sudden
   are task-specific candidates; FT spatial fails the global-error safeguard.
   Neither combined curve preset is a universal winner. Dynamic weighting is
   tested, not adopted; keep the accepted baseline pending researcher review.
@@ -24,7 +46,7 @@ It has not been dispatched automatically. New submissions require explicit scope
   0.1/1; seed42,450 epochs/patience52, execution/reload gate. No initial OOF or
   curve fits; no true future damage input or inferred topology deletion. Gate
   33533900 and eight dependents33533901–33533908 use immutable633dbba; inspect
-  actual status before any retry. Preliminary schematic/protocol: samples/status-study/.
+  actual status before any retry. Completed report: samples/status-study/.
 - [x] Implement the isolated field Locality screen in `HPC/studies/Locality/`:
   degree-only, existing/gated local graph, adjacency/relative-geometry attention,
   one/two-block masked CNN. Latest researcher green light authorizes the screen;
@@ -95,7 +117,7 @@ confirmation. First screen final generators only; no OOF or curve retraining.
 Total13 new seed42 fits plus two reused matched controls. All other settings
 fixed:384/8/3, batch2, AdamW,450 maximum epochs/patience52. Report global and
 confirmed STATUS-event errors, FT box and local-motion timing/sign, cost and
-parameter counts. Confirm worthwhile isolated variants across seeds43/44 before
+parameter counts. Confirm worthwhile isolated variants across seeds 43/44 before
 combining changes; only then pay for OOF banks and Mixed curve adaptation.
 
 ## Cleanup

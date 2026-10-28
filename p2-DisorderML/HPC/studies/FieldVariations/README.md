@@ -46,6 +46,11 @@ Save physical predictions/masks, mean-relative skill, local motion metrics,
 training/runtime metadata, log losses and truth/prediction/error views (UT full,
 FT crack-tip). Retrospective STATUS-event review follows completion. Confirm
 promising variants across seeds43/44 before combining or generating OOF banks.
-`review_field_variations.py --jobs PATH --execution-note TEXT` renders the
-preliminary protocol, actual submission receipt and temporal-weight profiles
-to canonical `samples/field-variations/`; it does not invent completed results.
+`review_field_variations.py` now reads completed13-fit results plus the matched
+Locality controls, verifies physical fields/IDs/masks/TRAIN means and writes the
+visual `samples/field-variations/README.md`. Use `--protocol-only` for a new,
+explicitly preliminary suite. Paths/suite/control/data roots remain CLI options.
+Reports follow the root visual-report route: recap/schematic, global control/
+mean comparisons, confirmed STATUS-region control/mean comparisons, shared-scale
+best/worst four-panel fields, costs, log validation and selected train/validation
+histories, then Gaussian/representation detail. No training occurs during review.

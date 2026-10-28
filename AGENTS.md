@@ -83,7 +83,7 @@ privately; exclude speculative/abandoned reading. The manager owns sorting.
 
 ## Analysis Deliverables
 
-Per study, deliver ignored `samples/<suite>/README.md`: conclusions, labelled figures, controls, relative errors, uncertainty, limits, tables and provenance. Reports stay Markdown-only unless another format is explicitly requested. Use inline image syntax with absolute local paths, not PNG download links. Link the report. Raw runs stay in data stores; analysis stays in maintained code, not copied notebooks. Applies beyond HPC.
+Per study, deliver one ignored `samples/<suite>/README.md` following [visual study reports](https://github.com/niccoforte/AcademicWriting/blob/main/docs/visual-study-reports.md). Combine global and local evidence, prefer plots to long tables, retain provenance and limits. Markdown-only unless requested otherwise; use inline images with absolute local paths. Raw runs stay in data stores; analysis stays in maintained code. Applies beyond HPC.
 
 ## Cleanup Constraint
 

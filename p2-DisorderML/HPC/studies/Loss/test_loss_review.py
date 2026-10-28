@@ -66,7 +66,9 @@ class LossReviewTests(unittest.TestCase):
             review.write_report(path, path, rows, extra, pd.DataFrame(), pd.DataFrame(), ["synthetic"])
             text = (path/"README.md").read_text(encoding="utf-8")
             self.assertIn("![Changes in global", text)
-            self.assertIn("| + spatial |", text)
+            self.assertIn("## Global performance versus the training mean", text)
+            self.assertIn("## Best and worst predictions", text)
+            self.assertNotIn("fracture-regions.md",text)
             self.assertNotIn("|\n\n|", text)
 
 

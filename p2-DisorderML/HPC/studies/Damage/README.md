@@ -142,6 +142,16 @@ Reference: [Abaqus ductile-metal damage evolution](https://docs.software.vt.edu/
 
 ## Existing report contracts
 
+`review_status_study.py` defaults to the completed eight-fit learning review;
+`--protocol-only` renders an explicitly preliminary plan for a new suite. The
+current report combines whole-field and confirmed-STATUS-region displacement
+performance versus its own control and TRAIN mean, truth/prediction/error/
+percent galleries, all-eight runtimes, log losses and fracture AP/PR/threshold/
+timing/reversal diagnostics. It verifies saved confusion counts from arrays.
+`auxiliary-balance.csv` measures weighted STATUS/field loss values at selected
+checkpoints; these are not gradient ratios. Do not promote field or damage
+benefit from discrimination alone. Read root visual-report guidance.
+
 Learning reports include field RMSE skill only when the saved baseline is
 verified `train_mean_field`; STATUS-only has no trained field score. Damage
 metrics use their own prevalence/precision-recall reference, not a displacement

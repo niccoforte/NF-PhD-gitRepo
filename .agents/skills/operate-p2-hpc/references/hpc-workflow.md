@@ -14,6 +14,15 @@ Read only the section relevant to the task and confirm it against the actual scr
 
 ## Production and debug policy
 
+Completed study reviews use the root visual-report route, one report per study
+combining global and actual STATUS-event metrics versus control/TRAIN mean,
+shared-scale truth/prediction/error/percentage examples, cost and log histories.
+`MLstudy_reports.py` is imported reporting logic; CLI readers stay beside each
+study. `review_status_study.py` and `review_field_variations.py` default to full
+completed-result reviews; use explicit `--protocol-only` for a preliminary plan.
+Download checksums and preserve external archive-relative layout. Reading or
+recommending follow-ups does not authorise new jobs or automatic promotion.
+
 - `studies/FieldVariations/B4_FieldVariations.sh SUITE [--submit]` screens13
   independent final fields: FT crack-face, UT/FT residual coordinates, FT box2/4,
   UT/FT Gaussian amplitude1/3 × width0.15/0.25. Reuse Locality plain controls;
