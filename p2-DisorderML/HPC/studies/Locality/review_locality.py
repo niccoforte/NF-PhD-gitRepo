@@ -69,130 +69,58 @@ def collect(root,suite):
     return table
 
 
-def figures(table,root,suite,out):
-    fig,axes=plt.subplots(1,2,figsize=(12,4))
-    for ax,mode in zip(axes,("UT","FT")):
-        values=table[table["mode"]==mode].set_index("variant").loc[list(VARIANTS)]
-        bars=ax.bar(range(8),values.skill,color="#42769b")
-        ax.bar_label(bars,fmt="%.1f",fontsize=8,padding=2)
-        ax.axhline(0,color="black",lw=.8)
-        ax.set(title=mode,ylabel="RMSE reduction vs TRAIN mean (%)",xticks=range(8),xticklabels=LABELS)
-        ax.tick_params(axis="x",rotation=30,labelsize=8);ax.grid(axis="y",alpha=.2)
-    fig.suptitle("Improvement beyond the average field\nZero = mean predictor; higher is better; seed42 only")
-    fig.tight_layout();fig.savefig(out/"locality-mean-skill.png",dpi=170);plt.close(fig)
-    fig,axes=plt.subplots(2,2,figsize=(13,8))
-    for col,mode in enumerate(("UT","FT")):
-        values=table[table["mode"]==mode].set_index("variant").loc[list(VARIANTS)]
-        axes[0,col].bar(range(8),values.change,color=["#24877c" if x<0 else "#c57860" for x in values.change])
-        axes[0,col].set(title=f"{mode} field",ylabel="RMSE change versus control (%)")
-        axes[1,col].plot(range(8),values.local_jump,"o-",label="Local-jump error")
-        axes[1,col].set(ylabel="Local-jump RMSE / target jump RMS (%)")
-        for ax in axes[:,col]:ax.set(xticks=range(8),xticklabels=[v.replace(" ","\n") for v in LABELS]);ax.grid(axis="y",alpha=.2);ax.tick_params(axis="x",labelsize=8)
-    fig.suptitle("Independent field-only locality screen, seed42\nLower is better; single-seed differences require confirmation")
-    fig.tight_layout();fig.savefig(out/"locality-accuracy.png",dpi=170);plt.close(fig)
-    fig,axes=plt.subplots(1,2,figsize=(12,4))
-    for ax,mode in zip(axes,("UT","FT")):
-        values=table[table["mode"]==mode].set_index("variant").loc[list(VARIANTS)]
-        ax.bar(range(8),values.hours,color="#42769b");ax.set(title=mode,ylabel="Recorded training hours",xticks=range(8),xticklabels=[v.replace(" ","\n") for v in LABELS]);ax.tick_params(axis="x",labelsize=8)
-    fig.tight_layout();fig.savefig(out/"locality-cost.png",dpi=170);plt.close(fig)
-    fig,axes=plt.subplots(1,2,figsize=(12,4))
-    for ax,mode in zip(axes,("UT","FT")):
-        for v in VARIANTS:
-            h=pd.read_csv(root/f"{suite}-{v}-{mode}-s42/loss_history.csv")
-            ax.plot(h.epoch,h.val_loss.clip(lower=1e-12),label=v)
-        ax.set(title=mode,yscale="log",xlabel="Epoch",ylabel="Validation field MSE (log)");ax.legend(fontsize=7)
-    fig.tight_layout();fig.savefig(out/"locality-loss.png",dpi=170);plt.close(fig)
-    fig,axes=plt.subplots(1,2,figsize=(12,4))
-    for ax,mode in zip(axes,("UT","FT")):
-        for variant,color in zip(("control","cnn1","cnn2"),("#6b6b6b","#4e9b8a","#316a9d")):
-            h=pd.read_csv(root/f"{suite}-{variant}-{mode}-s42/loss_history.csv")
-            for name,style in (("train_loss","--"),("val_loss","-")):
-                ax.plot(h.epoch,h[name].clip(lower=1e-12),style,color=color,label=variant+" "+name)
-            best=table[(table["mode"]==mode)&(table.variant==variant)].best_epoch.iloc[0]
-            ax.axvline(best,color=color,alpha=.35,lw=.9,linestyle=":")
-        ax.set(title=mode,yscale="log",xlabel="Epoch",ylabel="Normalized field MSE (log)");ax.legend(fontsize=7)
-    fig.suptitle("Training versus validation: selected checkpoints precede the overfit tail\nDotted vertical markers = saved best epoch; validation selects, never last epoch")
-    fig.tight_layout();fig.savefig(out/"locality-train-validation.png",dpi=170);plt.close(fig)
-    for mode in ("UT","FT"):
-        # Saved examples already contain matched truth/prediction/error, FT zoom,
-        # common limits and sample/frame labels; preserve the producer's figure.
-        source=root/f"{suite}-cnn2-{mode}-s42/results/field-examples.png"
-        (out/f"{mode}-cnn2-examples.png").write_bytes(source.read_bytes())
-
-
-def confirmed_regions(root,suite,damage_root,out):
-    helper=runpy.run_path(str(Path(__file__).resolve().parents[1]/"Loss/review_fracture_regions.py"))
-    rows=[]
-    for mode in ("UT","FT"):
-        descriptor=json.loads((root/f"{suite}-control-{mode}-s42/model_data.json").read_text())
-        ids=descriptor["sample_ids"]["val"];xy=np.asarray(descriptor["metadata"]["canonical_coords"])
-        nodes,event,edges,_=helper["region_masks"](damage_root/f"MULTI-{mode}-disNodes-allD.npz",descriptor,mode,ids)
-        mean=helper["training_mean"](damage_root,descriptor,mode)
-        for variant in ("control","cnn1","cnn2"):
-            path=root/f"{suite}-{variant}-{mode}-s42"
-            with np.load(path/"results/predictions.npz",allow_pickle=False) as a:
-                if list(map(str,a["sample_ids"]))!=list(map(str,ids)):raise ValueError("STATUS and Locality IDs differ")
-                truth=a[f"{mode}_val_field_truth"];pred=a[f"{mode}_val_field_outputs"]
-                valid=a[f"{mode}_val_field_mask"].astype(bool)&a[f"{mode}_node_mask"][None,:,None]
-                measured=helper["measure_regions"](pred,truth,valid,nodes,event,edges,mean,mode,xy)
-                diag=json.loads((path/"results/metrics.json").read_text())["diagnostics"]["field"][mode]
-                if not np.isclose(measured[0]["mean_baseline_rmse"],diag["mean_field_baseline_rmse"],rtol=3e-6):raise ValueError("TRAIN mean differs")
-                for r in measured:r.update(mode=mode,variant=variant)
-                rows.extend(measured)
-    table=pd.DataFrame(rows);base=table[table.variant=="control"].set_index(["mode","region"]).rmse
-    table["change_percent"]=[100*(r.rmse/base.loc[r.mode,r.region]-1) for r in table.itertuples()]
-    table.to_csv(out/"confirmed-fracture-regions.csv",index=False)
-    helper["region_figures"](table,out)
-    return table
-
 
 def main(argv=None):
+    from resources.MLstudy_reports import (collect_fields, comparison_figures, loss_figures,
+        architecture_figure, field_examples, figure)
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root",type=Path,default=Path("Z:/p2/MULTI/Dual/Transformer"))
     p.add_argument("--suite",default="locality-261026-r1")
     p.add_argument("--out",type=Path,default=Path(__file__).resolve().parents[3]/"samples/locality-study")
-    p.add_argument("--download-manifest",type=Path)
     p.add_argument("--damage-root",type=Path,default=Path("Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata"))
+    p.add_argument("--download-manifest",type=Path)
     a=p.parse_args(argv);a.out.mkdir(parents=True,exist_ok=True)
     if a.download_manifest:
         receipt=verify_download(a.root,a.download_manifest)
-        (a.out/"download-verification.json").write_text(json.dumps(receipt,indent=2));print(receipt,flush=True)
-    table=collect(a.root,a.suite);figures(table,a.root,a.suite,a.out)
-    regional=confirmed_regions(a.root,a.suite,a.damage_root,a.out)
-    text=["# Locality: independent field predictions\n\n**All16 production fits completed successfully. CNN2 is the strongest confirmation candidate for both tasks; it is not yet a multi-seed winner.** No curves or OOF banks were trained in this screen.\n\n",
-        "The experiment keeps the saved793 validation specimens, train-fitted scaling, field architecture384/8/3, MSE, seed42 and stopping policy fixed. Each intervention is separate. Control is freshly trained in this same protocol; compare against it, not older independently timed runs.\n\n",
-        "| Variant | Isolated change | UT RMSE change | FT RMSE change | UT / FT local-jump error (%) |\n|---|---|---:|---:|---:|\n"]
-    meanings=("Original Transformer","Add degree/8 only","One pre-attention message block","Same block with small learned residual gate","Learned connected-pair attention bias","Adjacency plus initial strut direction/length bias","One masked reference-grid block","Two masked reference-grid blocks")
-    for v,label,meaning in zip(VARIANTS,LABELS,meanings):
-        ut=table[(table.variant==v)&(table["mode"]=="UT")].iloc[0];ft=table[(table.variant==v)&(table["mode"]=="FT")].iloc[0]
-        text.append(f"| {label} | {meaning} | {ut.change:+.2f}% | {ft.change:+.2f}% | {ut.local_jump:.2f} / {ft.local_jump:.2f} |\n")
-    def image(name,caption):return f"\n![{caption}](<{(a.out/name).resolve().as_posix()}>)\n\n"
-    text += ["\n## Is it better than predicting the average field?\n\nSkill =100×(1−model RMSE/TRAIN-mean RMSE), evaluated on identical validation masks. Zero means the mean predictor; negative is worse. TRAIN mean is fitted separately at every node/frame/component. This tests specimen-specific accuracy, not simply a shared deformation pattern. Collapse ratio measures mean predicted/truth across-specimen standard deviation:0 indicates constant output,1 matched spread; spread alone does not prove correct predictions.\n\n",
-        "| Variant | UT skill | FT skill | UT / FT variation ratio |\n|---|---:|---:|---:|\n"]
-    for v,label in zip(VARIANTS,LABELS):
-        ut=table[(table.variant==v)&(table["mode"]=="UT")].iloc[0];ft=table[(table.variant==v)&(table["mode"]=="FT")].iloc[0]
-        text.append(f"| {label} | {ut.skill:.2f}% | {ft.skill:.2f}% | {ut.collapse_ratio:.2f} / {ft.collapse_ratio:.2f} |\n")
-    text += [image("locality-mean-skill.png","Field accuracy beyond the training-mean predictor"),
-        image("locality-accuracy.png","Accuracy and local-jump safeguards"),
-        "## Actual fracture events\n\nSTATUS is used retrospectively for evaluation only. Evaluate both endpoints of each observed intact→failed strut at onset ±1 retained frame; relative-motion error compares the connected pair. TRAIN-mean skill below uses exactly those same events. The larger FT box is a separate, broader region.\n\n",
-        "| Task | Region | Control skill | CNN2 skill | CNN2 RMSE change |\n|---|---|---:|---:|---:|\n"]
+        (a.out/"download-verification.json").write_text(json.dumps(receipt,indent=2))
+    legacy=collect(a.root,a.suite)
+    api=runpy.run_path(str(Path(__file__).parents[1]/"Loss/review_fracture_regions.py"))
+    entries=[dict(mode=m,variant=v,label=label,path=a.root/f"{a.suite}-{v}-{m}-s42")
+        for m in ("UT","FT") for v,label in zip(VARIANTS,LABELS)]
+    table,regions,frames=collect_fields(entries,a.damage_root,api)
+    table.to_csv(a.out/"metrics.csv",index=False);regions.to_csv(a.out/"confirmed-fracture-regions.csv",index=False)
+    frames.to_csv(a.out/"frame-metrics.csv",index=False);legacy.to_csv(a.out/"motion-and-capacity.csv",index=False)
+    comparison_figures(table,regions,a.out);loss_figures(table,a.out,{"UT":"cnn2","FT":"cnn2"})
+    architecture_figure(a.out,"Isolated local processing before global attention:\nGNN / gated GNN / CNN1 / CNN2\nOR degree / pairwise attention bias\nNo candidate adopted yet")
     for mode in ("UT","FT"):
-        selected=regional[(regional["mode"]==mode)&(regional.variant=="cnn2")]
-        for r in selected.itertuples():
-            base=regional[(regional["mode"]==mode)&(regional.variant=="control")&(regional.region==r.region)].iloc[0]
-            text.append(f"| {mode} | {r.region} | {base.skill_percent:.2f}% | {r.skill_percent:.2f}% | {r.change_percent:+.2f}% |\n")
-    text += [image("status-fracture-regions.png","CNNs at verified fracture events and in the surrounding field"),
-        "## Verdict\n\nConfirm CNN2 across seeds43/44 before combining it with loss changes or updating WINNER.md. CNN1 is a useful depth comparator. Gated graph is worth retaining for FT, while the tested ungated graph does not support adoption. Small degree/attention gains need seed confirmation. More local layers are not proven always better; the grid convolution is not physical connectivity, and global attention remains available.\n\n",
-        "## Representative CNN2 predictions\n\nThe saved plots use initial disordered positions and show truth, prediction and signed error, with full UT and the FT crack-tip box. Best/worst use whole-field sample RMSE at one labelled frame; they do not summarize every fracture event.\n\n",
-        image("UT-cnn2-examples.png","UT CNN2 examples"),image("FT-cnn2-examples.png","FT crack-tip CNN2 examples"),
-        "## Runtime and training\n\nThese are final generators only, much cheaper than the loss study's three-fold banks plus final fits. Queue time is excluded; different stopping epochs and parameter counts contribute to runtime.\n\n",
-        image("locality-cost.png","Recorded training cost"),image("locality-loss.png","Log-scale loss histories"),
-        image("locality-train-validation.png","Training and validation curves for the control and CNN variants"),
-        "A declining training loss with stalled/rising validation loss is overfitting; the saved best validation checkpoint is used, not the final epoch. UT shows that pattern strongly, including the original control; the CNN does not solve it. FT validation continues improving much longer. Training uses dropout and the extrema-aware training population, while validation disables dropout; a train/validation gap alone is not an overfitting test. UT has specimen-specific, spatially distributed competing localization paths, whereas FT has a fixed initial crack with concentrated responses. Local grid processing may therefore be a stronger prior for FT. These are hypotheses, not proof of the cause: target variability, normalization, optimization and one-seed noise also differ. The same weights/hyperparameters need not suit both tasks.\n\n",
-        "## Verification and limits\n\nThe reader checks completed/reloaded status, exact IDs, scaler/mask agreement, identical targets and physical RMSE from saved arrays. The actual-fracture section aligns delivered STATUS and checks a reconstructed TRAIN mean against saved global baseline RMSE. This is one seed and validation only. Locked test remains untouched. Other local-jump activity metrics remain kinematic proxies. No downstream curve improvement is claimed.\n\n",
-        "[Full metrics, parameter counts and run provenance](metrics.csv). Raw archives: `Z:/p2/MULTI/Dual/Transformer/locality-261026-r1-<variant>-<UT|FT>-s42`.\n"]
-    table.to_csv(a.out/"metrics.csv",index=False);(a.out/"README.md").write_text("".join(text),encoding="utf-8")
-    print(table[["variant","mode","change","local_jump","timing","hours"]].to_string(index=False))
+        path=a.root/f"{a.suite}-cnn2-{mode}-s42";descriptor=json.loads((path/"model_data.json").read_text())
+        field_examples(path,mode,a.out,"CNN2",a.damage_root,api["training_mean"](a.damage_root,descriptor,mode))
+    image=lambda name,caption:figure(a.out,name,caption)
+    text=["# Locality: independent field predictions\n\n## Recap and verdict\n\n",
+        "All 16 fits completed. CNN2 remains the strongest confirmation candidate: global RMSE −2.39% UT / −12.47% FT, confirmed fracture endpoints −4.41% / −13.22%, strut relative motion −5.79% / −13.56%. One seed 42; no adopted winner or claimed curve improvement. Same plain 384/8/3 field Transformer, split, MSE and stopping; each change is isolated.\n\n",
+        image("architecture-comparison.png","Control versus isolated locality changes; CNN2 is a candidate"),
+        "## Global performance versus control\n\nNegative is better. Matched validation IDs, masks, physical targets and train-fitted scales are checked.\n\n",
+        image("global-control.png","Global RMSE changes"),
+        "## Global performance versus TRAIN mean\n\nSkill = 100×(1−model RMSE/TRAIN-mean RMSE); zero matches mean-predictor error. Because the reference error is fixed, this score is mathematically linked to RMSE. It does not by itself show that prediction arrays moved towards the mean. The variation ratio is a separate collapse diagnostic.\n\n",
+        image("global-mean.png","Accuracy beyond the mean field"),image("diversity.png","Predicted versus true specimen variation"),
+        image("UT-mean-field-examples.png","UT TRAIN-mean reference comparison, not a duplicate error gallery"),
+        image("FT-mean-field-examples.png","FT TRAIN-mean reference comparison"),
+        "## STATUS fracture regions versus control\n\nActual intact→failed strut endpoints and signed strut motion at onset ±1 retained frame. STATUS is retrospective evaluation only. The larger FT box is a separate overlapping scale.\n\n",
+        image("fracture-control.png","Confirmed event changes for every locality variant"),
+        "## STATUS fracture regions versus TRAIN mean\n\nExactly the same regions and masks apply to both predictors; reconstructed global mean-baseline error must reproduce saved metrics.\n\n",
+        image("fracture-mean.png","Fracture-region accuracy beyond TRAIN mean"),
+        "## Best and worst examples\n\nCNN2 seed 42, rank by complete valid field RMSE. U2 at largest true regional increment; full UT, crack-tip FT. Four columns show truth, prediction, signed error and absolute percentage error. Tiny/zero truth is grey; the percentage colour limit is P95, with no aggregate filtering.\n\n",
+        image("UT-field-examples.png","UT CNN2 four-column gallery"),image("FT-field-examples.png","FT CNN2 four-column gallery"),
+        "## Training time\n\nFinal generators only, no OOF or downstream curves; queue time excluded. Different stopping and parameter counts affect cost.\n\n",
+        image("runtime.png","Recorded training hours"),
+        "## Loss histories\n\nThe first figure compares validation across all variants; the second compares train/validation for control and CNN2, diagnosing overfitting. These have different purposes. Log axes; selected checkpoints supply predictions, not overfit final epochs.\n\n",
+        image("loss-validation.png","All validation histories"),image("loss-train-validation.png","Selected training versus validation"),
+        "## What the modules change\n\nGNN uses initial strut neighbours; gated GNN starts with a small residual contribution. Adjacency bias changes attention scores while retaining long-range attention; geometry bias adds initial edge direction/length. CNN uses occupied sites on the reference grid, depthwise 3×3 plus pointwise residual processing before global attention; vacant sites remain masked. Grid neighbours are a spatial prior, not asserted strut connectivity. Degree adds only degree/8. All preserve common base initialization.\n\n",
+        "UT has distributed competing localization paths, while FT has a fixed initial crack. Local processing may therefore suit FT more strongly; this is a hypothesis. UT overfitting appears in the plain control too. Neither more layers nor identical UT/FT settings are assumed universally best. Confirmation and a separate CNN3 screen are now authorised; use PROJECT_STATUS/job receipts for live state.\n\n",
+        "[Fixed metrics](metrics.csv) · [Fracture entries and denominators](confirmed-fracture-regions.csv) · [Motion/capacity provenance](motion-and-capacity.csv). Validation only; locked test unchanged.\n"]
+    from resources.MLstudy_reports import submission_note
+    text.append(submission_note(a.out,"confirmation-jobs.tsv","CNN confirmation/depth"))
+    (a.out/"README.md").write_text("".join(text),encoding="utf-8")
     print("REPORT",a.out/"README.md")
 
 

@@ -4,17 +4,21 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
 
 ## Active implementation
 
-- Authorised continuation: prepare ten CNN confirmation/depth fits, five FT
-  spatial-coefficient fits and six STATUS balance/UT-confirmation fits. Each
-  changes one field factor, uses a disposable execution gate and full 240h
-  production budget. Submission/GPU checks pending; no accepted model promotion.
-  Temporal refinement and regional-only spatial loss remain deferred.
-
-- Authorised continuation: prepare ten CNN confirmation/depth fits, five FT
-  spatial-coefficient fits and six STATUS balance/UT-confirmation fits. Each
-  changes one field factor, uses a disposable execution gate and full 240h
-  production budget. Submission/GPU checks pending; no accepted model promotion.
-  Temporal refinement and regional-only spatial loss remain deferred.
+- 28 October authorised follow-ups submitted from immutable8ca82d5:
+  CNN confirmation/depth: gate33731151 passed0:0 (5m39s), ten240h fits
+  33731152–33731161; first two running at check. FT spatial balance:
+  gate33731162 passed0:0 (5m24s), five240h fits33731163–33731167.
+  STATUS balance/UT confirmation: gate33731169 pending priority; six240h
+  afterok fits33731170–33731175. CPU Locality/STATUS/coefficient checks and
+  Linux p2 validation86 non-failing/zero failed; no accepted model promotion.
+  Home manifests: p2/MULTI/{Dual|Damage}/Transformer/<suite>/jobs.tsv.
+  Maintained six-study reports are refreshed, including actual STATUS regions
+  for the original sharing/input/locality studies. Historical true-field curve
+  losses remain separate with peak/post-peak error, TRAIN mean, cost and losses.
+  Four-column galleries are larger; superseded prediction triples are removed.
+  Same-baseline skill is mathematically linked to RMSE; variation is separate.
+  Temporal/regional spatial work remains deferred. Existing winner unchanged.
+  This supersedes the earlier no-new-job state below.
 
 - 28 October: no jobs remain queued/running. STATUS 33533901–33533908 and
   FieldVariations 33563102–33563114 all completed 0:0 and passed checkpoint reload;

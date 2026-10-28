@@ -80,3 +80,10 @@ TRAIN-mean skill, raw components and cost. Temporal work is deferred until this
 spatial balance question is resolved. Regional spatial-only supervision inside
 the FT box is feasible but remains a separate proposed ablation; it is not
 included in the coefficient screen or silently combined with regional MSE.
+
+The separate `true-field-curves.md` is a distinct historical shared-encoder,
+true-training/true-evaluation study. Its expanded reader verifies physical CSV
+truths and TRAIN means, reports target-defined peak/pre/post-peak windows, hard
+peak/work metrics, large error/percentage examples, costs and log histories.
+These curve regions are not spatial STATUS-labelled nodes. Bundled presets do
+not identify each loss term: one-term attribution remains deferred.

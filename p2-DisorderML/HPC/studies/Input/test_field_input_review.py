@@ -39,21 +39,6 @@ class InputReviewTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 review.verify_ids(values, ["1", "2"])
 
-    def test_submission_section_uses_receipts_and_is_optional(self):
-        with tempfile.TemporaryDirectory() as directory:
-            out = Path(directory)
-            self.assertEqual(review.followup_section(out), [])
-            pd.DataFrame([
-                dict(role="preflight", seed=42, job_id=100, source_revision="abc"),
-                dict(role="spatial", seed=42, job_id=101, source_revision="abc"),
-            ]).to_csv(out / "loss-study-jobs.tsv", sep="\t", index=False)
-            (out / "loss-study-status.json").write_text(json.dumps(
-                dict(checked_at="2026-10-18", summary="Gate completed; production pending.")), encoding="utf-8")
-            section = "\n".join(review.followup_section(out))
-            self.assertIn("1 full jobs (101–101)", section)
-            self.assertIn("Gate completed; production pending.", section)
-            self.assertIn("`abc`", section)
-
     def test_generated_figure_links_are_absolute_but_other_links_unchanged(self):
         with tempfile.TemporaryDirectory(prefix="report images ") as directory:
             source = "![Test figure](test.png)\n[Evidence](selection.json)"

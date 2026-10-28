@@ -3,8 +3,8 @@
 Goal: improve independent Case1(i) **field** prediction with one change at a
 time. `A0-Locality.py` and `B4_Locality.sh` implement the screen; PROJECT_STATUS
 records actual submission/execution, never infer it from this guide.
-The current loss study continues unchanged. Locality has no logical dependency
-on its completion: use the unchanged masked-MSE baseline to isolate architecture,
+Locality is independent of the completed loss comparison: use the unchanged
+masked-MSE baseline to isolate architecture,
 then test combinations only after each intervention has evidence.
 
 Common controls: native UT/FT topology on canonical nodes, exact saved specimen
@@ -99,3 +99,7 @@ not an adopted improvement. Same reference, splits, MSE, 450-epoch ceiling and
 patience; no OOF/curves/loss/feature changes. The six-case disposable gate uses
 `--preflight-variants control cnn2 cnn3`, followed by 240h/1GPU/12CPU/90000MB fits.
 Only successful home gate logs survive; production exports retain reload checks.
+
+The maintained review now follows the visual-report route: global control/mean,
+actual STATUS regions for every variant, four-column field galleries, costs and
+validation/selected train-validation histories. Use `review_locality.py`.

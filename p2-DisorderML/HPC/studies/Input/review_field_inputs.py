@@ -210,100 +210,19 @@ def plot_comparisons(rows, extra, scores, out):
     fig.tight_layout(); fig.savefig(out / "selection-score.png", dpi=170); plt.close(fig)
 
 
-def galleries(root, suite, control, winner, out):
-    from resources.MLmetrics import load_dual_diagnostics, plot_field_sample
-
-    chosen = run_path(root, suite, control, winner, 42)
-    baseline = run_path(root, suite, control, "predicted", 42)
-    for mode in ("UT", "FT"):
-        a, b = [load_dual_diagnostics(run, "field", mode) for run in (baseline, chosen)]
-        errors = b["sample_metrics"]["sample_rmse" if "sample_rmse" in b["sample_metrics"] else "rmse"]
-        order = np.argsort(errors.to_numpy())
-        for label, index in (("best", int(order[0])), ("worst", int(order[-1]))):
-            frame = int(np.nanargmax(np.nanmean(np.diff(b["y_true"][index], axis=0) ** 2, axis=(1, 2))) + 1)
-            xy = b["node_coords"]
-            region = np.ones(len(xy), dtype=bool) if mode == "UT" else (
-                (xy[:, 0] >= 90) & (xy[:, 0] <= 150) & (xy[:, 1] >= 65) & (xy[:, 1] <= 125))
-            valid = region & b["valid_mask"][index, frame, :, 1]
-            values = np.concatenate([d[k][index, frame, valid, 1] for d in (a, b) for k in ("y_true", "y_pred")])
-            errors = np.concatenate([d["y_pred"][index, frame, valid, 1] - d["y_true"][index, frame, valid, 1] for d in (a, b)])
-            limit = max(float(np.nanpercentile(abs(values), 98)), 1e-12)
-            error_limit = max(float(np.nanpercentile(abs(errors), 98)), 1e-12)
-            for tag, diag in (("baseline", a), ("winner", b)):
-                fig, axes = plot_field_sample(diag, index, frame, 1, show=False, point_size=30)
-                for position, ax in enumerate(axes):
-                    bound = error_limit if position == 2 else limit
-                    for collection in ax.collections:
-                        collection.set_clim(-bound, bound)
-                    ax.set(xlabel="Reference x (mm)", ylabel="Reference y (mm)")
-                    if mode == "FT": ax.set(xlim=(90, 150), ylim=(65, 125))
-                fig.suptitle(f"{mode} {label} winner-ranked specimen {b['sample_ids'][index]}: {tag}, U2 (mm), frame {frame + 1}/20\n"
-                             "Truth and prediction share a scale; signed error has a separate scale", fontsize=11)
-                fig.tight_layout(rect=(0, 0, 1, .88)); fig.savefig(out / f"{mode}-{label}-{tag}-field.png", dpi=160); plt.close(fig)
-        del a, b
-        a, b = [load_dual_diagnostics(run, "curve", mode) for run in (baseline, chosen)]
-        order = np.argsort(b["sample_metrics"].sample_rmse.to_numpy())
-        fig, axes = plt.subplots(2, 2, figsize=(12, 7.5))
-        for row, (tag, diag) in enumerate((("Predicted-only baseline", a), ("Selected pipeline", b))):
-            for ax, label, index in zip(axes[row], ("Best", "Worst"), (order[0], order[-1])):
-                scale = 1000 if mode == "FT" else 1
-                x, y, p = diag["x"], diag["y_true"][index] / scale, diag["y_pred"][index] / scale
-                ax.bar(x, p - y, width=np.median(np.diff(x)) * .95, alpha=.3, color="steelblue", label="Signed error")
-                ax.plot(x, y, color="#26746c", label="Truth"); ax.plot(x, p, "--", color="#c36b42", label="Prediction")
-                ax.set(title=f"{tag}: {label.lower()} specimen {diag['sample_ids'][index]}",
-                       xlabel="Strain" if mode == "UT" else "Load-line displacement (mm)",
-                       ylabel="Stress / error (MPa)" if mode == "UT" else "Force / error (kN)")
-                ax.legend(fontsize=8)
-        fig.suptitle(f"{mode}: seed42, same winner-ranked specimens; all curves start from predicted fields")
-        fig.tight_layout(); fig.savefig(out / f"{mode}-curve-examples.png", dpi=170); plt.close(fig)
-    history = pd.read_csv(chosen / "results/loss_history.csv")
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-    for ax, mode in zip(axes, ("UT", "FT")):
-        group = history[history.training_group == f"curve_{mode}"]
-        ax.plot(group.epoch, group.train_loss, label="Train"); ax.plot(group.epoch, group.val_loss, label="Validation")
-        ax.set(title=f"Selected {mode} curve fit, seed42", yscale="log", xlabel="Epoch", ylabel="Normalized loss")
-        ax.legend()
-    fig.tight_layout(); fig.savefig(out / "winner-loss-history.png", dpi=170); plt.close(fig)
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
-    for ax, mode in zip(axes, ("UT", "FT")):
-        for policy in POLICIES:
-            run = run_path(root, suite, control, policy, 42)
-            table = pd.read_csv(run / f"results/{mode}_val_curve_point_metrics.csv")
-            scale = 1000 if mode == "FT" else 1
-            ax.plot(table.x, table.pred_std / scale, label=LABELS[policy], lw=1.3)
-        ax.plot(table.x, table.true_std / scale, "k--", lw=2, label="Truth variability")
-        ax.set(title=f"{mode}: specimen-to-specimen curve diversity, seed42", xlabel="Loading coordinate",
-               ylabel="Curve standard deviation (MPa)" if mode == "UT" else "Curve standard deviation (kN)")
-        ax.legend(fontsize=7); ax.set_ylim(bottom=0)
-    fig.tight_layout(); fig.savefig(out / "curve-diversity.png", dpi=170); plt.close(fig)
+def galleries(root, suite, control, winner, out, data_root=Path("Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata")):
+    import runpy
+    from resources.MLstudy_reports import field_examples,curve_examples
+    helper=runpy.run_path(str(Path(__file__).parents[1]/"Loss/review_fracture_regions.py"))
+    # Practical accepted route; numerical Corrected+True selection is unchanged.
+    chosen=run_path(root,suite,control,"mixed",42)
+    descriptor=json.loads((chosen/"model_data.json").read_text())
+    for mode in ("UT","FT"):
+        mean=helper["training_mean"](data_root,descriptor,mode)
+        field_examples(chosen,mode,out,"Predicted + True (raw fields)",data_root,mean)
+        curve_examples(chosen,mode,out,"Predicted + True deployment",data_root)
 
 
-def followup_section(out):
-    """Include the submitted study when its local scheduler receipt is present."""
-    manifest = out / "loss-study-jobs.tsv"
-    if not manifest.exists():
-        return []
-    jobs = pd.read_csv(manifest, sep="\t")
-    gate = jobs[jobs.role == "preflight"].iloc[0]
-    full = jobs[jobs.role != "preflight"]
-    lines = ["## Submitted custom-loss study", "",
-             f"Suite **independent-losses-261018**: gate **{gate.job_id}**, then **{len(full)} full jobs ({full.job_id.min()}–{full.job_id.max()})**. Immutable training source: `{gate.source_revision}`.", "",
-             "Each full job requests **240 hours, one GPU, 12 CPUs and 90,000 MB RAM**. Seeds 42/43/44 retain the selected corrected+true policy. Dependencies require successful upstream completion; submitted is not the same as completed.", "",
-             "| Comparison | Generator loss change | Full jobs across three seeds |",
-             "|---|---|---:|",
-             "| Spatial | MSE + 0.1 signed neighbour-motion loss | 9 |",
-             "| Temporal | MSE + 0.1 adjacent-frame increment loss | 9 |",
-             "| Both | MSE + 0.1 spatial + 0.1 temporal | 9 |",
-             "| Sudden motion | Capped specimen/node/frame weighting, gain 1 | 9 |",
-             "| Curve combined | Frozen original fields/correctors; no peak location versus soft/soft location | 6 |", "",
-             "The nine jobs per field variant are three generator banks, three new nested correction banks and three adapted curve fits. Correctors retain MSE. Curve-loss fits reuse the same original winning frozen field pipeline; the existing MSE winner is their control. Combined curve coefficients are MSE 1, zone 0.5, derivative 0.05, peak height 0.25 and work 0.1; peak-location coefficient is 0 versus 0.02 with soft-peak sharpness 20. These are starting ablation settings, not HPO-selected values.", "",
-             "Sudden-motion weights combine changes in a node's displacement increments with unusual local neighbour motion after removing a fitted affine contribution. They are capped and normalized per specimen, not based on displacement magnitude or a prescribed fracture region. They weight training errors only: no true fields or target-derived weights are required at inference. Spatial/temporal differences are formed in physical displacement units with fixed train-fitted normalization; adjacent recorded-frame increments are not velocities.", "",
-             "[Exact jobs, dependencies and source](loss-study-jobs.tsv). Home: `/data/home/exy053/p2/MULTI/Dual/Transformer/independent-losses-261018/`. Successful full-run archives: `/data/SEMS-TaoLab/Niccolo-Forte/p2/MULTI/Dual/Transformer/independent-losses-261018-<role>-s<seed>/`. The disposable preflight is not archived.", ""]
-    receipt = out / "loss-study-status.json"
-    if receipt.exists():
-        state = json.loads(receipt.read_text(encoding="utf-8"))
-        lines += [f"Last verified **{state['checked_at']}**: {state['summary']}", ""]
-    return lines
 
 
 def corrector_changes(rows):
@@ -481,7 +400,7 @@ def review_correction_cost(root, suite, control, out, evidence_path):
     return summary
 
 
-def review(root, suite, control, out):
+def review(root, suite, control, out, data_root=Path("Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata")):
     out.mkdir(parents=True, exist_ok=True)
     rows, extra, checks, sources = collect(root, suite, control)
     winner, scores = select_winner(rows)
@@ -492,63 +411,62 @@ def review(root, suite, control, out):
                     score=float(scores.loc[winner].mean()), seeds=[42, 43, 44], split="val",
                     input_suite=suite, control_suite=control, runs=sources)
     (out / "selection.json").write_text(json.dumps(decision, indent=2), encoding="utf-8")
-    plot_comparisons(rows, extra, scores, out); galleries(root, suite, control, winner, out)
-    summary = rows.groupby(["policy", "kind", "mode"]).skill.agg(["mean", "std"])
-    baseline = rows.query("policy == 'predicted'").set_index(["seed", "kind", "mode"]).rmse
-    selected = rows.query("policy == @winner").copy()
-    selected["relative_change"] = [100 * (r.rmse / baseline.loc[(r.seed, r.kind, r.mode)] - 1) for r in selected.itertuples()]
-    changes = selected.groupby(["kind", "mode"]).relative_change.mean()
-    true_skills = extra.query("policy == 'true' and metric == 'true_field_curve_skill'").groupby("mode").value.mean()
-    cost_review = out / "correction-cost.md"
-    selection_title = "Original fixed-score winner" if cost_review.exists() else "Selected next-study pipeline"
-    text = ["# Field-input study: completed validation comparison", "",
-            f"**{selection_title}: {LABELS[winner]}.** It has the lowest fixed four-output score ({decision['score']:.6f}) across seeds 42/43/44.", "",
-            "Case 1(i) remains four independently trained UT/FT field/curve models. The selected correction option adds two independently trained residual field refiners; it does not restore joint UT/FT training.", "",
-            "## Main result", "", "Skill = 100 × (1 − model RMSE / training-mean baseline RMSE). Higher is better; zero means the mean predictor. Entries are mean ± sample SD across three seeds, not confidence intervals.", "",
-            "| Curve training source | UT field skill | FT field skill | UT curve skill | FT curve skill |",
-            "|---|---:|---:|---:|---:|"]
-    for policy in POLICIES:
-        values = [summary.loc[(policy, kind, mode)] for kind, mode in TASKS]
-        text.append("| " + LABELS[policy] + " | " + " | ".join(f"{v['mean']:.2f} ± {v['std']:.2f}%" for v in values) + " |")
-    text += ["", "![Accuracy overview](accuracy-overview.png)", "", "## What wins, and how much?", ""]
-    text += [f"- {mode} {kind}: mean RMSE change **{changes.loc[(kind, mode)]:+.2f}%** versus its same-seed predicted-only control (negative is better)." for kind, mode in TASKS]
-    text += ["", "These are modest improvements, not a solution to fracture-path prediction. Predicted+true training without correction is a cheaper alternative and has slightly better mean UT curve accuracy here. Selection uses the existing equal four-output physical-MSE/baseline-MSE score, not a new field-first ranking; the winner is not best on every individual metric/seed.", "",
-             "![Fixed selection score](selection-score.png)", "", "## What each experiment changes", "",
-             "- **Predicted only:** original OOF predicted-field curve training, then final-generator predicted-field validation.",
-             "- **True only:** curve training uses true fields, but the main evaluation still uses predicted fields. Poor deployment results measure source mismatch, not inability to learn curves from true fields.",
-             "- **Predicted + true:** each training specimen/update samples one complete source with probability 0.5; validation uses predicted fields.",
-             "- **Corrected only:** a residual Transformer corrects predicted fields; curves train on nested-OOF corrected fields and deploy on corrected predictions.",
-             "- **Corrected + true:** the same corrector, with 50/50 corrected/true curve training. No true fields are available at deployment.", "",
-             "The corrector is field-supervised and frozen during curve training. Its nested cross-fitting excludes each held-out training specimen from both upstream and corrector fitting. Reference curves held fixed after correction are saved as a separate diagnostic, not a fresh curve fit.", "",
-             "## True fields versus deployment", "",
-             "The green bars below bypass the field generator using true validation fields in the same checkpoint. They are diagnostic and are excluded from winner selection. Checkpoints were selected on predicted/corrected-field validation, not independently selected as true-field oracles.", "",
-             f"For the **true-only-trained** curve models, true-field evaluation gives **{true_skills['UT']:.2f}% UT and {true_skills['FT']:.2f}% FT RMSE skill** averaged across seeds, versus {summary.loc[('true', 'curve', 'UT'), 'mean']:.2f}% and {summary.loc[('true', 'curve', 'FT'), 'mean']:.2f}% when those same models receive predicted fields. This isolates a substantial source-distribution problem; it does not establish a deployable improvement.", "",
-             "![True-field source substitution](true-versus-deployment.png)", "",
-             "The UT deployment curve skill remains low, despite the winning overall score. The next plot shows whether across-specimen variation is recovered rather than merely the shared average curve shape; high global curve R² alone can conceal this collapse.", "",
-             "![Curve diversity](curve-diversity.png)", "", "## Local-motion and curve safeguards", "",
-             "Local jump error is normalized by target jump RMS on the same valid events, not by maximum displacement. Peak-location error uses the loading span; work error uses mean absolute true work. Kinematic jump events are not verified broken-strut labels. Full per-seed values, sign accuracy and eligible sample counts are in additional-metrics.csv; no new local acceptance threshold is silently imposed.", "",
-             "![Local and peak errors](local-and-peak-errors.png)", "", "## Representative predictions", "",
-             "Seed 42 is fixed, not selected for its score. Best/worst IDs are ranked by the selected pipeline's whole-field/full-curve RMSE; baseline and selected predictions use the same IDs. U2 field frames maximize the specimen's true adjacent-frame motion; this is not a confirmed fracture time. UT shows the full body; FT uses a 90–150 by 65–125 mm crack-tip window. Point plots avoid interpolation across cracks. Each baseline/selected pair uses common 98th-percentile truth/prediction limits and common signed-error limits, calculated over the displayed region. Error has a separately labelled scale. Numerical metrics retain all valid values.", ""]
-    for mode in ("UT", "FT"):
-        text += [f"### {mode}", "", f"![{mode} curve examples]({mode}-curve-examples.png)", ""]
-        for rank in ("best", "worst"):
-            for tag in ("baseline", "winner"):
-                text += [f"![{mode} {rank} {tag} field]({mode}-{rank}-{tag}-field.png)", ""]
-    text += ["## Training and follow-up", "", "![Selected curve losses](winner-loss-history.png)", "",
-             "The correction-bank production jobs took approximately 49–53 hours per seed, including nested upstream fits; new curve fits took approximately 3–8 hours. These are training costs, not inference latency measurements. Correction adds field-refinement inference passes; latency was not benchmarked.", "",
-             "The custom-loss comparison must preserve the selected source policy. Each changed field generator needs a newly cross-fitted corrector; the original corrector must not be reused on a different error distribution. Hold corrector MSE fixed while changing generator losses. Curve-loss comparisons instead reuse the same baseline field/correction pipeline. Loss coefficients remain controlled starting presets, not optimized optima.", "",
-             *followup_section(out),
-             "## Verification and limits", "", "All 18 saved validation evaluations (five candidates plus frozen-readout correction, three seeds) are checked for identical specimen IDs/order, training-fitted scalers, masks, truths, baseline denominators and recomputed physical RMSE. Raw/corrected fields remain identical across corresponding curve-source fits. [Validation checks](validation.txt) and [selection receipt](selection.json) record the rule and source runs.", "",
-             "The split is 7,137 train / 793 validation / 881 locked test. No locked-test targets, inference, new training, FEA or ODB exports are used by this review. Selection on these same validation results is exploratory; three seeds are not a final generalization guarantee. Raw archives are under " + f"`{root}`.", ""]
-    if cost_review.exists():
-        text[2:2] = [f"**Cost-aware follow-up:** the [performance/runtime review]({cost_review.resolve().as_posix()}) recommends Predicted + True for future work. Original accuracy selection and the submitted corrected-source study below are preserved; no job policy is changed by that recommendation.", ""]
-    receipt = out / "transfer-verification.json"
-    if receipt.exists():
-        transfer = json.loads(receipt.read_text(encoding="utf-8"))
-        text += [f"Download receipt: **{transfer['verified_files']:,} files, {transfer['bytes']:,} bytes, {transfer['hash_mismatches']} SHA256 mismatches**. See the [transfer receipt](transfer-verification.json).", ""]
-    (out / "README.md").write_text(absolute_figure_links("\n".join(text), out), encoding="utf-8")
-    print(json.dumps({"winner": winner, "score": decision["score"], "report": str(out / "README.md")}), flush=True)
+    plot_comparisons(rows, extra, scores, out)
+    refresh_visual_report(root,suite,control,out,data_root)
     return decision
+
+
+def refresh_visual_report(root,suite,control,out,data_root=Path("Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata")):
+    import runpy
+    from resources.MLstudy_reports import pipeline_regions,pipeline_global_figures,figure
+    rows=pd.read_csv(out/"per-run-metrics.csv");rows=rows[rows.policy.isin(POLICIES)].copy()
+    baseline=rows[rows.policy=="predicted"].set_index(["seed","kind","mode"]).rmse
+    rows["change_percent"]=[100*(r.rmse/baseline.loc[r.seed,r.kind,r.mode]-1) for r in rows.itertuples()]
+    pipeline_global_figures(rows.rename(columns={"policy":"variant","skill":"skill_percent"}),out)
+    helper=runpy.run_path(str(Path(__file__).parents[1]/"Loss/review_fracture_regions.py"))
+    runs=[dict(variant=policy,seed=seed,path=run_path(root,suite,control,policy,seed)) for policy in POLICIES for seed in (42,43,44)]
+    pipeline_regions(runs,"predicted",data_root,helper,out)
+    galleries(root,suite,control,"mixed",out,data_root)
+    for name,columns in (("validation",("val_loss",)),("train-validation",("train_loss","val_loss"))):
+        fig,axes=plt.subplots(1,2,figsize=(15,5.5))
+        for ax,mode in zip(axes,("UT","FT")):
+            for index,policy in enumerate(POLICIES):
+                if len(columns)>1 and policy not in ("predicted","mixed"):continue
+                h=pd.read_csv(run_path(root,suite,control,policy,42)/"results/loss_history.csv")
+                h=h[h.training_group==f"curve_{mode}"]
+                for column in columns:ax.plot(h.epoch,h[column].where(h[column]>0),"--" if column.startswith("train") else "-",color=plt.get_cmap("tab10")(index),label=LABELS[policy]+" "+column.replace("_loss",""))
+            ax.set(title=mode,yscale="log",xlabel="Curve training epoch",ylabel="Normalized curve MSE (log)");ax.legend(fontsize=9);ax.grid(alpha=.2)
+        fig.tight_layout();fig.savefig(out/f"loss-{name}.png",dpi=170);plt.close(fig)
+    fig,axes=plt.subplots(1,2,figsize=(14,4.5))
+    for ax,policy,title in zip(axes,("predicted","mixed"),("Pre-study control","Accepted source policy")):
+        ax.axis("off")
+        ax.text(.5,.85,title,ha="center",fontsize=16)
+        ax.text(.5,.60,"Independent disorder → field models (unchanged)",ha="center",fontsize=13,bbox=dict(boxstyle="round",facecolor="#dceee8"))
+        ax.annotate("",(.5,.36),(.5,.52),arrowprops=dict(arrowstyle="->"))
+        ax.text(.5,.28,"Independent field → curve models\nTRAIN: "+("OOF predicted fields" if policy=="predicted" else "50/50 OOF predicted + true fields")+"\nDEPLOY: predicted fields only",ha="center",fontsize=13,bbox=dict(boxstyle="round",facecolor="#dbe8f3"))
+    fig.tight_layout();fig.savefig(out/"source-architecture.png",dpi=170);plt.close(fig)
+    image=lambda name,caption:figure(out,name,caption)
+    text=["# Field-input study — completed validation comparison\n\n## Recap and verdict\n\n",
+        "**Accepted practical policy: Predicted + True, no corrector.** Case1(i) remains four independently trained models. Corrected+True retains its original numerical fixed-score win (0.743791), but its small field gain does not materially improve curves and its extra training is costly. Three seeds, 793 validation specimens. All main predictions use predicted/corrected fields, never true deployment inputs.\n\n",
+        image("source-architecture.png","Pre-study source versus accepted Mixed source; model architecture unchanged"),
+        "## Global performance versus predicted-only control\n\nSame-seed physical RMSE changes; lower is better. Raw field generators are unchanged for predicted/true/mixed curve policies; corrected policies add supervised refiners.\n\n",image("global-control.png","Four-output changes versus predicted-only"),
+        "## Global performance versus TRAIN mean\n\nSkill = 100×(1−model RMSE/TRAIN-mean RMSE). Zero matches the mean; this does not measure literal distance to the mean field.\n\n",image("global-mean.png","Accuracy beyond mean outputs"),
+        image("output-variation.png","Specimen variation is separate from RMSE skill; matching spread does not establish accuracy"),
+        image("UT-mean-field-examples.png","UT TRAIN-mean reference comparison"),image("FT-mean-field-examples.png","FT TRAIN-mean reference comparison"),
+        "## Actual STATUS fracture regions versus control\n\nDelivered intact→failed struts define endpoint and relative-motion windows at onset ±1 retained frame. STATUS is evaluation only. Raw fields repeat across the three uncorrected curve policies by design.\n\n",image("status-fracture-regions.png","Actual fracture errors versus predicted-only"),
+        "## Actual STATUS fracture regions versus TRAIN mean\n\nIdentical event masks apply to predictions and TRAIN-only means. The broader FT box is an overlapping diagnostic, not a damage label.\n\n",image("fracture-mean.png","Actual fracture accuracy beyond mean fields"),
+        "## Best and worst predictions\n\nThese show the accepted Mixed pipeline at seed42, not the discarded-for-cost numerical corrector leader. Complete valid output RMSE ranks specimens. Large four-column galleries contain truth, prediction, error and percent error; tiny/zero truth is excluded from percentage displays only. FT fields zoom at the crack tip.\n\n"]
+    for mode in ("UT","FT"):text += [image(f"{mode}-field-examples.png",f"{mode} Mixed fields"),image(f"{mode}-curve-examples.png",f"{mode} Mixed deployment curves")]
+    text += ["## Training time\n\nThe measured cost/benefit review compares complete workflows and the incremental correction step. It is not inference latency.\n\n",image("correction-training-cost.png","Mixed versus corrected-Mixed measured training cost"),
+        "[Detailed correction cost/benefit](correction-cost.md). The accepted policy avoids nested corrector fitting; existing compatible generator banks remain reusable.\n\n",
+        "## Loss histories\n\nValidation-only compares all source policies; selected train/validation compares predicted-only and accepted Mixed. These are distinct views of curve training, not repeated field-loss plots.\n\n",image("loss-validation.png","All source-policy validation curves"),image("loss-train-validation.png","Selected curve training and validation histories"),
+        "## Source mismatch, fracture-relevant curve windows and limits\n\nTrue-only-trained models reach 50.69% UT / 43.53% FT RMSE reduction versus TRAIN mean when given true fields, but −30.40% / 9.39% with predicted fields. This is a source-distribution diagnostic, not deployable performance.\n\n",image("true-versus-deployment.png","True-field diagnostic versus predicted-field deployment"),
+        image("curve-regions.png","Target peak/post-peak windows versus control and TRAIN mean"),
+        "Curve windows use each true hard peak (±5% x span) and post-peak through recorded end; they are not spatial STATUS nodes or inferred physical initiation times. The original hard peak/work and kinematic safeguards remain below.\n\n",image("local-and-peak-errors.png","Fixed motion and hard curve metrics"),
+        "Predicted-only uses training-only OOF fields; true-only uses true fields for curve training; Mixed samples one entire field source with probability0.5. Corrected-only and corrected-Mixed use nested OOF refiners and remain comparison evidence, not current workflow. No in-training predictions substitute for OOF inputs.\n\n",
+        "[Global metrics](per-run-metrics.csv) · [Actual fracture metrics](confirmed-fracture-regions.csv) · [Curve regions](curve-region-metrics.csv) · [Original selection](selection.json) · [Validation checks](validation.txt). Locked test unchanged; no new training/inference/export in this review.\n"]
+    (out/"README.md").write_text("".join(text),encoding="utf-8")
+    print("REFRESHED_REPORT",out/"README.md",flush=True)
 
 
 if __name__ == "__main__":
@@ -557,10 +475,11 @@ if __name__ == "__main__":
     parser.add_argument("--suite", default="independent-inputs-261015")
     parser.add_argument("--control", default="independence-261013-r1")
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--data-root",type=Path,default=Path("Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata"))
     parser.add_argument("--cost-evidence", type=Path,
                         help="Build only the correction-cost figures/summary from supplied scheduler evidence and existing verified review tables.")
     options = parser.parse_args()
     if options.cost_evidence:
         review_correction_cost(options.root, options.suite, options.control, options.output_dir, options.cost_evidence)
     else:
-        review(options.root, options.suite, options.control, options.output_dir)
+        review(options.root, options.suite, options.control, options.output_dir, options.data_root)

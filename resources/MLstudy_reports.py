@@ -18,6 +18,18 @@ def figure(out, name, caption):
     return f"\n![{caption}](<{(Path(out)/name).resolve().as_posix()}>)\n\n"
 
 
+def submission_note(out,filename,title):
+    path=Path(out)/filename
+    if not path.exists():return ""
+    jobs=pd.read_csv(path,sep="\t",dtype=str)
+    gate=jobs[jobs.role=="preflight"];production=jobs[jobs.role!="preflight"]
+    if len(gate)!=1 or production.empty:raise ValueError("Malformed study submission receipt")
+    return (f"\n## Submitted follow-up: {title}\n\n{len(production)} production fits, execution gate "
+            f"{gate.iloc[0].job_id}, immutable source `{gate.iloc[0].source_revision}`. "
+            "These are separate follow-ups, not additional completed results in the figures above. "
+            f"[Exact jobs and dependencies]({filename}); PROJECT_STATUS owns the latest execution check.\n")
+
+
 def verify_download(root, manifest, expected_runs):
     root=Path(root).resolve();runs=set();count=size=0
     for line in Path(manifest).read_text(encoding="utf-8-sig").splitlines():
@@ -186,6 +198,20 @@ def architecture_figure(out,intervention,damage=False,curve_stage=False):
     fig.tight_layout();fig.savefig(Path(out)/"architecture-comparison.png",dpi=170);plt.close(fig)
 
 
+def serial_schematic(out,name,panels):
+    """Show two explicitly described serial workflows without inferring sharing."""
+    fig,axes=plt.subplots(1,2,figsize=(15,4.5))
+    for ax,(title,nodes,note) in zip(axes,panels):
+        ax.set(xlim=(0,10),ylim=(0,5));ax.axis("off");ax.set_title(title,fontsize=15)
+        for index,label in enumerate(nodes):
+            x=.2+index*3.3
+            ax.add_patch(FancyBboxPatch((x,2),2.8,1.5,boxstyle="round,pad=.08",facecolor="#dcebe9",edgecolor="#456075"))
+            ax.text(x+1.4,2.75,label,ha="center",va="center",fontsize=12)
+            if index<2:ax.add_patch(FancyArrowPatch((x+2.8,2.75),(x+3.3,2.75),arrowstyle="-|>",mutation_scale=14))
+        ax.text(5,.9,note,ha="center",va="center",fontsize=11)
+    fig.tight_layout();fig.savefig(Path(out)/name,dpi=170);plt.close(fig)
+
+
 def percent_error(pred,truth,valid,training_scale):
     """Pointwise absolute error; mask tiny denominators rather than fabricate ratios."""
     keep=np.asarray(valid,bool)&np.isfinite(truth)&(np.abs(truth)>=.01*max(float(training_scale),1e-12))
@@ -194,7 +220,85 @@ def percent_error(pred,truth,valid,training_scale):
     return values
 
 
-def field_examples(path,mode,out,tag,data_root,mean):
+def training_curve_mean(data_root, descriptor, mode, truth, ids, x):
+    """Reproduce the existing absolute full-curve target and TRAIN-only reference."""
+    raw = pd.read_csv(Path(data_root)/f"MULTI-{mode}-disNodes-allOUT.csv", index_col=0)
+    recorded_x = raw.iloc[0].drop("0").to_numpy(float)
+    values = raw.iloc[1:].drop(columns="0"); values.index = values.index.map(str)
+    if not values.index.is_unique or not np.allclose(recorded_x, x, rtol=0, atol=1e-7):
+        raise ValueError("Curve IDs/grid differ from delivered source")
+    observed = values.loc[list(map(str, ids))].to_numpy(float)
+    stats = descriptor["normalizers"]["curve"][mode]
+    # Saved float32 affine inverse can leave a small residual even at true zero.
+    tolerance = 4*np.finfo(np.float32).eps*(np.max(np.abs(stats["mean"]))+np.max(stats["scale"]))
+    if not np.allclose(observed, truth, rtol=2e-5, atol=max(tolerance, 1e-6)):
+        raise ValueError("CSV physical curves differ from saved validation truths")
+    train_ids = list(map(str, descriptor["sample_ids"]["train"]))
+    if set(train_ids) & set(map(str, ids)):
+        raise ValueError("TRAIN mean overlaps reviewed validation IDs")
+    return values.loc[train_ids].mean().to_numpy(float)
+
+
+def measure_curve_regions(pred, truth, x, mean):
+    """Fixed target-peak windows; curve regions are not spatial fracture labels."""
+    pred, truth, x = np.asarray(pred, float), np.asarray(truth, float), np.asarray(x, float)
+    if pred.shape != truth.shape or truth.ndim != 2 or np.any(np.diff(x) <= 0):
+        raise ValueError("Require aligned full curves on a strictly increasing grid")
+    if not np.isfinite(pred).all() or not np.isfinite(truth).all():
+        raise ValueError("Nonfinite reviewed curve values")
+    peak = truth.argmax(1); peak_x = x[peak, None]
+    masks = {"Whole curve": np.ones_like(truth, bool),
+             "Peak window ±5% span": np.abs(x[None]-peak_x) <= .05*np.ptp(x),
+             "Pre-peak": x[None] < peak_x, "Post-peak to recorded end": x[None] > peak_x}
+    rows = []
+    for region, keep in masks.items():
+        keep = keep & np.isfinite(truth) & np.isfinite(pred)
+        error = np.sqrt(np.mean((pred[keep]-truth[keep])**2))
+        baseline = np.sqrt(np.mean((np.broadcast_to(mean, truth.shape)[keep]-truth[keep])**2))
+        target = np.sqrt(np.mean(truth[keep]**2))
+        rows.append(dict(region=region, rmse=error, baseline_rmse=baseline,
+            skill_percent=100*(1-error/baseline) if baseline > 1e-12 else np.nan,
+            target_nrmse_percent=100*error/target if target > 1e-12 else np.nan,
+            valid_points=int(keep.sum()), eligible_specimens=int(keep.any(1).sum())))
+    return rows
+
+
+def curve_examples(path,mode,out,tag,data_root,prefix=""):
+    """One large four-column curve gallery, including the percentage diagnostic."""
+    path=Path(path);data=json.loads((path/"model_data.json").read_text())
+    with np.load(path/"results/predictions.npz",allow_pickle=False) as a:
+        y,p,x,ids=(a[f"{mode}_val_curve_truth"],a[f"{mode}_val_curve_outputs"],a[f"{mode}_curve_x_values"],a["sample_ids"])
+        mean=training_curve_mean(data_root,data,mode,y,ids,x)
+        score=np.sqrt(np.mean((p.astype(float)-y)**2,axis=1));picks=[score.argmin(),score.argmax()]
+        unit=1000. if mode=="FT" else 1.;ylabel="Force (kN)" if mode=="FT" else "Stress (MPa)"
+        limit=max(float(np.max(np.abs(p[picks]-y[picks])))/unit,1e-12)
+        lo=min(float(y[picks].min()/unit),float(p[picks].min()/unit),float(mean.min()/unit),-limit)
+        hi=max(float(y[picks].max()/unit),float(p[picks].max()/unit),float(mean.max()/unit))
+        percent=[percent_error(p[i],y[i],np.isfinite(y[i]),np.sqrt(np.mean(mean**2))) for i in picks]
+        fig,axes=plt.subplots(2,4,figsize=(21,10.5))
+        for row,index in enumerate(picks):
+            for col,ax in enumerate(axes[row]):
+                if col in (0,1):ax.plot(x,y[index]/unit,color="black",label="Truth")
+                if col==1:
+                    ax.plot(x,p[index]/unit,"--",color="#367da0",label="Prediction")
+                    ax.plot(x,mean/unit,":",color="#a77448",label="TRAIN mean")
+                    ax.bar(x,(p[index]-y[index])/unit,width=np.median(np.diff(x))*.95,alpha=.18,color="#ad6158",label="Signed error")
+                if col in (0,1):ax.set_ylim(lo*1.05,hi*1.05)
+                if col==2:
+                    ax.bar(x,(p[index]-y[index])/unit,width=np.median(np.diff(x))*.95,alpha=.3,label="Signed error")
+                    ax.set_ylim(-limit*1.05,limit*1.05);ax.axhline(0,color="black",lw=.8)
+                if col==3:ax.plot(x,percent[row],color="#ad6158",label="100 × |error| / |truth|")
+                ax.set(title=("Truth","Prediction + reference","Signed error","Percent error")[col],
+                    xlabel="Strain" if mode=="UT" else "Load-line displacement (mm)",ylabel="Percent" if col==3 else ylabel)
+                ax.title.set_fontsize(17);ax.tick_params(labelsize=13);ax.xaxis.label.set_size(14);ax.yaxis.label.set_size(14)
+                ax.set_xlim(float(x[0]),float(x[-1]));ax.legend(fontsize=11);ax.grid(alpha=.15)
+            axes[row,0].text(0,1.13,f"{'Best' if row==0 else 'Worst'} ID {ids[index]}",transform=axes[row,0].transAxes,fontsize=15)
+        fig.suptitle(f"{mode} {tag}: best/worst by full-curve RMSE\nPercent gaps = tiny/zero truth below 1% TRAIN-mean RMS; aggregate metrics unfiltered",fontsize=18)
+        fig.tight_layout(rect=(0,0,1,.93),h_pad=3)
+        fig.savefig(Path(out)/f"{prefix}{mode}-curve-examples.png",dpi=170);plt.close(fig)
+
+
+def field_examples(path,mode,out,tag,data_root,mean,prefix=""):
     path=Path(path);data=json.loads((path/"model_data.json").read_text())
     with np.load(path/"results/predictions.npz",allow_pickle=False) as a:
         y,p=a[f"{mode}_val_field_truth"],a[f"{mode}_val_field_outputs"]
@@ -230,7 +334,9 @@ def field_examples(path,mode,out,tag,data_root,mean):
         common_error=max(float(max(v.max() for v in error_values)),1e-12)
         finite_percent=np.concatenate([v[np.isfinite(v)] for v in percent_values])
         common_percent=max(float(np.percentile(finite_percent,95)),1.) if len(finite_percent) else 1.
-        fig,axes=plt.subplots(2,4,figsize=(15,7.6));details=[]
+        fig=plt.figure(figsize=(22,12),layout="constrained")
+        rowfigs=fig.subfigures(2,1,hspace=.04)
+        axes=np.asarray([rowfig.subplots(1,4) for rowfig in rowfigs]);details=[]
         for row,(sample,frame,loc) in enumerate(zip(picks,chosen,shapes)):
             channel=2*frame+1;v=valid[sample,:,channel]&region
             truth,pred=y[sample,:,channel],p[sample,:,channel]
@@ -238,30 +344,142 @@ def field_examples(path,mode,out,tag,data_root,mean):
             display_scale=float(np.sqrt(np.mean(mean[region,frame,1]**2)))
             ape=percent_error(pred,truth,v,display_scale)
             lo,hi,limit,cap=common_lo,common_hi,common_error,common_percent
-            for col,(label,values) in enumerate((("Truth",truth),("Prediction",pred),("Signed error",pred-truth),("Absolute error / |truth| (%)",ape))):
+            for col,(label,values) in enumerate((("Truth",truth),("Prediction",pred),("Signed error",pred-truth),("Absolute % error",ape))):
                 ax=axes[row,col];cmap=plt.get_cmap("magma" if col==3 else "coolwarm" if col==2 else "viridis").copy();cmap.set_bad("#b5b5b5")
-                view=np.ma.masked_invalid(values[region]);image=ax.scatter(loc[region,0],loc[region,1],c=view,s=17,cmap=cmap,
+                view=np.ma.masked_invalid(values[region]);image=ax.scatter(loc[region,0],loc[region,1],c=view,s=27,cmap=cmap,
                     vmin=0 if col==3 else -limit if col==2 else lo,vmax=cap if col==3 else limit if col==2 else hi,plotnonfinite=True)
                 ax.set(title=label,aspect="equal",xlabel="Initial x (mm)",ylabel="Initial y (mm)")
+                ax.title.set_fontsize(17);ax.xaxis.label.set_size(15);ax.yaxis.label.set_size(15);ax.tick_params(labelsize=13)
                 if mode=="FT":ax.set_xlim(96.6,173.6);ax.set_ylim(54,136)
-                fig.colorbar(image,ax=ax,label="% (colour capped at P95)" if col==3 else "U2 / error (mm)",shrink=.8,extend="max" if col==3 else "neither")
-            axes[row,0].text(0,1.13,f"{'Best' if row==0 else 'Worst'} ID{ids[sample]} · frame{frame+1}/20 · sample RMSE{scores[sample]:.3g}mm",transform=axes[row,0].transAxes,fontsize=10)
+                bar=rowfigs[row].colorbar(image,ax=ax,label="% error (P95 cap)" if col==3 else "Error (mm)" if col==2 else "U2 (mm)",shrink=.85,fraction=.05,pad=.03,extend="max" if col==3 else "neither")
+                bar.ax.tick_params(labelsize=12);bar.ax.yaxis.label.set_size(14)
+            rowfigs[row].suptitle(f"{'Best' if row==0 else 'Worst'} specimen {ids[sample]} · frame {frame+1}/20 · full-field RMSE {scores[sample]:.3g} mm",fontsize=17)
             details.append(dict(rank="best" if row==0 else "worst",sample_id=ids[sample],retained_frame=frame+1,component="U2",sample_rmse=scores[sample],percent_colour_cap=cap,tiny_truth_threshold=.01*display_scale))
-        fig.suptitle(f"{mode} {tag}: best/worst by complete valid field RMSE\nU2 at largest true regional increment; percent-error grey = tiny/invalid truth, no metric filtering",fontsize=12)
-        fig.tight_layout(rect=(0,0,1,.94));fig.savefig(Path(out)/f"{mode}-field-examples.png",dpi=170);plt.close(fig)
-        # Direct mean-field comparison at the same displayed states; no fitting
-        # to these validation specimens and no change to model predictions.
-        fig,axes=plt.subplots(2,3,figsize=(12,7))
-        for row,(sample,frame,loc) in enumerate(zip(picks,chosen,shapes)):
-            channel=2*frame+1
-            for col,(label,values) in enumerate((("Truth",y[sample,:,channel]),("TRAIN mean",mean[:,frame,1]),("Model",p[sample,:,channel]))):
-                ax=axes[row,col];im=ax.scatter(loc[region,0],loc[region,1],c=values[region],s=17,cmap="viridis",vmin=common_lo,vmax=common_hi)
-                ax.set(title=f"{label}: {'best' if row==0 else 'worst'} ID{ids[sample]}, frame{frame+1}",aspect="equal",xlabel="Initial x (mm)",ylabel="Initial y (mm)")
-                if mode=="FT":ax.set_xlim(96.6,173.6);ax.set_ylim(54,136)
-                fig.colorbar(im,ax=ax,label="U2 (mm)",shrink=.8)
-        fig.suptitle(f"{mode}: does the model reproduce more than the average field?\nSame specimens/frames as the error gallery; mean fit on TRAIN only")
-        fig.tight_layout();fig.savefig(Path(out)/f"{mode}-mean-field-examples.png",dpi=170);plt.close(fig)
+        fig.suptitle(f"{mode} {tag}: best/worst by complete valid field RMSE\nU2 at largest true regional increment; percent-error grey = tiny/invalid truth, no metric filtering",fontsize=18)
+        fig.savefig(Path(out)/f"{prefix}{mode}-field-examples.png",dpi=170);plt.close(fig)
+        mean_field_evolution(mean,xy,present,mode,out,prefix=prefix)
         return details
+
+
+def mean_field_evolution(mean,coords,present,mode,out,prefix=""):
+    """Display the TRAIN reference alone, without duplicating model galleries."""
+    mean,coords,present=np.asarray(mean),np.asarray(coords),np.asarray(present,bool)
+    region=present.copy()
+    if mode=="FT":region&=(coords[:,0]>=96.6)&(coords[:,0]<=173.6)&(coords[:,1]>=54)&(coords[:,1]<=136)
+    frames=[max(0,int(np.ceil(q*mean.shape[1]))-1) for q in (.25,.5,.75,1)]
+    values=mean[region][:,frames,1];lo,hi=float(values.min()),float(values.max())
+    fig,axes=plt.subplots(1,4,figsize=(20,5.5),layout="constrained")
+    for ax,frame in zip(axes,frames):
+        image=ax.scatter(coords[region,0],coords[region,1],c=mean[region,frame,1],cmap="viridis",s=24,vmin=lo,vmax=hi)
+        ax.set(title=f"TRAIN mean · frame {frame+1}",aspect="equal",xlabel="Reference x (mm)",ylabel="Reference y (mm)")
+        ax.title.set_fontsize(15);ax.tick_params(labelsize=12);ax.xaxis.label.set_size(13);ax.yaxis.label.set_size(13)
+        if mode=="FT":ax.set_xlim(96.6,173.6);ax.set_ylim(54,136)
+    bar=fig.colorbar(image,ax=axes,label="Mean U2 (mm)",shrink=.8,pad=.02);bar.ax.tick_params(labelsize=12)
+    fig.suptitle(f"{mode}: TRAIN-only mean-field evolution\nCanonical reference positions; no individual specimen or model prediction",fontsize=17)
+    fig.savefig(Path(out)/f"{prefix}{mode}-mean-field-examples.png",dpi=170);plt.close(fig)
+
+
+def pipeline_regions(runs, control, data_root, region_api, out):
+    """Retrospective field regions for completed serial pipeline comparisons."""
+    rows=[];cache={}
+    for run in runs:
+        path=Path(run["path"]);data=json.loads((path/"model_data.json").read_text())
+        metrics=json.loads((path/"results/metrics.json").read_text())
+        meta=json.loads((path/"run_metadata.json").read_text())
+        if metrics.get("evaluation_split")!="val" or meta.get("status")!="complete":
+            raise ValueError("Require completed validation pipeline: "+str(path))
+        with np.load(path/"results/predictions.npz",allow_pickle=False) as a:
+            ids=list(map(str,a["sample_ids"]))
+            if ids!=list(map(str,data["sample_ids"]["val"])) or len(ids)!=len(set(ids)):
+                raise ValueError("Pipeline specimen IDs disagree")
+            for mode in ("UT","FT"):
+                fingerprint=hashlib.sha256(json.dumps(dict(ids=data["sample_ids"],
+                    frames=data["metadata"]["field_frame_values"][mode],
+                    coords=data["metadata"]["canonical_coords"],presence=data["node_masks"][mode],
+                    mapping=data["metadata"]["field_to_canonical"][mode]),sort_keys=True).encode()).hexdigest()
+                key=mode,fingerprint
+                if key not in cache:
+                    nodes,event,edges,counts=region_api["region_masks"](Path(data_root)/f"MULTI-{mode}-disNodes-allD.npz",data,mode,ids)
+                    mean=region_api["training_mean"](Path(data_root),data,mode)
+                    cache[key]=nodes,event,edges,counts,mean
+                nodes,event,edges,counts,mean=cache[key]
+                y,p=a[f"{mode}_val_field_truth"],a[f"{mode}_val_field_outputs"]
+                valid=a[f"{mode}_val_field_mask"].astype(bool)&a[f"{mode}_node_mask"][None,:,None]&np.isfinite(y)
+                if not np.isfinite(p[valid]).all():raise ValueError("Nonfinite pipeline predictions")
+                measured=region_api["measure_regions"](p,y,valid,nodes,event,edges,mean,mode,a["canonical_coords"])
+                saved=metrics["diagnostics"]["field"][mode]
+                if saved.get("mean_field_baseline_source")!="train_mean_field":raise ValueError("Unverified pipeline mean")
+                if not np.isclose(measured[0]["rmse"],saved["rmse"],rtol=3e-6) or not np.isclose(measured[0]["mean_baseline_rmse"],saved["mean_field_baseline_rmse"],rtol=3e-6):
+                    raise ValueError("Pipeline physical/mean field error differs")
+                rows.extend(dict(variant=run["variant"],seed=run["seed"],mode=mode,**r,**counts) for r in measured)
+        print("PIPELINE_REGION",run["variant"],run["seed"],flush=True)
+    table=pd.DataFrame(rows);base=table[table.variant==control].set_index(["seed","mode","region"]).rmse
+    table["change_percent"]=[100*(r.rmse/base.loc[r.seed,r.mode,r.region]-1) for r in table.itertuples()]
+    table.to_csv(Path(out)/"confirmed-fracture-regions.csv",index=False)
+    region_api["region_figures"](table,Path(out));regional_mean_figures(table,Path(out))
+    pipeline_curve_regions(runs,control,data_root,out)
+    return table
+
+
+def pipeline_curve_regions(runs,control,data_root,out):
+    """Peak/post-peak curve regions, distinct from spatial STATUS evaluation."""
+    curve_rows=[];cache={}
+    for run in runs:
+        path=Path(run["path"]);data=json.loads((path/"model_data.json").read_text())
+        metrics=json.loads((path/"results/metrics.json").read_text())
+        if metrics.get("evaluation_split")!="val":raise ValueError("Require validation-only curves")
+        with np.load(path/"results/predictions.npz",allow_pickle=False) as a:
+            ids=list(map(str,a["sample_ids"]))
+            if ids!=list(map(str,data["sample_ids"]["val"])):raise ValueError("Curve IDs differ")
+            for mode in ("UT","FT"):
+                y,p,x=a[f"{mode}_val_curve_truth"],a[f"{mode}_val_curve_outputs"],a[f"{mode}_curve_x_values"]
+                key=mode,tuple(map(str,data["sample_ids"]["train"])),tuple(ids),tuple(x)
+                if key not in cache:cache[key]=training_curve_mean(data_root,data,mode,y,ids,x)
+                mean=cache[key];measured=measure_curve_regions(p,y,x,mean)
+                saved=metrics["diagnostics"]["curve"][mode]
+                if not np.isclose(measured[0]["rmse"],saved["rmse"],rtol=3e-6) or not np.isclose(measured[0]["baseline_rmse"],saved["mean_curve_baseline_rmse"],rtol=3e-6):
+                    raise ValueError("Curve global/baseline error does not reproduce")
+                curve_rows.extend(dict(variant=run["variant"],seed=run["seed"],mode=mode,**r) for r in measured)
+    curves=pd.DataFrame(curve_rows);base=curves[curves.variant==control].set_index(["seed","mode","region"]).rmse
+    curves["change_percent"]=[100*(r.rmse/base.loc[r.seed,r.mode,r.region]-1) for r in curves.itertuples()]
+    curves.to_csv(Path(out)/"curve-region-metrics.csv",index=False)
+    fig,axes=plt.subplots(2,2,figsize=(15,9));variants=list(dict.fromkeys(curves.variant))
+    for row,column in enumerate(("change_percent","skill_percent")):
+        for col,mode in enumerate(("UT","FT")):
+            ax=axes[row,col]
+            for j,region in enumerate(("Peak window ±5% span","Post-peak to recorded end")):
+                means=[];sds=[]
+                for variant in variants:
+                    values=curves[(curves.variant==variant)&(curves["mode"]==mode)&(curves.region==region)][column]
+                    means.append(values.mean());sds.append(values.std() if len(values)>1 else 0)
+                ax.errorbar(np.arange(len(variants))+(j-.5)*.13,means,yerr=sds,marker="o",capsize=3,label=region)
+            ax.set(title=f"{mode}: {'vs control, lower better' if row==0 else 'vs TRAIN mean, higher better'}",
+                   ylabel="Percent",xticks=range(len(variants)),xticklabels=variants)
+            ax.tick_params(axis="x",rotation=25,labelsize=9);ax.axhline(0,color="black",lw=.8);ax.legend(fontsize=8);ax.grid(alpha=.2)
+    fig.suptitle("Mechanically relevant curve windows, not spatial STATUS regions; whiskers = seed SD")
+    fig.tight_layout();fig.savefig(Path(out)/"curve-regions.png",dpi=170);plt.close(fig)
+    return curves
+
+
+def pipeline_global_figures(table,out):
+    """Four fixed outputs, paired controls and TRAIN-mean reference across seeds."""
+    variants=list(dict.fromkeys(table.variant))
+    for name,column,title in (("global-control","change_percent","Global RMSE change versus the study control — lower is better"),
+                               ("global-mean","skill_percent","RMSE reduction versus TRAIN mean — higher is better"),
+                               ("output-variation","collapse_ratio","Predicted / true specimen variation — zero is constant output, one matches spread")):
+        fig,axes=plt.subplots(2,2,figsize=(15,9))
+        for row,kind in enumerate(("field","curve")):
+            for col,mode in enumerate(("UT","FT")):
+                ax=axes[row,col]
+                values=[table[(table.variant==v)&(table.kind==kind)&(table["mode"]==mode)][column] for v in variants]
+                heights=[v.mean() for v in values];sd=[v.std() if len(v)>1 else 0 for v in values]
+                bars=ax.bar(range(len(variants)),heights,yerr=sd,capsize=3,color="#477f9f")
+                ax.bar_label(bars,fmt="%.2f",fontsize=9,padding=4)
+                ax.set(title=f"{mode} {kind}",ylabel="Variation ratio" if column=="collapse_ratio" else "Percent",xticks=range(len(variants)),xticklabels=variants)
+                if column=="collapse_ratio":ax.axhline(1,color="black",linestyle=":",lw=1)
+                ax.tick_params(axis="x",rotation=25,labelsize=9);ax.axhline(0,color="black",lw=.8);ax.grid(axis="y",alpha=.2);ax.margins(y=.2)
+        fig.suptitle(title+"\nWhiskers = seed SD, not confidence intervals")
+        fig.tight_layout();fig.savefig(Path(out)/f"{name}.png",dpi=170);plt.close(fig)
 
 
 def regional_mean_figures(table,out,variants=None):

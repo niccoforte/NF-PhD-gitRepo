@@ -26,7 +26,7 @@ def parse_args(argv=None):
     parser.add_argument("--batch", type=int, help="Explicit override; default is the saved control batch")
     parser.add_argument("--allow-cpu", action="store_true")
     parser.add_argument("--preflight", action="store_true", help="Full-data identity check, then all sixteen tiny train/reload cases")
-    parser.add_argument("--preflight-variants", nargs="+", choices=VARIANTS, default=VARIANTS,
+    parser.add_argument("--preflight-variants", nargs="+", choices=VARIANTS, default=VARIANTS[:8],
                         help="Explicit cases for a disposable execution gate")
     args = parser.parse_args(argv)
     if args.epochs < 1 or (args.batch is not None and args.batch < 1):

@@ -59,3 +59,10 @@ DUAL variants, not adopted independent-model improvements.
 Full source/cross-fitting and loss-policy contracts remain documented in
 `../../DualOutputs/README.md`. The CLI lives here; reusable fitting logic is
 `resources/MLfield_sources.py`, and source controls stay explicit.
+
+`review_field_inputs.py` retains the original fixed-score decision while its
+current report presents the accepted Mixed/no-corrector route. It includes actual
+STATUS-event and target-defined peak/post-peak evaluations, global/TRAIN-mean
+comparisons, large four-column galleries and explained loss/cost panels.
+Cancelled corrected-source submission instructions are not regenerated. Raw
+correction results remain comparison evidence, not the active workflow.

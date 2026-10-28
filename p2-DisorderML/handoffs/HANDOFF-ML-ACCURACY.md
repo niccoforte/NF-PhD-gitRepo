@@ -10,36 +10,31 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Current priority order (28 October; supersedes older next-step wording)
 
-- [ ] Execute newly authorised CNN2 seeds43/44 controls (eight fits), CNN3 seed42
-  depth screen (two), FT spatial0/.001/.003/.01/.1 (five), FT STATUS .001/.01
-  (two) and UT control/STATUS1 seeds43/44 (four). Named study launchers now
-  prepare these isolated fits; check actual gates/job receipts before repeating.
-- [ ] Defer temporal-loss revisions until spatial balance is reviewed. Consider
-  FT-box-only spatial supervision separately, retaining whole-field MSE.
-- [ ] Curve-term attribution is outstanding: historical bundled presets do not
-  isolate derivatives/area/zones/peak terms. Keep MSE pending one-term ablations.
-
-- [x] Download/verify/review all 8 STATUS and 13 FieldVariations fits: all complete
-  and reload-checked, 348 files/6.56GB matched SHA256. STATUS report is updated
-  in place; FieldVariations has its own report. Main Loss report now owns global
-  plus actual STATUS-event comparisons and mean-field plots; no separate
-  fracture-region Markdown report. Follow root visual-report guidance.
-- [ ] First proposed execution: CNN2 and matched plain controls, UT/FT,
-  seeds 43/44 (eight final fits; reuse seed42). No new job is authorised by a
-  recommendation/report alone. Retain fixed global and confirmed-event metrics.
-- [ ] Then propose one FT spatial balance screen in the same final-only trainer:
-  coefficients 0/.001/.003/.01/.1, seed 42 (five fits, fresh 0/.1 bridge controls),
-  fixed architecture/splits/physical selection. Confirm a useful coefficient on
-  seeds 43/44 before OOF/curve adaptation. Current 0.1 is strongly overemphasised
-  relative to global FT error; this is not proof of a connectivity defect.
-- [ ] Optional: smaller FT auxiliary STATUS coefficients 0.001/0.01 against the
-  existing matched STATUS control. Current 0.1/1 give weighted BCE/field values
-  1.98×/43.82× at chosen FT checkpoints, not measured gradient ratios. Do not
-  add predicted-damage feedback until this simpler balance question is answered.
-- [ ] UT auxiliary 1 is a local candidate (endpoints−3.17%, global−0.04%), not
-  a proven null or an adopted winner; repeat with controls before promotion.
-  UT residual and FT Gaussian 3/.25 also need seeds, but gains are smaller than
-  the prior CNN2 candidate. FT residual is not supported by this independent run.
+- [x] Submit isolated follow-ups from8ca82d5: CNN confirmation/depth (ten),
+  FT spatial balance (five), STATUS balance/UT confirmation (six). CNN/spatial
+  gates passed; STATUS gate is pending. PROJECT_STATUS and report-side jobs.tsv
+  receipts own IDs/live state; do not repeat submissions.
+- [ ] Review these results against matched controls, TRAIN mean, actual STATUS
+  endpoints/strut motion and curve safeguards; permit task-specific choices.
+  UT spatial0.1 improves field and adapted-curve RMSE in all three seeds, but
+  peak-height/location errors worsen: retain the trade-off before promotion.
+- [ ] After spatial balance: consider FT-box-only spatial supervision, using
+  edges with both endpoints in the fixed geometric box plus whole-field MSE.
+  This has no STATUS-informed path, but shared parameters/global attention can
+  still change predictions outside the box. Defer temporal revisions until then.
+- [ ] Individual curve-term attribution remains untested: bundled presets and
+  the conditional soft-location addition do not isolate other terms. Keep MSE;
+  later test one modest peak term with independent true-field controls first.
+- [x] Refresh maintained Independence/Input/Locality/Loss/STATUS/Variations
+  reports; large four-column galleries replace superseded prediction triples.
+  Historical true-field/shared-encoder curve-loss study stays separately labelled
+  and now includes peak/post-peak windows, TRAIN means, costs and log histories.
+- [x] Download/verify/review eight STATUS and13 FieldVariations fits:348 files,
+  6.56GB match SHA256. Main Loss report includes actual STATUS-event and mean
+  field evidence. No model has been automatically promoted.
+- [ ] Lower-priority confirmation: UT residual and FT Gaussian candidates;
+  explicit damage feedback only after loss balance; existing damage-to-curve
+  input work remains deferred. FT residual is unsupported in the independent run.
 
 - [x] Finish the source-layout cleanup and verification: named entry points and
   reviews under `HPC/studies/<Study>/`, imported helpers in resources; keep
