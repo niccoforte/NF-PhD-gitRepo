@@ -18,13 +18,14 @@ It has not been dispatched automatically. New submissions require explicit scope
   endpoints/strut motion and curve safeguards; permit task-specific choices.
   UT spatial0.1 improves field and adapted-curve RMSE in all three seeds, but
   peak-height/location errors worsen: retain the trade-off before promotion.
-- [ ] After spatial balance: consider FT-box-only spatial supervision, using
-  edges with both endpoints in the fixed geometric box plus whole-field MSE.
-  This has no STATUS-informed path, but shared parameters/global attention can
-  still change predictions outside the box. Defer temporal revisions until then.
-- [ ] Individual curve-term attribution remains untested: bundled presets and
-  the conditional soft-location addition do not isolate other terms. Keep MSE;
-  later test one modest peak term with independent true-field controls first.
+- [ ] Authorised FT-box spatial screen: four seed42 coefficients0.001/0.003/
+  0.01/0.1; both endpoints inside fixed box, whole-field MSE and scales unchanged.
+  Reuse the fresh zero control; compare with all-edge balance. No STATUS weights.
+- [ ] Authorised independent true-field curve-term study: eight arms × UT/FT ×
+  three seeds =48 fits. True fields for both training/validation; unchanged base
+  MSE for additive arms, fixed selection, historical shared oracle kept separate.
+  Review per-term global/peak/post-peak/work and TRAIN-mean metrics before Mixed
+  deployment. See Loss guide and report-side receipts; avoid repeat submissions.
 - [x] Refresh maintained Independence/Input/Locality/Loss/STATUS/Variations
   reports; large four-column galleries replace superseded prediction triples.
   Historical true-field/shared-encoder curve-loss study stays separately labelled
@@ -70,12 +71,11 @@ It has not been dispatched automatically. New submissions require explicit scope
   fields and its broader tip box, despite slight gains at actual STATUS onset
   endpoints. Do not spend on fresh OOF banks before a useful field-only result.
   Proposed FT coefficients0.001/0.003/0.01 versus existing0/0.1 evidence; no
-  redesign until the balance question is answered. These are not submitted.
+  redesign until the balance question is answered. Submission receipts and PROJECT_STATUS own current execution state.
 - [x] Check the existing historical true-field custom-curve-loss comparison:
-  samples/loss-study/true-field-curves.md. Same shared curve architecture/split,
+  samples/loss-study/historical-shared-true-field/README.md. Same shared curve architecture/split,
   one seed; custom presets worsen overall RMSE even with true fields. It is not
-  a completed independent Case1(i) oracle comparison. Retain that matched
-  independent test as a later decision, not a reason to repeat old shared runs.
+  a completed independent Case1(i) oracle comparison. The matched independent test is now authorised above; do not repeat old shared runs.
 - [ ] If peak errors still warrant loss changes after improving fields: MSE plus
   one train-scaled peak-height OR soft-location term, with other custom terms
   disabled. Isolate it with independent true-field inputs before Mixed deployment.
@@ -104,6 +104,30 @@ physics/strain and optimisation handoffs own those deferred directions. Output
 PCA/autoencoder remains conditional on a demonstrated compression need.
 Numerical fracture-metric acceptance tolerances remain unagreed; show fixed
 metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
+
+### Seminar follow-up,28 October — deferred, not new job authority
+
+- Compare field MAE/Huber versus MSE as isolated alternatives only after the
+  current loss/locality evidence; evaluate fracture jumps/signs and extremes.
+  L1 estimates conditional medians, not a guarantee of sharper fracture paths;
+  it also reduces the influence of large errors that can matter mechanically.
+- RNOs learn causal constitutive history with latent internal variables. Current
+  attention is spatial over800 nodes, while20 times are output channels.
+  A spatial encoder + recurrent/continuous-time decoder is a future comparator
+  if loading-path/time-resolution generalisation becomes a requirement, not an
+  immediate Transformer replacement. Fixed Ti/BC data cannot establish general
+  constitutive learning or arbitrary temporal resolution. Source:
+  https://arxiv.org/abs/2210.17443 (Liu et al.,2023,JMPS178:105329).
+- Do not infer macro stress from average strain alone: the current common
+  loading can make the average nearly identical while local fracture differs.
+  Retain displacement localisation/damage summaries for any later true-field
+  information-content diagnostic; no force reconstruction is authorised.
+- Do not impose Ku=F across plastic fracture dynamics from nodal translations
+  alone. Beam rotations, material/history/damage and inertial terms are missing.
+  An equilibrium/PINN study first needs a correct residual and identifiable state;
+  loss-of-fit to true FEA fields must be checked before model training.
+- Pretraining/fine-tuning is a conditional future option if training families or
+  experimental data expand, not a reason to revive cancelled joint sharing.
 
 ### Authorised isolated field variations
 

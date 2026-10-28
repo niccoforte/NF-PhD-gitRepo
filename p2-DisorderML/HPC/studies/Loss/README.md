@@ -81,9 +81,67 @@ spatial balance question is resolved. Regional spatial-only supervision inside
 the FT box is feasible but remains a separate proposed ablation; it is not
 included in the coefficient screen or silently combined with regional MSE.
 
-The separate `true-field-curves.md` is a distinct historical shared-encoder,
+The separate `historical-shared-true-field/README.md` is a distinct historical shared-encoder,
 true-training/true-evaluation study. Its expanded reader verifies physical CSV
 truths and TRAIN means, reports target-defined peak/pre/post-peak windows, hard
 peak/work metrics, large error/percentage examples, costs and log histories.
 These curve regions are not spatial STATUS-labelled nodes. Bundled presets do
 not identify each loss term: one-term attribution remains deferred.
+# Independent true-field curve-term attribution (28 October)
+
+`A0-CurveTerms.py` and `B4_CurveTerms.sh` fit **one independent UT or FT curve
+Transformer per job**, using true fields in both training and validation. No
+field-generator optimization, Mixed source, shared UT/FT encoder or locked-test
+evaluation is involved. The current accepted descriptor supplies architecture,
+IDs, feature/scaler contract and optimizer/budget, not pretrained weights.
+
+Eight arms × two modes × seeds42/43/44 = **48 final fits**, each up to450 epochs,
+patience52,240h/1GPU/12CPU/90000MB. One disposable16-case GPU execution gate
+checks all arms and both modes, including full-data identity/scaler checks and
+checkpoint reload. Jobs remain dependent on its success.
+
+| Arm | Objective change from normalized MSE |
+| --- | --- |
+| mse | None; fresh matched control |
+| range_mse | Replace only the base by historical per-target-range MSE |
+| zone | Add0.5 × range-normalized zone MSE; zone weights1/5/0.2 |
+| derivative | Add0.05 × existing first-derivative term |
+| peak_height | Add0.25 × existing normalized peak-height term |
+| work | Add0.1 × existing normalized area/work term |
+| peak_location | Add0.02 × soft-versus-soft location term, beta20 |
+| combined | Add all five terms; interaction diagnostic, not single-term attribution |
+
+Except `range_mse`, the base is unchanged. Additional terms reconstruct physical
+curves differentiably; UT/FT zone boundaries use their existing definitions.
+These fixed coefficients are screening settings, not HPO optima. A negative
+result at one coefficient does not establish that a term is intrinsically bad.
+All arms select by the same physical validation MSE divided by the fixed error
+of the TRAIN-mean predictor; differing weighted loss totals never rank arms.
+
+Archives use `{UT|FT}/FieldToCurve/Transformer/<suite>-<arm>-<mode>-s<seed>`.
+The explicit `independent-curve-loss-terms` checkpoint kind loads with
+`resources.MLcurve_terms.load_curve_term_model`, not `DUAL_MODEL` or legacy
+`MODEL`. It contains only the active curve model, data contract and provenance.
+Predictions, per-specimen peak/work diagnostics, peak/pre/post-peak regions and
+loss components are saved for the requested visual report. The historical
+shared-encoder report lives in
+`samples/loss-study/historical-shared-true-field/README.md`; do not mix populations.
+
+## FT-box spatial supervision
+
+`B4_SpatialBox.sh` uses `A0-SpatialBalance.py --spatial-region ft_box`:
+four seed42 final FT fits at0.001/0.003/0.01/0.1, reusing the zero coefficient
+control in the all-edge balance suite. Architecture, full-field MSE and TRAIN
+normalizers/jump scales stay fixed. Only initial struts with **both endpoints**
+inside the existing geometric crack-tip box contribute to the added spatial
+term. No STATUS labels define training regions. Endpoint validity and
+degree-balanced averaging remain active. Global attention/shared parameters
+can still change predictions outside the box. A separate five-case GPU gate
+checks this region implementation; existing all-edge jobs remain untouched.
+
+Preview/submit from a clean synchronized repository:
+
+```bash
+bash p2-DisorderML/HPC/studies/Loss/B4_CurveTerms.sh curve-terms-261028 [--submit]
+bash p2-DisorderML/HPC/studies/Loss/B4_SpatialBox.sh spatial-box-261028 [--submit]
+```

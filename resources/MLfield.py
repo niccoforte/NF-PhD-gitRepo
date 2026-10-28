@@ -91,7 +91,7 @@ class StructuredFieldLoss(nn.Module):
     def __init__(self, edges, n_nodes, n_components=2, mean=0., scale=1.,
                  spatial_scale=1., temporal_scale=1., spatial_weight=0.1,
                  temporal_weight=0.1, localization_gain=0., eps=1e-8, fixed_weights=None,
-                 localization_mode="activity"):
+                 localization_mode="activity", spatial_node_mask=None):
         super().__init__()
         self.n_nodes, self.n_components = int(n_nodes), int(n_components)
         self.spatial_weight, self.temporal_weight = float(spatial_weight), float(temporal_weight)
@@ -122,9 +122,15 @@ class StructuredFieldLoss(nn.Module):
         if fixed is not None and (fixed.ndim != 3 or not torch.isfinite(fixed).all() or torch.any(fixed <= 0)):
             raise ValueError("fixed_weights must be positive finite [node,frame,component] broadcast weights.")
         self.register_buffer("fixed_weights", fixed)
+        spatial_nodes = None if spatial_node_mask is None else torch.as_tensor(spatial_node_mask, dtype=torch.bool)
+        if spatial_nodes is not None:
+            if spatial_nodes.shape != (self.n_nodes,) or not spatial_nodes[torch.as_tensor(edge)].all(1).any():
+                raise ValueError("Spatial region must select nodes and at least one complete initial edge.")
+        self.register_buffer("spatial_node_mask", spatial_nodes)
 
     def get_config(self):
         return {"fixed_weights": None if self.fixed_weights is None else self.fixed_weights.cpu().tolist(),
+                "spatial_node_mask": None if self.spatial_node_mask is None else self.spatial_node_mask.cpu().tolist(),
                 **{k: getattr(self, k) for k in ("n_nodes", "n_components", "spatial_weight",
                 "temporal_weight", "localization_gain", "localization_mode", "eps")},
                 **{k: getattr(self, k).detach().cpu().tolist() for k in
@@ -236,6 +242,8 @@ class StructuredFieldLoss(nn.Module):
         p, y, pu, yu, valid = self._prepare(pred, target, mask)
         i, j = self.edges.T
         edge_valid = valid[:, i] & valid[:, j]
+        if self.spatial_node_mask is not None:
+            edge_valid = edge_valid & (self.spatial_node_mask[i] & self.spatial_node_mask[j])[None,:,None,None]
         dp = (pu[:, j]-pu[:, i])/self.spatial_scale
         dy = (yu[:, j]-yu[:, i])/self.spatial_scale
         node_spatial, node_valid = self._node_average((dp-dy).square(), edge_valid)

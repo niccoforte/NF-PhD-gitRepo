@@ -200,3 +200,11 @@ uses an immutable clean source, a disposable execution gate and B1 afterok
 B1 stages Locality's common runner for the SpatialBalance entry just as for
 FieldVariations. Explicit damage coefficients are auxiliary-only and saved;
 historical defaults remain unchanged. No temporal/CNN/STATUS mixing or curves.
+# Independent curve-term and regional-spatial screens
+
+Loss/A0-CurveTerms.py archives one task under FieldToCurve with an explicit
+curve-only loader; it trains and validates on true fields. B4_CurveTerms.sh and
+B4_SpatialBox.sh own disposable afterok gates and immutable sources. Their Loss
+README owns cases/coefficient choices. FT-box masks affect only spatial edges;
+global MSE/scalers/selection remain fixed. Do not reuse a shared-encoder oracle
+as the independent curve control or treat a preflight as scientific evidence.

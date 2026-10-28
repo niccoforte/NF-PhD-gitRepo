@@ -137,3 +137,10 @@ re-export; existing producer output defaults are not current read dependencies.
 ## Synthetic boundary check
 
 The explicitly non-scientific fixture lives at `.agents/skills/validate-repo-change/fixtures/synthetic_contract/contract.json`. Run `python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope contract` to check aligned ids, reference id `0`, field dimensions/metadata, CSV round-trip identity, and NPZ round-trip shapes when NumPy is available. It does not validate real values, Abaqus behavior, scientific assumptions, or HPC execution.
+# Independent curve-term checkpoints
+
+`independent-curve-loss-terms`,version1 is a curve-only saved kind, loaded by
+resources.MLcurve_terms.load_curve_term_model. It stores one task Transformer,
+train-fitted DUAL_DATA contract, true-field source metadata and validation-only
+curve outputs. No placeholder field predictions are exported. It is distinct
+from both legacy MODEL and the assembled independent DUAL_MODEL container.

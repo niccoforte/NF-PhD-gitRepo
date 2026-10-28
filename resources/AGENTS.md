@@ -108,3 +108,10 @@ below expose imported functions/classes. Do not add job entry points here.
 - Preserve backward compatibility for saved artifacts where practical; old runs are research evidence.
 - When a change touches p1 and p2, validate at the lowest common contract: file names, sample ids, array shapes, metadata keys, and loader behavior.
 - Treat `utilities.py` operations that rename files, edit `.inp` files, or delete `.bak` files as destructive. Use dry-run paths when available.
+# Curve-term attribution
+
+`MLcurve_terms.py` contains imported independent true-field training components,
+not a CLI. Its versioned curve-only checkpoints use its explicit loader. Keep
+normalized MSE fixed in additive ablations and physical inverses differentiable;
+do not route these checkpoints through legacy MODEL or DUAL_MODEL. Optional
+MLfield spatial-node regions mask only the extra edge term, never full-field MSE.

@@ -1,5 +1,13 @@
 # p2 Implementation Status
 
+- 28 October continuation: existing CNN gate and spatial gate passed; CNN
+  controlUT43/controlFT43/CNN2UT43 completed0:0; other existing fits queue for
+  Priority/dependency, with no new failures at the live check. Preparing48
+  independent true-field curve-term fits and four FT-box spatial fits; no
+  accepted winner change. Historical shared true-field curve report moved to
+  samples/loss-study/historical-shared-true-field/README.md. Samples README is
+  the interpretation index; external Z:/p2/README is the raw-artifact catalogue.
+
 This is a compact repository handoff, not a second research plan or an Obsidian mirror. Scientific objectives, manuscript reasoning and supervisor decisions remain in the vault's `Writing/p2/` and `Writing/Research Plans/`. Durable contracts belong in `AGENTS.md`; completed changes belong in Git history.
 
 ## Active implementation
@@ -78,7 +86,7 @@ This is a compact repository handoff, not a second research plan or an Obsidian 
   no gate archive retained; home log is the execution record.
   Six STATUS regressions,31 dual contracts and10 locality regressions pass;
   Linux contract validation111 non-failing/zero failed. The historical true-field
-  shared-curve custom-loss comparison is verified in `samples/loss-study/true-field-curves.md`:
+  shared-curve custom-loss comparison is verified in `samples/loss-study/historical-shared-true-field/README.md`:
   combined presets worsen global error even with true fields; not a new Case1(i)
   oracle result. Accepted Mixed MSE configuration remains unchanged.
 

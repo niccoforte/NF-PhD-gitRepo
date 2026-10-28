@@ -16,7 +16,7 @@ LABELS=("MSE","Combined, no location","Combined + soft location")
 def main(argv=None):
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--root",type=Path,default=Path("Z:/p2/MULTI/Dual/Transformer"))
-    p.add_argument("--out",type=Path,default=Path(__file__).resolve().parents[3]/"samples/loss-study")
+    p.add_argument("--out",type=Path,default=Path(__file__).resolve().parents[3]/"samples/loss-study/historical-shared-true-field")
     p.add_argument("--data-root",type=Path,default=Path("Z:/p1/data/Ti/disNodes/0.2/FCC/MLdata"))
     a=p.parse_args(argv);a.out.mkdir(parents=True,exist_ok=True);rows=[];contract={}
     for name,label in zip(RUNS,LABELS):
@@ -146,7 +146,7 @@ def deepen(root,out,table,data_root):
         "The bundle uses curve MSE1, zone MSE0.5 (weights1/5/0.2), first derivative0.05, peak height0.25, work0.1; the location coefficient is0 or0.02 with sharpness20. These terms were not individually ablated. Adding soft location to the existing bundle isolates that addition conditionally; it does not isolate the other terms or demonstrate their individually optimal coefficients. FT integrated force-displacement work is a proxy, not K_JIC. No new property definition or physical fracture-time alignment is inferred.\n\n",
         "The next useful curve test, after field improvements, is MSE plus one modest term at a time with independent true-field controls, followed by Mixed/predicted-field evaluation. No curve-term learning job is submitted by this review.\n\n",
         "[Global/hard metrics](true-field-curve-losses.csv) · [Regional errors, counts and denominators](true-field-curve-regions.csv) · [Measured costs](true-field-curve-cost.csv). No inference, retraining, locked-test evaluation or upstream export.\n"]
-    table.to_csv(out/"true-field-curve-losses.csv",index=False);(out/"true-field-curves.md").write_text("".join(text),encoding="utf-8")
+    table.to_csv(out/"true-field-curve-losses.csv",index=False);(out/"README.md").write_text("".join(text),encoding="utf-8")
     print(regions[["label","mode","region","change_percent","skill_percent"]].to_string(index=False))
 
 

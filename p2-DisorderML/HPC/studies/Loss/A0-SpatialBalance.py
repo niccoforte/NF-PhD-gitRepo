@@ -12,6 +12,7 @@ def parse_args(argv=None):
     p.add_argument("--reference-model-json", required=True)
     p.add_argument("--run-label", required=True)
     p.add_argument("--spatial-coefficient", type=float, choices=COEFFICIENTS, default=.001)
+    p.add_argument("--spatial-region", choices=("all","ft_box"), default="all")
     p.add_argument("--data-path", default="HPC")
     p.add_argument("--run-root")
     p.add_argument("--seed", type=int, default=42)
@@ -25,18 +26,19 @@ def parse_args(argv=None):
     if a.epochs < 1 or (a.batch is not None and a.batch < 1) or (a.nsims is not None and a.nsims < 1):
         p.error("Positive training budgets required")
     a.mode = "FT"
-    a.variant = "spatial_"+str(a.spatial_coefficient).replace(".", "p")
+    a.variant = ("box_spatial_" if a.spatial_region=="ft_box" else "spatial_")+str(a.spatial_coefficient).replace(".", "p")
     return a
 
 
 def configure(network, data, args):
     from resources.MLdual import DualLoss
-    from resources.MLfield import field_loss_from_data
+    from resources.MLfield import field_loss_from_data,fcc_initial_crack_region
     # Both loss modules expose the same component logs. Only FT executes/trains;
     # the inactive UT loss has zero added weights and no active targets.
+    region = fcc_initial_crack_region(data.metadata["canonical_coords"], data.node_masks["FT"])[0] if args.spatial_region=="ft_box" else None
     losses = {m: field_loss_from_data(data, m,
         spatial_weight=args.spatial_coefficient if m == "FT" else 0.,
-        temporal_weight=0., localization_gain=0.) for m in ("UT", "FT")}
+        temporal_weight=0., localization_gain=0.,spatial_node_mask=region if m=="FT" else None) for m in ("UT", "FT")}
     return DualLoss(field_loss=losses)
 
 
@@ -60,7 +62,7 @@ def main(argv=None):
     for coefficient in COEFFICIENTS:
         case = argparse.Namespace(**vars(a))
         case.spatial_coefficient = coefficient
-        case.variant = "spatial_"+str(coefficient).replace(".", "p")
+        case.variant = ("box_spatial_" if a.spatial_region=="ft_box" else "spatial_")+str(coefficient).replace(".", "p")
         case.nsims, case.epochs = 64, 1
         case.run_label = a.run_label+"-"+case.variant
         run(case); gc.collect()

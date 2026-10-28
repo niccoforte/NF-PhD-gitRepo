@@ -398,7 +398,7 @@ def write_report(root, out, rows, extra, sources, banks, checks):
         "## Further diagnostics and evidence\n\nThe FT spatial error persists after removing each sample/frame/component's mean nodal error. This rules out a uniform offset as the entire explanation; it does not establish a causal optimization mechanism. Connectivity agrees with the bounded INP audit. These models are independent, so UT/FT competing shared gradients cannot explain this result.\n\n",
         image("field-error-decomposition.png","Mean nodal and centred error decomposition"),
         image("frozen-versus-adapted.png","Frozen curve readout versus freshly adapted curves"),
-        "[Historical true-field curve-loss check](true-field-curves.md) is a separate input-source diagnostic, not a Case1(i) oracle result. [Full metrics](metrics.csv), [fracture-region errors/denominators/counts](status-fracture-regions.csv), [motion and curve safeguards](safeguards.csv), [runtime and provenance](runs.csv), [field banks](field-banks.csv), [verification](verification.json). No model is retrained by this report.\n"]
+        "[Historical true-field curve-loss check](historical-shared-true-field/README.md) is a separate input-source diagnostic, not a Case1(i) oracle result. [Full metrics](metrics.csv), [fracture-region errors/denominators/counts](status-fracture-regions.csv), [motion and curve safeguards](safeguards.csv), [runtime and provenance](runs.csv), [field banks](field-banks.csv), [verification](verification.json). No model is retrained by this report.\n"]
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(out,"spatial-balance-jobs.tsv","FT spatial coefficients"))
     (out/"README.md").write_text("".join(text),encoding="utf-8")

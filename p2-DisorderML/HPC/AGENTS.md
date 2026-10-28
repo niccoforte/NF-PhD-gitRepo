@@ -50,6 +50,8 @@ This directory owns p2 QMUL Slurm training, HPO, resume, archive and transfer. R
 
 ## Validation
 
+- Loss/README.md owns independent curve-term/regional-spatial gates, fixed MSE selection and explicit curve-only loaders.
+
 - Locality/FieldVariations and named confirmation/balance launchers isolate field changes; preserve IDs, physical selection and field-only exports. Their guides own cases/gates/budgets. FieldVariations reuses Locality's runner; B1 stages both. Read WINNER.md before choosing controls.
 
 - Named study wrappers preview unless `--submit`. Keep strict bank/seed/scaler/source checks and afterok gates; `studies/README.md` owns entry paths and each study guide owns cases/resources. Mixed loss continuation reuses12 compatible banks; do not resubmit them or mix new features into frozen comparisons.
