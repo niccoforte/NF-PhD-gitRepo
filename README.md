@@ -435,6 +435,8 @@ final cleanup; source values and unique temporary evidence must be preserved.
 Publication exports in `audit/paper` show only initiation results from the
 original simulations using the initial-triangle convention, versus Hsieh's
 initial data. They provide PNG/PDF/SVG, captions and point/exclusion CSVs.
+Paper legends identify the simulation series as Current study; internal
+`Simulation` series keys in the point tables remain stable identifiers.
 Large hollow reference markers and smaller layered simulation markers reveal
 coincident points without coordinate jitter. The original Fig.8b comparison is
 retained. Two explicitly labelled hypothesis views, `figure8b_hsieh_fix` and

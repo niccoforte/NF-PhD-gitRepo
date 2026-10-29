@@ -791,24 +791,24 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
     write_rows(destination / "points.csv", points)
     write_rows(destination / "exclusions.csv", [r for r in points if r["series"] == "Simulation" and not r["plotted"]])
     captions = {
-        "8a": ("Initial-fracture comparison at nominal relative densities 13%, 16%, 20%. Simulation values use the original Explicit histories, "
+        "8a": ("Initial-fracture comparison at nominal relative densities 13%, 16%, 20%. Current study values use the original Explicit histories, "
                "the last recorded undamaged tensile-strain sample and Hsieh's initial-slope area convention with the C(T) calibration. "
-               "Simulation normalisation uses parent UTS 1111.792 MPa and bar length in metres. Hsieh's original normalised ordinates are unchanged "
+               "Current study normalisation uses parent UTS 1111.792 MPa and bar length in metres. Hsieh's original normalised ordinates are unchanged "
                "and repeated at the two nominal length assignments; the source strength convention remains unresolved. Undefined areas and absent cases are omitted, "
                "with every exclusion recorded in exclusions.csv. No vertical shift, fitted factor or replacement work estimate is used."),
         "8b": ("Initial-fracture comparison at nominal relative density 20%. The original Hsieh ordinates are retained at nominal 3/10 mm assignments. "
                "The x coordinate is sqrt(bar length in mm), following the source tick convention despite its metre label; source marker x coordinates were not digitised. "
-               "Simulation values use parent UTS 1111.792 MPa. The inconsistency between Figures 8a/8b remains unresolved; this is not independent proof of absolute toughness. "
+               "Current study values use parent UTS 1111.792 MPa. The inconsistency between Figures 8a/8b remains unresolved; this is not independent proof of absolute toughness. "
                "The undefined 3 mm hexagonal simulation is omitted."),
         "10": ("Dimensional comparison based on Figure 10 initiation data at matched nominal relative densities, avoiding the different constituent mass densities 4430/4500 kg/m3. "
                "The 3 mm Hsieh initial-toughness points are directly digitised; the 10 mm reference is an explicitly declared sqrt(10/3) scaling inference. "
-               "Error bars bound graphical extraction only and are not statistical confidence intervals. Simulation values use the original Explicit histories and initial-slope area convention; "
+               "Error bars bound graphical extraction only and are not statistical confidence intervals. Current study values use the original Explicit histories and initial-slope area convention; "
                "no final-fracture, dissipation or nonlinear-recovery estimates are included. Negative-area values and absent cases are omitted; data and source fingerprints are in points.csv. "
                "This comparison does not establish ASTM qualification or agreement for all lattices.")}
     for figure in variants:
-        adjusted = ("Hsieh's displayed Fig.8b ordinates divided by sqrt(3); simulation ordinates unchanged. "
+        adjusted = ("Hsieh's displayed Fig.8b ordinates divided by sqrt(3); Current study ordinates unchanged. "
                     if figure == "8b_hsieh_fix" else
-                    "Simulation displayed Fig.8b ordinates multiplied by sqrt(3); Hsieh ordinates unchanged. ")
+                    "Current study displayed Fig.8b ordinates multiplied by sqrt(3); Hsieh ordinates unchanged. ")
         captions[figure] = ("Hypothetical reconciliation of the Fig.8a/8b normalisation mismatch. " + adjusted +
                            "This is an explicitly requested interpretation test, not a verified correction or new simulation result. "
                            "Original source ordinates, simulation K, nominal density, lengths and initiation samples are unchanged in their source files. "
@@ -876,13 +876,13 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                     ax.text(.02,.95,"({})".format("ab"[panel]),transform=ax.transAxes,va="top",fontsize=9)
             handles = [Line2D([],[],color=colors[t],lw=1.6,label=names[t]) for t in TOPOLOGIES]
             handles += [Line2D([],[],color="#555555",marker="^",mfc="none",ms=8.4,mew=1.25,ls="-",lw=1,label="Hsieh et al."),
-                        Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Simulation")]
+                        Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Current study")]
             fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.08),ncol=5,frameon=False,
                        columnspacing=1.15,handlelength=1.5,handletextpad=.45)
             note = (r"10 mm reference: 3 mm data $\times\sqrt{10/3}$. " if figure == "10" else "")
             if figure in variants:
-                note += (r"Hypothesis: Hsieh ordinates $/\sqrt{3}$; simulation unchanged. " if figure == "8b_hsieh_fix" else
-                         r"Hypothesis: simulation ordinates $\times\sqrt{3}$; Hsieh unchanged. ")
+                note += (r"Hypothesis: Hsieh ordinates $/\sqrt{3}$; Current study unchanged. " if figure == "8b_hsieh_fix" else
+                         r"Hypothesis: Current study ordinates $\times\sqrt{3}$; Hsieh unchanged. ")
             note += "Initial fracture only."
             fig.text(.5,.025,note,ha="center",va="bottom",fontsize=7.5)
             for extension in ("png","pdf","svg"):
@@ -894,6 +894,7 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                 "excluded_simulation_rows":sum(r["series"]=="Simulation" and not r["plotted"] for r in points),
                 "inputs":{key:inputs[key] for key in ("reference", "original_fig8", "original_fig8_provenance", "selected_recalculation") if key in inputs},
                 "published_pdf_sha256":source_pdf_sha,"captions":captions,
+                "display_labels":{"Hsieh et al.":"Hsieh et al.", "Simulation":"Current study"},
                 "hypothesis_views": {key: {"reference_ordinate_factor":values[0], "simulation_ordinate_factor":values[1],
                                           "verified_correction":False} for key,values in variants.items()},
                 "marker_design": {"reference":"large hollow triangle,8.4pt", "simulation_sizes_pt":simulation_sizes,

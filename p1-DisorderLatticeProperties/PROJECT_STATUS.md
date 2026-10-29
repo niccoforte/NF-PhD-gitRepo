@@ -74,7 +74,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   clarification blocks current validation. All queued auxiliary jobs are now
   settled;7 of10 matched unloads completed,5 pass the numerical closure screen,
   with failed controls explicitly retained. A new missing-case completion
-  campaign has1 original-fracture job running and6 queued serially on8CPUs;
+  campaign has1 completed,1 running and5 queued serially on8CPUs at the latest
+  check (triangular3mm/.16 completed; kagome3mm/.16 running);
   `audit/new-validation/queue-20261029/state.json` owns live status. It uses
   verified transformations of archived A1 inputs, not today's generator
   defaults. New13% hexagonal cases use nx80 without a new convergence claim.
@@ -94,6 +95,9 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Marker sizes/layering now expose overlaps without coordinate jitter. Two
   explicitly labelled Fig.8b sqrt(3) hypothesis views preserve the original plot
   and all source K values; neither is an established reference correction.
+  Paper legend wording is Current study. The maintained validation report has
+  the final-paper checklist, including direct3mm primacy and explicit10mm
+  length-scaled-reference wording; manuscript integration remains deferred.
   The file inventory and cleanup-review register cover code, workbook additions/legacy
   cells, raw/derived audit evidence, early reviews and named temporary work.
   Cleanup remains deferred until the final method and integration are accepted.

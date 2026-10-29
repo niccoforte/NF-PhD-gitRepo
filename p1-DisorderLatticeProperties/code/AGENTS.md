@@ -56,6 +56,8 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   ordinates only with explicit per-point factors and captions; keep the base
   comparison unchanged and never promote either view to a verified correction.
   Use hollow reference outlines and layered simulation sizes without x jitter.
+  Paper display labels use Current study; retain internal Simulation series
+  identifiers so a presentation edit does not migrate numerical tables.
 - `validation_completion.py` prepares the seven absent length/density cases
   under `audit/new-validation`, using archived A1 INPs and verified dimensional
   scaling rather than today's A1 defaults. It never submits; the serial queue
