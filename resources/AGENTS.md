@@ -122,6 +122,14 @@ below expose imported functions/classes. Do not add job entry points here.
 - Treat `utilities.py` operations that rename files, edit `.inp` files, or delete `.bak` files as destructive. Use dry-run paths when available.
 # Curve-term attribution
 
+`MLstudy_reports` verifies explicit multi-layout download inventories and
+renders final-field follow-ups using same-task/same-seed controls. Keep fixed
+physical validation selection histories separate from differently weighted
+objectives. Study readers supply scientific verdicts; reporting never promotes
+an accepted winner. Preserve completed follow-up blocks when rebuilding a base
+report, including STATUS. Curve-only regional windows are not spatial damage
+events and do not imply changed field predictions.
+
 `MLcurve_terms.py` contains imported independent true-field training components,
 not a CLI. Its versioned curve-only checkpoints use its explicit loader. Keep
 normalized MSE fixed in additive ablations and physical inverses differentiable;

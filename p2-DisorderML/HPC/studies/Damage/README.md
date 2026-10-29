@@ -167,6 +167,14 @@ The `corpus_summary` docstring specifies optional `--execution-json` / `corpus_e
 
 ## Authorised auxiliary-balance and UT confirmation
 
+`review_status_balance.py` verifies six follow-up downloads and updates the
+existing STATUS report, preserving its original STATUS-only screen. UT uses
+three paired seeds; FT smaller budgets remain one seed. Report displacement
+and STATUS discrimination separately, reproduce fixed-threshold confusion
+counts and weighted BCE/MSE values, and distinguish loss-value ratios from
+gradient measurements. Completed follow-up sections survive original-reader
+regeneration. No damage feedback, curve fits or automatic winner promotion.
+
 `B4_Damage-balance.sh SUITE [--submit]` schedules six final fits: FT auxiliary
 coefficients .001/.01 at seed 42, and UT control/auxiliary1 at seeds 43/44.
 FT reuses its completed same-trainer seed-42 control; UT confirms its small

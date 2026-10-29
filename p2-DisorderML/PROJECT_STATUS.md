@@ -1,5 +1,21 @@
 # p2 Implementation Status
 
+- 29 October: all remaining66 production fits completed0:0/reload passed and
+  were downloaded to external Z:/p2:886 files/6,046,392,078 bytes match HPC SHA256.
+  Existing STATUS report now includes auxiliary-balance/UT confirmation; Loss
+  subreports cover48 independent true-field curve-term fits, four FT-box-only
+  spatial fits and eight MSE/MAE/Smooth-L1 fits. No jobs remain in the queue.
+  UT STATUS1 improves global error in all three seeds (mean−0.84%) and confirmed
+  endpoints−2.67%; FT smaller auxiliary weights still worsen displacement.
+  Box-spatial0.001 improves global−1.16%, endpoints−3.10%, strut motion−3.27%
+  at one seed. MAE worsens both tasks; MSE remains the practical field control.
+  True-field derivative-only curve loss worsens global7.86%UT/8.95%FT; its
+  weighted value is17.97×/8.61× MSE, not a gradient measurement. Peak-height
+  supervision improves amplitude with task-specific location/global trade-offs.
+  Reports retain fixed metrics, TRAIN mean/variation, local errors, examples,
+  cost and distinct fixed-validation/objective histories. Accepted WINNER.md
+  is unchanged; no new fits, loss changes or locked-test evaluation occurred.
+
 - Latest29 October review: all10 CNN confirmation/depth fits33731152–33731161
   and five FT spatial-balance fits33731163–33731167 completed0:0/reload passed.
   Downloaded270 files/4,246,811,540 bytes to external Z:/p2; all SHA256 match.
@@ -15,7 +31,7 @@
   1.22→1.54% /2.84→3.02% span. Paired hierarchical bootstrap intervals for
   curve/peak/work changes cross zero; field interval stays below zero. Keep
   UT loss conditional; these validation intervals are not final-test evidence.
-  Other study gates passed; unrelated curve/STATUS/robust/box jobs continue.
+  Other curve/STATUS/robust/box studies are now reviewed in the block above.
   No new jobs, loss/model changes or handoffs were made by this review.
 
 - 28 October continuation: existing CNN gate and spatial gate passed; CNN

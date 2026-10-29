@@ -1,5 +1,19 @@
 # Custom-loss study
 
+## Completed-study readers
+
+`review_curve_terms.py` verifies all48 independent true-field fits and writes
+`samples/loss-study/independent-true-field-terms/README.md`: same-seed global and
+peak/pre/post-peak errors, hard peak/work metrics, TRAIN mean, variation,
+four-column examples, costs and distinct fixed-error/objective histories.
+It does not report predicted-field deployment or changed displacement accuracy.
+
+`review_field_loss_followups.py robust-fields` and `... spatial-box` update the
+existing `robust-field-loss/` and `ft-box-spatial/` READMEs. The box comparison reuses the verified
+all-edge zero control and compares both edge scopes at equal coefficients.
+No reader retrains, touches the locked test or promotes WINNER.md. Multi-layout
+download inventories retain archive-relative paths and verify every file.
+
 `review_spatial_balance.py` reads the completed five-coefficient FT screen and
 updates the existing Loss report. Use the fresh same-trainer zero control;
 keep narrow STATUS events separate from the broader FT box and global error.
@@ -119,17 +133,17 @@ valid connected pairs and degree averaging are unchanged. Fresh 0/.1 controls
 bridge the older OOF-bank trainer. The gate checks full IDs then all five tiny
 train/export/reload paths; production uses 450 epochs and 240h B1 dependents.
 Report global, actual fracture endpoint/strut and broader FT-box errors plus
-TRAIN-mean skill, raw components and cost. Temporal work is deferred until this
-spatial balance question is resolved. Regional spatial-only supervision inside
-the FT box is feasible but remains a separate proposed ablation; it is not
-included in the coefficient screen or silently combined with regional MSE.
+TRAIN-mean skill, raw components and cost. Temporal work remains deferred.
+Regional spatial-only supervision inside the FT box is the separate completed
+screen below, not part of the all-edge coefficient screen or regional MSE.
 
 The separate `historical-shared-true-field/README.md` is a distinct historical shared-encoder,
 true-training/true-evaluation study. Its expanded reader verifies physical CSV
 truths and TRAIN means, reports target-defined peak/pre/post-peak windows, hard
 peak/work metrics, large error/percentage examples, costs and log histories.
 These curve regions are not spatial STATUS-labelled nodes. Bundled presets do
-not identify each loss term: one-term attribution remains deferred.
+not identify each loss term: the independent one-term attribution below now
+provides that separate evidence; do not reinterpret the historical population.
 # Independent true-field curve-term attribution (28 October)
 
 `A0-CurveTerms.py` and `B4_CurveTerms.sh` fit **one independent UT or FT curve

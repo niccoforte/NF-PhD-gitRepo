@@ -7,9 +7,34 @@ import unittest
 import numpy as np
 from resources.MLstudy_reports import percent_error,verify_download,measure_curve_regions
 from resources.MLstudy_reports import write_study_report,replace_study_followup
+from resources.MLstudy_reports import verify_study_inventory
 
 
 class StudyReportTests(unittest.TestCase):
+    def test_curve_changes_match_task_seed_and_region(self):
+        import pandas as pd
+        fn=runpy.run_path(str(Path(__file__).parent/"Loss/review_curve_terms.py"))["matched_changes"]
+        table=pd.DataFrame([dict(mode="UT",seed=42,variant="mse",region="peak",rmse=2.),
+            dict(mode="UT",seed=43,variant="mse",region="peak",rmse=10.),
+            dict(mode="UT",seed=43,variant="work",region="peak",rmse=5.),
+            dict(mode="UT",seed=42,variant="work",region="peak",rmse=3.)])
+        np.testing.assert_allclose(fn(table,["mode","seed","region"]),[0,0,-50,50])
+        with self.assertRaises(ValueError):fn(pd.concat([table,table.iloc[:1]]),["mode","seed","region"])
+
+    def test_multilayout_inventory_checks_metadata_hashes_and_containment(self):
+        import json
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);run=root/"UT/FieldToCurve/Transformer/run";run.mkdir(parents=True)
+            meta=dict(status="complete",checkpoint_reload="passed");payload=run/"run_metadata.json"
+            payload.write_text(json.dumps(meta));manifest=root/"inventory.json"
+            row=dict(path=payload.relative_to(root).as_posix(),size=payload.stat().st_size,sha256=hashlib.sha256(payload.read_bytes()).hexdigest())
+            inventory=dict(runs=[dict(path=run.relative_to(root).as_posix(),metadata=meta,files=[row])])
+            manifest.write_text(json.dumps(inventory));self.assertEqual(verify_study_inventory(root,manifest,1)["files"],1)
+            payload.write_text("changed")
+            with self.assertRaises(ValueError):verify_study_inventory(root,manifest,1)
+            payload.write_text(json.dumps(meta));row["path"]="../outside";manifest.write_text(json.dumps(inventory))
+            with self.assertRaises(ValueError):verify_study_inventory(root,manifest,1)
+
     def test_completed_followup_survives_base_rebuild_and_replaces_once(self):
         with tempfile.TemporaryDirectory() as folder:
             path=Path(folder)/"README.md";write_study_report(path,"# Original\n\nInitial evidence.\n")

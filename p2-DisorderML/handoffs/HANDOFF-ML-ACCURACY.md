@@ -23,16 +23,22 @@ It has not been dispatched automatically. New submissions require explicit scope
   but peak-height/location means deteriorate and paired bootstrap intervals for
   curve/peak/work changes cross zero. Keep a conditional loss recommendation;
   do not claim a universal winner or invent post-hoc acceptance thresholds.
-- [ ] Review the separate STATUS-balance, curve-term, FT-box and robust-loss
-  studies when complete. This heartbeat must not submit/repeat any of them.
+- [x] Download/verify/review the remaining66 STATUS-balance, curve-term,
+  FT-box and robust-loss fits:886 files/6.05GB SHA256 matched. Existing STATUS
+  and labelled Loss subreports own the completed results. UT STATUS has a small
+  replicated field/local gain; FT auxiliary still lacks displacement benefit.
+  FT-box spatial0.001 is a one-seed candidate; MSE beats MAE globally. Curve
+  derivative/bundle deterioration is distinct from peak-height-term benefits.
+  Keep WINNER unchanged pending acceptance and do not repeat these studies.
 - [x] Submit FT-box spatial screen (gate33799292; fits33799293–33799296): four seed42 coefficients0.001/0.003/
   0.01/0.1; both endpoints inside fixed box, whole-field MSE and scales unchanged.
   Reuse the fresh zero control; compare with all-edge balance. No STATUS weights.
 - [x] Submit independent true-field curve-term study (gate33799243; fits33799244–33799291): eight arms × UT/FT ×
   three seeds =48 fits. True fields for both training/validation; unchanged base
   MSE for additive arms, fixed selection, historical shared oracle kept separate.
-  Review remains outstanding: per-term global/peak/post-peak/work and TRAIN-mean metrics before Mixed
-  deployment. See Loss guide and report-side receipts; avoid repeat submissions.
+  Completed review includes per-term global/peak/post-peak/work, TRAIN-mean and
+  variation metrics. Predicted+True deployment confirmation remains a separate
+  decision. See Loss guide and report-side receipts; avoid repeat submissions.
 - [x] Refresh maintained Independence/Input/Locality/Loss/STATUS/Variations
   reports; large four-column galleries replace superseded prediction triples.
   Historical true-field/shared-encoder curve-loss study stays separately labelled

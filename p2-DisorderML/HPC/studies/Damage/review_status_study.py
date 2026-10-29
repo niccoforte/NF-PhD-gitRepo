@@ -217,7 +217,8 @@ def render_results(root,suite,data_root,out,fields,regions,damage,cost):
         "[Field metrics and provenance](field-metrics.csv) · [Actual fracture errors/counts](fracture-metrics.csv) · [Damage thresholds, AP, timing and reversals](damage-metrics.csv) · [All-eight training costs](all-training-costs.csv) · [Download verification](download-verification.json). No locked-test evaluation or ODB re-export.\n"]
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(out,"balance-jobs.tsv","STATUS balance and UT confirmation"))
-    (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import write_study_report
+    write_study_report(out/"README.md","".join(text))
     from resources.MLstudy_reports import insert_variation_section
     insert_variation_section(out/"README.md",fields[["variant","path"]].to_dict("records"))
     (out/"example-selection.json").write_text(json.dumps(examples,indent=2))
@@ -225,7 +226,7 @@ def render_results(root,suite,data_root,out,fields,regions,damage,cost):
     print(damage[damage.threshold_policy=="fixed_05"][["mode","variant","average_precision","precision","recall"]].to_string(index=False))
 
 
-def schematic(out):
+def schematic(out,coefficient_label="0.1 or 1",prefix="status-architecture"):
     fig,ax=plt.subplots(figsize=(13,7));ax.set(xlim=(0,13),ylim=(0,7));ax.axis("off")
     def box(x,y,w,h,text,color="#dfeaf3"):
         ax.add_patch(FancyBboxPatch((x,y),w,h,boxstyle="round,pad=0.08",facecolor=color,edgecolor="#3a586b"))
@@ -241,11 +242,11 @@ def schematic(out):
     box(9.2,4.5,3.3,1.1,"Masked displacement MSE\nAll present valid nodes",color="#e8efdc")
     box(9.2,.3,3.3,1.1,"Masked class-balanced BCE\nTRAIN-derived weights",color="#f5e6d7")
     arrow((2.4,3.7),(3,3.7));arrow((5.4,4.1),(6.1,5));arrow((5.4,3.3),(6.1,2.6));arrow((8.6,5.05),(9.2,5.05));arrow((8.6,2.6),(9.2,2.6));arrow((10.85,2),(10.85,1.4))
-    ax.text(6.4,.55,"L = Ldisplacement + λ LSTATUS\nλ=0.1 or 1; both update the same encoder",ha="center",fontsize=12,color="#384d60")
+    ax.text(6.4,.55,f"L = Ldisplacement + λ LSTATUS\nλ={coefficient_label}; same encoder",ha="center",fontsize=12,color="#384d60")
     ax.text(6.5,6.5,"Repeat independently for UT and FT: no shared parameters or losses between tasks",ha="center",fontsize=14,weight="bold")
     ax.text(3.4,1.75,"Control: displacement head only\nSTATUS-only: no displacement objective\nAuxiliary: both branches; no damage feedback",ha="center",fontsize=11)
     ax.text(6.5,6.05,"Truth is used only in losses. At inference: disorder/context → predicted displacement and/or damage.",ha="center",fontsize=11)
-    fig.tight_layout();fig.savefig(out/"status-architecture.png",dpi=180);fig.savefig(out/"status-architecture.svg");plt.close(fig)
+    fig.tight_layout();fig.savefig(out/f"{prefix}.png",dpi=180);fig.savefig(out/f"{prefix}.svg");plt.close(fig)
 
 
 def main(argv=None):

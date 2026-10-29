@@ -140,6 +140,29 @@ def verify_download(root, manifest, expected_runs):
     return dict(runs=len(runs),files=count,bytes=size,sha256="all matched")
 
 
+def verify_study_inventory(root,inventory,expected_runs):
+    """Verify explicit archive-relative multi-layout inventories without a transfer."""
+    root=Path(root).resolve();record=json.loads(Path(inventory).read_text())
+    runs=record["runs"];seen=set();names=set();size=0
+    if len(runs)!=expected_runs:raise ValueError("Unexpected downloaded study run count")
+    for run in runs:
+        name=run["path"];folder=(root/name).resolve()
+        if name in names or not folder.is_relative_to(root):raise ValueError("Invalid/duplicate archive run")
+        names.add(name)
+        meta=json.loads((folder/"run_metadata.json").read_text())
+        if meta!=run["metadata"] or meta.get("status")!="complete" or meta.get("checkpoint_reload")!="passed":
+            raise ValueError("Incomplete or changed run metadata")
+        for row in run["files"]:
+            path=(root/row["path"]).resolve()
+            if row["path"] in seen or not path.is_relative_to(folder):raise ValueError("Invalid inventory file")
+            seen.add(row["path"]);h=hashlib.sha256()
+            with path.open("rb") as stream:
+                for chunk in iter(lambda:stream.read(4*1024*1024),b""):h.update(chunk)
+            if path.stat().st_size!=row["size"] or h.hexdigest()!=row["sha256"]:raise ValueError("Downloaded checksum differs: "+row["path"])
+            size+=row["size"]
+    return dict(runs=len(runs),files=len(seen),bytes=size,sha256="all matched")
+
+
 def collect_fields(entries,data_root,region_api):
     """Compare physical validation fields, exact IDs/masks and TRAIN-only means."""
     rows=[];regional=[];frames=[];contracts={};cache={}
@@ -231,14 +254,14 @@ def replace_study_followup(path,name,text):
 
 def repeated_field_figures(table,regions,out,prefix):
     """Matched-seed changes and TRAIN references; one-seed points have no CI."""
-    modes=list(dict.fromkeys(table["mode"]));variants=list(dict.fromkeys(table.variant))
+    modes=list(dict.fromkeys(table["mode"]))
     for filename,values,column,regional in (("global-control",table,"change_percent",False),
         ("global-mean",table,"skill_percent",False),("fracture-control",regions,"change_percent",True),
         ("fracture-mean",regions,"skill_percent",True),("runtime",table,"hours",False)):
         fig,axes=plt.subplots(1,len(modes),figsize=(8*len(modes),5.8),squeeze=False)
         for ax,mode in zip(axes[0],modes):
             part=values[values["mode"]==mode]
-            selected=[v for v in variants if (part.variant==v).any()]
+            selected=list(part.variant.drop_duplicates())
             groups=("STATUS onset endpoints ±1 frame","STATUS onset strut relative motion ±1 frame","FT crack-tip box") if regional else ("",)
             for j,region in enumerate(groups):
                 sub=part[part.region==region] if regional else part
@@ -249,8 +272,8 @@ def repeated_field_figures(table,regions,out,prefix):
                     color=plt.get_cmap("tab10")(j)
                     ax.errorbar(x,y.mean(),yerr=y.std(ddof=1) if len(y)>1 else None,fmt="o",capsize=4,color=color,
                         label=region if regional and index==0 else None)
+                    ax.scatter(x+np.linspace(-.035,.035,len(y)),y,s=16,color=color,alpha=.7)
                     if not regional:
-                        ax.scatter(x+np.linspace(-.07,.07,len(y)),y,s=17,color=color,alpha=.7)
                         ax.annotate(f"{y.mean():.2f}",(x,y.mean()),xytext=(3,8),textcoords="offset points",fontsize=10)
             ylabel="Training hours (queue excluded)" if column=="hours" else "RMSE change vs matched control (%) — lower is better" if column=="change_percent" else "RMSE reduction vs TRAIN mean (%) — higher is better"
             ax.axhline(0,color="black",lw=.8);ax.set(title=mode,ylabel=ylabel,xticks=range(len(selected)),xticklabels=selected)
@@ -258,8 +281,73 @@ def repeated_field_figures(table,regions,out,prefix):
             if column=="change_percent" and part[column].abs().max()>30:
                 ax.set_yscale("symlog",linthresh=5);ax.set_ylabel(ylabel+"; symlog beyond ±5%")
             if regional:ax.legend(fontsize=9,loc="upper center",bbox_to_anchor=(.5,-.18))
-        fig.suptitle("Saved validation evidence: points = seed values, whiskers = seed SD (not confidence intervals)",fontsize=13)
+        fig.suptitle("Saved validation: large markers = means; small points = seeds; whiskers = seed SD, not confidence intervals",fontsize=13)
         fig.tight_layout();fig.savefig(Path(out)/f"{prefix}-{filename}.png",dpi=170);plt.close(fig)
+
+
+def completed_field_review(entries,data_root,region_api,out,prefix,title,question,change,verdict):
+    """Render a saved final-generator study; never train or select a default.
+
+    Callers verify downloads and supply explicit controls, identities and prose.
+    Shared physical metrics retain same-seed controls and TRAIN-only means.
+    """
+    out=Path(out);out.mkdir(parents=True,exist_ok=True)
+    fields,regions,frames=collect_fields(entries,Path(data_root),region_api)
+    for name,table in (("metrics",fields),("regions",regions),("frames",frames)):
+        table.to_csv(out/f"{prefix}-{name}.csv",index=False)
+    repeated_field_figures(fields,regions,out,prefix)
+    spread=prediction_variation_section(entries,out,prefix=prefix+"-variation").replace("## Prediction","### Prediction")
+    serial_schematic(out,prefix+"-architecture.png",[
+        ("Matched pre-study control",["Disorder + context","Independent field\nTransformer","20-frame U1/U2"],"Masked displacement MSE; fixed physical validation selection"),
+        ("Isolated candidate",["Same disorder/context","Same field\nTransformer","20-frame U1/U2"],change)])
+    # Fixed physical selection score answers accuracy; saved objective totals
+    # answer optimization. Both are shown, without comparing unlike totals.
+    modes=list(fields["mode"].drop_duplicates());selected={}
+    for mode in modes:
+        candidates=fields[fields["mode"]==mode].groupby("variant").change_percent.mean()
+        selected[mode]=candidates.idxmin()
+    for filename,columns in (("validation",("selection_score",)),("objectives",("val_loss",)),("train-validation",("train_loss","val_loss"))):
+        fig,axes=plt.subplots(1,len(modes),figsize=(8*len(modes),5.8),squeeze=False)
+        for ax,mode in zip(axes[0],modes):
+            part=fields[fields["mode"]==mode];variants=list(part.variant.drop_duplicates())
+            for row in part.itertuples():
+                if len(columns)>1 and (row.variant not in ("control",selected[mode]) or row.seed!=42):continue
+                h=pd.read_csv(Path(row.path)/"loss_history.csv").rename(columns={"val_selection_score":"selection_score"})
+                color=plt.get_cmap("tab10")(variants.index(row.variant)%10)
+                for column in columns:
+                    values=h[column].where(h[column]>0)
+                    ax.plot(h.epoch,values,"--" if column.startswith("train") else "-",alpha=.65 if len(part)>8 else .9,
+                        color=color,label=f"{row.variant} s{row.seed} {column}")
+                if len(columns)>1:ax.axvline(row.best_epoch,color=color,alpha=.3,linestyle=":")
+            ax.set(title=mode,yscale="log",xlabel="Epoch",ylabel="Physical MSE / TRAIN-mean MSE (log)" if filename=="validation" else "Saved optimization objective (log)")
+            ax.legend(fontsize=9);ax.grid(alpha=.2)
+        fig.tight_layout();fig.savefig(out/f"{prefix}-{filename}.png",dpi=170);plt.close(fig)
+    examples=[];selection=[]
+    for mode in modes:
+        row=fields[(fields["mode"]==mode)&(fields.variant==selected[mode])&(fields.seed==42)].iloc[0]
+        data=json.loads((Path(row.path)/"model_data.json").read_text())
+        details=field_examples(row.path,mode,out,f"{row.variant}, seed42",data_root,
+            region_api["training_mean"](Path(data_root),data,mode),prefix=prefix+"-")
+        selection.append(dict(mode=mode,variant=row.variant,seed=42,path=row.path,examples=details))
+        examples.extend([figure(out,f"{prefix}-{mode}-field-examples.png",f"{mode}: truth, prediction, signed error and percentage error"),
+            figure(out,f"{prefix}-{mode}-mean-field-examples.png",f"{mode}: actual TRAIN-mean field across loading")])
+    (out/f"{prefix}-examples.json").write_text(json.dumps(selection,indent=2))
+    image=lambda suffix,caption:figure(out,f"{prefix}-{suffix}.png",caption)
+    text=[f"## {title}\n\n{question}\n\n{verdict}\n\n",
+        image("architecture","Pre-study control and isolated intervention; no winner automatically promoted"),
+        "### Global performance versus the matched study control\n\nNegative RMSE changes are better. Large markers are means; small points are individual seeds; whiskers are seed standard deviation, not confidence intervals.\n\n",
+        image("global-control","Global RMSE change with same-task/same-seed controls"),
+        "### Global performance versus TRAIN mean\n\nSkill = 100 × (1 − model RMSE / TRAIN-mean RMSE), on the same validation observations and masks. Zero matches the average-field predictor. The mean uses TRAIN IDs only and reproduces the saved reference error.\n\n",
+        image("global-mean","Field accuracy beyond the mean-field predictor"),spread,
+        "### STATUS fracture regions versus control\n\nObserved intact→failed struts define onset ±1 retained-frame windows. Endpoint displacement and signed connected-pair relative motion are distinct metrics. The larger FT crack-tip box is shown separately. Unknown labels remain masked. True STATUS is used retrospectively for evaluation, never to supply a fracture path as an input. Counts and denominators are in the regional CSV.\n\n",
+        image("fracture-control","Confirmed-event and broader crack-tip RMSE changes"),
+        "### STATUS fracture regions versus TRAIN mean\n\nIdentical event masks evaluate the model and TRAIN-mean field.\n\n",image("fracture-mean","Accuracy beyond mean displacement at confirmed fracture events"),
+        "### Best and worst examples\n\nDisplay each task's lowest mean-global-error arm, including its control, at seed42. This is illustrative selection, not promotion. Rank specimens by full valid field RMSE; show U2 at their largest true regional increment, whole UT body and FT crack-tip zoom. Shared colour scales apply to both ranks. Grey percentage pixels have |truth| below 1% of TRAIN-mean RMS; the P95 colour cap and tiny-denominator mask affect display only.\n\n",*examples,
+        "### Training time\n\nFinal-generator training only, excluding queue, export, OOF banks and downstream curves. Different stopping epochs can dominate total cost. No inference-latency result is implied.\n\n",image("runtime","Measured training hours by task and seed"),
+        "### Loss histories\n\nFirst: the fixed physical validation MSE/TRAIN-mean-MSE selection score, comparable across objectives. Second: saved total validation objectives, which diagnose optimization but do not rank unlike losses. Third: seed42 control and displayed candidate train/validation objectives; dotted lines mark chosen checkpoints. These are distinct diagnostics, not duplicate plots. Positive values use log axes.\n\n",
+        image("validation","Comparable fixed validation error"),image("objectives","Saved validation training objectives"),image("train-validation","Selected training/validation histories"),
+        f"### Scope and numerical evidence\n\nNo downstream curve training, new inference, locked-test evaluation or model promotion occurs here. [Global metrics/provenance]({prefix}-metrics.csv), [regional metrics/counts]({prefix}-regions.csv), [frame metrics]({prefix}-frames.csv), [example identities]({prefix}-examples.json).\n\n"]
+    return fields,regions,"".join(text)
 
 
 def comparison_figures(table,regions,out):
