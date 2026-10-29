@@ -11,6 +11,21 @@ from resources.MLstudy_reports import verify_study_inventory
 
 
 class StudyReportTests(unittest.TestCase):
+    def test_base_variation_refresh_preserves_completed_nested_diagnostics(self):
+        from unittest.mock import patch
+        from resources.MLstudy_reports import insert_variation_section
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/"README.md"
+            write_study_report(path,"# Study\n\n## Global TRAIN mean\n\nReference.\n\n## Local errors\n\nMeasured.\n")
+            replace_study_followup(path,"complete","## Completed follow-up\n\n### Prediction variation and collapse\n\nPreserve follow-up diagnostic.\n\n### Cost\n\nPreserve cost.")
+            with patch("resources.MLstudy_reports.prediction_variation_section",return_value="## Prediction variation and collapse\n\nRefreshed original diagnostic.\n\n"):
+                insert_variation_section(path,[])
+                insert_variation_section(path,[])
+            result=path.read_text()
+            self.assertIn("Preserve follow-up diagnostic.",result)
+            self.assertIn("Preserve cost.",result)
+            self.assertEqual(result.count("Refreshed original diagnostic."),1)
+
     def test_curve_changes_match_task_seed_and_region(self):
         import pandas as pd
         fn=runpy.run_path(str(Path(__file__).parent/"Loss/review_curve_terms.py"))["matched_changes"]

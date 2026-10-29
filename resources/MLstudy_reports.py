@@ -97,7 +97,7 @@ def insert_variation_section(report,entries):
     """Place the diagnostic after the global TRAIN-mean block; avoid repeats."""
     import re
     report=Path(report);text=report.read_text(encoding="utf-8")
-    text=re.sub(r"## Prediction variation and collapse\n.*?(?=\n## |\Z)","",text,flags=re.S)
+    text=re.sub(r"^## Prediction variation and collapse\n.*?(?=^## |\Z)","",text,flags=re.S|re.M)
     # Superseded inline spread plots are replaced by the dedicated common view.
     text=re.sub(r"!\[[^\]]*\]\(<[^>]*(?:/diversity|/output-variation)\.png>\)\s*","",text)
     headings=list(re.finditer(r"^## .+$",text,re.M))

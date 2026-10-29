@@ -13,6 +13,10 @@ existing `robust-field-loss/` and `ft-box-spatial/` READMEs. The box comparison 
 all-edge zero control and compares both edge scopes at equal coefficients.
 No reader retrains, touches the locked test or promotes WINNER.md. Multi-layout
 download inventories retain archive-relative paths and verify every file.
+Refreshing the base report's level-two variation section preserves nested
+variation/cost sections inside completed follow-ups; do not match headings by
+an unanchored substring. Superseded next-step wording refers to the initial
+screen, not to already-completed follow-ups.
 
 `review_spatial_balance.py` reads the completed five-coefficient FT screen and
 updates the existing Loss report. Use the fresh same-trainer zero control;
