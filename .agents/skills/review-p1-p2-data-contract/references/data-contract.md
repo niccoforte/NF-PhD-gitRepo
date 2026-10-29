@@ -56,6 +56,9 @@ re-export; existing producer output defaults are not current read dependencies.
   and Hsieh's initial-triangle convention from dissipation/nonlinear-recovery
   eta-J estimates. Source hashes, event brackets and invalid negative areas
   survive this comparison boundary. An alternate work estimate is not ASTM J.
+  Paper views select only original-simulation initial-triangle initiation values;
+  equal nominal relative densities share an x coordinate. Do not mix control
+  histories, final-failure data or force-fit literature ordinates into that view.
 
 ## Field boundary
 

@@ -428,7 +428,18 @@ the initial-slope triangle; this source convention remains distinct from the
 finite-geometry eta-work estimates, with negative area shown as unavailable.
 No method is automatically size/constraint-qualified ASTM J.
 `validation_inventory.py` records retained evidence and named temporary work
-without deleting anything. Refresh the inventory before final cleanup.
+without deleting anything. `audit/cleanup-review.json` extends that inventory
+to code/notebook cleanup, legacy workbook values and audit additions, competing
+early reviews, backup states and pending reference capture. Refresh both before
+final cleanup; source values and unique temporary evidence must be preserved.
+Publication exports in `audit/paper` show only initiation results from the
+original simulations using the initial-triangle convention, versus Hsieh's
+initial data. They provide PNG/PDF/SVG, captions and point/exclusion CSVs.
+The dimensional Fig.10-based view uses common nominal relative density; mass
+density4430 versus4500kg/m3 does not create an artificial horizontal offset.
+Its3mm reference is direct;10mm uses declared sqrt(length) scaling. Alternative
+energy/unloading controls and source final-failure points stay in diagnostics.
+The corrected CSV/notebook route does not rewrite FTval or shared calcFT defaults.
 Shared calculation/export defaults and p2 datasets are unchanged. Verified
 foundation fixes from `Review lattices.py` preserve canonical 10 mm graphs and
 default tri/kagome/hex/FCC unit stiffness; full/disordered RVE geometry and the

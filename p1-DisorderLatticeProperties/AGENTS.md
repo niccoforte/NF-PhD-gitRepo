@@ -54,6 +54,12 @@ In practical terms:
   are separate calculations; a positive alternative work estimate does not
   establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
   records audit products and named temporary files without cleanup authority.
+- Paper exports in `audit/paper` show initiation only, with a single calculation
+  convention from the original simulations. Diagnostic alternatives remain in
+  `audit/benchmark`; they are not competing paper results. Relative-density
+  axes match the common nominal density without altering either input material.
+  Workbook FTval remains historical until explicitly reconciled to the accepted
+  method; the notebook's corrected CSV route does not update shared calcFT.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
 - For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.
 - Keep active p1 scripts and notebooks lean. Remove abandoned approaches, stale cells, obsolete helper paths, and superseded experiments as work progresses.

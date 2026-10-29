@@ -71,8 +71,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   hexagonal initial-triangle values remain invalid; separate recovery estimates
   differ by+9.17%/.16 and+13.68%/.20 from direct references. The calculation
   audit is reproducible; universal source-method agreement is not established.
-  The file inventory records maintained evidence and named temporary work;
-  cleanup remains deferred until final review.
+  Clean initiation-only paper exports now separate original-simulation results
+  from diagnostic energy/unloading comparisons; they use nominal relative
+  density to match Hsieh's. The underlying original-simulation calculation
+  convention is unchanged. FTval/shared calcFT still retain the historical path;
+  the corrected values are in external CSVs read by ValConvPlots. The file
+  inventory and cleanup-review register cover code, workbook additions/legacy
+  cells, raw/derived audit evidence, early reviews and named temporary work.
+  Cleanup remains deferred until the final method and integration are accepted.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset
   processing and local/HPC archive delivery are complete. The generated labels,
   aligned banks and visual report are ready for the separate ML workflow.

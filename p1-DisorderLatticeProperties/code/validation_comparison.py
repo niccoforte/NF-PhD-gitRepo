@@ -696,10 +696,184 @@ def plot_normalisation_sensitivity(records, fig8, material, out):
     plt.close(fig)
 
 
+def paper_exports(records, fig8, reference_rows, material, destination, inputs, source_pdf_sha):
+    """Initiation-only paper figures; audit calculations and values stay intact."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from matplotlib.ticker import NullFormatter
+
+    destination.mkdir(parents=True, exist_ok=True)
+    method = "Hsieh_initial_triangle_native"
+    simulations = {}
+    for row in records:
+        if row["method"] != method:
+            continue
+        key = (row["topology"], row["l_mm"], row["relative_density"])
+        if key in simulations:
+            raise ValueError("Duplicate paper simulation identity: " + repr(key))
+        simulations[key] = row
+    reference = reference_lookup(reference_rows)
+    uts = float(material["parent_UTS_workbook_MPa"])
+    points = []
+    for figure in ("8a", "8b", "10"):
+        for length in LENGTHS:
+            for topology in TOPOLOGIES:
+                for rho in ((.2,) if figure == "8b" else DENSITIES):
+                    key = (topology, length, rho)
+                    if figure == "10":
+                        source = reference[topology, rho]
+                        factor = math.sqrt(length/3.)
+                        ref_value = float(source["K_MPa_sqrt_m"])*factor
+                        ref_low = float(source["K_graphical_lower"])*factor
+                        ref_high = float(source["K_graphical_upper"])*factor
+                        basis = "direct_published_3mm" if length == 3 else "published_3mm_times_sqrt_10_over_3_inference"
+                        source_id, source_cell = source["point_id"], ""
+                    else:
+                        source = [r for r in fig8 if r["figure"] == figure and r["topology"] == topology
+                                  and float(r["l_mm"]) == length and float(r["relative_density"]) == rho]
+                        if len(source) != 1:
+                            raise ValueError("Ambiguous paper Figure8 source identity: " + repr(key))
+                        source = source[0]
+                        ref_value, ref_low, ref_high = float(source["literal_ordinate"]), None, None
+                        basis = "original_literal_ordinate_nominal_length_assignment"
+                        source_id, source_cell = source["reference_identity"], source["source_cell"]
+                    x = math.sqrt(length) if figure == "8b" else 100*rho
+                    unit = "MPa sqrt(m)" if figure == "10" else "sqrt(m)" if figure == "8b" else "dimensionless"
+                    common = {"figure": figure, "topology": topology, "l_mm": length, "relative_density": rho,
+                              "x_value": x, "x_unit": "sqrt(mm)" if figure == "8b" else "relative density (%)",
+                              "ordinate_unit": unit, "initiation_only": True,
+                              "reference_basis": basis, "reference_point_id": source_id,
+                              "reference_source_cell": source_cell, "published_pdf_sha256": source_pdf_sha,
+                              "normalisation_parent_UTS_MPa": uts if figure != "10" else None,
+                              "source_ordinates_rescaled": figure == "10" and length == 10,
+                              "vertical_fit_or_offset": False}
+                    points.append({**common, "series": "Hsieh et al.", "plotted": True, "ordinate": ref_value,
+                                   "graphical_lower": ref_low, "graphical_upper": ref_high,
+                                   "source_input_sha256": inputs["reference" if figure == "10" else "original_fig8"]["sha256"]})
+                    row = simulations.get(key)
+                    valid = (row is not None and row["value_status"] == "available_provisional"
+                             and row.get("KJ_MPa_sqrt_m") is not None and not negative_area(row))
+                    value = row["KJ_MPa_sqrt_m"] if valid else None
+                    denominator = uts*(math.sqrt(length/1000.) if figure == "8a" else 1) if figure != "10" else 1
+                    reason = ("" if valid else "negative initial-triangle area" if row is not None and negative_area(row) else
+                              "no selected simulation" if row is None else "unavailable recalculation")
+                    points.append({**common, "series": "Simulation", "plotted": bool(valid),
+                                   "ordinate": value/denominator if valid else None, "exclusion_reason": reason,
+                                   "case_id": row.get("case_id") if row else None, "method": method,
+                                   "endpoint": row.get("endpoint") if row else None,
+                                   "endpoint_time_s": row.get("endpoint_time_s") if row else None,
+                                   "KI_MPa_sqrt_m": row.get("KI_MPa_sqrt_m") if row else None,
+                                   "KJ_MPa_sqrt_m": row.get("KJ_MPa_sqrt_m") if row else None,
+                                   "Apl_Nmm": row.get("Apl_Nmm") if row else None,
+                                   "qualified_ASTM_J": row.get("qualified_ASTM_J") if row else False,
+                                   "source_input_sha256": inputs.get("selected_recalculation", {}).get("sha256"),
+                                   **{name: row.get(name) if row else None for name in
+                                      ("source_inp_sha256", "source_odb_sha256", "modulus_odb_sha256", "modulus_job",
+                                       "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note")}})
+    write_rows(destination / "points.csv", points)
+    write_rows(destination / "exclusions.csv", [r for r in points if r["series"] == "Simulation" and not r["plotted"]])
+    captions = {
+        "8a": ("Initial-fracture comparison at nominal relative densities 13%, 16%, 20%. Simulation values use the original Explicit histories, "
+               "the last recorded undamaged tensile-strain sample and Hsieh's initial-slope area convention with the C(T) calibration. "
+               "Simulation normalisation uses parent UTS 1111.792 MPa and bar length in metres. Hsieh's original normalised ordinates are unchanged "
+               "and repeated at the two nominal length assignments; the source strength convention remains unresolved. Undefined areas and absent cases are omitted, "
+               "with every exclusion recorded in exclusions.csv. No vertical shift, fitted factor or replacement work estimate is used."),
+        "8b": ("Initial-fracture comparison at nominal relative density 20%. The original Hsieh ordinates are retained at nominal 3/10 mm assignments. "
+               "The x coordinate is sqrt(bar length in mm), following the source tick convention despite its metre label; source marker x coordinates were not digitised. "
+               "Simulation values use parent UTS 1111.792 MPa. The inconsistency between Figures 8a/8b remains unresolved; this is not independent proof of absolute toughness. "
+               "The undefined 3 mm hexagonal simulation is omitted."),
+        "10": ("Dimensional comparison based on Figure 10 initiation data at matched nominal relative densities, avoiding the different constituent mass densities 4430/4500 kg/m3. "
+               "The 3 mm Hsieh initial-toughness points are directly digitised; the 10 mm reference is an explicitly declared sqrt(10/3) scaling inference. "
+               "Error bars bound graphical extraction only and are not statistical confidence intervals. Simulation values use the original Explicit histories and initial-slope area convention; "
+               "no final-fracture, dissipation or nonlinear-recovery estimates are included. Negative-area values and absent cases are omitted; data and source fingerprints are in points.csv. "
+               "This comparison does not establish ASTM qualification or agreement for all lattices.")}
+    colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#3465a4"}
+    names = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal"}
+    style = {"font.size": 9, "axes.labelsize": 10, "axes.titlesize": 10, "legend.fontsize": 8.5,
+             "pdf.fonttype": 42, "svg.fonttype": "none", "axes.linewidth": .8}
+    with plt.rc_context(style):
+        for figure in ("8a", "8b", "10"):
+            count = 1 if figure == "8b" else 2
+            fig, axes = plt.subplots(1, count, figsize=(7.2, 3.5), squeeze=False, sharey=count==2)
+            fig.subplots_adjust(left=.145, right=.98, top=.89, bottom=.30, wspace=.22)
+            for panel, length in enumerate((None,) if figure == "8b" else LENGTHS):
+                ax = axes[0, panel]
+                for topology in TOPOLOGIES:
+                    for series in ("Hsieh et al.", "Simulation"):
+                        selected = [r for r in points if r["figure"] == figure and r["topology"] == topology
+                                    and r["series"] == series and r["plotted"] and (length is None or r["l_mm"] == length)]
+                        selected.sort(key=lambda r: r["x_value"])
+                        if not selected:
+                            continue
+                        xx, yy = [r["x_value"] for r in selected], [r["ordinate"] for r in selected]
+                        sim = series == "Simulation"
+                        options = dict(color=colors[topology], marker="o" if sim else "^", ms=4.8,
+                                       mfc=colors[topology] if sim else "white", mew=1., lw=1.,
+                                       ls="--" if sim else "-", zorder=3 if sim else 2)
+                        if figure == "10" and not sim:
+                            ax.errorbar(xx, yy, yerr=[[r["ordinate"]-r["graphical_lower"] for r in selected],
+                                                    [r["graphical_upper"]-r["ordinate"] for r in selected]],
+                                        capsize=2, elinewidth=.7, **options)
+                        else:
+                            ax.plot(xx, yy, **options)
+                ax.set_yscale("log")
+                ax.grid(alpha=.18, which="major", lw=.6)
+                ax.set_axisbelow(True)
+                if figure == "8b":
+                    ax.set_xticks([math.sqrt(3), math.sqrt(10)], [r"$\sqrt{3}$", r"$\sqrt{10}$"])
+                    ax.set_xlabel(r"$\sqrt{\ell}$ (mm$^{1/2}$)")
+                    ax.set_title(r"$\bar{\rho}=20\%$")
+                else:
+                    ax.set_xscale("log")
+                    ax.set_xticks([13,16,20], ["13","16","20"])
+                    ax.xaxis.set_minor_formatter(NullFormatter())
+                    ax.set_xlim(12.4,20.6)
+                    ax.set_xlabel("Relative density (%)")
+                    title = r"$\ell={}$ mm".format(int(length))
+                    if figure == "10":
+                        title += " | direct reference" if length == 3 else " | scaled reference"
+                    ax.set_title(title)
+                if panel == 0:
+                    ax.set_ylabel(r"$K_J/(\sigma_{\mathrm{TS}}\sqrt{\ell})$" if figure == "8a" else
+                                  r"$K_J/\sigma_{\mathrm{TS}}$ (m$^{1/2}$)" if figure == "8b" else
+                                  r"$K_J$ (MPa$\sqrt{\mathrm{m}}$)")
+                if figure == "10":
+                    ax.set_ylim(1.5,65)
+                if count == 2:
+                    ax.text(.02,.95,"({})".format("ab"[panel]),transform=ax.transAxes,va="top",fontsize=9)
+            handles = [Line2D([],[],color=colors[t],lw=1.6,label=names[t]) for t in TOPOLOGIES]
+            handles += [Line2D([],[],color="#555555",marker="^",mfc="white",ls="-",lw=1,label="Hsieh et al."),
+                        Line2D([],[],color="#555555",marker="o",mfc="#555555",ls="--",lw=1,label="Simulation")]
+            fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.08),ncol=5,frameon=False,
+                       columnspacing=1.15,handlelength=1.5,handletextpad=.45)
+            note = (r"10 mm reference: 3 mm data $\times\sqrt{10/3}$. " if figure == "10" else "")
+            note += "Initial fracture only."
+            fig.text(.5,.025,note,ha="center",va="bottom",fontsize=7.5)
+            for extension in ("png","pdf","svg"):
+                fig.savefig(destination / ("figure{}.{}".format(figure,extension)),dpi=300)
+            plt.close(fig)
+    metadata = {"selection_method":method,"case_selection":"Existing selected largest model per topology/length/nominal density; no agreement-based selection",
+                "simulation_cases":len(simulations),"point_rows":len(points),
+                "plotted_simulation_rows":sum(r["series"]=="Simulation" and r["plotted"] for r in points),
+                "excluded_simulation_rows":sum(r["series"]=="Simulation" and not r["plotted"] for r in points),
+                "inputs":{key:inputs[key] for key in ("reference", "original_fig8", "original_fig8_provenance", "selected_recalculation") if key in inputs},
+                "published_pdf_sha256":source_pdf_sha,"captions":captions,
+                "limits":["Original Explicit initial-triangle recalculation only; no recovery/IE-SE/QS/final-fracture series",
+                          "No ordinate shift or agreement fit; same nominal densities have identical horizontal coordinates",
+                          "Figure8 source normalisation and length ambiguities remain unresolved",
+                          "Only3mm Figure10 references are direct;10mm is an explicit length-scaling inference",
+                          "Negative area remains unavailable; positive area does not establish qualified ASTM J"]}
+    (destination / "metadata.json").write_text(json.dumps(metadata,indent=2),encoding="utf-8")
+    (destination / "captions.txt").write_text("\n\n".join("Figure {}. {}".format(k,v) for k,v in captions.items())+"\n",encoding="utf-8")
+
+
 def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None):
     root = Path(root).resolve()
-    out = Path(output).resolve() if output else root / "audit/benchmark"
+    out = Path(output).resolve() if output is not None else root / "audit/benchmark"
     out.mkdir(parents=True, exist_ok=True)
+    paper_out = out / "paper" if output is not None else root / "audit/paper"
     sources = {"reference": root / "audit/benchmark/fig10-digitised.csv",
                "native": root / "audit/calculations/comparison.csv",
                "native_provenance": root / "audit/calculations/provenance.json",
@@ -758,14 +932,19 @@ def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None):
         sources["original_fig8"] = fig8_path
         sources["original_fig8_provenance"] = root / "audit/benchmark/fig8-source-provenance.json"
         fig8 = capture("original_fig8")
-        material = capture("original_fig8_provenance", json_data=True)["material"]
+        fig8_provenance = capture("original_fig8_provenance", json_data=True)
+        material = fig8_provenance["material"]
         write_rows(out / "fig8-normalised-comparison.csv", normalised_records(records,fig8,material))
         for panel in ("8a", "8b"):
             plot_fig8(principal,fig8,material,out,panel,principal=True)
             plot_fig8(controls,fig8,material,out,panel)
         plot_normalisation_sensitivity(records,fig8,material,out)
+        paper_exports(principal,fig8,reference_rows,material,paper_out,
+                      {name:{"path":str(path),"sha256":hashlib.sha256(snapshots[name]).hexdigest()}
+                       for name,path in sources.items()},fig8_provenance["published_pdf_sha256"])
     provenance = {"inputs": {name: {"path": str(path), "sha256": hashlib.sha256(snapshots[name]).hexdigest()}
                              for name, path in sources.items()},
+                  "paper_output_directory": str(paper_out),
                   "inputs_changed_after_capture": [name for name, path in sources.items()
                        if sha256(path) != hashlib.sha256(snapshots[name]).hexdigest()],
                   "selection": "Existing FTval exact case IDs plus prepared exact static controls; no fit to benchmark",
