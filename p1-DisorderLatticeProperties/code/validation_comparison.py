@@ -772,6 +772,22 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                                    **{name: row.get(name) if row else None for name in
                                       ("source_inp_sha256", "source_odb_sha256", "modulus_odb_sha256", "modulus_job",
                                        "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note")}})
+    # Explicit interpretation tests; the captured source and calculated K stay
+    # unchanged. The factor is prescribed from the Fig.8a/8b discrepancy, not fit.
+    variants = {"8b_hsieh_fix": (1/math.sqrt(3.), 1.),
+                "8b_my_fix": (1., math.sqrt(3.))}
+    baseline = list(points)
+    for figure, (reference_factor, simulation_factor) in variants.items():
+        for row in baseline:
+            if row["figure"] != "8b":
+                continue
+            factor = simulation_factor if row["series"] == "Simulation" else reference_factor
+            points.append({**row, "figure": figure,
+                           "ordinate": row["ordinate"]*factor if row["ordinate"] is not None else None,
+                           "unadjusted_ordinate": row["ordinate"], "display_ordinate_factor": factor,
+                           "interpretation_test_only": True,
+                           "source_ordinates_rescaled": factor != 1.,
+                           "reference_basis": row["reference_basis"] + "; sqrt3_hypothesis_view"})
     write_rows(destination / "points.csv", points)
     write_rows(destination / "exclusions.csv", [r for r in points if r["series"] == "Simulation" and not r["plotted"]])
     captions = {
@@ -789,16 +805,27 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                "Error bars bound graphical extraction only and are not statistical confidence intervals. Simulation values use the original Explicit histories and initial-slope area convention; "
                "no final-fracture, dissipation or nonlinear-recovery estimates are included. Negative-area values and absent cases are omitted; data and source fingerprints are in points.csv. "
                "This comparison does not establish ASTM qualification or agreement for all lattices.")}
+    for figure in variants:
+        adjusted = ("Hsieh's displayed Fig.8b ordinates divided by sqrt(3); simulation ordinates unchanged. "
+                    if figure == "8b_hsieh_fix" else
+                    "Simulation displayed Fig.8b ordinates multiplied by sqrt(3); Hsieh ordinates unchanged. ")
+        captions[figure] = ("Hypothetical reconciliation of the Fig.8a/8b normalisation mismatch. " + adjusted +
+                           "This is an explicitly requested interpretation test, not a verified correction or new simulation result. "
+                           "Original source ordinates, simulation K, nominal density, lengths and initiation samples are unchanged in their source files. "
+                           "The unadjusted comparison remains figure8b. The same missing/negative-area points remain unavailable. "
+                           "Per-point original ordinates and display factors are recorded in points.csv.")
     colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#3465a4"}
+    simulation_sizes = {"tri": 6.2, "kagome": 3.5, "hex": 4.6}
     names = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal"}
     style = {"font.size": 9, "axes.labelsize": 10, "axes.titlesize": 10, "legend.fontsize": 8.5,
              "pdf.fonttype": 42, "svg.fonttype": "none", "axes.linewidth": .8}
     with plt.rc_context(style):
-        for figure in ("8a", "8b", "10"):
-            count = 1 if figure == "8b" else 2
+        for figure in ("8a", "8b", "10", *variants):
+            is_8b = figure.startswith("8b")
+            count = 1 if is_8b else 2
             fig, axes = plt.subplots(1, count, figsize=(7.2, 3.5), squeeze=False, sharey=count==2)
             fig.subplots_adjust(left=.145, right=.98, top=.89, bottom=.30, wspace=.22)
-            for panel, length in enumerate((None,) if figure == "8b" else LENGTHS):
+            for panel, length in enumerate((None,) if is_8b else LENGTHS):
                 ax = axes[0, panel]
                 for topology in TOPOLOGIES:
                     for series in ("Hsieh et al.", "Simulation"):
@@ -809,9 +836,12 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                             continue
                         xx, yy = [r["x_value"] for r in selected], [r["ordinate"] for r in selected]
                         sim = series == "Simulation"
-                        options = dict(color=colors[topology], marker="o" if sim else "^", ms=4.8,
-                                       mfc=colors[topology] if sim else "white", mew=1., lw=1.,
-                                       ls="--" if sim else "-", zorder=3 if sim else 2)
+                        # Large transparent reference outlines and smaller nested
+                        # simulation symbols reveal coincident points without jitter.
+                        options = dict(color=colors[topology], marker="o" if sim else "^",
+                                       ms=simulation_sizes[topology] if sim else 8.4,
+                                       mfc=colors[topology] if sim else "none", mew=1.05 if sim else 1.25,
+                                       lw=.9, ls="--" if sim else "-", zorder=4+TOPOLOGIES.index(topology) if sim else 2)
                         if figure == "10" and not sim:
                             ax.errorbar(xx, yy, yerr=[[r["ordinate"]-r["graphical_lower"] for r in selected],
                                                     [r["graphical_upper"]-r["ordinate"] for r in selected]],
@@ -819,9 +849,10 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                         else:
                             ax.plot(xx, yy, **options)
                 ax.set_yscale("log")
+                ax.margins(y=.11)
                 ax.grid(alpha=.18, which="major", lw=.6)
                 ax.set_axisbelow(True)
-                if figure == "8b":
+                if is_8b:
                     ax.set_xticks([math.sqrt(3), math.sqrt(10)], [r"$\sqrt{3}$", r"$\sqrt{10}$"])
                     ax.set_xlabel(r"$\sqrt{\ell}$ (mm$^{1/2}$)")
                     ax.set_title(r"$\bar{\rho}=20\%$")
@@ -837,18 +868,21 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                     ax.set_title(title)
                 if panel == 0:
                     ax.set_ylabel(r"$K_J/(\sigma_{\mathrm{TS}}\sqrt{\ell})$" if figure == "8a" else
-                                  r"$K_J/\sigma_{\mathrm{TS}}$ (m$^{1/2}$)" if figure == "8b" else
+                                  r"$K_J/\sigma_{\mathrm{TS}}$ (m$^{1/2}$)" if is_8b else
                                   r"$K_J$ (MPa$\sqrt{\mathrm{m}}$)")
                 if figure == "10":
                     ax.set_ylim(1.5,65)
                 if count == 2:
                     ax.text(.02,.95,"({})".format("ab"[panel]),transform=ax.transAxes,va="top",fontsize=9)
             handles = [Line2D([],[],color=colors[t],lw=1.6,label=names[t]) for t in TOPOLOGIES]
-            handles += [Line2D([],[],color="#555555",marker="^",mfc="white",ls="-",lw=1,label="Hsieh et al."),
-                        Line2D([],[],color="#555555",marker="o",mfc="#555555",ls="--",lw=1,label="Simulation")]
+            handles += [Line2D([],[],color="#555555",marker="^",mfc="none",ms=8.4,mew=1.25,ls="-",lw=1,label="Hsieh et al."),
+                        Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Simulation")]
             fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.08),ncol=5,frameon=False,
                        columnspacing=1.15,handlelength=1.5,handletextpad=.45)
             note = (r"10 mm reference: 3 mm data $\times\sqrt{10/3}$. " if figure == "10" else "")
+            if figure in variants:
+                note += (r"Hypothesis: Hsieh ordinates $/\sqrt{3}$; simulation unchanged. " if figure == "8b_hsieh_fix" else
+                         r"Hypothesis: simulation ordinates $\times\sqrt{3}$; Hsieh unchanged. ")
             note += "Initial fracture only."
             fig.text(.5,.025,note,ha="center",va="bottom",fontsize=7.5)
             for extension in ("png","pdf","svg"):
@@ -860,8 +894,13 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                 "excluded_simulation_rows":sum(r["series"]=="Simulation" and not r["plotted"] for r in points),
                 "inputs":{key:inputs[key] for key in ("reference", "original_fig8", "original_fig8_provenance", "selected_recalculation") if key in inputs},
                 "published_pdf_sha256":source_pdf_sha,"captions":captions,
+                "hypothesis_views": {key: {"reference_ordinate_factor":values[0], "simulation_ordinate_factor":values[1],
+                                          "verified_correction":False} for key,values in variants.items()},
+                "marker_design": {"reference":"large hollow triangle,8.4pt", "simulation_sizes_pt":simulation_sizes,
+                                  "coordinate_jitter":False, "layering":"smaller kagome circles above larger triangular circles"},
                 "limits":["Original Explicit initial-triangle recalculation only; no recovery/IE-SE/QS/final-fracture series",
-                          "No ordinate shift or agreement fit; same nominal densities have identical horizontal coordinates",
+                          "Base figures retain ordinates; explicitly named sqrt3 views are hypothesis tests, not fitted or verified corrections",
+                          "Same nominal densities have identical horizontal coordinates; no marker jitter",
                           "Figure8 source normalisation and length ambiguities remain unresolved",
                           "Only3mm Figure10 references are direct;10mm is an explicit length-scaling inference",
                           "Negative area remains unavailable; positive area does not establish qualified ASTM J"]}

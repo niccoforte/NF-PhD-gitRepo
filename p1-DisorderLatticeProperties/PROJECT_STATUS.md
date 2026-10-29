@@ -73,7 +73,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   PSC and supervisor-agreed sizes/criteria remain deferred. No user code
   clarification blocks current validation. All queued auxiliary jobs are now
   settled;7 of10 matched unloads completed,5 pass the numerical closure screen,
-  and no solver remains running/queued. Failed controls remain explicitly failed.
+  with failed controls explicitly retained. A new missing-case completion
+  campaign has1 original-fracture job running and6 queued serially on8CPUs;
+  `audit/new-validation/queue-20261029/state.json` owns live status. It uses
+  verified transformations of archived A1 inputs, not today's generator
+  defaults. New13% hexagonal cases use nx80 without a new convergence claim.
+  Abaqus input preflight passed; original inputs/catalogue remain unchanged.
+  New simulations require event, KE/IE and exact-source conversion/compliance
+  qualification before inclusion in the current plots.
   Triangular native comparisons are+0.66 to+5.38%, kagome+9.16 to+18.66% versus
   dimensional Fig10 (10mm requires declared sqrt(length) inference). Both3mm
   hexagonal initial-triangle values remain invalid; separate recovery estimates
@@ -83,8 +90,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   from diagnostic energy/unloading comparisons; they use nominal relative
   density to match Hsieh's. The underlying original-simulation calculation
   convention is unchanged. FTval/shared calcFT still retain the historical path;
-  the corrected values are in external CSVs read by ValConvPlots. The file
-  inventory and cleanup-review register cover code, workbook additions/legacy
+  the corrected values are in external CSVs read by ValConvPlots.
+  Marker sizes/layering now expose overlaps without coordinate jitter. Two
+  explicitly labelled Fig.8b sqrt(3) hypothesis views preserve the original plot
+  and all source K values; neither is an established reference correction.
+  The file inventory and cleanup-review register cover code, workbook additions/legacy
   cells, raw/derived audit evidence, early reviews and named temporary work.
   Cleanup remains deferred until the final method and integration are accepted.
 - The authorised existing Ti FCC periodic/20% nodal-disorder STATUS dataset

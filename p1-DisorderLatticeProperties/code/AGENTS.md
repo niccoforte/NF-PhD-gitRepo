@@ -52,6 +52,18 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   3mm is direct and10mm reference scaling is explicitly declared. Omit invalid
   negative-area points and keep the alternative work/control methods in the
   separate diagnostic figures. Simplifying presentation must not change K.
+  The separately named Fig.8b sqrt(3) hypothesis views may rescale displayed
+  ordinates only with explicit per-point factors and captions; keep the base
+  comparison unchanged and never promote either view to a verified correction.
+  Use hollow reference outlines and layered simulation sizes without x jitter.
+- `validation_completion.py` prepares the seven absent length/density cases
+  under `audit/new-validation`, using archived A1 INPs and verified dimensional
+  scaling rather than today's A1 defaults. It never submits; the serial queue
+  owns execution. Its prepared catalogue is not evidence of completed results.
+  Preserve the immutable original index; qualify new source hashes, initiation,
+  KE/IE, modulus and compliance before including completed cases in plots.
+  Hexagonal13% nx80 is anchored to the largest retained hex mesh, not new PSC
+  convergence evidence. History output uses supported time intervals.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 

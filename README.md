@@ -435,11 +435,28 @@ final cleanup; source values and unique temporary evidence must be preserved.
 Publication exports in `audit/paper` show only initiation results from the
 original simulations using the initial-triangle convention, versus Hsieh's
 initial data. They provide PNG/PDF/SVG, captions and point/exclusion CSVs.
+Large hollow reference markers and smaller layered simulation markers reveal
+coincident points without coordinate jitter. The original Fig.8b comparison is
+retained. Two explicitly labelled hypothesis views, `figure8b_hsieh_fix` and
+`figure8b_my_fix`, respectively divide the reference ordinates by sqrt(3) or
+multiply the simulation ordinates by sqrt(3). These prescribed interpretation
+tests do not change source data/calculated K or establish a verified correction.
 The dimensional Fig.10-based view uses common nominal relative density; mass
 density4430 versus4500kg/m3 does not create an artificial horizontal offset.
 Its3mm reference is direct;10mm uses declared sqrt(length) scaling. Alternative
 energy/unloading controls and source final-failure points stay in diagnostics.
 The corrected CSV/notebook route does not rewrite FTval or shared calcFT defaults.
+`validation_completion.py` prepares the seven absent length/density combinations
+in `audit/new-validation`, preserving archived A1 model settings through checked
+dimensional scaling and a separate prepared-case catalogue. It does not execute
+today's A1 generator or submit jobs. `validation_queue.py` runs that explicit
+manifest serially with8CPUs per job; never start another solver alongside it.
+The13% hexagonal nx80 mesh is a first-case choice anchored to the largest retained
+hexagonal mesh, not an extension of the accepted PSC convergence claim. Denser
+field/history output and whole-model energy requests improve qualification;
+completion alone does not make a plotted toughness eligible. New-case results
+and their generation lineage are research artifacts retained for final cleanup,
+separately from disposable preflight or solver scratch.
 Shared calculation/export defaults and p2 datasets are unchanged. Verified
 foundation fixes from `Review lattices.py` preserve canonical 10 mm graphs and
 default tri/kagome/hex/FCC unit stiffness; full/disordered RVE geometry and the

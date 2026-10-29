@@ -59,6 +59,8 @@ re-export; existing producer output defaults are not current read dependencies.
   Paper views select only original-simulation initial-triangle initiation values;
   equal nominal relative densities share an x coordinate. Do not mix control
   histories, final-failure data or force-fit literature ordinates into that view.
+  Explicit Fig.8b sqrt(3) hypothesis views carry per-row display factors and keep
+  base/source values unchanged; these are not corrected labels or training data.
 
 ## Field boundary
 

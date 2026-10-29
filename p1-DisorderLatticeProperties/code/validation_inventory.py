@@ -106,6 +106,9 @@ def cleanup_review(audit, repo, scratch_roots):
          "paths": [str(audit / "paper"), str(audit / "final"),
                    str(repo / "p1-DisorderLatticeProperties/code/ValConvPlots.ipynb")],
          "reason": "Keep the agreed calculation CSV, clean initiation figures, captions and notebook caller; avoid independent spreadsheet/Python copies of final values."},
+        {"component": "New validation simulations", "action": "retain_results_and_generation_lineage",
+         "paths": [str(audit / "new-validation")],
+         "reason": "These complete absent fracture cases and are new research simulations, not disposable audit controls. Preserve source/generated INPs, prepared identities and verified delivered results. Active marker-owned queue scratch is protected; bounded datacheck intermediates are reviewed separately after delivery."},
         {"component": "Workbook legacy results", "action": "reconcile_after_method_is_accepted",
          "paths": [str(WORKBOOK)], "areas": ["FTval", "Deshpande", "Validation audit"],
          "reason": "FTval still holds historical values/placeholders. The added Validation audit sheet contains sensitivity controls, not final results. Decide its replacement/removal and update affected notebook/chart links only after the final method is settled. Preserve original reference cells and Deshpande!A50:L73 digitisation."},
@@ -161,6 +164,9 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
         elif path.relative_to(audit).parts[0] == "final":
             group, retention = "calculation_source_or_receipt", "retain_current_verified_calculation"
             reason = "Single source for paper/diagnostic rendering; method and unavailable-area records remain explicit"
+        elif path.relative_to(audit).parts[0] == "new-validation":
+            group, retention = "new_validation_simulation_or_queue", "retain_research_results_and_generation_lineage"
+            reason = "New missing-case fracture simulations and source/queue receipts; retain verified research results and protect active scratch"
         elif path.name.startswith(("fig10-", "fig8-")) and path.suffix in (".csv", ".json", ".jpg"):
             group, retention = "literature_digitisation_or_provenance", "retain_source_values"
             reason = "Preserve source coordinates and original initial/final values independently of paper selection"

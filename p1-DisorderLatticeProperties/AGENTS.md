@@ -58,6 +58,11 @@ In practical terms:
   convention from the original simulations. Diagnostic alternatives remain in
   `audit/benchmark`; they are not competing paper results. Relative-density
   axes match the common nominal density without altering either input material.
+  Separately labelled Fig.8b sqrt(3) hypothesis views preserve the original
+  comparison and source K; they are interpretation tests, not accepted fixes.
+  New absent-case model derivatives live in `audit/new-validation` with their
+  own prepared identities; they do not replace the immutable original index.
+  Solver completion and calculation eligibility must be checked before plotting.
   Workbook FTval remains historical until explicitly reconciled to the accepted
   method; the notebook's corrected CSV route does not update shared calcFT.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
