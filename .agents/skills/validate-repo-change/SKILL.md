@@ -9,6 +9,7 @@ Use the repository entry point first:
 
 ```powershell
 python .agents/skills/validate-repo-change/scripts/validate_repo.py --changed
+python .agents/skills/validate-repo-change/scripts/validate_repo.py --base-ref <remote-tip-before-push>
 python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope root
 python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope resources
 python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope p1

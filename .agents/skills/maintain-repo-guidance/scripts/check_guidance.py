@@ -90,6 +90,16 @@ def is_guidance_path(path: str) -> bool:
 
 
 def guidance_candidates(path: str) -> tuple[str, ...]:
+    """Accept ancestor READMEs without allowing sibling documentation coverage."""
+    readmes = tuple(
+        (parent / "README.md").as_posix()
+        for parent in PurePosixPath(path).parents
+        if parent != PurePosixPath(".")
+    )
+    return tuple(dict.fromkeys((*readmes, *broad_guidance_candidates(path))))
+
+
+def broad_guidance_candidates(path: str) -> tuple[str, ...]:
     if path.startswith("p1-DisorderLatticeProperties/SIMscripts/"):
         return (
             "p1-DisorderLatticeProperties/SIMscripts/AGENTS.md",

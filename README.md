@@ -83,11 +83,23 @@ Useful broader scopes are `--scope resources`, `--scope p1`, `--scope p2`, `--sc
 
 - runs `git diff --check` and the guidance-integrity checker, which reports every effective `AGENTS.md` chain, warns above 24 KiB, and fails above 32 KiB;
 - recognises `p2-DisorderML/WINNER.md` as guidance and preserves all checker errors in failure summaries, even when size warnings are also present; CI runs regression tests for both behaviours;
+- accepts ancestor READMEs for changes within their subtree, including study READMEs; documentation in a sibling study does not cover shared resources;
 - compiles selected Python without executing it and labels Abaqus-dependent code `SYNTAX-ONLY`;
 - imports applicable `resources` modules in fresh Python processes;
 - checks notebook JSON/required structure, `bash -n`, and PowerShell parsing when those interpreters are available;
 - checks the explicitly non-scientific contract fixture for aligned sample ids, periodic id `0`, field shapes/metadata, and CSV/NPZ serialization;
 - reports Abaqus, Slurm/HPC, external `Z:` data, saved-run, and scientific execution as `SKIP` when they were not exercised.
+
+After committing and before pushing, also run the validator with
+`--base-ref <remote-tip-before-push>` to check the same committed range as CI.
+`--changed` checks uncommitted files only; a clean checkout does not validate the
+pending push. Local guidance acknowledgements are not persisted to CI.
+
+Study-report refreshes preserve completed diagnostic sections. Replacing the
+prediction-variation section stops at the next level-two heading and leaves
+other sections intact; refresh the base report before inserting that diagnostic.
+The shared implementation is `resources/MLstudy_reports.py`, used by the Loss
+and Damage report builders.
 
 The synthetic fixture contains only minimal identities and shapes, not experimental or simulated research values. It detects structural breakage; it cannot establish scientific correctness. The `.github/workflows/guidance-integrity.yml` workflow runs the changed-surface validator on pushes and pull requests to the public GitHub.com mirror, using Node 24-based v7 checkout and Python setup actions. The job is skipped before runner allocation on the QMUL Enterprise mirror because that server currently cancels runner-backed jobs; this prevents misleading cancellation warnings while the public mirror remains the authoritative remote CI host. Local validation remains required.
 

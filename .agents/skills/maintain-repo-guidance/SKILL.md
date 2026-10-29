@@ -31,6 +31,8 @@ Edit current guidance in place. Do not append routine dated change logs or dupli
 The checker treats `p2-DisorderML/WINNER.md` as guidance itself. Editing its wording
 does not require a second guidance-file edit; implementation changes still require
 coverage from the relevant AGENTS, README or status file.
+Ancestor READMEs count for files beneath them, including individual study READMEs;
+sibling study READMEs do not cover shared helpers or other studies.
 
 ## Completion gate
 
@@ -54,3 +56,10 @@ coverage from the relevant AGENTS, README or status file.
 
    Use this exception only for a change that alters no durable fact or workflow. Report the reason in the final response.
 6. State which `AGENTS.md`, `README.md`, and skill files were updated. Do not claim the task is complete from code validation alone.
+
+Before pushing, record the remote branch tip and run the validator with
+`--base-ref <remote-tip>` after committing. This checks the committed push range
+as CI does. A clean working tree makes `--changed` empty; a local
+`--acknowledge-current-guidance` reason is not persisted to CI. For a durable
+behaviour change, update the relevant documentation rather than relying on that
+local exception.
