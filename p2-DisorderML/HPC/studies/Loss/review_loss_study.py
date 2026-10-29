@@ -401,7 +401,8 @@ def write_report(root, out, rows, extra, sources, banks, checks):
         "[Historical true-field curve-loss check](historical-shared-true-field/README.md) is a separate input-source diagnostic, not a Case1(i) oracle result. [Full metrics](metrics.csv), [fracture-region errors/denominators/counts](status-fracture-regions.csv), [motion and curve safeguards](safeguards.csv), [runtime and provenance](runs.csv), [field banks](field-banks.csv), [verification](verification.json). No model is retrained by this report.\n"]
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(out,"spatial-balance-jobs.tsv","FT spatial coefficients"))
-    (out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import write_study_report
+    write_study_report(out/"README.md","".join(text))
     from resources.MLstudy_reports import insert_variation_section
     insert_variation_section(out/"README.md",[dict(variant=v,seed=s,path=run_path(root,v,s)) for v in VARIANTS for s in (42,43,44)])
     rows.to_csv(out/"metrics.csv",index=False);extra.to_csv(out/"safeguards.csv",index=False)

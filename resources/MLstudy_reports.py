@@ -18,7 +18,7 @@ def figure(out, name, caption):
     return f"\n![{caption}](<{(Path(out)/name).resolve().as_posix()}>)\n\n"
 
 
-def prediction_variation_section(entries,out):
+def prediction_variation_section(entries,out,prefix="prediction-variation"):
     """Saved predictions only; return a dedicated, accuracy-independent section.
 
     Match IDs/truths for each output within a study. Average pointwise ratios
@@ -63,7 +63,7 @@ def prediction_variation_section(entries,out):
                         mean_prediction_truth_bias=float(np.mean((p-y)[valid])),path=str(path)))
     if not rows:
         return "## Prediction variation and collapse\n\nNot applicable: no saved regression predictions in this report.\n\n"
-    table=pd.DataFrame(rows);table.to_csv(out/"prediction-variation.csv",index=False)
+    table=pd.DataFrame(rows);table.to_csv(out/f"{prefix}.csv",index=False)
     kinds=[k for k in ("field","curve") if (table.kind==k).any()]
     fig,axes=plt.subplots(len(kinds),2,figsize=(15,5*len(kinds)),squeeze=False)
     for row,kind in enumerate(kinds):
@@ -80,7 +80,7 @@ def prediction_variation_section(entries,out):
             ax.tick_params(axis="x",rotation=35,labelsize=10);ax.tick_params(axis="y",labelsize=11)
             ax.set_ylim(bottom=0);ax.grid(axis="y",alpha=.2);ax.legend(fontsize=10)
     fig.suptitle("Prediction variation: zero means constant across specimens; one does not establish accuracy",fontsize=16)
-    fig.tight_layout();fig.savefig(out/"prediction-variation.png",dpi=170);plt.close(fig)
+    fig.tight_layout();fig.savefig(out/f"{prefix}.png",dpi=170);plt.close(fig)
     return ("## Prediction variation and collapse\n\n"
         "This measures specimen-to-specimen output spread separately from TRAIN-mean accuracy. "
         "Zero indicates the same output for every specimen; values below one indicate compressed variation. "
@@ -89,8 +89,8 @@ def prediction_variation_section(entries,out):
         "Nearly constant truth locations are excluded only from this diagnostic (relative1e-6/absolute1e-12); "
         "all accuracy metrics keep their original masks. Unknown field entries remain masked. "
         "STATUS-only models have no displacement output and are evaluated separately by precision–recall.\n\n"
-        +figure(out,"prediction-variation.png","Across-specimen predicted versus true variation")
-        +"[Values, eligible locations and provenance](prediction-variation.csv).\n\n")
+        +figure(out,f"{prefix}.png","Across-specimen predicted versus true variation")
+        +f"[Values, eligible locations and provenance]({prefix}.csv).\n\n")
 
 
 def insert_variation_section(report,entries):
@@ -114,6 +114,12 @@ def submission_note(out,filename,title):
     jobs=pd.read_csv(path,sep="\t",dtype=str)
     gate=jobs[jobs.role=="preflight"];production=jobs[jobs.role!="preflight"]
     if len(gate)!=1 or production.empty:raise ValueError("Malformed study submission receipt")
+    verification=Path(out)/(filename.removesuffix("-jobs.tsv")+"-download-verification.json")
+    if verification.is_file():
+        return (f"\n## Completed follow-up receipt: {title}\n\n{len(production)} production fits; "
+            f"execution gate{gate.iloc[0].job_id}, source `{gate.iloc[0].source_revision}`. "
+            f"[Jobs/dependencies]({filename}) · [Verified downloads]({verification.name}). "
+            "The completed-evidence section above owns the findings; this is not a fresh scheduler check.\n")
     return (f"\n## Submitted follow-up: {title}\n\n{len(production)} production fits, execution gate "
             f"{gate.iloc[0].job_id}, immutable source `{gate.iloc[0].source_revision}`. "
             "These are separate follow-ups, not additional completed results in the figures above. "
@@ -144,7 +150,8 @@ def collect_fields(entries,data_root,region_api):
         data=json.loads((path/"model_data.json").read_text())
         if meta.get("status")!="complete" or meta.get("checkpoint_reload")!="passed" or metrics.get("evaluation_split")!="val":
             raise ValueError("Require completed/reloaded validation artifacts: "+str(path))
-        if meta.get("mode")!=mode or meta.get("variant")!=variant:raise ValueError("Run identity disagrees with study entry")
+        if meta.get("mode")!=mode or meta.get("variant")!=entry.get("source_variant",variant):raise ValueError("Run identity disagrees with study entry")
+        if "seed" in entry and meta.get("run_config",{}).get("seed")!=entry["seed"]:raise ValueError("Training seed differs from study entry")
         ids=list(map(str,data["sample_ids"]["val"]))
         if len(ids)!=len(set(ids)):raise ValueError("Duplicate validation IDs")
         for key,value in (("splits",data["sample_ids"]),("geometry_scale",data["normalizers"]["geometry"]),
@@ -173,7 +180,7 @@ def collect_fields(entries,data_root,region_api):
             if diag.get("mean_field_baseline_source")!="train_mean_field":raise ValueError("Unverified mean baseline")
             if not np.isclose(measured[0]["rmse"],diag["rmse"],rtol=3e-6):raise ValueError("Physical RMSE does not reproduce")
             if not np.isclose(measured[0]["mean_baseline_rmse"],diag["mean_field_baseline_rmse"],rtol=3e-6):raise ValueError("Reconstructed training mean does not reproduce")
-            for row in measured:row.update(mode=mode,variant=variant)
+            for row in measured:row.update(mode=mode,variant=variant,seed=entry.get("seed",42))
             regional.extend(measured)
             p,y,v=pred.reshape(len(ids),800,20,2),truth.reshape(len(ids),800,20,2),valid.reshape(len(ids),800,20,2)
             for frame in range(20):
@@ -181,21 +188,78 @@ def collect_fields(entries,data_root,region_api):
                 avg=np.broadcast_to(mean[:,frame],y[:,:,frame].shape)
                 base=(avg-y[:,:,frame])[keep]
                 rmse=np.sqrt(np.mean(err**2));den=np.sqrt(np.mean(base**2))
-                frames.append(dict(mode=mode,variant=variant,frame=frame+1,rmse=rmse,skill_percent=100*(1-rmse/den),valid_entries=int(keep.sum())))
+                frames.append(dict(mode=mode,variant=variant,seed=entry.get("seed",42),frame=frame+1,rmse=rmse,skill_percent=100*(1-rmse/den),valid_entries=int(keep.sum())))
         history=pd.read_csv(path/"loss_history.csv")
         cfg=json.loads((path/"model.json").read_text())
-        rows.append(dict(mode=mode,variant=variant,label=entry.get("label",variant),rmse=diag["rmse"],
+        rows.append(dict(mode=mode,variant=variant,seed=entry.get("seed",42),label=entry.get("label",variant),rmse=diag["rmse"],
             baseline_rmse=diag["mean_field_baseline_rmse"],skill_percent=100*diag["skill_vs_mean_field_rmse"],
             collapse_ratio=diag["collapse_ratio"],hours=meta["training_seconds"]/3600,epochs=len(history),
             best_epoch=cfg.get("best_epoch",cfg.get("training",{}).get("best_epoch")),job=meta.get("slurm_job_id"),
-            revision=meta.get("source_revision"),path=str(path),**counts))
+            revision=meta.get("source_revision"),path=str(path),parameters=meta.get("active_parameters"),gpu=meta.get("gpu_name"),**counts))
         print("FIELD_REVIEW",mode,variant,flush=True)
     table=pd.DataFrame(rows);regions=pd.DataFrame(regional)
-    controls=table[table.variant=="control"].set_index("mode").rmse
-    table["change_percent"]=100*(table.rmse/table["mode"].map(controls)-1)
-    base=regions[regions.variant=="control"].set_index(["mode","region"]).rmse
-    regions["change_percent"]=[100*(r.rmse/base.loc[r.mode,r.region]-1) for r in regions.itertuples()]
+    controls=table[table.variant=="control"].set_index(["mode","seed"]).rmse
+    if not controls.index.is_unique:raise ValueError("Require one field control per task/seed")
+    table["change_percent"]=[100*(r.rmse/controls.loc[r.mode,r.seed]-1) for r in table.itertuples()]
+    base=regions[regions.variant=="control"].set_index(["mode","seed","region"]).rmse
+    regions["change_percent"]=[100*(r.rmse/base.loc[r.mode,r.seed,r.region]-1) for r in regions.itertuples()]
     return table,regions,pd.DataFrame(frames)
+
+
+def write_study_report(path,text):
+    """Preserve completed follow-up sections when the initial screen is rebuilt."""
+    import re
+    path=Path(path);previous=path.read_text(encoding="utf-8") if path.exists() else ""
+    blocks=re.findall(r"<!-- completed-followup:[\w-]+ -->.*?<!-- end-completed-followup -->",previous,re.S)
+    if blocks:
+        title_end=text.find("\n")+1
+        text=text[:title_end]+"\n"+"\n\n".join(blocks)+"\n\n"+text[title_end:].lstrip()
+    path.write_text(text.rstrip()+"\n",encoding="utf-8")
+
+
+def replace_study_followup(path,name,text):
+    """One canonical report; newest completed evidence follows its title."""
+    import re
+    if not re.fullmatch(r"[\w-]+",name):raise ValueError("Invalid follow-up identity")
+    path=Path(path);previous=path.read_text(encoding="utf-8")
+    pattern=rf"<!-- completed-followup:{name} -->.*?<!-- end-completed-followup -->\s*"
+    previous=re.sub(pattern,"",previous,flags=re.S)
+    title_end=previous.find("\n")+1
+    block=f"\n<!-- completed-followup:{name} -->\n{text.rstrip()}\n<!-- end-completed-followup -->\n\n"
+    path.write_text(previous[:title_end]+block+previous[title_end:].lstrip(),encoding="utf-8")
+
+
+def repeated_field_figures(table,regions,out,prefix):
+    """Matched-seed changes and TRAIN references; one-seed points have no CI."""
+    modes=list(dict.fromkeys(table["mode"]));variants=list(dict.fromkeys(table.variant))
+    for filename,values,column,regional in (("global-control",table,"change_percent",False),
+        ("global-mean",table,"skill_percent",False),("fracture-control",regions,"change_percent",True),
+        ("fracture-mean",regions,"skill_percent",True),("runtime",table,"hours",False)):
+        fig,axes=plt.subplots(1,len(modes),figsize=(8*len(modes),5.8),squeeze=False)
+        for ax,mode in zip(axes[0],modes):
+            part=values[values["mode"]==mode]
+            selected=[v for v in variants if (part.variant==v).any()]
+            groups=("STATUS onset endpoints ±1 frame","STATUS onset strut relative motion ±1 frame","FT crack-tip box") if regional else ("",)
+            for j,region in enumerate(groups):
+                sub=part[part.region==region] if regional else part
+                if sub.empty:continue
+                for index,variant in enumerate(selected):
+                    y=sub[sub.variant==variant][column].dropna().to_numpy();x=index+(j-(len(groups)-1)/2)*.16
+                    if not len(y):continue
+                    color=plt.get_cmap("tab10")(j)
+                    ax.errorbar(x,y.mean(),yerr=y.std(ddof=1) if len(y)>1 else None,fmt="o",capsize=4,color=color,
+                        label=region if regional and index==0 else None)
+                    if not regional:
+                        ax.scatter(x+np.linspace(-.07,.07,len(y)),y,s=17,color=color,alpha=.7)
+                        ax.annotate(f"{y.mean():.2f}",(x,y.mean()),xytext=(3,8),textcoords="offset points",fontsize=10)
+            ylabel="Training hours (queue excluded)" if column=="hours" else "RMSE change vs matched control (%) — lower is better" if column=="change_percent" else "RMSE reduction vs TRAIN mean (%) — higher is better"
+            ax.axhline(0,color="black",lw=.8);ax.set(title=mode,ylabel=ylabel,xticks=range(len(selected)),xticklabels=selected)
+            ax.tick_params(axis="x",rotation=28,labelsize=11);ax.grid(axis="y",alpha=.2);ax.margins(y=.18)
+            if column=="change_percent" and part[column].abs().max()>30:
+                ax.set_yscale("symlog",linthresh=5);ax.set_ylabel(ylabel+"; symlog beyond ±5%")
+            if regional:ax.legend(fontsize=9,loc="upper center",bbox_to_anchor=(.5,-.18))
+        fig.suptitle("Saved validation evidence: points = seed values, whiskers = seed SD (not confidence intervals)",fontsize=13)
+        fig.tight_layout();fig.savefig(Path(out)/f"{prefix}-{filename}.png",dpi=170);plt.close(fig)
 
 
 def comparison_figures(table,regions,out):

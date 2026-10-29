@@ -1,5 +1,20 @@
 # Custom-loss study
 
+`review_spatial_balance.py` reads the completed five-coefficient FT screen and
+updates the existing Loss report. Use the fresh same-trainer zero control;
+keep narrow STATUS events separate from the broader FT box and global error.
+It also reviews existing UT spatial0.1 versus MSE using paired validation IDs
+and a hierarchical seed/specimen bootstrap for field/curve RMSE and peak/work
+MAE differences. Intervals are descriptive: three seeds and validation-based
+checkpoint selection are not a final locked-test claim. No training/selection
+change occurs; fixed metric definitions and masks remain authoritative.
+Completed sections survive rebuilding the original study report.
+
+```powershell
+$env:PYTHONPATH=(Get-Location).Path
+python -B p2-DisorderML/HPC/studies/Loss/review_spatial_balance.py
+```
+
 ## Independent MSE versus MAE/Smooth-L1 field screen
 
 `A0-RobustFieldLoss.py` / `B4_RobustFieldLoss.sh` fit final field generators only:

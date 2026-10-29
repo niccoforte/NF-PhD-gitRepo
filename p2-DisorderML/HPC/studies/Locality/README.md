@@ -103,3 +103,15 @@ Only successful home gate logs survive; production exports retain reload checks.
 The maintained review now follows the visual-report route: global control/mean,
 actual STATUS regions for every variant, four-column field galleries, costs and
 validation/selected train-validation histories. Use `review_locality.py`.
+
+`review_cnn_confirmation.py` reviews the ten completed confirmation/depth runs,
+reusing original seed42 controls/CNN2. It verifies downloads, all IDs/masks/truths,
+TRAIN means and same-seed controls, then updates the existing Locality README
+with three-seed global/fracture/cost/variation evidence and a single-seed CNN3
+depth check. It trains nothing and does not promote WINNER.md. Rebuilding the
+initial screen preserves the completed follow-up section. Run from repo root:
+
+```powershell
+$env:PYTHONPATH=(Get-Location).Path
+python -B p2-DisorderML/HPC/studies/Locality/review_cnn_confirmation.py
+```

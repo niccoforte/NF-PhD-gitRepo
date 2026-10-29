@@ -8,16 +8,23 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
-## Current priority order (28 October; supersedes older next-step wording)
+## Current priority order (29 October; supersedes older next-step wording)
 
 - [x] Submit isolated follow-ups from8ca82d5: CNN confirmation/depth (ten),
   FT spatial balance (five), STATUS balance/UT confirmation (six). CNN/spatial
-  gates passed; STATUS gate is pending. PROJECT_STATUS and report-side jobs.tsv
+  gates passed; STATUS gate later passed too. PROJECT_STATUS and report-side jobs.tsv
   receipts own IDs/live state; do not repeat submissions.
-- [ ] Review these results against matched controls, TRAIN mean, actual STATUS
-  endpoints/strut motion and curve safeguards; permit task-specific choices.
-  UT spatial0.1 improves field and adapted-curve RMSE in all three seeds, but
-  peak-height/location errors worsen: retain the trade-off before promotion.
+- [x] Review/download CNN confirmation/depth and FT spatial balance:270 files,
+  4.25GB SHA256 verified. Existing Locality/Loss reports own the completed review.
+  CNN2 global/local gains replicate on42/43/44; CNN3 is one seed only. Accepted
+  WINNER unchanged pending acceptance; OOF/curve confirmation is not authorised
+  by this monitoring task. FT small spatial coefficients are one-seed candidates.
+- [x] Resolve the requested UT spatial paired review: field gain is supported,
+  but peak-height/location means deteriorate and paired bootstrap intervals for
+  curve/peak/work changes cross zero. Keep a conditional loss recommendation;
+  do not claim a universal winner or invent post-hoc acceptance thresholds.
+- [ ] Review the separate STATUS-balance, curve-term, FT-box and robust-loss
+  studies when complete. This heartbeat must not submit/repeat any of them.
 - [x] Submit FT-box spatial screen (gate33799292; fits33799293–33799296): four seed42 coefficients0.001/0.003/
   0.01/0.1; both endpoints inside fixed box, whole-field MSE and scales unchanged.
   Reuse the fresh zero control; compare with all-edge balance. No STATUS weights.

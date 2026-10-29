@@ -120,7 +120,8 @@ def main(argv=None):
         "[Fixed metrics](metrics.csv) · [Fracture entries and denominators](confirmed-fracture-regions.csv) · [Motion/capacity provenance](motion-and-capacity.csv). Validation only; locked test unchanged.\n"]
     from resources.MLstudy_reports import submission_note
     text.append(submission_note(a.out,"confirmation-jobs.tsv","CNN confirmation/depth"))
-    (a.out/"README.md").write_text("".join(text),encoding="utf-8")
+    from resources.MLstudy_reports import write_study_report
+    write_study_report(a.out/"README.md","".join(text))
     from resources.MLstudy_reports import insert_variation_section
     insert_variation_section(a.out/"README.md",entries)
     print("REPORT",a.out/"README.md")

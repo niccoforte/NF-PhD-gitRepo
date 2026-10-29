@@ -1,15 +1,22 @@
 # p2 Implementation Status
 
-- Latest28 October continuation: five CNN confirmation jobs33731155–33731159
-  running; three earlier fits completed0:0; no new failure at check. Gates for
-  STATUS/curve terms/FT-box remain queued. Submitted the authorised eight-fit
-  field-only MSE/MAE/Smooth-L1 screen: gate33812045, fits33812046–33812053,
-  immutable1085892; gate pending scheduling. CPU mask/train/reload tests pass,
-  existing14 field regressions pass, Linux changed validation27 non-failing/0 failed. Original context channels have no matched
-  individual attribution; proposal recorded, not submitted. The seminar's
-  average-strain/stress reconstruction and Ku=F ideas are abandoned. RNO and
-  common-lattice pretraining remain deferred; accepted winner unchanged.
-
+- Latest29 October review: all10 CNN confirmation/depth fits33731152–33731161
+  and five FT spatial-balance fits33731163–33731167 completed0:0/reload passed.
+  Downloaded270 files/4,246,811,540 bytes to external Z:/p2; all SHA256 match.
+  Existing Locality/Loss reports now include completed follow-up figures and
+  paired UT safeguards. CNN2 global RMSE improves all3 seeds: mean−2.19% UT/
+  −12.42% FT; STATUS endpoints−3.43%/−13.18%, strut motion−4.45%/−13.34%.
+  CNN3 has only seed42 evidence. FT CNN2 training averages4.30h versus1.59h;
+  UT0.97h versus1.12h. Recommend CNN2 as the confirmed field candidate, but
+  WINNER.md remains unchanged; no downstream OOF/curve or locked-test claim.
+  FT spatial0.001 is globally neutral(+0.07%), with endpoint−0.91%/strut−1.14%;
+  0.1 still fails global error(+119.75%). One seed: do not adopt a new FT loss.
+  UT spatial0.1 field RMSE−1.47%, curve−1.05%; peak-height/location means worsen
+  1.22→1.54% /2.84→3.02% span. Paired hierarchical bootstrap intervals for
+  curve/peak/work changes cross zero; field interval stays below zero. Keep
+  UT loss conditional; these validation intervals are not final-test evidence.
+  Other study gates passed; unrelated curve/STATUS/robust/box jobs continue.
+  No new jobs, loss/model changes or handoffs were made by this review.
 
 - 28 October continuation: existing CNN gate and spatial gate passed; CNN
   controlUT43/controlFT43/CNN2UT43 completed0:0; other existing fits queue for

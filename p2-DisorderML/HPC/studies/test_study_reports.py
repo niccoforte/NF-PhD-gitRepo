@@ -2,12 +2,33 @@
 import hashlib
 from pathlib import Path
 import tempfile
+import runpy
 import unittest
 import numpy as np
 from resources.MLstudy_reports import percent_error,verify_download,measure_curve_regions
+from resources.MLstudy_reports import write_study_report,replace_study_followup
 
 
 class StudyReportTests(unittest.TestCase):
+    def test_completed_followup_survives_base_rebuild_and_replaces_once(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/"README.md";write_study_report(path,"# Original\n\nInitial evidence.\n")
+            replace_study_followup(path,"cnn","## Completed\n\nFirst verdict.")
+            replace_study_followup(path,"cnn","## Completed\n\nNew verdict.")
+            write_study_report(path,"# Rebuilt\n\nRefreshed initial evidence.\n")
+            text=path.read_text();self.assertNotIn("First verdict",text)
+            self.assertEqual(text.count("New verdict"),1)
+            self.assertLess(text.index("New verdict"),text.index("Refreshed initial evidence"))
+
+    def test_paired_bootstrap_preserves_exact_matched_effect(self):
+        fn=runpy.run_path(str(Path(__file__).parent/"Loss/review_spatial_balance.py"))["paired_interval"]
+        b=np.array([[1.,2.,3.],[10.,20.,30.]])
+        result=fn(b,b*.25,rmse=True,repeats=200)
+        for key in ("change","ci_low","ci_high"):self.assertAlmostEqual(result[key],-50.)
+        result=fn(b,b+.5,rmse=False,repeats=200)
+        for key in ("change","ci_low","ci_high"):self.assertAlmostEqual(result[key],.5)
+        with self.assertRaises(ValueError):fn(b,b[:1])
+
     def test_percent_error_masks_zero_tiny_and_invalid_truth_without_changing_input(self):
         truth=np.array([0.,.001,-2.,4.,np.nan]);pred=np.array([9.,1.,-1.,5.,8.])
         result=percent_error(pred,truth,np.ones(5,bool),1.)
