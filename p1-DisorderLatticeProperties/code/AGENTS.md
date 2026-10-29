@@ -64,6 +64,9 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   KE/IE, modulus and compliance before including completed cases in plots.
   Hexagonal13% nx80 is anchored to the largest retained hex mesh, not new PSC
   convergence evidence. History output uses supported time intervals.
+  Submitted preparation is immutable for both default and refresh calls;
+  preflight uses the durable serial-owner gate as well as the OS lock, so an
+  interrupted worker cannot allow a second solver to start unnoticed.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 

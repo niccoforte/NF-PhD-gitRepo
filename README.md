@@ -457,6 +457,9 @@ field/history output and whole-model energy requests improve qualification;
 completion alone does not make a plotted toughness eligible. New-case results
 and their generation lineage are research artifacts retained for final cleanup,
 separately from disposable preflight or solver scratch.
+Once submitted, preparation and preflight entry points refuse mutation. A
+durable preflight owner record also blocks later queues after worker interruption
+until solver ownership has been reviewed.
 Shared calculation/export defaults and p2 datasets are unchanged. Verified
 foundation fixes from `Review lattices.py` preserve canonical 10 mm graphs and
 default tri/kagome/hex/FCC unit stiffness; full/disordered RVE geometry and the

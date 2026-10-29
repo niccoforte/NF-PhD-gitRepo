@@ -10,6 +10,7 @@ from collections import Counter
 import csv
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -130,9 +131,9 @@ def pair_checks(root):
 def prepare(root=ROOT, refresh_unsubmitted=False):
     root = Path(root).resolve()
     out = root / "audit/new-validation"
-    out.mkdir(parents=True, exist_ok=True)
-    if refresh_unsubmitted and (out / "queue-20261029/state.json").exists():
+    if (out / "queue-20261029/state.json").exists():
         raise ValueError("Submitted queue preparation is immutable")
+    out.mkdir(parents=True, exist_ok=True)
     prior_path = out / "generation-receipt.json"
     prior = json.loads(prior_path.read_text()) if prior_path.exists() else {"cases":[]}
     known_inputs = {row["input"]:row["input_sha256"] for row in prior["cases"]}
@@ -228,23 +229,26 @@ def datacheck(root=ROOT):
     import validation_queue as queue
     root = Path(root).resolve()
     out = root / "audit/new-validation"
+    if (out / "queue-20261029/state.json").exists():
+        raise ValueError("Submitted queue preparation is immutable; use retained preflight evidence")
     manifest, _ = queue.validate_manifest(out / "serial-fracture-proposal.json", root)
     job = dict(manifest["jobs"][0], job="check_"+manifest["jobs"][0]["job"], required_outputs=[".dat"])
     check_root = out / "datacheck"
-    old_receipt = out / "datacheck-receipt.json"
-    if old_receipt.exists():
-        previous = json.loads(old_receipt.read_text())
-        previous_job = previous["delivery"]["job"]
-        previous_path = check_root/"runs"/previous_job/"preflight.json"
-        queue.write_json(previous_path, previous)
-    attempt = len(list((check_root/"runs").glob("check_*"))) if (check_root/"runs").exists() else 0
-    if attempt:
-        job["job"] += "_r" + str(attempt)
-    work = check_root / "scratch" / job["job"]
     with queue.worker_lock(root/"audit", "serial-worker.lock"):
-        owner = json.loads((root/"audit/serial-owner.json").read_text())
+        owner_path = root / "audit/serial-owner.json"
+        owner = json.loads(owner_path.read_text())
         if owner["phase"] != "settled":
             raise ValueError("Another validation queue remains active")
+        old_receipt = out / "datacheck-receipt.json"
+        if old_receipt.exists():
+            previous = json.loads(old_receipt.read_text())
+            previous_job = previous["delivery"]["job"]
+            previous_path = check_root/"runs"/previous_job/"preflight.json"
+            queue.write_json(previous_path, previous)
+        attempt = len(list((check_root/"runs").glob("check_*"))) if (check_root/"runs").exists() else 0
+        if attempt:
+            job["job"] += "_r" + str(attempt)
+        work = check_root / "scratch" / job["job"]
         work.mkdir(parents=True, exist_ok=False)
         queue.write_json(work/"scratch-owner.json", {"job":job["job"], "input_sha256":job["input_sha256"]})
         shutil.copy2(job["input"], work/(job["job"]+".inp"))
@@ -253,8 +257,15 @@ def datacheck(root=ROOT):
         (work/"solver-scratch").mkdir()
         command = [manifest["abaqus"], "job="+job["job"], "input="+job["job"]+".inp",
                    "cpus=8", "datacheck", "interactive", "scratch="+str(work/"solver-scratch")]
+        preflight_owner = {"phase":"active", "kind":"input_datacheck",
+                           "queue_root":str(check_root), "worker_pid":os.getpid(),
+                           "command":command, "started_at":queue.timestamp()}
+        queue.write_json(owner_path, preflight_owner)
         with (work/"launcher.txt").open("w", encoding="utf-8") as log:
             process = subprocess.run(command, cwd=work, stdout=log, stderr=subprocess.STDOUT)
+        # Only a returned subprocess confirms the solver has exited. Worker
+        # interruption leaves the durable gate active for explicit review.
+        queue.write_json(owner_path, dict(preflight_owner, phase="settled", finished_at=queue.timestamp()))
         delivered = queue.deliver_and_clean(work, check_root/"runs"/job["job"], job)
         destination = check_root / "runs" / job["job"]
         output = (destination/"launcher.txt").read_text(errors="replace")
