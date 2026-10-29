@@ -335,7 +335,8 @@ def plot_frequency(raw_data, data, test, bins=50):
     
     plt.show()
 
-def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, highlight=None):
+def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, highlight=None,
+                    axis_limits=None):
     x_data_np = np.array(x_data)
     y_data_np = np.array(y_data)
 
@@ -354,6 +355,10 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, h
         title = "Multiple Properties"
         x_label = 'Normalized Ductility'
         y_label = 'Normalized $K_{JIC}$'
+    elif test == "K_STRENGTH":
+        title = "Paired initiation resistance and tensile strength"
+        x_label = 'Normalised $K_{J,init}$'
+        y_label = 'Normalised tensile strength'
     elif test == "FCL":
         title = "Fracto-Cohesive Length"
         x_label = 'Normalized $L_{f}$'
@@ -418,7 +423,29 @@ def plot_properties(x_data, y_data, test, include_freq=False, compare_ax=None, h
         # ax.legend(prop={'size':20})
         fig.tight_layout()
 
+    if axis_limits is None:
+        ax.set_xlim(left=0)
+        ax.set_ylim(bottom=0)
+    else:
+        ax.set_xlim(axis_limits[0])
+        ax.set_ylim(axis_limits[1])
     return fig, ax
+
+
+def synchronise_property_axes(axes):
+    """Give comparable scatter panels one shared scale starting at zero.
+
+    Pass the axes for one comparable row across all topology/design panels,
+    after every dataset has been plotted. This changes display only.
+    """
+    axes = list(axes)
+    if not axes:
+        return
+    x_upper = max(ax.get_xlim()[1] for ax in axes)
+    y_upper = max(ax.get_ylim()[1] for ax in axes)
+    for ax in axes:
+        ax.set_xlim(0, x_upper)
+        ax.set_ylim(0, y_upper)
 
 def plot_curve(OUT_df, mode, idx=None, q=15, compare_ax=None):
     if compare_ax is not None:

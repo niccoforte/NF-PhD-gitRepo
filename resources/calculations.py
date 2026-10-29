@@ -168,17 +168,17 @@ def calc_Apl(d, F_sm, dd, P, frac, n):
         pass
     return A_pl
 
-def calc_p_poly(lam_bar, rho_bar, a_W):
+def calc_p_poly(lam_bar, chi_bar, a_W):
     v_lr = np.array([
         1.0,
         lam_bar,
-        rho_bar,
+        chi_bar,
         lam_bar**2,
-        lam_bar * rho_bar,
-        rho_bar**2,
+        lam_bar * chi_bar,
+        chi_bar**2,
         lam_bar**3,
-        lam_bar**2 * rho_bar,
-        lam_bar * rho_bar**2,
+        lam_bar**2 * chi_bar,
+        lam_bar * chi_bar**2,
     ])
 
     C = np.array([
@@ -198,21 +198,40 @@ def calc_p_poly(lam_bar, rho_bar, a_W):
     p = v_lr @ C @ v_a
     return float(p)
 
-def calc_FaW_aniso(a, W, C):
+def calc_FaW_aniso(a, W, C=None, S=None):
+    """Ortega's fitted C(T) factor for explicitly supplied source-axis C or S.
+
+    C/S must already describe the intended constraint in order (1,2,6).
+    This pure fit does not infer plane strain or resolve the source's axis
+    ambiguity for unequal axial moduli. chi is Ortega's rho, not density.
+    """
     from resources.lattices import calc_anisoParams
-    lambda_aniso, rho_aniso = calc_anisoParams(C)
-    if lambda_aniso < 0.03162 or lambda_aniso > 10.0 or rho_aniso < 0.1 or rho_aniso > 10.0:
-        print(f"WARNING: lambda: {lambda_aniso} or rho: {rho_aniso} out of bounds for f(a/W) calculation.")
+    lambda_aniso, chi = calc_anisoParams(C=C, S=S)
+    if not 0 < a < W:
+        raise ValueError("Ortega's C(T) fit requires 0 < a < W.")
+    if lambda_aniso < 0.03162 or lambda_aniso > 10.0 or chi < 0.1 or chi > 10.0:
+        print(f"WARNING: lambda: {lambda_aniso} or chi: {chi} out of bounds for f(a/W) calculation.")
 
     a_bar = np.log10(a/W)
     lambda_bar = np.log10(lambda_aniso)
-    rho_bar = np.log10(rho_aniso+1)
-    D = -0.066112 + 0.75681*a_bar - 0.015*rho_bar + 0.58136*(a_bar**2) - 0.08451*a_bar*rho_bar
+    chi_bar = np.log10(chi+1)
+    D = -0.066112 + 0.75681*a_bar - 0.015*chi_bar + 0.58136*(a_bar**2) - 0.08451*a_bar*chi_bar
 
-    f_a_W = calc_p_poly(lambda_bar, rho_bar, a/W)*(lambda_aniso**D)*((1+0.006689*rho_aniso)**0.47151)*((2*(2+(a/W)))/((1-(a/W))**(3/2)))*(((2*(lambda_aniso**(3/2)))/(1+rho_aniso))**(1/4))
+    f_a_W = calc_p_poly(lambda_bar, chi_bar, a/W)*(lambda_aniso**D)*((1+0.006689*chi)**0.47151)*((2*(2+(a/W)))/((1-(a/W))**(3/2)))*(((2*(lambda_aniso**(3/2)))/(1+chi))**(1/4))
     return f_a_W
 
-def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):  
+def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
+           C_state="plane_stress", v_s=0.3, ortega_axis1=None):
+    """Calculate legacy initiation measures with a consistent FCC elastic chain.
+
+    E_eff_pe is the mode-I conversion modulus M, not a directional Young's
+    modulus. FCC physical C is reduced using the prismatic mixture model;
+    declare C_state='plane_strain' for already-reduced beam homogenisation.
+    Unequal-axial-modulus FCC requires an explicit Ortega source-axis map
+    (0=x or 1=y). Equal axial moduli make that mapping immaterial.
+    The plastic-area calibration and historical validation override are
+    retained, not independently established by this elastic correction.
+    """
     if not getattr(geom, "ftcalc_done", False):
         geom.FTcalc()
 
@@ -224,6 +243,23 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):
     if validation == True:
         E_eff_pe = E          # TODO: CHECK FT VAL
     E_eff_pe = stress_to_mpa(E_eff_pe)
+
+    fcc_elastic = None
+    if geom.LAT.lower() == "fcc":
+        from resources.lattices import calcC_mohr, prismatic_plane_strain
+        if C is None:
+            if C_state != "plane_stress":
+                raise ValueError("Supply C explicitly when it is already plane-strain reduced.")
+            C = calcC_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]
+        fcc_elastic = prismatic_plane_strain(C, geom.rD, E, v_s, C_state=C_state)
+        M_I_pe = stress_to_mpa(fcc_elastic["M_I_pe"])
+        if not np.isclose(E_eff_pe, M_I_pe, rtol=1e-6, atol=0):
+            raise ValueError("FCC E_eff_pe must equal M_I_pe from the same reduced compliance used for its geometry factor.")
+        if ortega_axis1 not in (None, 0, 1):
+            raise ValueError("ortega_axis1 must be 0 (x), 1 (y), or None.")
+        if (ortega_axis1 is None
+                and not np.isclose(fcc_elastic["lambda_pe"], 1., rtol=1e-6, atol=0)):
+            raise ValueError("Unequal FCC axial moduli require an explicitly verified Ortega source-axis mapping.")
 
     W = geom.W
     B = geom.B
@@ -238,10 +274,19 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None):
         if geom.iso == True:
             f_a_W = calc_FaW(ai[n], W)
         elif geom.iso == False:
-            if C is None:
+            if fcc_elastic is not None:
+                # Ortega uses axis1 along loading, unlike Bao's crack-axis1
+                # convention used for M. Keep the two input axes explicit.
+                source_axis1 = 1 if ortega_axis1 is None else ortega_axis1
+                order = [source_axis1, 1-source_axis1, 2]
+                S_ortega = fcc_elastic["S_xy_pe"][np.ix_(order, order)]
+                f_a_W = calc_FaW_aniso(ai[n], W, S=S_ortega)
+            elif C is None:
                 from resources.lattices import calcC_mohr
                 C = calcC_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]
-            f_a_W = calc_FaW_aniso(ai[n], W, C)
+                f_a_W = calc_FaW_aniso(ai[n], W, C)
+            else:
+                f_a_W = calc_FaW_aniso(ai[n], W, C)
         K = (P/(B*(W**(1/2)))) * f_a_W
 
         J_el = (K**2) / E_eff_pe

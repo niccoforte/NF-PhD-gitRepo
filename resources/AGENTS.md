@@ -46,6 +46,18 @@ below expose imported functions/classes. Do not add job entry points here.
 - If changing a lattice definition, update node counts, connectivity assumptions, fracture crack positions, stiffness calculations, and field body-node masks together.
 - `calcUT` and `calcFT` encode current scientific definitions for ductility, strength, stiffness, work of fracture, fracture force/displacement, and toughness metrics. Do not adjust thresholds, smoothing, or fitted regions without documenting why.
 - `calc_FaW_aniso`, `calcC_mohr`, `calcC_sims`, and anisotropy helpers are used by validation/stiffness workflows. Keep units and plane-strain assumptions explicit.
+- `prismatic_plane_strain` completes physical C in (1,2,6) order with E3=rD*E_s,
+  nu31=nu32=nu_s and reduces once. Already constrained beam tensors require
+  `C_state="plane_strain"`. Invalid compliance and normal/shear coupling fail.
+- FCC `effProperties` returns directional E first and fracture M third; `calcFT`
+  uses the same reduced tensor for M and its geometry factor. Bao uses crack1,
+  opening2; Ortega reverses them. Unequal axial moduli require verified
+  `ortega_axis1`; canonical FCC has lambda=1. `calc_FaW_aniso` only fits the
+  explicitly supplied source-axis C/S. Other-topology defaults, exact-source
+  B21 controls and stored results remain separate; no data schema changed.
+- Scatter helpers only alter display. Use `synchronise_property_axes` on all
+  comparable panels after plotting to share zero-origin limits; `K_STRENGTH`
+  requires sample-aligned paired properties, never positional row pairing.
 - FCC half-cell connectivity is dimensionless; canonical 10 mm graph semantics
   remain the saved-model reference. Boundary thickness weights require floats.
   `check_isotropy` tests general 2D engineering-shear form and does not select

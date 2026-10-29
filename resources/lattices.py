@@ -449,10 +449,94 @@ def pStrainProperties(E, v, v_s=None, B=None, b=None, rD=None, typ="bulk"):
     elif typ.lower() == "lattice":
         return E/(1 - (B*(rD**(b-1))*(v_s**2))), (v + (B*(rD**(b-1))*(v_s**2)))/(1 - (B*(rD**(b-1))*(v_s**2)))
 
-def effProperties(LAT, geom, E_s=123e9, v_s=0.3, mode="stiff", C=None):
+def prismatic_plane_strain(C, rD=None, E_s=123e9, v_s=0.3,
+                          C_state="plane_stress", crack_axis=0):
+    """Reduce a prismatic lattice and obtain its elastic mode-I modulus.
+
+    C uses engineering shear and Voigt order (1, 2, 6) in specimen (x, y).
+    For an unconstrained tensor, the rule of mixtures supplies E_3=rD*E_s
+    and nu_31=nu_32=v_s (nu_ij is strain in j under stress in i). The
+    returned S_1236 is the normal/in-plane-shear compliance block, not a
+    complete 6-by-6 tensor: out-of-plane shear moduli are not assumed.
+
+    C_state='plane_strain' accepts an already-reduced tensor, including
+    homogenisation with plane-strain-equivalent beam inputs. It bypasses
+    the mixture/reduction, preventing a second plane-strain correction.
+
+    crack_axis=0 means crack along x and opening load along y. S_pe is
+    ordered (crack, opening, engineering shear); Bao's lambda=S11/S22
+    and M=(1/S11)*sqrt(2*lambda**1.5/(1+chi)) use those axes. This does
+    not establish the axis mapping of an orthotropic C(T) calibration.
+    Every modulus must use the same stress unit as C and E_s.
+    """
+    C = np.asarray(C, dtype=float)
+    if (C.shape != (3, 3) or not np.isfinite(C).all()
+            or not np.allclose(C, C.T, rtol=1e-8, atol=0)):
+        raise ValueError("C must be a finite symmetric 3-by-3 engineering-shear tensor.")
+    if np.linalg.eigvalsh(C).min() <= 0:
+        raise ValueError("C must be positive definite.")
+    if crack_axis not in (0, 1):
+        raise ValueError("crack_axis must be 0 (x) or 1 (y).")
+    S_input = np.linalg.inv(C)
+    S_full = None
+    if C_state == "plane_stress":
+        if (rD is None or not np.isfinite(rD) or not 0 < rD <= 1
+                or not np.isfinite(E_s) or E_s <= 0
+                or not np.isfinite(v_s) or not -1 < v_s < .5):
+            raise ValueError("The mixture model requires 0<rD<=1, E_s>0 and -1<v_s<0.5.")
+        E3 = rD * E_s
+        S_full = np.zeros((4, 4))
+        inplane = [0, 1, 3]
+        S_full[np.ix_(inplane, inplane)] = S_input
+        S_full[2, 2] = 1 / E3
+        S_full[0, 2] = S_full[2, 0] = -v_s / E3
+        S_full[1, 2] = S_full[2, 1] = -v_s / E3
+        if np.linalg.eigvalsh(S_full).min() <= 0:
+            raise ValueError("The prismatic mixture compliance is not positive definite; check finite-density constants.")
+        coupling = S_full[inplane, 2]
+        S_xy_pe = S_input - np.outer(coupling, coupling) / S_full[2, 2]
+    elif C_state == "plane_strain":
+        E3 = None
+        S_xy_pe = S_input.copy()
+    else:
+        raise ValueError("C_state must be 'plane_stress' or 'plane_strain'.")
+    # Bao's aligned orthotropic formula excludes normal/shear coupling.
+    scale = np.max(np.abs(S_xy_pe))
+    if np.max(np.abs(S_xy_pe[:2, 2])) > 1e-8 * scale:
+        raise ValueError("Aligned orthotropic mode-I conversion requires zero S16 and S26.")
+    order = [crack_axis, 1-crack_axis, 2]
+    S_pe = S_xy_pe[np.ix_(order, order)]
+    lambda_pe, chi_pe = calc_anisoParams(S=S_pe)
+    M_I_pe = np.sqrt(2 * lambda_pe**1.5 / (1 + chi_pe)) / S_pe[0, 0]
+    return {"S_input": S_input, "S_1236": S_full, "S_xy_pe": S_xy_pe,
+            "S_pe": S_pe, "E3": E3, "lambda_pe": lambda_pe,
+            "chi_pe": chi_pe, "M_I_pe": M_I_pe,
+            "E_pe": 1 / S_pe[0, 0], "nu_pe": -S_pe[0, 1] / S_pe[0, 0]}
+
+
+def effProperties(LAT, geom, E_s=123e9, v_s=0.3, mode="stiff", C=None,
+                  C_state="plane_stress"):
+    """Return input-state E, nu and plane-strain fracture M, nu.
+
+    For FCC, E is a directional Young's modulus, not the fracture modulus.
+    Physical-material C is mixture-reduced once; C_state='plane_strain'
+    instead declares that the supplied C already includes the constraint.
+    Existing non-FCC scaling/affine approximations are retained; these are
+    not a common finite-density homogenisation or a revised dataset.
+    """
     if LAT.lower() == "fcc":
-        B, b = 0, 0
-    elif LAT.lower() == "square":
+        if mode != "stiff":
+            raise ValueError("FCC requires a stiffness tensor; no isotropic FCC scaling law is defined.")
+        if C is None:
+            if C_state != "plane_stress":
+                raise ValueError("Supply C explicitly when it is already plane-strain reduced.")
+            C = calcC_mohr(copy.deepcopy(geom), "unit", E_s)[0]
+        elastic = prismatic_plane_strain(C, geom.rD, E_s, v_s, C_state=C_state)
+        S = elastic["S_input"]
+        return 1/S[0, 0], -S[0, 1]/S[0, 0], elastic["M_I_pe"], elastic["nu_pe"]
+    if C_state != "plane_stress":
+        raise ValueError("For already-reduced non-FCC tensors, use prismatic_plane_strain directly.")
+    if LAT.lower() == "square":
         B, b = 1/2, 1
     elif LAT.lower() == "45square":
         B, b = 1/4, 3
@@ -467,13 +551,11 @@ def effProperties(LAT, geom, E_s=123e9, v_s=0.3, mode="stiff", C=None):
             C = calcC_mohr(copy.deepcopy(geom), "unit", E_s)[0]
         E, v, _ = calc_IsoEffProperties(C)
         if not geom.iso:
-            lambda_aniso, rho_aniso = calc_anisoParams(C=C)
-            E = (C[0,0]*(1-v**2)) * np.sqrt((2*(lambda_aniso**(3/2)))/(1+rho_aniso))
+            lambda_aniso, chi_aniso = calc_anisoParams(C=C)
+            E = (C[0,0]*(1-v**2)) * np.sqrt((2*(lambda_aniso**(3/2)))/(1+chi_aniso))
     else:
         E = E_s * B * (geom.rD ** b)
-        if LAT.lower() == "fcc":
-            v = 0
-        elif LAT.lower() == "square":
+        if LAT.lower() == "square":
             v = 0
         elif LAT.lower() == "45square":
             v = 1
@@ -825,11 +907,22 @@ def calc_ZenerRatio(C):
     return Z
 
 def calc_anisoParams(C=None, S=None):
+    """Return lambda, chi for supplied in-plane compliance in order (1,2,6).
+
+    This algebra does not infer constraint, reduce plane stress, or map
+    specimen/source axes. Supply the already appropriate C or S explicitly.
+    The second return is Ortega's rho (called chi to avoid density ambiguity).
+    """
+    if (C is None) == (S is None):
+        raise ValueError("Supply exactly one of C or S.")
     if C is not None:
         S = calc_Compliance(C)
+    S = np.asarray(S, dtype=float)
+    if S.shape != (3, 3) or not np.isfinite(S).all() or S[0, 0] <= 0 or S[1, 1] <= 0:
+        raise ValueError("S must be a finite 3-by-3 compliance with positive axial entries.")
     lambda_aniso = S[0,0]/S[1,1]
-    rho_aniso = (2*S[0,1] + S[2,2])/(2*np.sqrt(S[0,0]*S[1,1]))
-    return lambda_aniso, rho_aniso
+    chi_aniso = (2*S[0,1] + S[2,2])/(2*np.sqrt(S[0,0]*S[1,1]))
+    return lambda_aniso, chi_aniso
 
 
 def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zener=False, paper=False):
@@ -873,7 +966,7 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         # ax1.set_ylim([-0.1, 0.1])
         # ax1.set_xticks([i+1 for i in range(len(K11))])
         ax1.plot([i+1 for i in range(len(K11))], K11, 'bx', markersize=10, label='$C_{11}$')
-        ax1.plot([i+1 for i in range(len(K33))], K33, 'r^', markersize=10, label='$C_{44}$')
+        ax1.plot([i+1 for i in range(len(K33))], K33, 'r^', markersize=10, label='$C_{66}$')
         ax1.tick_params(axis='both', which='major', labelsize=20)
         ax1.tick_params(axis='both', which='minor', labelsize=20)
         # ax1.grid()
@@ -883,8 +976,8 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         ax2.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         # ax2.set_ylim([-0.05, 0.05])
         # ax2.set_xticks([i+1 for i in range(len(K11))])
-        ax2.plot([i+1 for i in range(len(K13))], K13, 'bx', markersize=10, label='$C^{dis}_{14}$')
-        ax2.plot([i+1 for i in range(len(K23))], K23, 'r^', markersize=10, label='$C^{dis}_{24}$')
+        ax2.plot([i+1 for i in range(len(K13))], K13, 'bx', markersize=10, label='$C^{dis}_{16}$')
+        ax2.plot([i+1 for i in range(len(K23))], K23, 'r^', markersize=10, label='$C^{dis}_{26}$')
         ax2.tick_params(axis='both', which='major', labelsize=20)
         ax2.tick_params(axis='both', which='minor', labelsize=20)
         # ax2.grid()
@@ -918,7 +1011,7 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         # ax4.grid()
         ax4.legend(prop={'size':18})
 
-        ax5.set_ylabel('$C_{12}/C_{33}$ (ratio)', fontsize=26, fontname="Times New Roman")
+        ax5.set_ylabel('$C_{12}/C_{66}$ (ratio)', fontsize=26, fontname="Times New Roman")
         ax5.set_xlabel('Dis Model No.', fontsize=26, fontname="Times New Roman")
         ax5.tick_params(axis='both', which='major', labelsize=20)
         ax5.tick_params(axis='both', which='minor', labelsize=20)
@@ -999,8 +1092,8 @@ def plot_IsotropyVariation(Ks, stiff=False, inplane=False, properties=False, zen
         # ax9.set_ylim([-0.05, 0.05])
         # ax9.set_xticks([i+1 for i in range(len(K11))])
         ax9.axhline(y=K_13_11p, color='k', linestyle='--', linewidth=2.5, label='Per')
-        ax9.plot([i+1 for i in range(len(K_13_11s))], K_13_11s, 'bx', markersize=10, label='$C^{*}=C_{14}$')
-        ax9.plot([i+1 for i in range(len(K_23_11s))], K_23_11s, 'r^', markersize=10, label='$C^{*}=C_{24}$')
+        ax9.plot([i+1 for i in range(len(K_13_11s))], K_13_11s, 'bx', markersize=10, label='$C^{*}=C_{16}$')
+        ax9.plot([i+1 for i in range(len(K_23_11s))], K_23_11s, 'r^', markersize=10, label='$C^{*}=C_{26}$')
         # ax9.grid()
         ax9.legend(prop={'size':18})
 

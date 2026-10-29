@@ -10,6 +10,10 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - `SIMresults.ipynb` is for quick local/transfer result inspection and mechanical-property calculation from output CSVs.
 - `StiffnessMatrix.ipynb` handles analytical/simulation stiffness matrices, isotropy checks, and effective-property calculations.
 - `ContinuumPlots.ipynb` and `ValConvPlots.ipynb` support displacement-field visualization, material/validation plots, mesh/refinement checks, and convergence/validation figures.
+- Continuum principal plots show both eigenvalues of reconstructed Green-Lagrange
+  strain with x/y coordinates and a shared signed scale. Confirm saved sample/frame
+  provenance before exporting an initiation figure; the colour cap is not a
+  beam-section damage threshold. Keep historical manuscript assets until matched.
 - `validation_history_audit.py` reads indexed density-campaign ODBs without upgrade,
   retaining actual times, NaNs/validity, monitored STATUS and named ALLKE/ALLIE.
   `validation_modal.py` explicitly prepares/runs local exact-input eigenproblems
@@ -65,6 +69,12 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - `resources/MLdata.py` owns `DATA`, ML-ready loading, property extraction, field loading, split construction, scaling, and save helpers.
 - `resources/calculations.py` owns curve smoothing/parsing and UT/FT mechanical-property calculations.
 - `resources/lattices.py` owns geometry, node counts, connectivity, effective properties, stiffness matrices, isotropy, and anisotropy calculations.
+- `StiffnessMatrix` now shows the explicit physical-C prismatic reduction and
+  separate fracture modulus M; `SIMresults` calls the third effective-property
+  return `M_I_pe`. For measured C from modified beam inputs, declare the
+  already-reduced state instead. Current FCC corrections do not rewrite stored
+  population metrics or the separate48-case validation route. The source-axis
+  ambiguity for unequal moduli must be resolved before generalising the C(T) fit.
 
 ## How To Work Here
 

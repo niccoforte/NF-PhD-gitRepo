@@ -4,6 +4,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
+- The manuscript revision has a common compliance/notation description and an
+  implemented FCC prismatic plane-strain elastic route. At nominal20% physical
+  material inputs, canonical FCC gives E3=24.6GPa, chi=.57457199 and
+  M_I=8.34026648GPa. Twenty-one focused constitutive/axis tests pass. This does
+  not regenerate historical population values or validate the FCC plastic-area
+  factor. Exact figure populations/frame provenance, density retention and the
+  final numerical method still require reconciliation. Principal-strain and
+  common-axis plot sources are prepared separately from historical assets.
 - The full p1 archive was downloaded to `Z:/p1/HPCarchive`. Read-only comparison
   confirmed all 212,198 files / 995,745,698,879 bytes and directory/type/size
   agreement with `/data/SEMS-TaoLab/Niccolo-Forte/p1` on 23 October 2026.
