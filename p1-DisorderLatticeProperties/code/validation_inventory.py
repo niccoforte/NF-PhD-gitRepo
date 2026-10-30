@@ -181,6 +181,7 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
     maintained = list(code.glob("validation_*.py")) + list(code.glob("test_validation_*.py"))
     maintained += [code / "validation_workbook_fig10.mjs", code / "ValConvPlots.ipynb",
                    Path(repo) / "resources/lattices.py", Path(repo) / "resources/test_lattice_validation.py",
+                   Path(repo) / "resources/AGENTS.md",
                    Path(repo) / "p2-DisorderML/samples/p1-validation/README.md",
                    Path(repo) / "README.md", Path(repo) / "p1-DisorderLatticeProperties/PROJECT_STATUS.md",
                    Path(repo) / "p1-DisorderLatticeProperties/AGENTS.md", code / "AGENTS.md",

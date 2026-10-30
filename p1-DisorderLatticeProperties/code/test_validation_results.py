@@ -6,7 +6,7 @@ import tempfile
 import unittest
 import numpy as np
 
-from validation_results import matched_loading_snapshot, measured_record, native_record, sha, triangle_record, verify_native_exports
+from validation_results import completion_records, matched_loading_snapshot, measured_record, native_record, sha, triangle_record, verify_native_exports
 
 
 class NativeResultTests(unittest.TestCase):
@@ -133,6 +133,37 @@ class NativeResultTests(unittest.TestCase):
         self.save()
         with self.assertRaisesRegex(ValueError, "differs from extraction"):
             verify_native_exports(self.root, self.case, proofs)
+
+    def test_additive_catalogue_uses_the_actual_source_database_identity(self):
+        receipt = {"read_only": True, "source_unchanged": True,
+                   "before": {"sha256": self.case["odb_sha256"]},
+                   "after": {"sha256": self.case["odb_sha256"]},
+                   "csv_sha256": sha(self.directory/"native_stored_energy.csv")}
+        (self.directory/"summary.json").write_text(json.dumps(receipt))
+        self.case["source_odb"] = str(self.root/"retained-queue/result.odb")
+        actual = str(Path(self.case["source_odb"]).resolve()).lower()
+        verify_native_exports(self.root, self.case, {actual:receipt})
+        with self.assertRaises(KeyError):
+            verify_native_exports(self.root, self.case,
+                                  {str((self.root/self.case["odb"]).resolve()).lower():receipt})
+
+    def test_unsettled_new_extraction_cannot_enter_the_final_results(self):
+        out = self.root/"audit/new-validation/results"
+        out.mkdir(parents=True)
+        (out/"extraction-summary.json").write_text('{"state":"extracting"}')
+        with self.assertRaisesRegex(ValueError, "still running"):
+            completion_records(self.root)
+
+    def test_changed_settled_initiation_table_is_rejected(self):
+        out = self.root/"audit/new-validation/results"
+        event = out/"audit/failure/failure-initiation.csv"
+        event.parent.mkdir(parents=True)
+        event.write_text("case_id,prevtime_s\nfixture,.05\n")
+        digest = sha(event)
+        (out/"extraction-summary.json").write_text(json.dumps({"state":"complete","event_csv_sha256":digest}))
+        event.write_text("case_id,prevtime_s\nfixture,.06\n")
+        with self.assertRaisesRegex(ValueError, "differs from its settled extraction"):
+            completion_records(self.root)
 
     def test_curve_csv_must_match_the_separate_native_array_export(self):
         receipt = {"read_only": True, "source_unchanged": True,

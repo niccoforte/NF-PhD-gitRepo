@@ -449,6 +449,19 @@ original simulations using the initial-triangle convention, versus Hsieh's
 initial data. They provide PNG/PDF/SVG, captions and point/exclusion CSVs.
 Paper legends identify the simulation series as Current study; internal
 `Simulation` series keys in the point tables remain stable identifiers.
+`validation_completion.py --extract-finished --include-interrupted` reads the
+finished new jobs into a separate `new-validation/results` catalogue with native
+histories, initiation/damage evidence and pinned extraction hashes. A reviewed
+failure after initiation can supply its intact prefix; incomplete pre-initiation
+histories remain unavailable. `validation_results.py` merges qualified new
+cases without rewriting the immutable original catalogue. Uniformly scaled
+copies of the same mesh/material/constraints may reuse verified linear controls:
+C is unchanged and specimen stiffness scales with length. New13% hexagonal
+thickness instead requires the two supplemental elastic controls; prepare with
+`validation_controls.py prepare-completion`, then extract completed jobs using
+`gather-completion --queue-root PATH` in Abaqus Python. Control derivation,
+parent ODB identities and source hashes remain explicit; no nonlinear result or
+fracture rate is transferred by similarity.
 Large hollow reference markers and smaller layered simulation markers reveal
 coincident points without coordinate jitter. The original Fig.8b comparison is
 retained. Two explicitly labelled hypothesis views, `figure8b_hsieh_fix` and

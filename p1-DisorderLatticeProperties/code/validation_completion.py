@@ -281,11 +281,308 @@ def datacheck(root=ROOT):
         return receipt
 
 
+def merge_completion_attempts(existing, incoming, attempt_history=()):
+    """Keep qualified cases; promote a replacement only after qualification."""
+    selected = {row["case"]["case_id"]:row for row in existing}
+    lineage = list(attempt_history)
+    for row in incoming:
+        identity = row["case"]["case_id"]
+        previous = selected.get(identity)
+        if previous is None:
+            selected[identity] = row
+            continue
+        if previous["before"]["sha256"] == row["before"]["sha256"]:
+            continue
+        replace = not previous["initiation_prefix_qualified"] and row["initiation_prefix_qualified"]
+        other = previous if replace else row
+        item = {"case_id":identity, "source_odb":other["case"]["source_odb"],
+                "source_sha256":other["before"]["sha256"], "state":other["state"],
+                "initiation_prefix_qualified":other["initiation_prefix_qualified"],
+                "event_json":other["event_json"], "event_json_sha256":other.get("event_json_sha256"),
+                "receipt":str(Path(other["history_export_directory"])/"extraction.json"),
+                "selection_reason":"Replaced unqualified attempt" if replace else "Retained prior qualified case or rejected an unqualified replacement"}
+        if item not in lineage:
+            lineage.append(item)
+        if replace:
+            selected[identity] = row
+    return list(selected.values()), lineage
+
+
+def extract_finished(root=ROOT, include_interrupted=False, queue_root=None):
+    """Reuse the native exporters for finished jobs in an additive result tree.
+
+    Existing helpers share a cached source fingerprint inside one extraction;
+    actual full-file fingerprints bracket the complete sequence. No source ODB
+    is upgraded, copied, edited, or deleted, including a reviewed dead-worker
+    partial ODB. The original case catalogue remains untouched.
+    """
+    import ctypes
+    import validation_failure_audit as failure
+    import validation_history_audit as history
+    from odbAccess import openOdb
+
+    extractor_digest = sha(__file__)
+
+    def active(pid):
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))
+        if not handle:
+            if ctypes.windll.kernel32.GetLastError() == 5:
+                raise PermissionError("Cannot establish worker absence: access denied")
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                raise OSError("Cannot establish worker process status")
+            return code.value == 259
+        finally:
+            ctypes.windll.kernel32.CloseHandle(handle)
+
+    root = Path(root).resolve()
+    campaign = root / "audit/new-validation"
+    queue_root = Path(queue_root).resolve() if queue_root else campaign / "queue-20261029"
+    queue_root.relative_to(campaign)
+    state = json.loads((queue_root / "state.json").read_text())
+    manifest = json.loads(Path(state["manifest"]).read_text())
+    definitions = {row["job"]:row for row in manifest["jobs"]}
+    prepared = {row["job"]:row for row in csv.DictReader((campaign/"prepared-case-index.csv").open())}
+    output = campaign / "results"
+    history_out, failure_out = output/"audit/history", output/"audit/failure"
+    history_out.mkdir(parents=True, exist_ok=True)
+    failure_out.mkdir(parents=True, exist_ok=True)
+    previous_path = output/"extraction-summary.json"
+    previous = json.loads(previous_path.read_text()) if previous_path.exists() else {"cases":[]}
+    if previous.get("state", "complete") != "complete":
+        raise ValueError("Existing unfinished extraction requires explicit review")
+    for name, path in (("event_csv_sha256", failure_out/"failure-initiation.csv"),
+                       ("stored_energy_summary_sha256", history_out/"stored-energy-summary.json"),
+                       ("case_index_sha256", output/"case-index.csv")):
+        if previous.get(name) and sha(path) != previous[name]:
+            raise ValueError("Existing extraction aggregate changed before merge: " + name)
+    cases, events, energies, statuses = [], [], [], []
+    real_history_fingerprint, real_failure_fingerprint = history.fingerprint, failure.fingerprint
+    for job in state["jobs"]:
+        definition = definitions[job["job"]]
+        if definition.get("kind") != "new_original_Explicit_fracture":
+            continue
+        status = job["status"]
+        if status not in ("completed", "failed"):
+            if not (status in ("running", "interrupted") and include_interrupted):
+                continue
+            if active(state["worker_pid"]) or active(job["solver_launcher_pid"]):
+                raise ValueError("Refuse to read a live interrupted-job candidate")
+        source = queue_root / ("scratch" if status in ("running", "interrupted") else "runs") / job["job"] / (job["job"]+".odb")
+        if not source.exists():
+            raise ValueError("No usable database exists for finished job: " + job["job"])
+        print("Extracting source read-only: " + str(source), flush=True)
+        before = real_history_fingerprint(source)
+        delivery_path = source.parent / "delivery.json"
+        if delivery_path.exists():
+            delivery = json.loads(delivery_path.read_text())
+            expected = next(row["sha256"] for row in delivery["files"] if row["file"] == source.name)
+            if before["sha256"] != expected:
+                raise ValueError("Delivered source changed before extraction")
+        parent_job = definition.get("parent_job", job["job"])
+        case = dict(prepared[parent_job])
+        case.update(job=job["job"], parent_job=parent_job, queue_root=str(queue_root))
+        if sha(root/case["inp"]) != case["inp_sha256"] or sha(source.with_suffix(".inp")) != case["inp_sha256"]:
+            raise ValueError("Prepared/retained solver input differs from its frozen source")
+        case.update(source_odb=str(source), source_inp=str(root/case["inp"]),
+                    inp=str(root/case["inp"]), odb_sha256=before["sha256"],
+                    odb=str(Path(source.parent.parent.name)/source.parent.name/source.name))
+        case_out = history_out / Path(case["odb"]).parent / source.stem
+        receipt_path = case_out / "extraction.json"
+        if receipt_path.exists():
+            prior = json.loads(receipt_path.read_text())
+            if prior["before"] != before or not prior["source_unchanged"]:
+                raise ValueError("Retained extraction source differs; explicit review required")
+            for item in prior["exports"]:
+                if sha(item["path"]) != item["sha256"]:
+                    raise ValueError("Retained native export changed")
+            event = json.loads(Path(prior["event_json"]).read_text())
+            if prior.get("event_json_sha256") and sha(prior["event_json"]) != prior["event_json_sha256"]:
+                raise ValueError("Retained initiation event changed")
+            cases.append(prior["case"]); events.append(event)
+            energies.append(prior["energy_attestation"]); statuses.append(prior)
+            continue
+
+        def cached(path):
+            return dict(before) if Path(path).resolve() == source.resolve() else real_history_fingerprint(path)
+
+        history.fingerprint = cached
+        failure.fingerprint = cached
+        try:
+            curve_proof = history.audit_case(source, history_out, histories_only=True)
+            energy_proof = history.export_stored_energy(source, history_out)
+            # Add the new whole-model channels to the same native time grid.
+            energy_path = case_out / "native_stored_energy.csv"
+            with energy_path.open(newline="") as file:
+                reader = csv.DictReader(file)
+                fieldnames, energy_rows = list(reader.fieldnames), list(reader)
+            odb = openOdb(path=str(source), readOnly=True)
+            try:
+                region = odb.steps["Step-1"].historyRegions[energy_proof["region"]]
+                for variable in ("ALLCD", "ALLWK"):
+                    values = list(region.historyOutputs[variable].data) if variable in region.historyOutputs else []
+                    lookup = dict(values)
+                    if len(lookup) != len(values):
+                        raise ValueError("Repeated native energy times need review")
+                    column = variable+"_Nmm"; fieldnames.append(column)
+                    for row in energy_rows:
+                        row[column] = lookup.get(float(row["time_s"]), float("nan"))
+                    energy_proof["variables"][variable] = {
+                        "available":bool(values), "samples":len(values),
+                        "meaning_if_unavailable":"not recorded; unknown, not zero",
+                        "values":history.numeric_summary([value for _, value in values])}
+                    energy_proof["all_recorded_time_grids_equal"] &= [time for time, _ in values] == [float(row["time_s"]) for row in energy_rows]
+            finally:
+                odb.close()
+            with energy_path.open("w", newline="", encoding="utf-8") as file:
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader(); writer.writerows(energy_rows)
+            energy_proof["csv_sha256"] = sha(energy_path)
+            event = failure.initiation_only(source, case, failure_out)
+            failure.save_initiations(failure_out, [event])
+            failure.damage_prefix_audit(failure_out)
+            event = json.loads((failure_out/"failure-initiation.json").read_text())["cases"][0]
+        finally:
+            history.fingerprint = real_history_fingerprint
+            failure.fingerprint = real_failure_fingerprint
+        after = real_history_fingerprint(source)
+        if before != after:
+            raise ValueError("Source changed during native extraction")
+        scope = "Actual full-file SHA256 before/after complete native extraction; inner helpers share that batch fingerprint"
+        for record in (curve_proof, energy_proof, event, event["damage_prefix"]):
+            record.update(before=before, after=after, source_unchanged=True,
+                          read_only=True, source_fingerprint_scope=scope)
+        event_path = failure_out/Path(case["odb"]).parent/source.stem/"initiation.json"
+        failure.dump(event_path, event)
+        history.json_dump(case_out/"summary.json", curve_proof)
+        valid = bool(event["threshold_found"] and event["recommended_prefix_available"]
+                     and event["undamaged_prefix_through_primary_lower_bound_verified"])
+        state_name = ("completed_and_extracted" if status == "completed" else
+                      "failed_with_usable_preinitiation_prefix" if status == "failed" and valid else
+                      "interrupted_with_usable_preinitiation_prefix" if status in ("running", "interrupted") and valid else
+                      "interrupted_before_qualified_initiation" if status in ("running", "interrupted") else "failed_without_qualified_prefix")
+        exports = [{"path":str(path), "sha256":sha(path)} for path in sorted(case_out.iterdir())
+                   if path.is_file() and path.suffix in (".csv", ".npz", ".json") and path != receipt_path]
+        receipt = {"case":case, "before":before, "after":after, "source_unchanged":True,
+                   "read_only":True, "source_fingerprint_scope":scope,
+                   "extractor_sha256":extractor_digest, "source_input_hash_verified":True,
+                   "retained_solver_input_hash_verified":True,
+                   "queue_solver_status":status, "state":state_name, "initiation_prefix_qualified":valid,
+                   "solver_complete":status == "completed", "event_json":str(event_path),
+                   "event_json_sha256":sha(event_path),
+                   "energy_attestation":energy_proof, "exports":exports,
+                   "solver_diagnostics":curve_proof.get("solver_diagnostics"),
+                   "history_export_directory":str(case_out)}
+        failure.dump(receipt_path, receipt)
+        cases.append(case); events.append(event); energies.append(energy_proof); statuses.append(receipt)
+        failure.save_initiations(failure_out, events)
+        failure.dump(history_out/"stored-energy-summary.json", energies)
+        failure.dump(output/"extraction-summary.json", {"cases":statuses, "state":"extracting",
+                                                       "extractor_sha256":extractor_digest})
+        print(json.dumps({"job":job["job"], "state":state_name,
+                          "criterion_found":event["threshold_found"], "usable_prefix":valid}), flush=True)
+    statuses, attempt_history = merge_completion_attempts(previous["cases"], statuses, previous.get("attempt_history", []))
+    cases = [row["case"] for row in statuses]
+    events = [json.loads(Path(row["event_json"]).read_text()) for row in statuses]
+    energies = [row["energy_attestation"] for row in statuses]
+    failure.save_initiations(failure_out, events)
+    failure.dump(history_out/"stored-energy-summary.json", energies)
+    with (output/"case-index.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=list(dict.fromkeys(key for row in cases for key in row)))
+        writer.writeheader(); writer.writerows(cases)
+    result = {"cases":statuses, "state":"complete", "extractor_sha256":extractor_digest,
+              "attempt_history":attempt_history, "last_extracted_queue":str(queue_root),
+              "note":"Additive catalogue for completed/reviewed partial new jobs only; original catalogue and live queue unchanged"}
+    failure.dump(output/"extraction-summary.json", result)
+    bind_extraction(output)
+    return {"results_root":str(output), "cases":len(cases), "usable_prefixes":sum(r["initiation_prefix_qualified"] for r in statuses)}
+
+
+def bind_extraction(output):
+    """Add small-file integrity bindings without repeating any ODB extraction."""
+    import validation_history_audit as history
+    from validation_failure_audit import dump
+
+    output = Path(output)
+    summary_path = output/"extraction-summary.json"
+    previous_bytes = summary_path.read_bytes()
+    summary = json.loads(previous_bytes)
+    if summary["state"] != "complete":
+        raise ValueError("Only a complete extraction may be bound for calculations")
+    source_history_path = output/"extraction-code-history.json"
+    source_history = json.loads(source_history_path.read_text()) if source_history_path.exists() else {"versions":{}}
+    extraction_digest = summary["extractor_sha256"]
+    # Previous extraction source is resolvable even after the maintained helper
+    # evolves. Store source text as JSON evidence, never executable data copies.
+    current_bytes = Path(__file__).read_bytes()
+    current_digest = hashlib.sha256(current_bytes).hexdigest()
+    source_history["versions"].setdefault(current_digest, {
+        "sha256":current_digest, "source_path":str(Path(__file__).resolve()),
+        "source_text":current_bytes.decode("utf-8"), "role":"Current extraction/binding implementation"})
+    if extraction_digest not in source_history["versions"]:
+        raise ValueError("Actual extraction code identity is not retained")
+    dump(output/"extraction-code-history.json", source_history)
+    rows = []
+    for receipt in summary["cases"]:
+        directory = Path(receipt["history_export_directory"])
+        receipt_path = directory/"extraction.json"
+        previous_receipt = receipt_path.read_bytes()
+        previous_digest = hashlib.sha256(previous_receipt).hexdigest()
+        history_dir = directory/"extraction-history"
+        history_dir.mkdir(exist_ok=True)
+        if receipt.get("schema_version") != 2:
+            (history_dir/(previous_digest+".json")).write_bytes(previous_receipt)
+            receipt["binding_upgrade"] = {"previous_receipt_sha256":previous_digest,
+                "previous_receipt":str(history_dir/(previous_digest+".json")),
+                "note":"Added integrity bindings and CSV-derived diagnostics; source ODB and scientific export bytes unchanged"}
+        event_path = Path(receipt["event_json"])
+        if receipt.get("event_json_sha256") and sha(event_path) != receipt["event_json_sha256"]:
+            raise ValueError("Pinned initiation event changed before binding")
+        event = json.loads(event_path.read_text())
+        energy_path = directory/"native_energy.csv"
+        with energy_path.open(newline="") as file:
+            energy = [[float(row[k]) for k in ("time_s", "ALLKE_Nmm", "ALLIE_Nmm", "KE_over_IE")]
+                      for row in csv.DictReader(file)]
+        cutoff = event.get("prev_native_history", {}).get("time_s")
+        receipt.update(schema_version=2, extractor_sha256=receipt.get("extractor_sha256", extraction_digest),
+                       event_json_sha256=sha(event_path),
+                       binding_code_sha256=current_digest,
+                       energy_prefix_check=history.energy_window(energy, cutoff, True, "through_last_saved_precriterion_sample"))
+        for item in receipt["exports"]:
+            if sha(item["path"]) != item["sha256"]:
+                raise ValueError("Scientific export changed before binding")
+        inp = Path(receipt["case"]["inp"])
+        source_inp = Path(receipt["case"]["source_odb"]).with_suffix(".inp")
+        if sha(inp) != receipt["case"]["inp_sha256"] or sha(source_inp) != receipt["case"]["inp_sha256"]:
+            raise ValueError("Prepared/retained input changed before binding")
+        receipt.update(source_input_hash_verified=True, retained_solver_input_hash_verified=True)
+        dump(receipt_path, receipt)
+        rows.append(receipt)
+    history_dir = output/"extraction-history"
+    history_dir.mkdir(exist_ok=True)
+    if summary.get("schema_version") != 2:
+        (history_dir/(hashlib.sha256(previous_bytes).hexdigest()+".json")).write_bytes(previous_bytes)
+    summary.update(cases=rows, schema_version=2, binding_code_sha256=current_digest,
+                   event_csv_sha256=sha(output/"audit/failure/failure-initiation.csv"),
+                   stored_energy_summary_sha256=sha(output/"audit/history/stored-energy-summary.json"),
+                   case_index_sha256=sha(output/"case-index.csv"))
+    dump(summary_path, summary)
+    return {"bound_cases":len(rows), "source_ODB_reads":0, "summary":str(summary_path)}
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--refresh-unsubmitted", action="store_true")
     parser.add_argument("--datacheck", action="store_true")
+    parser.add_argument("--extract-finished", action="store_true")
+    parser.add_argument("--include-interrupted", action="store_true")
+    parser.add_argument("--bind-extraction", action="store_true")
+    parser.add_argument("--queue-root", type=Path, help="Explicit reviewed queue; auxiliary jobs are skipped and fracture parent_job maps to prepared identity")
     args = parser.parse_args()
-    print(json.dumps(datacheck(args.root) if args.datacheck else
+    print(json.dumps(bind_extraction(args.root/"audit/new-validation/results") if args.bind_extraction else
+                     extract_finished(args.root, args.include_interrupted, args.queue_root) if args.extract_finished else
+                     datacheck(args.root) if args.datacheck else
                      prepare(args.root, args.refresh_unsubmitted), indent=2))

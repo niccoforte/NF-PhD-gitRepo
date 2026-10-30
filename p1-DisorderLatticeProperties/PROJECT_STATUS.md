@@ -74,15 +74,21 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   clarification blocks current validation. All queued auxiliary jobs are now
   settled;7 of10 matched unloads completed,5 pass the numerical closure screen,
   with failed controls explicitly retained. A new missing-case completion
-  campaign has1 completed,1 running and5 queued serially on8CPUs at the latest
-  check (triangular3mm/.16 completed; kagome3mm/.16 running);
-  `audit/new-validation/queue-20261029/state.json` owns live status. It uses
+  campaign now has4qualified new3mm prefixes: triangular13%/16% and kagome13%/16%.
+  Kagome13% terminated after initiation and is retained without a fracture rerun.
+  The interrupted hexagonal10mm/16% source ended before initiation; its unchanged
+  restart is running, with both13% hexagonal cases queued serially on8CPUs.
+  `audit/new-validation/queue-resume-20261030/state.json` owns live status. It uses
   verified transformations of archived A1 inputs, not today's generator
   defaults. New13% hexagonal cases use nx80 without a new convergence claim.
   Abaqus input preflight passed; original inputs/catalogue remain unchanged.
-  New simulations require event, KE/IE and exact-source conversion/compliance
-  qualification before inclusion in the current plots.
-  Triangular native comparisons are+0.66 to+5.38%, kagome+9.16 to+18.66% versus
+  Two new13% hexagonal linear controls completed. Uniformly scaled existing
+  sources reuse verified linear controls with explicit C/k derivation and parent
+  identities, never nonlinear/dynamic equivalence. There are52calculated cases,
+  156all-case rows,45selected rows/15cases and13unique valid paper cases. Every
+  previously selected field/value is unchanged. New remaining simulations still
+  require event/energy qualification before plotting.
+  Triangular native comparisons are+0.66 to+5.38%, kagome+9.16 to+19.42% versus
   dimensional Fig10 (10mm requires declared sqrt(length) inference). Both3mm
   hexagonal initial-triangle values remain invalid; separate recovery estimates
   differ by+9.17%/.16 and+13.68%/.20 from direct references. The calculation

@@ -56,7 +56,8 @@ def prepare(args):
     root = Path(args.root).resolve()
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    with (root / "case-index.csv").open(newline="", encoding="utf-8-sig") as file:
+    case_index = getattr(args, "case_index", None) or root / "case-index.csv"
+    with Path(case_index).open(newline="", encoding="utf-8-sig") as file:
         cases = list(csv.DictReader(file))
     inputs = args.inp or PRIMARY_INPUTS
     for relative in inputs:

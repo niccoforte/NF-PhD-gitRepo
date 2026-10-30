@@ -63,6 +63,9 @@ In practical terms:
   New absent-case model derivatives live in `audit/new-validation` with their
   own prepared identities; they do not replace the immutable original index.
   Solver completion and calculation eligibility must be checked before plotting.
+  Qualified completion results are merged through their separate extraction
+  catalogue. A verified same-material/mesh uniform scale can reuse only linear
+  controls with explicit parent evidence; changed density requires new controls.
   Workbook FTval remains historical until explicitly reconciled to the accepted
   method; the notebook's corrected CSV route does not update shared calcFT.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.

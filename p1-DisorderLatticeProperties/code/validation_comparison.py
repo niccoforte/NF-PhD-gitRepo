@@ -771,7 +771,9 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                                    "source_input_sha256": inputs.get("selected_recalculation", {}).get("sha256"),
                                    **{name: row.get(name) if row else None for name in
                                       ("source_inp_sha256", "source_odb_sha256", "modulus_odb_sha256", "modulus_job",
-                                       "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note")}})
+                                       "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note",
+                                       "control_source_kind", "control_similarity_proof_sha256", "source_solver_state",
+                                       "source_inp", "source_odb", "extraction_receipt_sha256")}})
     # Explicit interpretation tests; the captured source and calculated K stay
     # unchanged. The factor is prescribed from the Fig.8a/8b discrepancy, not fit.
     variants = {"8b_hsieh_fix": (1/math.sqrt(3.), 1.),
@@ -791,7 +793,7 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
     write_rows(destination / "points.csv", points)
     write_rows(destination / "exclusions.csv", [r for r in points if r["series"] == "Simulation" and not r["plotted"]])
     captions = {
-        "8a": ("Initial-fracture comparison at nominal relative densities 13%, 16%, 20%. Current study values use the original Explicit histories, "
+        "8a": ("Initial-fracture comparison at nominal relative densities 13%, 16%, 20%. Current study values use retained and qualified new Explicit fracture histories, "
                "the last recorded undamaged tensile-strain sample and Hsieh's initial-slope area convention with the C(T) calibration. "
                "Current study normalisation uses parent UTS 1111.792 MPa and bar length in metres. Hsieh's original normalised ordinates are unchanged "
                "and repeated at the two nominal length assignments; the source strength convention remains unresolved. Undefined areas and absent cases are omitted, "
@@ -802,7 +804,7 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                "The undefined 3 mm hexagonal simulation is omitted."),
         "10": ("Dimensional comparison based on Figure 10 initiation data at matched nominal relative densities, avoiding the different constituent mass densities 4430/4500 kg/m3. "
                "The 3 mm Hsieh initial-toughness points are directly digitised; the 10 mm reference is an explicitly declared sqrt(10/3) scaling inference. "
-               "Error bars bound graphical extraction only and are not statistical confidence intervals. Current study values use the original Explicit histories and initial-slope area convention; "
+               "Error bars bound graphical extraction only and are not statistical confidence intervals. Current study values use retained and qualified new Explicit fracture histories and the initial-slope area convention; "
                "no final-fracture, dissipation or nonlinear-recovery estimates are included. Negative-area values and absent cases are omitted; data and source fingerprints are in points.csv. "
                "This comparison does not establish ASTM qualification or agreement for all lattices.")}
     for figure in variants:
@@ -888,18 +890,21 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
             for extension in ("png","pdf","svg"):
                 fig.savefig(destination / ("figure{}.{}".format(figure,extension)),dpi=300)
             plt.close(fig)
-    metadata = {"selection_method":method,"case_selection":"Existing selected largest model per topology/length/nominal density; no agreement-based selection",
+    metadata = {"selection_method":method,"case_selection":"Original selected specimens plus qualified completion cases at the declared topology/length/nominal density; no agreement-based selection",
                 "simulation_cases":len(simulations),"point_rows":len(points),
                 "plotted_simulation_rows":sum(r["series"]=="Simulation" and r["plotted"] for r in points),
                 "excluded_simulation_rows":sum(r["series"]=="Simulation" and not r["plotted"] for r in points),
                 "inputs":{key:inputs[key] for key in ("reference", "original_fig8", "original_fig8_provenance", "selected_recalculation") if key in inputs},
                 "published_pdf_sha256":source_pdf_sha,"captions":captions,
                 "display_labels":{"Hsieh et al.":"Hsieh et al.", "Simulation":"Current study"},
+                "linear_controls":"Source-specific B21 RVE/compliance solves for retained cases; qualified completion cases may use proven uniform geometric similarity: C unchanged and specimen stiffness proportional to length. No fitted modulus or alternative work definition.",
+                "completion_control_proofs":{row["case_id"]:row["control_similarity_proof_sha256"]
+                                             for row in simulations.values() if row.get("control_similarity_proof_sha256")},
                 "hypothesis_views": {key: {"reference_ordinate_factor":values[0], "simulation_ordinate_factor":values[1],
                                           "verified_correction":False} for key,values in variants.items()},
                 "marker_design": {"reference":"large hollow triangle,8.4pt", "simulation_sizes_pt":simulation_sizes,
                                   "coordinate_jitter":False, "layering":"smaller kagome circles above larger triangular circles"},
-                "limits":["Original Explicit initial-triangle recalculation only; no recovery/IE-SE/QS/final-fracture series",
+                "limits":["Explicit fracture initial-triangle recalculation only; no recovery/IE-SE/QS/final-fracture series",
                           "Base figures retain ordinates; explicitly named sqrt3 views are hypothesis tests, not fitted or verified corrections",
                           "Same nominal densities have identical horizontal coordinates; no marker jitter",
                           "Figure8 source normalisation and length ambiguities remain unresolved",

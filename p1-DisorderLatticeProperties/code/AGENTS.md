@@ -69,6 +69,15 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   Submitted preparation is immutable for both default and refresh calls;
   preflight uses the durable serial-owner gate as well as the OS lock, so an
   interrupted worker cannot allow a second solver to start unnoticed.
+  `--extract-finished` creates an additive results catalogue using native
+  history/strain/damage exporters. `--include-interrupted` requires a dead-owner
+  review before reading a partial ODB. Source fingerprints bracket the complete
+  extraction batch; event/table/export hashes pin the settled result. Failed
+  post-initiation tails do not invalidate an independently verified intact prefix.
+  Results merge only qualified cases. Exact uniform geometric scaling permits
+  linear-control reuse (C unchanged, k scales with length) after source/material/
+  mesh/BC/periodic-patch proof; never use it for nonlinear fracture or loading
+  rate equivalence. New13% hexagonal controls remain separate supplemental solves.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
 - `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
 

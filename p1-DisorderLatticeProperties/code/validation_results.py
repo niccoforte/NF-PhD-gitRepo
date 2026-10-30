@@ -121,7 +121,8 @@ def native_record(root, case, event, rve, endpoint):
 def verify_native_exports(root, case, attestations):
     """Bind derived CSVs to the existing read-only ODB extraction receipts."""
     directory = root / "audit/history" / Path(case["odb"]).parent / Path(case["odb"]).stem
-    proof = attestations[str((root / case["odb"]).resolve()).lower()]
+    source_odb = Path(case.get("source_odb") or root / case["odb"])
+    proof = attestations[str(source_odb.resolve()).lower()]
     curve_proof = json.loads((directory / "summary.json").read_text())
     for receipt in (proof, curve_proof):
         if (not receipt.get("read_only") or not receipt.get("source_unchanged")
@@ -241,6 +242,85 @@ def qs_triangle_record(result, case, rve, compliance):
     return triangle_record(base, compliance)
 
 
+def completion_records(root):
+    """Add reviewed new-case prefixes without changing the original catalogue."""
+    from validation_controls import completion_controls
+
+    base = Path(root) / "audit/new-validation"
+    result_root = base / "results"
+    document_path = result_root / "extraction-summary.json"
+    if not document_path.exists():
+        return [], [], []
+    document = json.loads(document_path.read_text())
+    if document["state"] != "complete":
+        raise ValueError("Completion extraction is still running; use its settled receipts before recalculation")
+    for field, path in (("event_csv_sha256", result_root / "audit/failure/failure-initiation.csv"),
+                        ("stored_energy_summary_sha256", result_root / "audit/history/stored-energy-summary.json"),
+                        ("case_index_sha256", result_root / "case-index.csv")):
+        if document.get(field) != sha(path):
+            raise ValueError("Completion event/catalogue/attestation differs from its settled extraction")
+    events = {row["case_id"]: row for row in read_csv(result_root / "audit/failure/failure-initiation.csv")}
+    attestations = {str(Path(row["source"]).resolve()).lower(): row for row in
+                    json.loads((result_root / "audit/history/stored-energy-summary.json").read_text())}
+    generation = {row["job"]: row for row in json.loads((base / "generation-receipt.json").read_text())["cases"]}
+    all_rows, selected, unavailable, control_proofs = [], [], [], []
+    for proof in document["cases"]:
+        case = proof["case"]
+        if not proof.get("source_unchanged") or not proof.get("read_only"):
+            raise ValueError("New source extraction is not verified read-only")
+        if sha(case["inp"]) != case["inp_sha256"]:
+            raise ValueError("New source input changed after preparation")
+        for exported in proof["exports"]:
+            if sha(exported["path"]) != exported["sha256"]:
+                raise ValueError("New source export changed after extraction")
+        if proof.get("event_json_sha256") != sha(proof["event_json"]):
+            raise ValueError("New source initiation evidence changed after extraction")
+        if not proof["initiation_prefix_qualified"]:
+            unavailable.append({"case_id": case["case_id"], "reason": proof["state"]})
+            continue
+        if proof["state"] not in ("completed_and_extracted", "failed_with_usable_preinitiation_prefix",
+                                   "interrupted_with_usable_preinitiation_prefix"):
+            raise ValueError("Unreviewed partial source cannot supply a validation result")
+        rve, compliance = completion_controls(root, case, generation[case["job"]])
+        verify_native_exports(result_root, case, attestations)
+        rows = [native_record(result_root, case, events[case["case_id"]], rve, endpoint)
+                for endpoint in ("criterion_last_intact", "criterion_first_crossed")]
+        for row in rows:
+            control_kind = rve["source_kind"]
+            row.update(modulus_source=("verified_geometric_similarity_B21_RVE_1_over_S11"
+                                      if control_kind == "verified_geometric_similarity" else
+                                      "exact_source_B21_RVE_1_over_S11"),
+                       control_source_kind=control_kind,
+                       control_similarity_proof_sha256=rve.get("similarity_proof_sha256"),
+                       source_solver_state=proof["state"], source_odb=case["source_odb"],
+                       source_inp=case["inp"], extraction_receipt_sha256=sha(
+                           Path(proof["history_export_directory"]) / "extraction.json"),
+                       quality_note=("IE-SE is a separate diagnostic work estimate; ALLPD and the new energy channels are recorded independently. Linear controls use verified source geometric similarity, not a new solve or a fitted modulus."
+                                     if control_kind == "verified_geometric_similarity" else
+                                     "IE-SE is a separate diagnostic work estimate; ALLPD and other energy channels are recorded independently. Linear controls are verified exact-source solves, not a fitted modulus."))
+        triangle = triangle_record(rows[0], compliance)
+        triangle["quality_note"] = (
+            "Hsieh initial-slope area with C(T) factors. Linear controls are inherited only after "
+            "verified uniform geometric scaling of the same source mesh/material/BCs: C unchanged, "
+            "k scaled with length. Parent control ODB hashes and the transformation proof are retained. "
+            "Negative area remains unavailable; no ASTM qualification is claimed.")
+        if rve["source_kind"] != "verified_geometric_similarity":
+            triangle["quality_note"] = "Hsieh initial-slope area with C(T) factors and independently verified exact-source linear controls. Negative area remains unavailable; no ASTM qualification is claimed."
+        # ALLPD is recorded in these new jobs; it remains a distinct diagnostic
+        # and never replaces the initial-triangle work in the paper result.
+        energy = read_csv(Path(proof["history_export_directory"]) / "native_stored_energy.csv")
+        for row in rows + [triangle]:
+            entry = energy[row["native_index"]]
+            row["recorded_ALLPD_available"] = "ALLPD_Nmm" in entry
+            if "ALLPD_Nmm" in entry:
+                row["recorded_ALLPD_Nmm"] = float(entry["ALLPD_Nmm"])
+        all_rows.extend(rows + [triangle])
+        selected.extend([rows[0], triangle])
+        control_proofs.append({"case_id": case["case_id"], "rve": rve, "compliance": compliance})
+    (result_root / "calculation-controls.json").write_text(json.dumps(control_proofs, indent=2))
+    return all_rows, selected, unavailable
+
+
 def run(root):
     root = Path(root)
     out = root / "audit/final"; out.mkdir(exist_ok=True)
@@ -287,19 +367,29 @@ def run(root):
                 measured["unloading_result_sha256"] = sha(path)
                 measured["matched_loading_evidence_file"] = snapshot
                 selected.append(measured)
+    new_all, new_selected, new_unavailable = completion_records(root)
+    original_selected = len(selected)
+    all_rows.extend(new_all)
+    selected.extend(new_selected)
     write_csv(out / "all-case-results.csv", all_rows)
     write_csv(out / "validation-results.csv", selected)
-    receipt = {"native_cases": len(cases), "all_native_method_rows": len(all_rows),
+    receipt = {"native_cases": len(cases) + len({row["case_id"] for row in new_all}),
+               "original_native_cases": len(cases), "completion_native_cases": len({row["case_id"] for row in new_all}),
+               "all_native_method_rows": len(all_rows), "original_selected_method_rows": original_selected,
                "selected_cases": len({row["case_id"] for row in selected}), "selected_method_rows": len(selected),
                "method_counts": {name: sum(row["method"] == name for row in selected) for name in sorted({row["method"] for row in selected})},
-               "selection": "Largest existing indexed model per topology/length/density in the published .13/.16/.20 domain; no selection by agreement",
-               "rule": "Native last recorded undamaged tensile LE11<.1105 bracket and separately verified QS precriterion peaks; exact-source RVE conversion. Initial-triangle source convention and finite-geometry energy estimates remain distinct.",
+               "selection": "Original largest indexed specimens plus explicitly prepared completion sources in the published .13/.16/.20 domain; no selection by agreement",
+               "rule": "Native last recorded undamaged tensile LE11<.1105 bracket and separately verified QS precriterion peaks; exact-source linear controls or verified geometric similarity. Initial-triangle source convention and finite-geometry energy estimates remain distinct.",
                "native_PD_is_derived_not_measured": True, "ASTM_Apl_not_claimed": True,
+               "new_native_ALLPD_is_recorded_separately": bool(new_all),
                "completion": "Recalculated available data only; native and counterfactual QS work estimates coexist and never replace each other's histories. Missing/invalid cases remain explicit.",
                "unavailable_unloading_controls": rejected,
                "compliance_results_sha256": sha(compliance_path) if compliance_path.exists() else None,
                "code_sha256": sha(__file__), "rve_results_sha256": sha(rve_path),
-               "event_csv_sha256": sha(root / "audit/failure/failure-initiation.csv")}
+               "event_csv_sha256": sha(root / "audit/failure/failure-initiation.csv"),
+               "completion_unavailable": new_unavailable,
+               "completion_extraction_sha256": sha(root / "audit/new-validation/results/extraction-summary.json")
+                   if (root / "audit/new-validation/results/extraction-summary.json").exists() else None}
     (out / "calculation-receipt.json").write_text(json.dumps(receipt, indent=2))
     print(json.dumps(receipt, indent=2))
     return selected

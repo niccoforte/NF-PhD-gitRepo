@@ -114,11 +114,8 @@ below expose imported functions/classes. Do not add job entry points here.
 - `field_motion_diagnostics` reports displacement activity, not verified damage. Timing and principal-axis metrics use explicit heuristic eligibility thresholds and must retain event counts/ambiguity. FT tip-region reporting is diagnostic only. Frozen independent curve comparisons use ID-aligned validation intersections, the original curve input scaler and unchanged static features; dual true-field substitution reports masked/imputed entries. Do not alter a live HPO objective when adding these diagnostics.
 
 - Avoid adding paper-specific assumptions to shared functions when a parameter or notebook/script configuration is enough.
-- Prefer small, named helper functions over copying data-processing code across notebooks.
-- Keep shared helpers compact and purposeful. Remove workaround helpers, fallback branches, and compatibility scaffolding once they no longer serve a concrete current workflow.
-- If a helper is used once and does not clarify the main flow, consider inlining it. If logic is reused or makes notebooks cleaner, keep it in the appropriate `resources` module.
-- Preserve backward compatibility for saved artifacts where practical; old runs are research evidence.
-- When a change touches p1 and p2, validate at the lowest common contract: file names, sample ids, array shapes, metadata keys, and loader behavior.
+- Keep shared helpers small and named. Inline one-off helpers that do not clarify flow; retain reused logic or helpers that simplify notebooks in `resources`. Avoid copied notebook logic and remove obsolete workarounds, fallbacks and compatibility code.
+- Preserve saved-artifact compatibility where practical; old runs are research evidence. Check names, sample IDs, shapes, metadata and loaders across p1/p2.
 - Treat `utilities.py` operations that rename files, edit `.inp` files, or delete `.bak` files as destructive. Use dry-run paths when available.
 # Curve-term attribution
 

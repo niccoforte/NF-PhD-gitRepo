@@ -61,6 +61,12 @@ re-export; existing producer output defaults are not current read dependencies.
   histories, final-failure data or force-fit literature ordinates into that view.
   Explicit Fig.8b sqrt(3) hypothesis views carry per-row display factors and keep
   base/source values unchanged; these are not corrected labels or training data.
+  New validation completion jobs have a separate catalogue and native exports;
+  their verified intact prefixes can join the selected comparison CSV without
+  changing the original index, shared exporters or p2 labels. Uniform geometric
+  scaling of identical linear models carries explicit C/k derivation and parent
+  control identities. This never transfers a nonlinear history or hides a failed
+  post-initiation tail; changed density requires fresh controls.
 
 ## Field boundary
 
