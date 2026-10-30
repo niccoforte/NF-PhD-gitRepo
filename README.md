@@ -511,7 +511,7 @@ only that new cell block was added. `validation_workbook_fig10.mjs` uses bundled
 Artifact Tool authoring, a current-byte backup and a lossless single-worksheet
 package transplant. It refuses occupied target rows, so routine plot refreshes
 use the CSV/Python workflow rather than reapplying the workbook integration.
-Read [the validation report](p2-DisorderML/samples/p1-validation/README.md)
+Read [the validation report](p1-DisorderLatticeProperties/samples/p1-validation/README.md)
 for measured effects, source inconsistencies and limits.
 
 ### `p1-DisorderLatticeProperties/code/`
@@ -969,7 +969,7 @@ Common local paths:
 - Saved p2 artifacts use `Z:/p2/` with the remote relative tree preserved,
   outside Git. No checkout may contain `data/`, on Windows or Mac; other hosts
   require an explicit external data root. Readable figures/reports belong only
-  in `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`. Other checkouts retain tracked
+  in the owning paper's `samples/` in `Z:/00-PhD-gitRepo`. Other checkouts retain tracked
   `samples/AGENTS.md`, not generated copies. Merge incoming Mac
   artifacts without overwriting unrelated content. PuTTY sharing transfers use
   PSCP; Windows B3 already defaults to `Z:/p2` via its OpenSSH route.

@@ -27,6 +27,12 @@ In practical terms:
 
 ## How To Work Here
 
+- Validation evidence/report and the unique SimCheck task checklist live in
+  `samples/p1-validation/README.md` and `CHECKLIST.md`. Keep the task checklist
+  tracked; generated report/figure outputs remain ignored. Keep accepted active
+  methods/results singular: final integration replaces superseded production,
+  workbook and notebook paths after verification, with minimal recovery evidence.
+
 - The consolidated Ti validation collection is `Z:/p1/sims/Ti/Validation`.
   Its `README.md`, `case-index.csv` and `file-manifest.json` define retained cases,
   exact duplicate references and original-path mappings. Density runs use

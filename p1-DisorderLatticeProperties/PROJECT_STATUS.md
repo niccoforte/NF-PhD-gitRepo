@@ -4,6 +4,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
+- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) owns the
+  validation finish, production replacement, Excel/paper integration, cleanup and
+  deferred UT/FCC/orthotropic/PSC work. The report is in this paper's samples,
+  not p2. Final integration replaces superseded methods/results rather than
+  retaining selectable legacy variants; it remains pending the scientific verdict.
+
 - The manuscript revision has a common compliance/notation description and an
   implemented FCC prismatic plane-strain elastic route. At nominal20% physical
   material inputs, canonical FCC gives E3=24.6GPa, chi=.57457199 and
@@ -131,7 +137,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   `validation_diagnostics.py`, `validation_failure_audit.py`, `validation_controls.py`,
   `validation_work_partition.py`, `validation_results.py`, `validation_inventory.py`
   and serial `validation_queue.py`; evidence under the external
-  collection's `audit/`; readable report in `p2-DisorderML/samples/p1-validation/`.
+  collection's `audit/`; readable report and unique task checklist in
+  `samples/p1-validation/` within this paper folder.
   The canonical OneDrive workbook's Validation audit sheet is a sensitivity view,
   not replacement paper values. Resolve work/initiation limits before promotion.
 

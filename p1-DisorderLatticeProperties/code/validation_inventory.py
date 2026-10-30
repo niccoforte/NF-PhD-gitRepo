@@ -137,6 +137,7 @@ def cleanup_review(audit, repo, scratch_roots):
     result = {"generated_UTC": datetime.now(timezone.utc).isoformat(),
               "status": "cleanup_deferred_user_requested_end_of_work",
               "inventory": str(audit / "file-inventory.csv"), "canonical_workbook": workbook,
+              "task_checklist": str(repo / "p1-DisorderLatticeProperties/samples/p1-validation/CHECKLIST.md"),
               "components": components, "automatic_deletion": False,
               "scope": "All validation audit outputs, new/modified code and notebook cells, workbook additions/legacy values, auxiliary solver evidence and named temporary work. PSC and orthotropic work remain deferred."}
     (audit / "cleanup-review.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -182,7 +183,8 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
     maintained += [code / "validation_workbook_fig10.mjs", code / "ValConvPlots.ipynb",
                    Path(repo) / "resources/lattices.py", Path(repo) / "resources/test_lattice_validation.py",
                    Path(repo) / "resources/AGENTS.md",
-                   Path(repo) / "p2-DisorderML/samples/p1-validation/README.md",
+                   Path(repo) / "p1-DisorderLatticeProperties/samples/p1-validation/README.md",
+                   Path(repo) / "p1-DisorderLatticeProperties/samples/p1-validation/CHECKLIST.md",
                    Path(repo) / "README.md", Path(repo) / "p1-DisorderLatticeProperties/PROJECT_STATUS.md",
                    Path(repo) / "p1-DisorderLatticeProperties/AGENTS.md", code / "AGENTS.md",
                    Path(repo) / ".agents/skills/review-p1-p2-data-contract/references/data-contract.md"]

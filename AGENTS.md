@@ -27,7 +27,7 @@ state. Durable rules belong in `AGENTS.md`; reusable procedures in `.agents/skil
 - Primary Windows checkout: `Z:/00-PhD-gitRepo`; use it for project sources, commands, and import hooks.
 - Local p1 data is commonly rooted at `Z:/p1/data/Ti/...`.
 - p2 saved runs belong under `Z:/p2`, outside Git, preserving archive-relative paths. No checkout may contain `data/`; other hosts require an explicit external root.
-- Reports/examples use only `Z:/00-PhD-gitRepo/p2-DisorderML/samples/`; other checkouts keep tracked guidance only. MLdata and its subfolders contain only files directly consumed by ML training/testing; retain optional info/audits/reports elsewhere only when needed, following the existing archive structure without an extra provenance tier.
+- Reports/examples use the owning paper's `samples/` in `Z:/00-PhD-gitRepo` (p1 reports under `p1-DisorderLatticeProperties/samples/`, p2 under `p2-DisorderML/samples/`); other checkouts keep tracked guidance only. MLdata holds only training/testing inputs; retain optional reports elsewhere in the existing archive structure.
 - QMUL HPC archive paths commonly use `/data/SEMS-TaoLab/Niccolo-Forte/...`; scratch paths may use `/gpfs/scratch/...`.
 - Generated Abaqus files, transfer CSVs/NPZs, MLdata products, model checkpoints, HPO databases, Slurm logs, and notebook output bulk are research artifacts. Do not delete, rename, or commit them unless the task explicitly asks for that.
 - `AGENTS.md` files and repo skills under `.agents/skills/` are tracked project infrastructure. Keep them synchronized with the implementation.
