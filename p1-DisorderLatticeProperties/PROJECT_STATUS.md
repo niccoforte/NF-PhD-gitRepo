@@ -88,8 +88,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   control is armed after the two missing cases via `serial-continuation-20261102`.
   Endpoint screening is not full-history quasistatic qualification. The3mm/13%
   worker then stopped at.0195s with no known cause. Its partial source is retained;
-  an unchanged restart and10mm/13% are submitted serially on8CPUs through a
-  hidden detached worker. A process-job breakaway probe survived tool return.
+  its unchanged restart also exited by18:40London2November, with field21/200
+  and solver time.01068s saved. Queue and continuation workers are absent;
+  neither10mm/13% nor the slower-rate control started. The cause remains
+  unknown and the host did not reboot. Sources are retained and queue/owner
+  states now require review; no solver is running. The earlier detached-process
+  probe was not evidence of survival through this later interruption.
   `audit/new-validation/queue-resume-20261102/state.json` owns live status. It uses
   verified transformations of archived A1 inputs, not today's generator
   defaults. New13% hexagonal cases use nx80 without a new convergence claim.
@@ -105,6 +109,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   hexagonal initial-triangle values remain invalid; separate recovery estimates
   differ by+9.17%/.16 and+13.68%/.20 from direct references. The calculation
   audit is reproducible; universal source-method agreement is not established.
+  The researcher requests a3November cutoff. Finalise the available numerical
+  comparison and bounded limitations; kagome's9.8-19.4% direct3mm residuals alone
+  do not require another rerun programme. Four absent plot points comprise two
+  unsolved13% cases and two completed3mm hexagonal negative-area cases; the
+  rate control addresses an existing10mm16% point. Keep measured/derived/scaled
+  result provenance explicit when finalising the paper comparison.
   Clean initiation-only paper exports now separate original-simulation results
   from diagnostic energy/unloading comparisons; they use nominal relative
   density to match Hsieh's. The underlying original-simulation calculation
