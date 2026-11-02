@@ -773,7 +773,8 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                                       ("source_inp_sha256", "source_odb_sha256", "modulus_odb_sha256", "modulus_job",
                                        "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note",
                                        "control_source_kind", "control_similarity_proof_sha256", "source_solver_state",
-                                       "source_inp", "source_odb", "extraction_receipt_sha256")}})
+                                       "source_inp", "source_odb", "extraction_receipt_sha256",
+                                       "precriterion_max_KE_IE", "startup_window_max_KE_IE", "energy_window_review_required")}})
     # Explicit interpretation tests; the captured source and calculated K stay
     # unchanged. The factor is prescribed from the Fig.8a/8b discrepancy, not fit.
     variants = {"8b_hsieh_fix": (1/math.sqrt(3.), 1.),
@@ -807,6 +808,14 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                "Error bars bound graphical extraction only and are not statistical confidence intervals. Current study values use retained and qualified new Explicit fracture histories and the initial-slope area convention; "
                "no final-fracture, dissipation or nonlinear-recovery estimates are included. Negative-area values and absent cases are omitted; data and source fingerprints are in points.csv. "
                "This comparison does not establish ASTM qualification or agreement for all lattices.")}
+    energy_reviews = [row for row in simulations.values() if row.get("energy_window_review_required") in (True, "True")]
+    if energy_reviews:
+        names = ", ".join("{} {}mm/{}%".format(r["topology"], r["l_mm"], round(100*r["relative_density"]))
+                          for r in energy_reviews)
+        for figure in ("8a", "10"):
+            captions[figure] += (" Provisional loading-rate review: " + names +
+                                 ". Low endpoint KE/IE does not certify quasistatic accumulated work; "
+                                 "pre-initiation transients require a slower-rate comparison.")
     for figure in variants:
         adjusted = ("Hsieh's displayed Fig.8b ordinates divided by sqrt(3); Current study ordinates unchanged. "
                     if figure == "8b_hsieh_fix" else
@@ -900,6 +909,9 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                 "linear_controls":"Source-specific B21 RVE/compliance solves for retained cases; qualified completion cases may use proven uniform geometric similarity: C unchanged and specimen stiffness proportional to length. No fitted modulus or alternative work definition.",
                 "completion_control_proofs":{row["case_id"]:row["control_similarity_proof_sha256"]
                                              for row in simulations.values() if row.get("control_similarity_proof_sha256")},
+                "pending_energy_window_reviews":[{key:row.get(key) for key in
+                     ("case_id", "precriterion_max_KE_IE", "startup_window_max_KE_IE", "quality_note")}
+                     for row in energy_reviews],
                 "hypothesis_views": {key: {"reference_ordinate_factor":values[0], "simulation_ordinate_factor":values[1],
                                           "verified_correction":False} for key,values in variants.items()},
                 "marker_design": {"reference":"large hollow triangle,8.4pt", "simulation_sizes_pt":simulation_sizes,

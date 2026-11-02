@@ -404,6 +404,8 @@ python p1-DisorderLatticeProperties/code/validation_diagnostics.py prepare
 python p1-DisorderLatticeProperties/code/validation_queue.py check --manifest Z:/p1/sims/Ti/Validation/audit/diagnostics/serial-proposal.json
 # Explicit run action submits serial local jobs; completed jobs are not resubmitted.
 python p1-DisorderLatticeProperties/code/validation_queue.py run --manifest Z:/p1/sims/Ti/Validation/audit/diagnostics/serial-proposal.json
+# For a new reviewed Windows queue, detach it from the calling app instead.
+python p1-DisorderLatticeProperties/code/validation_queue.py launch --manifest Z:/p1/sims/Ti/Validation/audit/diagnostics/serial-proposal.json
 & 'C:/SIMULIA/Commands/abaqus.bat' python p1-DisorderLatticeProperties/code/validation_diagnostics.py extract
 python p1-DisorderLatticeProperties/code/validation_diagnostics.py analyze
 python p1-DisorderLatticeProperties/code/validation_diagnostics.py plot
@@ -506,6 +508,14 @@ failed while the following independent jobs run.
 A validation-wide worker lock also prevents different queues from overlapping.
 An unsettled durable `audit/serial-owner.json` blocks subsequent submissions
 after worker death until its solver processes/state have been explicitly reviewed.
+For long Windows runs, `launch` starts a hidden worker with explicit process-job
+breakaway and a retained `worker.log`/`launch.json`; solver children also have no
+console window. It preserves the serial locks and owner gate, fails if detachment
+is refused, and requires a new reviewed queue root. This installs no scheduler
+and does not resume after a host reboot. Review live state after any interruption.
+New-case result/point tables expose pre-initiation kinetic-energy windows and
+transient-review flags. A low endpoint KE/IE alone does not qualify accumulated
+work; flagged points remain provisional pending a loading-rate comparison.
 The 18 Fig.10 points are mirrored in Deshpande!A50:L73 of the existing workbook;
 only that new cell block was added. `validation_workbook_fig10.mjs` uses bundled
 Artifact Tool authoring, a current-byte backup and a lossless single-worksheet

@@ -26,7 +26,8 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   identities. Only 3 mm is published in Fig.10; 10 mm scaling is an inference.
   `validation_diagnostics.py` prepares/extracts exact-source B21 periodic and
   nonlinear-work controls; `validation_queue.py` alone submits reviewed manifests
-  serially, verifies retained result hashes, then removes marker-owned scratch.
+  serially, verifies delivery, then removes marker-owned scratch. Windows
+  `launch` detaches a new reviewed queue; logs and serial-owner gates remain.
   `validation_workbook_fig10.mjs` authors the additive Deshpande mirror with
   Artifact Tool, backs up current bytes and verifies every existing package part
   and cell before replacement. It refuses occupied target rows; do not rerun it
@@ -44,7 +45,8 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   `validation_inventory.py` inventories retained evidence and named task scratch;
   its `cleanup-review.json` also covers workbook additions/legacy values, code,
   early reviews, pending reference capture and temporary evidence dependencies.
-  It never deletes. Refresh it before final cleanup.
+  It never deletes. Continuation `-status.json` receipts are not submission plans.
+  Refresh it before final cleanup.
 - Publication views from `validation_comparison.py` use only original-simulation
   initial-triangle results and Hsieh initiation data. They live in `audit/paper`
   as PNG/PDF/SVG with point/exclusion tables and captions. Fig.10 comparisons use
@@ -74,7 +76,10 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   review before reading a partial ODB. Source fingerprints bracket the complete
   extraction batch; event/table/export hashes pin the settled result. Failed
   post-initiation tails do not invalidate an independently verified intact prefix.
-  Results merge only qualified cases. Exact uniform geometric scaling permits
+  Endpoint KE/IE is not full-path quasistatic qualification. New-case tables and
+  captions expose transient-review flags; slower-rate checks remain separate.
+  Results merge only qualified cases; restarts use frozen parent generation
+  records while retaining actual attempt/ODB identities. Uniform scaling permits
   linear-control reuse (C unchanged, k scales with length) after source/material/
   mesh/BC/periodic-patch proof; never use it for nonlinear fracture or loading
   rate equivalence. New13% hexagonal controls remain separate supplemental solves.

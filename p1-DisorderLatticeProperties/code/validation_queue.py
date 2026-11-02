@@ -17,6 +17,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import time
 
 
@@ -126,7 +127,8 @@ def execute_abaqus(abaqus, job, work, on_started):
             raise ValueError("Unreviewed execution option: " + option)
         command.append(option)
     with (work / "launcher.txt").open("w", encoding="utf-8") as launcher:
-        process = subprocess.Popen(command, cwd=str(work), stdout=launcher, stderr=subprocess.STDOUT)
+        process = subprocess.Popen(command, cwd=str(work), stdout=launcher, stderr=subprocess.STDOUT,
+                                   creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
         try:
             on_started(process.pid, command)
         finally:
@@ -134,6 +136,37 @@ def execute_abaqus(abaqus, job, work, on_started):
             # its PID fails. A callback error must not orphan a live solver.
             code = process.wait()
         return code
+
+
+def launch_queue(manifest_path):
+    """Start a hidden Windows worker outside the calling application's job.
+
+    The worker retains the same serial locks and durable owner gate. Failure to
+    detach is an error, never a fallback to an app-owned long-running process.
+    This does not install a scheduled task or restart work after a host reboot.
+    """
+    if os.name != "nt":
+        raise RuntimeError("Detached local validation launch requires Windows")
+    manifest, root = validate_manifest(manifest_path)
+    root.mkdir(parents=True, exist_ok=True)
+    owner_path = VALIDATION_ROOT / "audit/serial-owner.json"
+    if owner_path.exists() and json.loads(owner_path.read_text()).get("phase") != "settled":
+        raise RuntimeError("Review the existing validation owner before launching another worker")
+    if (root / "state.json").exists():
+        raise ValueError("Use a new reviewed queue for detached launch; existing state is retained")
+    log_path = root / "worker.log"
+    with log_path.open("x", encoding="utf-8") as log:
+        worker = subprocess.Popen(
+            [sys.executable, "-u", str(Path(__file__).resolve()), "run", "--manifest",
+             str(Path(manifest_path).resolve())], cwd=str(Path(__file__).resolve().parents[2]),
+            stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+    receipt = {"launched_at": timestamp(), "worker_pid": worker.pid,
+               "manifest": str(Path(manifest_path).resolve()), "manifest_sha256": sha256(manifest_path),
+               "worker_log": str(log_path), "runner_sha256": sha256(__file__),
+               "launch": "Windows detached process with explicit job breakaway; no scheduler installed"}
+    write_json(root / "launch.json", receipt)
+    return receipt
 
 
 def deliver_and_clean(work, destination, job):
@@ -258,9 +291,12 @@ def run_queue(manifest_path, execute=execute_abaqus, allowed_root=VALIDATION_ROO
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("check", "run", "status"))
+    parser.add_argument("action", choices=("check", "run", "launch", "status"))
     parser.add_argument("--manifest", required=True)
     args = parser.parse_args()
+    if args.action == "launch":
+        print(json.dumps(launch_queue(args.manifest), indent=2))
+        raise SystemExit(0)
     if args.action == "run":
         result = run_queue(args.manifest)
         print(json.dumps(result, indent=2))

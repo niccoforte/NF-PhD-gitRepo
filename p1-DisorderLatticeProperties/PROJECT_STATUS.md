@@ -82,16 +82,22 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   with failed controls explicitly retained. A new missing-case completion
   campaign now has4qualified new3mm prefixes: triangular13%/16% and kagome13%/16%.
   Kagome13% terminated after initiation and is retained without a fracture rerun.
-  The interrupted hexagonal10mm/16% source ended before initiation; its unchanged
-  restart is running, with both13% hexagonal cases queued serially on8CPUs.
-  `audit/new-validation/queue-resume-20261030/state.json` owns live status. It uses
+  The hexagonal10mm/16% restart completed: KJ=5.3487MPa sqrt(m), positive
+  area and endpoint KE/IE=.464%; it is included provisionally in Figs8a/10.
+  Earlier KE/IE exceeds5% until.0239s, so a3.333times longer loading-rate
+  control is armed after the two missing cases via `serial-continuation-20261102`.
+  Endpoint screening is not full-history quasistatic qualification. The3mm/13%
+  worker then stopped at.0195s with no known cause. Its partial source is retained;
+  an unchanged restart and10mm/13% are submitted serially on8CPUs through a
+  hidden detached worker. A process-job breakaway probe survived tool return.
+  `audit/new-validation/queue-resume-20261102/state.json` owns live status. It uses
   verified transformations of archived A1 inputs, not today's generator
   defaults. New13% hexagonal cases use nx80 without a new convergence claim.
   Abaqus input preflight passed; original inputs/catalogue remain unchanged.
   Two new13% hexagonal linear controls completed. Uniformly scaled existing
   sources reuse verified linear controls with explicit C/k derivation and parent
-  identities, never nonlinear/dynamic equivalence. There are52calculated cases,
-  156all-case rows,45selected rows/15cases and13unique valid paper cases. Every
+  identities, never nonlinear/dynamic equivalence. There are53calculated cases,
+  159all-case rows,47selected rows/16cases and14numerically available paper cases. Every
   previously selected field/value is unchanged. New remaining simulations still
   require event/energy qualification before plotting.
   Triangular native comparisons are+0.66 to+5.38%, kagome+9.16 to+19.42% versus

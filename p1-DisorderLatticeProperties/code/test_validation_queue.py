@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from validation_queue import execute_abaqus, run_queue, sha256, validate_manifest, worker_lock, write_json
+from validation_queue import execute_abaqus, launch_queue, run_queue, sha256, validate_manifest, worker_lock, write_json
 
 
 class QueueTests(unittest.TestCase):
@@ -114,6 +114,38 @@ class QueueTests(unittest.TestCase):
             with self.assertRaises(PermissionError):
                 execute_abaqus("fake-solver", self.jobs[0], work, failed_record)
         process.wait.assert_called_once_with()
+
+    def test_detached_launch_keeps_serial_owner_gate_and_records_process(self):
+        import subprocess
+        (self.base / "audit").mkdir()
+        owner = self.base / "audit/serial-owner.json"
+        write_json(owner, {"phase": "active"})
+        with mock.patch("validation_queue.VALIDATION_ROOT", self.base), \
+             mock.patch("validation_queue.validate_manifest", return_value=(json.loads(self.manifest.read_text()), self.root)), \
+             mock.patch("validation_queue.subprocess.Popen") as start:
+            with self.assertRaisesRegex(RuntimeError, "existing validation owner"):
+                launch_queue(self.manifest)
+            start.assert_not_called()
+            write_json(owner, {"phase": "settled"})
+            start.return_value.pid = 456
+            receipt = launch_queue(self.manifest)
+            self.assertEqual(receipt["worker_pid"], 456)
+            self.assertEqual(start.call_args.kwargs["creationflags"],
+                             subprocess.DETACHED_PROCESS | subprocess.CREATE_BREAKAWAY_FROM_JOB)
+            self.assertEqual(start.call_args.kwargs["stdin"], subprocess.DEVNULL)
+            self.assertTrue((self.root / "launch.json").exists())
+            # Retain the launch log and refuse a second launch into this root.
+            with self.assertRaises(FileExistsError):
+                launch_queue(self.manifest)
+
+    def test_solver_launch_has_no_console_window(self):
+        import subprocess
+        work = self.base / "hidden_fixture"
+        work.mkdir()
+        with mock.patch("validation_queue.subprocess.Popen") as start:
+            start.return_value.wait.return_value = 0
+            execute_abaqus("fake-solver", self.jobs[0], work, lambda *args: None)
+        self.assertEqual(start.call_args.kwargs["creationflags"], subprocess.CREATE_NO_WINDOW)
 
     def test_crashed_worker_owner_blocks_a_different_queue(self):
         audit = self.base / "audit"

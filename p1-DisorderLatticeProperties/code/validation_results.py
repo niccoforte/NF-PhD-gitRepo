@@ -281,7 +281,7 @@ def completion_records(root):
         if proof["state"] not in ("completed_and_extracted", "failed_with_usable_preinitiation_prefix",
                                    "interrupted_with_usable_preinitiation_prefix"):
             raise ValueError("Unreviewed partial source cannot supply a validation result")
-        rve, compliance = completion_controls(root, case, generation[case["job"]])
+        rve, compliance = completion_controls(root, case, generation[case.get("parent_job", case["job"])])
         verify_native_exports(result_root, case, attestations)
         rows = [native_record(result_root, case, events[case["case_id"]], rve, endpoint)
                 for endpoint in ("criterion_last_intact", "criterion_first_crossed")]
@@ -314,6 +314,16 @@ def completion_records(root):
             row["recorded_ALLPD_available"] = "ALLPD_Nmm" in entry
             if "ALLPD_Nmm" in entry:
                 row["recorded_ALLPD_Nmm"] = float(entry["ALLPD_Nmm"])
+            window = proof.get("energy_prefix_check") or {}
+            row["precriterion_max_KE_IE"] = window.get("positive_IE", {}).get("ke_ie_max")
+            row["startup_window_max_KE_IE"] = window.get(
+                "startup_sensitivity_t_ge_0p1_event_IE_gt_1pct_max", {}).get("ke_ie_max")
+            row["energy_window_review_required"] = (row["startup_window_max_KE_IE"] is not None
+                                                   and row["startup_window_max_KE_IE"] > .05)
+            if row["energy_window_review_required"]:
+                row["quality_note"] += (" Pre-initiation kinetic transients require a loading-rate review; "
+                                        "endpoint KE/IE alone does not establish quasistatic accumulated work. "
+                                        "The startup window is descriptive, not a new acceptance gate.")
         all_rows.extend(rows + [triangle])
         selected.extend([rows[0], triangle])
         control_proofs.append({"case_id": case["case_id"], "rve": rve, "compliance": compliance})

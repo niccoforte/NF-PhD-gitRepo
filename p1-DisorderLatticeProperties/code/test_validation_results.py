@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import numpy as np
 
 from validation_results import completion_records, matched_loading_snapshot, measured_record, native_record, sha, triangle_record, verify_native_exports
@@ -153,6 +154,49 @@ class NativeResultTests(unittest.TestCase):
         (out/"extraction-summary.json").write_text('{"state":"extracting"}')
         with self.assertRaisesRegex(ValueError, "still running"):
             completion_records(self.root)
+
+    def test_restart_uses_frozen_parent_generation_without_changing_attempt_identity(self):
+        base = self.root / "audit/new-validation"
+        out = base / "results"
+        event = out / "audit/failure/failure-initiation.csv"
+        event.parent.mkdir(parents=True)
+        event.write_text("case_id\nfixture\n")
+        energy = out / "audit/history/stored-energy-summary.json"
+        energy.parent.mkdir(parents=True)
+        source = self.root / "source.inp"
+        source.write_text("Frozen source fixture")
+        case = {"case_id":"fixture", "job":"original_r1", "parent_job":"original",
+                "inp":str(source), "inp_sha256":sha(source), "source_odb":str(self.root/"retry.odb")}
+        energy.write_text(json.dumps([{"source":case["source_odb"]}]))
+        index = out / "case-index.csv"
+        index.write_text("fixture")
+        detail = out / "event.json"
+        detail.write_text("{}")
+        history = out / "history"
+        history.mkdir()
+        (history / "native_stored_energy.csv").write_text("time_s\n0\n")
+        proof = {"case":case, "source_unchanged":True, "read_only":True, "exports":[],
+                 "event_json":str(detail), "event_json_sha256":sha(detail),
+                 "initiation_prefix_qualified":True, "state":"completed_and_extracted",
+                 "energy_prefix_check":{"positive_IE":{"ke_ie_max":2.0},
+                     "startup_sensitivity_t_ge_0p1_event_IE_gt_1pct_max":{"ke_ie_max":.2}},
+                 "history_export_directory":str(history)}
+        (history / "extraction.json").write_text("{}")
+        (out / "extraction-summary.json").write_text(json.dumps({"state":"complete", "cases":[proof],
+            "event_csv_sha256":sha(event), "stored_energy_summary_sha256":sha(energy),
+            "case_index_sha256":sha(index)}))
+        generation = {"job":"original", "input_sha256":case["inp_sha256"]}
+        (base / "generation-receipt.json").write_text(json.dumps({"cases":[generation]}))
+        with patch("validation_controls.completion_controls", return_value=({"source_kind":"exact"}, {})) as controls, \
+             patch("validation_results.verify_native_exports"), \
+             patch("validation_results.native_record", side_effect=lambda *args: {"native_index":0,"quality_note":"Fixture"}), \
+             patch("validation_results.triangle_record", side_effect=lambda *args: {"native_index":0}):
+            all_rows, selected, unavailable = completion_records(self.root)
+        controls.assert_called_once_with(self.root, case, generation)
+        self.assertEqual((len(all_rows), len(selected), unavailable), (3, 2, []))
+        self.assertTrue(all(row["source_odb"] == case["source_odb"] for row in all_rows[:2]))
+        self.assertTrue(all(row["energy_window_review_required"] for row in all_rows))
+        self.assertTrue(all("endpoint KE/IE alone" in row["quality_note"] for row in all_rows))
 
     def test_changed_settled_initiation_table_is_rejected(self):
         out = self.root/"audit/new-validation/results"

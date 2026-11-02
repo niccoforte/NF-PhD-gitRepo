@@ -65,6 +65,8 @@ def queue_ledger(audit):
                 "queue_state": str(path), "status": job["status"],
                 "queue_phase": state.get("phase"), "job": job["job"]})
     for plan_path in audit.glob("serial-continuation-*.json"):
+        if plan_path.name.endswith("-status.json"):
+            continue  # Worker receipts are inventoried files, not submission plans.
         plan = json.loads(plan_path.read_text(encoding="utf-8-sig"))
         for entry in plan["following_manifests"]:
             manifest_path = Path(entry["path"])

@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat 01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated 30 October 2026. [Evidence and figures](README.md).
+Updated 2 November 2026. [Evidence and figures](README.md).
 This file owns task completion; PROJECT_STATUS and the cleanup register link here.
 
 ## Hsieh validation before closing this phase
@@ -15,9 +15,18 @@ This file owns task completion; PROJECT_STATUS and the cleanup register link her
 - [x] Digitise Fig.10 and retain original Fig.8 references and stated inconsistencies.
 - [x] Process four new3mm triangular/kagome13%/16% cases and update existing plots.
 - [x] Complete the new13% hexagonal elastic controls.
-- [ ] Complete/process hexagonal10mm/16% restart,3mm/13% and10mm/13% runs.
-  [Live serial queue](Z:/p1/sims/Ti/Validation/audit/new-validation/queue-resume-20261030/state.json).
-  Already submitted;8CPUs per job, no concurrent solver submissions.
+- [x] Complete/process hexagonal10mm/16%: KJ=5.349MPa sqrt(m), positive area,
+  endpoint KE/IE=.464%; included provisionally in Figs8a/10. Earlier transients
+  require the separate rate check below; this is not full quasistatic qualification.
+- [ ] Complete/process hexagonal3mm/13% restart and10mm/13% run.
+  [Live serial queue](Z:/p1/sims/Ti/Validation/audit/new-validation/queue-resume-20261102/state.json).
+  Submitted locally in series on8CPUs. The previous3mm worker stopped at.0195s;
+  its partial source is preserved. Detached launch passed a persistence probe.
+- [ ] Process the slower hexagonal10mm/16% rate check, armed after those two jobs
+  through the [serial continuation](Z:/p1/sims/Ti/Validation/audit/serial-continuation-20261102-status.json).
+  Time is3.333times longer, with the same end displacement and material/mesh.
+  The baseline exceeds5% KE/IE until.0239s, about30% of its time to initiation.
+  Compare force, work and onset; choose the accepted result from this evidence.
 - [ ] Resolve the hexagonal negative-area limitation: establish a defensible
   fracture-energy calibration or explicitly delimit unavailable source-convention
   results. Do not clip area or substitute dissipation/unloading work as ASTM J.
@@ -53,9 +62,26 @@ This file owns task completion; PROJECT_STATUS and the cleanup register link her
 ## Later work already in this chat's scope
 
 - [ ] UT validation and any missing-stiffness processing issues.
+  Corrections confirmed516 hexagonal stiffness NaNs despite finite201-sample
+  curves: peak indices17-19 select only2fitpoints. Of956 common UT/FT IDs,
+  502 are removed by that fit failure, leaving454 paired rows. Repair the
+  verified elastic-window calculation; do not impute or rerun516 simulations.
+  [Read-only evidence](C:/Users/exy053/AppData/Local/Temp/p1-corrections-coordination-20261102/hex-stiffness-readonly.json).
 - [ ] FCC elastic/fracture validation coordinated with Corrections.
+  Inventory existing material cards first; reuse mapped controls only when their
+  exact source matches. All54 inspected StiffMatrix FCC inputs, including the
+  three canonical periodic controls, use physical E=123000MPa,nu=.3, not mapped
+  material. This bounded inventory does not establish full-archive absence.
+  [FCC inventory](C:/Users/exy053/AppData/Local/Temp/p1-corrections-coordination-20261102/fcc-source-inventory-readonly.json).
+  Propagate the same measured C and its material state through FTprops/calcFT;
+  replacing a scalar alone does not settle the FCC calculation.
 - [ ] Square/45square orthotropic validation and specimen-axis calibration.
 - [ ] PSC calculation audit, especially fracture toughness; preserve the
   supervisor-agreed specimen sizes and convergence criteria.
 - [ ] Revisit conditional lattice-foundation findings only where those later
   workflows actively use them; verify downstream p1/p2 dependencies.
+
+Corrections owns manuscript/notation work and read-only paired-population checks;
+SimCheck owns this calculation/solver migration. Agree exact shared-file edits
+before either chat changes resources or stiffness notebooks. Final population
+selection remains deferred; paper candidate IDs are1-1000 and ID0 is reference only.
