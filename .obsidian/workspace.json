@@ -1,0 +1,205 @@
+{
+  "main": {
+    "id": "a3305e1eb49184c7",
+    "type": "split",
+    "children": [
+      {
+        "id": "2068adaa9e348208",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e16b31fcd071db57",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "p2-DisorderML/samples/README.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "README"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "5e13e8c59904cdfe",
+    "type": "split",
+    "children": [
+      {
+        "id": "2976139f2bff97d8",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "2455d65ad35ed402",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "650e2eed810ca99d",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "ba9b875958d50f5f",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "bc4fab9b0bb43d67",
+    "type": "split",
+    "children": [
+      {
+        "id": "8710eee1046eb859",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "97e53c6f3ccc7067",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "p2-DisorderML/samples/README.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "2913f65f1447aa19",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "p2-DisorderML/samples/README.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "aba43106050de56e",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "428c5340a1921cd8",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "5f6a02d94320944c",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "p2-DisorderML/samples/README.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "2455d65ad35ed402",
+  "lastOpenFiles": [
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_controls.cpython-311.pyc.3037235162576",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_comparison.cpython-311.pyc.2768967409840",
+    "p1-DisorderLatticeProperties/code/__pycache__/test_validation_completion.cpython-311.pyc.1431503394640",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_completion.cpython-311.pyc.1999197400800",
+    "p1-DisorderLatticeProperties/code/__pycache__/test_validation_completion.cpython-311.pyc",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_controls.cpython-311.pyc.1880923572304",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_completion.cpython-311.pyc.2578023804640",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_controls.cpython-311.pyc.2095920213936",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_results.cpython-311.pyc.2933064813104",
+    "resources/__pycache__/calculations.cpython-310.pyc.2775565377072",
+    "p1-DisorderLatticeProperties/code/__pycache__/validation_failure_audit.cpython-311.pyc"
+  ]
+}
