@@ -1,5 +1,17 @@
 # p2 Implementation Status
 
+- 2 November accuracy continuation: researcher authorised immediate nodal-feature
+  attribution and useful non-HPO follow-ups. The feature audit was a plan, not a
+  submitted study. Implemented15 CNN2/MSE field-only feature fits (UT6/FT9),
+  including raw-present/all-context controls with operational absence masks
+  preserved and pin suppression after specimen refresh. Also prepared six
+  CNN2+spatial fits (UT all-edge0.1, FT fixed-box0.001; seeds42/43/44) and four
+  missing CNN3/MSE seeds43/44. No field-source/curve/HPO changes are bundled.
+  CPU mask/gradient/checkpoint tests pass; GPU execution/submission remains to
+  be recorded below. Existing accepted WINNER is unchanged pending acceptance;
+  recommendation is CNN2 fields/MSE for both tasks, with task-specific losses
+  still conditional. HPO explicitly requires separate approval.
+
 - 29 October: all remaining66 production fits completed0:0/reload passed and
   were downloaded to external Z:/p2:886 files/6,046,392,078 bytes match HPC SHA256.
   Existing STATUS report now includes auxiliary-balance/UT confirmation; Loss

@@ -90,7 +90,33 @@ Show train and validation losses together on log axes; selected best epochs,
 not overfit tails, supply saved predictions. `run(...,configure=...)` also serves
 the named FieldVariations entry point; the default Locality CLI is unchanged.
 
-## Authorised confirmation and depth screen
+## CNN2 with task-specific spatial loss and CNN3 confirmation
+
+`A0-CNNSpatial.py` / `B4_CNNSpatial.sh` schedule ten final fits: CNN2+spatial
+for UT/FT at seeds42/43/44 (six), and missing CNN3/MSE seeds43/44 (four).
+Reuse original CNN3 seed42 and CNN2 three-seed controls; fresh CNN2/MSE seed42
+controls in the Features suite provide a same-revision bridge. Do not silently
+change comparison populations or reuse weights as pretrained initializations.
+
+UT uses whole-field MSE +0.1 signed connected-node spatial loss. FT uses
+whole-field MSE +0.001 spatial loss on struts with both initial endpoints inside
+the fixed tip box. Physical inverse transforms, TRAIN-only jump scales, validity
+and degree balancing remain unchanged; temporal/localization weights are zero.
+No STATUS-informed training region, auxiliary damage head, feature removal,
+OOF/curve training or HPO is bundled. CNN3 differs only in the third grid block.
+
+The shared final-field submit helper creates a six-case disposable GPU gate
+(CNN2, CNN3, CNN2+spatial × UT/FT), then afterok450-epoch/patience52 production
+fits with240h/1GPU/12CPU/90000MB requests. Check PROJECT_STATUS for live IDs.
+Review against same-seed CNN2, field/fracture/TRAIN-mean/variation and cost;
+downstream curve/peak confirmation is required separately before claiming a
+new serial-workflow winner. No accepted default is promoted by this study.
+
+```bash
+bash p2-DisorderML/HPC/studies/Locality/B4_CNNSpatial.sh cnn-spatial-depth-261102
+```
+
+## Original completed confirmation and depth screen
 
 `B4_Locality-confirmation.sh SUITE [--submit]` previews ten final fits: control
 and CNN2 for UT/FT at seeds 43/44 (eight), plus CNN3 for UT/FT at seed 42 (two).

@@ -10,6 +10,28 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ## Current priority order (29 October; supersedes older next-step wording)
 
+### 2 November authorised continuation
+
+- [ ] Submit/check15 CNN2/MSE feature fits: UT control/no-xy/no-designable/
+  no-interfaces/no-present/no-context; FT control/no-xy/no-designable/no-pins/
+  no-tip/no-tip-offsets/no-tip-distance/no-present/no-context. Seed42;
+  post-refresh model-side suppression preserves operational masks and width.
+- [ ] Submit/check six CNN2+spatial fits, UT0.1 all-edge/FT0.001 fixed-tip-box,
+  seeds42/43/44; and missing CNN3/MSE seeds43/44 (four). Reuse verified CNN2
+  and CNN3 seed42 evidence; fresh feature controls provide same-revision bridge.
+- [ ] Review these against matched task/seed CNN2 controls using global,
+  confirmed STATUS-event, TRAIN-mean/variation, cost and existing safeguards.
+  Only then choose task-specific features/losses and regenerate TRAIN-only OOF
+  banks/Mixed curves for retained fields. No new serial-curve gain is assumed.
+- [ ] HPO proposal only: independent UT/FT field searches after this small
+  decision set, then independent Mixed curve searches on the frozen new OOF
+  sources; explicit approval required before HPO submission.
+- [ ] Defer signed second-difference supervision (change between recorded
+  displacement increments) until CNN/spatial/feature results resolve. It is
+  distinct from target-derived sudden-motion weighting. If revisited, invert
+  affine scales first, mask valid triples and fit scales on TRAIN only; do not
+  call recorded-index differences physical acceleration or use a large preset.
+
 - [x] Submit isolated follow-ups from8ca82d5: CNN confirmation/depth (ten),
   FT spatial balance (five), STATUS balance/UT confirmation (six). CNN/spatial
   gates passed; STATUS gate later passed too. PROJECT_STATUS and report-side jobs.tsv
@@ -124,11 +146,12 @@ metrics and trade-offs rather than inventing a pass/fail rule after seeing data.
   UT/FT, seed42. Eight final fits, no CNN/STATUS/derivative/OOF/curve changes.
   Same physical selection and train standardization; named Loss guide/receipts
   own submission. Results/review remain outstanding; no adopted improvement.
-- [ ] Original physical-context contribution remains untested individually.
+- [ ] Original physical-context contribution remains unmeasured individually.
   Feature audit in samples/input-feature-audit/ separates raw presence from
   mandatory operational masks, task-specific BCs and redundant tip coordinates.
-  Proposed9 changed fits+2 controls after field-architecture confirmation;
-  no feature-submission authority from this recommendation request.
+  The2 November authorisation supersedes the old recommendation-only scope:
+ 15 fits now include raw-present/all-context controls on CNN2. Check current
+  PROJECT_STATUS before any submission; do not duplicate completed/queued work.
 - [ ] Retain FT gated-GNN/relative-geometry confirmation as lower priority than
   CNN2. Degree is task-specific and off. Do not combine unconfirmed candidates.
 - [ ] All predictive report generators place variation/collapse below global

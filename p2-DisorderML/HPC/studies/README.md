@@ -13,6 +13,7 @@ sources, job names and archive paths are not renamed by this source cleanup.
 | [Damage](Damage/README.md) | `A0-Damage.py`, `B4_Damage.sh`; completed dataset tools | Completed STATUS screen; `review_status_study.py` compares field/fracture/AP/cost |
 | [Locality](Locality/README.md) | `A0-Locality.py`, `B4_Locality.sh` | Isolated field-only screen; execution in PROJECT_STATUS |
 | [Field variations](FieldVariations/README.md) | `A0-FieldVariations.py`, `B4_FieldVariations.sh` | Completed13-fit screen; `review_field_variations.py` checks global/STATUS-region/mean/cost |
+| [Nodal features](Features/README.md) | `A0-FeatureAblation.py`, `B4_FeatureAblation.sh` |15 CNN2/MSE context-removal fits; actual execution in PROJECT_STATUS |
 
 `B4_Field-source-study.sh` contains shared Input/Loss submission mechanics; their
 small named wrappers supply the study. The Python presets reuse the established
@@ -26,6 +27,10 @@ OOF banks; `resources/MLfield_sources.py` owns field-source policies and loss
 comparisons; `MLfield.py` owns field losses; `MLdual.py` owns shared architectures.
 These are libraries, not job entry points. Damage preprocessing remains shared
 with p1 in `resources/damage.py` and `resources/damage_data.py`.
+
+`B4_Final-field-study.sh` is the sourced immutable-source/afterok submission
+helper for the named Features and CNNSpatial launchers. Plans remain in those
+study launchers; no scheduler change occurs without their explicit `--submit`.
 
 Reports write only to canonical ignored `p2-DisorderML/samples/`; run artifacts
 stay outside Git under `Z:/p2`, preserving archive-relative paths. No notebooks

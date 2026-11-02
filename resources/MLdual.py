@@ -885,6 +885,7 @@ class DualTaskTransformer(nn.Module):
         local_graph=None,
         modes=DUAL_MODES,
         locality=None,
+        context_keep=None,
     ):
         super().__init__()
         self.modes = tuple(modes)
@@ -894,6 +895,7 @@ class DualTaskTransformer(nn.Module):
         self.out_sizes = _mode_sizes(out_size, "out_size")
         self.seq_len = int(seq_len)
         self.context_size = int(context_size)
+        self.set_context_keep(context_keep)
         self.d_model = int(d_model)
         self.n_heads = int(n_heads)
         self.n_layers = int(n_layers)
@@ -1041,7 +1043,24 @@ class DualTaskTransformer(nn.Module):
         expected = (batch_size, self.seq_len, self.context_size)
         if tuple(features.shape) != expected:
             raise ValueError(f"{mode} task features must have shape {expected}, got {tuple(features.shape)}.")
+        if self.context_keep is not None:
+            keep=torch.as_tensor(self.context_keep[mode],dtype=torch.bool,device=device)
+            features=features.masked_fill(~keep,0.)
         return self.context_projection(features)
+
+    def set_context_keep(self, keep):
+        """Opt-in channel suppression after specimen-specific context refresh.
+
+        Preserve input width, common initial weights and all operational masks.
+        The mapping is identical in independent task descriptors so reloading
+        the container retains each task's distinct channel selection.
+        """
+        if keep is not None:
+            if set(keep)!=set(DUAL_MODES):raise ValueError("Context mask requires UT and FT entries")
+            keep={m:list(keep[m]) for m in DUAL_MODES}
+            if any(len(v)!=self.context_size or any(type(x) is not bool for x in v) for v in keep.values()):
+                raise ValueError("Context mask must contain one boolean per channel")
+        self.context_keep=keep
 
     def forward(self, inputs, task_features=None, node_masks=None, return_node_features=False):
         if return_node_features and self.pool != "node":
@@ -1153,6 +1172,7 @@ class DualTaskTransformer(nn.Module):
             "private_layers": self.private_layers,
             "local_graph": self.local_graph.config if self.local_graph is not None else None,
             **({"locality": self.locality_config} if self.locality_config is not None else {}),
+            **({"context_keep": self.context_keep} if self.context_keep is not None else {}),
         }
 
 
