@@ -127,6 +127,18 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   own UAT stiffness and existing representative tensor evidence remain necessary
   before production conversion. Filtering replacement and UAT fit repair are
   still pending; the validation Butterworth/modal helpers already exist.
+  Corrections'32-deck manuscript sample coversIDs1/1000 only. Four read-only
+  native fullID1 UAT replays reproduce all checked stored prefix stresses/strains
+  with gross area and bodyH; no blanket thickness rescale is justified by stale
+  co-located scripts. HexfullID1density is.200151 with the fullbody envelope,
+  not.210686 from the narrower contact span; pairedFT is.200000 despite different
+  section t. Sampled UAT rotations are constrained, and terminal softening lengths
+  vary. All32sampled full-envelope densities support nominal20%: UAT.200061-
+  .200153 andFT.199999-.200001. This does not certify allfirst1000realisations.
+  These source/gauge/damage definitions remain production/paper gates,
+  not demonstrated whole-corpus numerical failures. Corrections owns manuscript
+  wording; SimCheck retains computational migration. Evidence is under
+  `Validation/audit/production`; no source data or paper values were changed.
   Clean initiation-only paper exports now separate original-simulation results
   from diagnostic energy/unloading comparisons; they use nominal relative
   density to match Hsieh's. The underlying original-simulation calculation

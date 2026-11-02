@@ -69,6 +69,28 @@ indices and length-scaled estimates retain their actual calculation provenance.
   deletion labels, UT endpoints or other materials' failure thresholds.
 - [ ] Reprocess affected production datasets from reusable native simulations;
   preserve sample identities, validity and downstream p1/p2 alignment.
+- [x] Triage the32-deck manuscript handoff (IDs1/1000, four topologies,
+  full/mechanism, UAT/FT). Input hashes match and all32local OUTs match their
+  archived copies. Four native UAT ODB replays (fullID1 per topology) reconstruct
+  stored stresses/strains exactly on genuine prefixes with full section area;
+  the archived unit-width scripts do not justify dividing those CSVs by B.
+  [Native normalisation evidence](Z:/p1/sims/Ti/Validation/audit/production/native-normalisation-replay-20261102.json).
+  Full-envelope material-volume accounting in all32sampled decks gives
+  UAT.200061-.200153 andFT.199999-.200001. This supports nominal20% in this
+  sample; it is not a complete first1000density audit. Durable source metadata:
+  [32-case input audit](<C:/Users/exy053/OneDrive - Queen Mary, University of London/Documents/Research/p1-Lattices/writing/codex-review/p1-first1000-input-sample-audit.json>).
+- [ ] Complete production-source checks for originalIDs1-1000 after Hsieh
+  closeout: actual material/damage cards, gauge/area conventions and genuine
+  histories, specimen B/W/a and paired density accounting. Existing bounded
+  cases do not certify the population. Do not change source laws or rescale
+  data from co-located exporter code without actual native-output agreement.
+- [ ] Reconcile manuscript boundary/damage definitions with historical inputs:
+  sampled UAT top/bottom rotations are constrained; softening terminal lengths
+  vary by task/mesh/producer. Corrections owns wording/comments. For hexfullID1,
+  whole-envelope densities areUT.200151/FT.200000 despite unequal t; the earlier
+  .210686 figure used the narrower contact span and is not confirmed overdensity.
+  CSV grip-displacement/body-H strain differs from local body gauge strain.
+  [Bounded triage](Z:/p1/sims/Ti/Validation/audit/production/bounded-triage-20261102.json).
 - [ ] Reconcile with Corrections: isotropic conversion and orthotropic FCC M are
   distinct; avoid a second plane-strain reduction of already mapped beam tensors.
 - [ ] Consolidate one bending-aware periodic homogenisation workflow. Retain the
