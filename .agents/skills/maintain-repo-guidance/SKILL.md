@@ -33,6 +33,8 @@ does not require a second guidance-file edit; implementation changes still requi
 coverage from the relevant AGENTS, README or status file.
 Ancestor READMEs count for files beneath them, including individual study READMEs;
 sibling study READMEs do not cover shared helpers or other studies.
+Required p3 guidance routes to the existing `p3-CFRP/` folder after its rename;
+do not require the removed icing folder or infer a new scientific validation.
 
 ## Completion gate
 

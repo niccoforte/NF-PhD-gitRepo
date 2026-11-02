@@ -18,7 +18,7 @@ from pathlib import Path, PurePosixPath
 
 ABAQUS_PATHS = (
     "p1-DisorderLatticeProperties/SIMscripts/",
-    "p3-DisorderIcingMitigation/SIMscripts/",
+    "misc/Icing-Mitigation/",
     "resources/abaqus.py",
 )
 CONTRACT_PREFIXES = (
@@ -41,7 +41,7 @@ SCOPES = {
     "resources": ("resources/",),
     "p1": ("p1-DisorderLatticeProperties/",),
     "p2": ("p2-DisorderML/",),
-    "p3": ("p3-DisorderIcingMitigation/",),
+    "p3": ("p3-CFRP/",),
     "contract": CONTRACT_PREFIXES,
     "all": ("",),
 }

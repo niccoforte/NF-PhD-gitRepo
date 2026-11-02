@@ -19,6 +19,9 @@ python .agents/skills/validate-repo-change/scripts/validate_repo.py --scope cont
 
 Run these commands from the repository root. The colocated script is non-destructive. It checks diff whitespace and guidance coverage; compiles selected Python without running modules; imports relevant shared modules in fresh processes; validates notebook JSON; runs `bash -n` and PowerShell parse checks when available; and validates the explicitly synthetic fixture under this skill's `fixtures/` directory. It reports environment setup/removal, Abaqus, HPC, external-data, and scientific execution as skipped rather than implying coverage.
 
+The p3 scope follows `p3-CFRP/`; the moved legacy icing script under
+`misc/Icing-Mitigation/` remains Abaqus-only, not a standard-Python import.
+
 ## Add focused validation
 
 1. Inspect `git status --short` and the complete diff.

@@ -25,8 +25,8 @@ REQUIRED_FILES = (
     "p2-DisorderML/WINNER.md",
     "p2-DisorderML/HPC/AGENTS.md",
     "p2-DisorderML/code/AGENTS.md",
-    "p3-DisorderIcingMitigation/AGENTS.md",
-    "p3-DisorderIcingMitigation/PROJECT_STATUS.md",
+    "p3-CFRP/AGENTS.md",
+    "p3-CFRP/PROJECT_STATUS.md",
     "resources/AGENTS.md",
     ".agents/skills/maintain-repo-guidance/SKILL.md",
     ".agents/skills/maintain-repo-guidance/agents/openai.yaml",
@@ -132,8 +132,8 @@ def broad_guidance_candidates(path: str) -> tuple[str, ...]:
         )
     if path.startswith("p2-DisorderML/"):
         return ("p2-DisorderML/AGENTS.md", "p2-DisorderML/PROJECT_STATUS.md", "README.md")
-    if path.startswith("p3-DisorderIcingMitigation/"):
-        return ("p3-DisorderIcingMitigation/AGENTS.md", "p3-DisorderIcingMitigation/PROJECT_STATUS.md", "README.md")
+    if path.startswith("p3-CFRP/"):
+        return ("p3-CFRP/AGENTS.md", "p3-CFRP/PROJECT_STATUS.md", "README.md")
     if path.startswith("resources/"):
         return ("resources/AGENTS.md", "AGENTS.md", "README.md")
     return ("AGENTS.md", "README.md")
@@ -200,7 +200,7 @@ def main() -> int:
         ("review-p1-p2-data-contract", "README.md"),
         ("operate-p2-hpc", "README.md"),
         (".github/workflows/guidance-integrity.yml", "README.md"),
-        ("p3-DisorderIcingMitigation/AGENTS.md", "README.md"),
+        ("p3-CFRP/AGENTS.md", "README.md"),
         ("PROJECT_STATUS.md", "README.md"),
         (".agents/skills/validate-repo-change/scripts/validate_repo.py", "README.md"),
         ("setup-Windows.ps1", "AGENTS.md"),

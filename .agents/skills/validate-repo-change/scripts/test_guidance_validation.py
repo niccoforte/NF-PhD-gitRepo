@@ -10,6 +10,16 @@ import validate_repo
 
 
 class GuidanceValidationTests(unittest.TestCase):
+    def test_p3_migration_routes_guidance_and_abaqus_scope(self):
+        script=Path(__file__).resolve().parents[2]/"maintain-repo-guidance/scripts/check_guidance.py"
+        spec=importlib.util.spec_from_file_location("migration_guidance",script)
+        checker=importlib.util.module_from_spec(spec);spec.loader.exec_module(checker)
+        self.assertIn("p3-CFRP/AGENTS.md",checker.REQUIRED_FILES)
+        self.assertNotIn("p3-DisorderIcingMitigation/AGENTS.md",checker.REQUIRED_FILES)
+        self.assertIn("p3-CFRP/PROJECT_STATUS.md",checker.guidance_candidates("p3-CFRP/example.py"))
+        self.assertEqual(validate_repo.SCOPES["p3"],("p3-CFRP/",))
+        self.assertIn("misc/Icing-Mitigation/",validate_repo.ABAQUS_PATHS)
+
     def test_ancestor_readmes_cover_only_their_own_subtree(self):
         script = (
             Path(__file__).resolve().parents[2]
