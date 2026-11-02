@@ -7,10 +7,14 @@
   preserved and pin suppression after specimen refresh. Also prepared six
   CNN2+spatial fits (UT all-edge0.1, FT fixed-box0.001; seeds42/43/44) and four
   missing CNN3/MSE seeds43/44. No field-source/curve/HPO changes are bundled.
-  CPU mask/gradient/checkpoint tests pass; GPU execution/submission remains to
-  be recorded below. Existing accepted WINNER is unchanged pending acceptance;
+  Submitted immutable0fec8bf: feature gate35173267 and fits35173268–35173282;
+  CNN/spatial gate35173283 and fits35173284–35173293. Gates initially pending;
+  production waits afterok and cancels on invalid dependencies.51 model/staging
+  regressions plus five guidance tests pass; changed-range24 non-failing/0failed.
+  Model-side masks survive refresh/reload. Existing accepted WINNER is unchanged;
   recommendation is CNN2 fields/MSE for both tasks, with task-specific losses
-  still conditional. HPO explicitly requires separate approval.
+  still conditional. New TRAIN-only OOF/Mixed curve evaluation is required
+  before claiming improved serial predictions. HPO requires separate approval.
 
 - 29 October: all remaining66 production fits completed0:0/reload passed and
   were downloaded to external Z:/p2:886 files/6,046,392,078 bytes match HPC SHA256.

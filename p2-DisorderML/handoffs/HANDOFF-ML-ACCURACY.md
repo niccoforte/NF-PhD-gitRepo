@@ -12,13 +12,15 @@ It has not been dispatched automatically. New submissions require explicit scope
 
 ### 2 November authorised continuation
 
-- [ ] Submit/check15 CNN2/MSE feature fits: UT control/no-xy/no-designable/
+- [x] Submit15 CNN2/MSE feature fits: UT control/no-xy/no-designable/
   no-interfaces/no-present/no-context; FT control/no-xy/no-designable/no-pins/
   no-tip/no-tip-offsets/no-tip-distance/no-present/no-context. Seed42;
   post-refresh model-side suppression preserves operational masks and width.
-- [ ] Submit/check six CNN2+spatial fits, UT0.1 all-edge/FT0.001 fixed-tip-box,
+  Immutable0fec8bf; gate35173267, fits35173268–35173282; check gate/results.
+- [x] Submit six CNN2+spatial fits, UT0.1 all-edge/FT0.001 fixed-tip-box,
   seeds42/43/44; and missing CNN3/MSE seeds43/44 (four). Reuse verified CNN2
   and CNN3 seed42 evidence; fresh feature controls provide same-revision bridge.
+  Immutable0fec8bf; gate35173283, fits35173284–35173293; check gate/results.
 - [ ] Review these against matched task/seed CNN2 controls using global,
   confirmed STATUS-event, TRAIN-mean/variation, cost and existing safeguards.
   Only then choose task-specific features/losses and regenerate TRAIN-only OOF
