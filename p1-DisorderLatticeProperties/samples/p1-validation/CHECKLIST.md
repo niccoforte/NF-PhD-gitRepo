@@ -9,6 +9,39 @@ strongest completed evidence and quantify remaining limitations; do not extend
 kagome into an open-ended agreement/rerun campaign. Derived simulation-energy
 indices and length-scaled estimates retain their actual calculation provenance.
 
+## Dependency order for the remaining work
+
+1. Close the Hsieh comparison display with its actual evidence:14 native
+   initial-triangle cases,2 nonlinear-recovery indices and2 density/length
+   predictions. Do not launch another full fracture completion campaign.
+   Direct3mm Fig.10 is primary;10mm references are length-scaled inferences.
+   The10mm/16% rate limitation and the negative source-convention areas remain
+   bounded limitations, not newly validated results.
+2. Settle shared production definitions before bulk recalculation: native
+   samples/tails, event, filter/work, source geometry/density, material state,
+   gauge/BC/damage wording, and per-specimen UAT elastic fitting. Pilot UAT
+   fitting and representative disorder-to-fracture conversion at this stage.
+3. Reuse the8 square/45square SiC sources in Z:/p1/sims/SiC/Validation for
+   the0/90 and+/-45 elastic validation; reconcile FCC tensor, axes and M with
+   the same assigned material state. Treat plastic eta-work calibration as a
+   separate gate: elastic agreement does not establish plastic J. Inspect an
+   asymmetric linear elastic control only if retaining a general unequal-axis
+   formula; ordered square/45square/FCC alone have equal axial moduli.
+4. Recalculate the28 retained PSC fracture cases in Z:/p1/sims/Ti/PSC/10
+   (four topologies at nx10,16,20,26,30,36,40). Check data, calculation and
+   chart against the final method; keep approved specimen sizes/criteria.
+5. Replace superseded production helpers in place and run a representative
+   end-to-end pilot; then recalculate the agreed population, originalIDs1-1000
+   per topology/design, ID0 reference only. Preserve exact UT/FT IDs and
+   native validity; document missing/censored properties without imputation.
+6. Replace Excel/notebook/plot results and recompute paired populations and
+   normalisations; then integrate verified methods, figures and wording into
+   the manuscript with Corrections. Finally remove superseded code/results,
+   overlapping controls and task scratch after consumer/replacement checks.
+
+The ordered gates below are the single completion register; this sequence
+sets their dependency order, not a second checklist.
+
 ## Hsieh validation before closing this phase
 
 - [x] Consolidate useful original validation sources and preserve their identities.
@@ -23,7 +56,8 @@ indices and length-scaled estimates retain their actual calculation provenance.
 - [x] Complete/process hexagonal10mm/16%: KJ=5.349MPa sqrt(m), positive area,
   endpoint KE/IE=.464%; included provisionally in Figs8a/10. Earlier transients
   require the separate rate check below; this is not full quasistatic qualification.
-- [ ] Close the missing13% hexagonal cases using the declared no-rerun scope.
+- [x] Close the missing13% hexagonal completion campaign using the declared
+  no-rerun scope; show explicit predictions in the final comparison display.
   [Queue state](Z:/p1/sims/Ti/Validation/audit/new-validation/queue-resume-20261102/state.json).
   The3mm restart and both workers subsequently exited without a known cause;
   field21/200 and solver time.01068s are saved. No solver remains active at the
@@ -31,34 +65,42 @@ indices and length-scaled estimates retain their actual calculation provenance.
   [Execution review](Z:/p1/sims/Ti/Validation/audit/new-validation/deadline-execution-review-20261102.json).
   No further full fracture retry is recommended for this deadline. These
   interrupted launches do not demonstrate a physical impossibility of the model.
-- [ ] Delimit10mm/16% loading-rate qualification without making the closeout
+- [x] Delimit10mm/16% loading-rate qualification without making the closeout
   depend on the unstarted slower-rate job. It was armed after those two jobs
   through the [serial continuation](Z:/p1/sims/Ti/Validation/audit/serial-continuation-20261102-status.json),
   now stopped for review because its worker exited. This control has not started.
   Time is3.333times longer, with the same end displacement and material/mesh.
   The baseline exceeds5% KE/IE until.0239s, about30% of its time to initiation.
-  Compare force, work and onset; choose the accepted result from this evidence.
-- [ ] Resolve the hexagonal negative-area limitation: establish a defensible
-  fracture-energy calibration or explicitly delimit unavailable source-convention
-  results. Do not clip area or substitute dissipation/unloading work as ASTM J.
+  Do not silently qualify the work integral from endpoint energy alone. The
+  no-rerun closeout retains this point provisionally with the rate limitation.
+- [x] Delimit the hexagonal source-convention negative areas as unavailable;
+  display the two measured recovery indices with their actual alternative work
+  definition. No clipping or claim that unloading work is qualified ASTM J.
+  A general production work/eta definition remains the later calculation gate.
 - [x] Close kagome agreement assessment: researcher accepts the current results.
   Retain direct3mm errors+19.42%,+9.82%,+14.02% at13%,16%,20% and move on.
-- [ ] Freeze one final calculation/event/filter/modulus definition and verdict.
-  Four unique points remain absent from the current plot: hex3mm13% and10mm13%
-  need new simulation prefixes; hex3mm16% and20% have completed histories but
-  negative initial-triangle area. The third planned job checks10mm16% rate
-  sensitivity and cannot fill either negative-area point.
+- [x] Freeze the bounded Hsieh comparison display and its evidence categories.
+  It now fills all18 topology/length/density slots,
+  but14 use native initial-triangle KJ,2 use matched nonlinear-recovery indices,
+  and2 are density/length predictions. The native source-convention hex3mm16/20%
+  values remain undefined; neither prediction is independent validation data.
+  The unstarted rate control does not fill an absent topology/density slot.
 - [x] Calculate a separate no-rerun option from existing own results: hex3mm16/20%
   nonlinear-recovery indices3.0710/4.6112MPa sqrt(m); two-point density scaling
   predicts13%3mm2.1039 and13%10mm3.8411. These are two derived indices and two
   predictions, not four new fracture simulations. A linear-density model gives
   1.9159/3.4980 instead, so the13% extrapolation is not independently validated.
   [Calculation and provenance](Z:/p1/sims/Ti/Validation/audit/new-validation/no-rerun-options-20261102.json).
-- [ ] Make direct3mm Fig.10 validation primary; describe10mm as a sqrt(10/3)
+- [x] Adopt the four no-rerun values for explicit mixed-evidence plot display;
+  bind measured recovery points to their existing selected rows and predictions
+  to their two-point density/length model. Preserve native negative areas and KJ.
+- [x] Make direct3mm Fig.10 validation primary; describe10mm as a sqrt(10/3)
   length-scaled reference. Keep Fig.8b sqrt(3) adjustments labelled hypotheses.
 
 ## Replace methods and results after the definition is settled
 
+- [ ] Freeze the final production calculation/event/filter/modulus definition,
+  including a consistent work/eta interpretation after orthotropic/FCC checks.
 - [ ] Replace superseded production exporter, initiation, filtering, stiffness and
   modulus logic in place; do not retain selectable wrong/legacy calculation paths.
   Butterworth/modal helpers are implemented and tested in validation only.
@@ -106,11 +148,26 @@ indices and length-scaled estimates retain their actual calculation provenance.
   All236 inspected historical StiffMatrix INPs use physical123000MPa,.3; they
   cannot simply be relabelled as mapped plane-strain controls.
   [Retention verification](Z:/p1/sims/Ti/Validation/audit/controls/retention-review-20261102.json).
-- [ ] Keep periodic C as the ordered reference; account for each disorder's
-  stiffness loss using its own UAT response and existing representative tensor
-  evidence. One directional UAT slope does not determine nu,G or general M.
-  Match material state and specimen axes before conversion; preserve the declared
-  quasi-isotropic approximation and test its scope rather than imposing periodic E.
+- [ ] Implement one per-specimen UAT stiffness estimator: longest verified
+  stable initial-loading window with at least5 distinct strains, positive slope,
+  intercept/residual/curvature checks and nested-window sensitivity. Set numeric
+  tolerances once on a representative pilot, then apply one fixed rule. If native
+  early samples are insufficient, flag the result or use an exact-geometry fast
+  linear elastic control; never fill with periodic stiffness.
+- [ ] Separate apparent UAT specimen stiffness from body material stiffness:
+  current strain is grip travel/bodyH and includes grip compliance. Prefer genuine
+  early body-gauge displacements where resolved; otherwise check a representative
+  source-group correction or exact-geometry linear elastic control with the actual
+  grip displacement/rotation BCs. Do not infer bulk E from uncorrected grip travel.
+- [ ] For tri/kagome/hex, test using each specimen's body E as mapped-plane-state
+  M under the declared quasi-isotropic approximation, with no second reduction.
+  Check low/median/high stiffness representatives per design for transverse and
+  shear response; own UAT softening must survive this conversion.
+- [ ] For FCC, test the economical C_i=s_i*C_ref model with
+  s_i=E_body,i/E_body,ref and hence M_i=s_i*M_ref. This is conditional on an
+  invariant normalised tensor shape, not established by one slope. Compare
+  representative shear/Poisson/coupling terms; use grouped or specimen-specific
+  tensors if the shape assumption fails. No1000-RVE campaign is proposed.
 - [ ] Organise final retained controls under StiffMatrix/periodic-material/
   plane-strain/<case> and StiffMatrix/specimen-compliance/CT/plane-strain/<case>,
   with one index binding source, assigned material, tensor/k0 and consumers.
@@ -144,8 +201,14 @@ indices and length-scaled estimates retain their actual calculation provenance.
   Propagate the same measured C and its material state through FTprops/calcFT;
   replacing a scalar alone does not settle the FCC calculation.
 - [ ] Square/45square orthotropic validation and specimen-axis calibration.
+  Eight retained SiC cases (four of each topology, A-D) include native inputs,
+  ODBs and transfers. Inspected45square inputs assign mapped418197MPa,.162791;
+  verify every replay's exact material state and avoid a second mapping. The
+  historical FTortho chart is not evidence of the new tensor/calibration route.
 - [ ] PSC calculation audit, especially fracture toughness; preserve the
-  supervisor-agreed specimen sizes and convergence criteria.
+  supervisor-agreed specimen sizes and convergence criteria. All28 FT transfers
+  and source models are retained; replace historical workbook values and guide
+  curves only after the final method has been checked on those same cases.
 - [ ] Revisit conditional lattice-foundation findings only where those later
   workflows actively use them; verify downstream p1/p2 dependencies.
 

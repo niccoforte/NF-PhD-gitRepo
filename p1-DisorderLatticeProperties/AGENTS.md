@@ -60,10 +60,12 @@ In practical terms:
   are separate calculations; a positive alternative work estimate does not
   establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
   records audit products and named temporary files without cleanup authority.
-- Paper exports in `audit/paper` show initiation only, with a single calculation
-  convention from the original simulations. Diagnostic alternatives remain in
-  `audit/benchmark`; they are not competing paper results. Relative-density
-  axes match the common nominal density without altering either input material.
+- Paper exports in `audit/paper` show initiation-related comparisons:14 native
+  initial-triangle cases plus the accepted two nonlinear-recovery indices and
+  two density/length predictions. Their supplement is source-hash-bound and
+  displayed with distinct markers/captions; it never overwrites native KJ or
+  negative areas. Other diagnostic alternatives stay in `audit/benchmark`.
+  Relative-density axes match the common nominal density without input changes.
   Separately labelled Fig.8b sqrt(3) hypothesis views preserve the original
   comparison and source K; they are interpretation tests, not accepted fixes.
   New absent-case model derivatives live in `audit/new-validation` with their

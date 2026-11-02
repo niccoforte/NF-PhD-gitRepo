@@ -119,14 +119,25 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   A no-rerun option is calculated separately: existing3mm hex16/20% recovery
   indices3.0710/4.6112 and exploratory13%3/10mm predictions2.1039/3.8411.
   Alternative linear-density extrapolation gives1.9159/3.4980; these two
-  predictions are not independent validation points and are not in paper plots.
+  predictions are not independent validation points. The four values are now
+  adopted for mixed-evidence paper-figure display with separate markers/captions,
+  source-bound to the unchanged native/recovery CSV; they are not four new native
+  fracture results. Workbook and manuscript replacement remain pending.
   The49completed mapped ordered conversion controls pass current source/input
   checks, SPD and work/energy closure. All236 historical StiffMatrix INPs use
   physical123000MPa,.3 material. Retention is conditional on the correct source
   state, not the folder name. Periodic C cannot represent disorder softening;
   own UAT stiffness and existing representative tensor evidence remain necessary
-  before production conversion. Filtering replacement and UAT fit repair are
-  still pending; the validation Butterworth/modal helpers already exist.
+  before production conversion. The concrete disorder proposal is own-body-gauge
+  elastic-window fitting, checked quasi-isotropic M for tri/kagome/hex, and a
+  representative-tested scalar tensor-shape model for FCC. These are proposed,
+  not implemented. Grip travel/bodyH slopes require gauge/compliance checks.
+  Filtering replacement and UAT fit repair remain pending.
+  The ordered gates in the unique checklist now put shared definitions and
+  orthotropic/FCC validation before PSC, a production pilot and the full original
+  IDs1-1000 population pass; Excel/paper replacement and cleanup follow.
+  Eight square/45square SiC sources and all28 PSC FT cases are retained for reuse.
+  The validation Butterworth/modal helpers already exist.
   Corrections'32-deck manuscript sample coversIDs1/1000 only. Four read-only
   native fullID1 UAT replays reproduce all checked stored prefix stresses/strains
   with gross area and bodyH; no blanket thickness rescale is justified by stale
@@ -139,10 +150,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   not demonstrated whole-corpus numerical failures. Corrections owns manuscript
   wording; SimCheck retains computational migration. Evidence is under
   `Validation/audit/production`; no source data or paper values were changed.
-  Clean initiation-only paper exports now separate original-simulation results
-  from diagnostic energy/unloading comparisons; they use nominal relative
-  density to match Hsieh's. The underlying original-simulation calculation
-  convention is unchanged. FTval/shared calcFT still retain the historical path;
+  Current paper exports distinguish native initial-triangle KJ, two accepted
+  nonlinear-recovery indices and two explicit predictions at nominal relative
+  density. Other energy controls stay diagnostic. The underlying native
+  calculation and its unavailable negative-area values are unchanged.
+  FTval/shared calcFT still retain the historical path;
   the corrected values are in external CSVs read by ValConvPlots.
   Marker sizes/layering now expose overlaps without coordinate jitter. Two
   explicitly labelled Fig.8b sqrt(3) hypothesis views preserve the original plot

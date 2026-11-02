@@ -446,9 +446,13 @@ without deleting anything. `audit/cleanup-review.json` extends that inventory
 to code/notebook cleanup, legacy workbook values and audit additions, competing
 early reviews, backup states and pending reference capture. Refresh both before
 final cleanup; source values and unique temporary evidence must be preserved.
-Publication exports in `audit/paper` show only initiation results from the
-original simulations using the initial-triangle convention, versus Hsieh's
-initial data. They provide PNG/PDF/SVG, captions and point/exclusion CSVs.
+Publication exports in `audit/paper` show14 native initial-triangle cases plus
+an explicitly adopted four-point display supplement:2 matched nonlinear-recovery
+indices and2 density/length predictions. The supplement JSON in
+`audit/new-validation/no-rerun-options-20261102.json` is bound to the selected CSV
+hash and rechecked against its source recovery rows; distinct markers/captions
+preserve these different origins. Native KJ and negative areas are unchanged.
+The exports provide PNG/PDF/SVG, captions and point/exclusion CSVs.
 Paper legends identify the simulation series as Current study; internal
 `Simulation` series keys in the point tables remain stable identifiers.
 `validation_completion.py --extract-finished --include-interrupted` reads the

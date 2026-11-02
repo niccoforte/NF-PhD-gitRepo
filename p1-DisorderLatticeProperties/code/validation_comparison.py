@@ -37,8 +37,8 @@ def read_rows(path):
         return list(csv.DictReader(file))
 
 
-def write_rows(path, rows):
-    fields = list(dict.fromkeys(key for row in rows for key in row))
+def write_rows(path, rows, fieldnames=None):
+    fields = fieldnames or list(dict.fromkeys(key for row in rows for key in row))
     with Path(path).open("w", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fields)
         writer.writeheader()
@@ -696,8 +696,79 @@ def plot_normalisation_sensitivity(records, fig8, material, out):
     plt.close(fig)
 
 
-def paper_exports(records, fig8, reference_rows, material, destination, inputs, source_pdf_sha):
-    """Initiation-only paper figures; audit calculations and values stay intact."""
+def paper_supplements(records, inputs, path=None):
+    """Load explicitly adopted display estimates without changing native results."""
+    selected = inputs.get("selected_recalculation")
+    if not selected:
+        return {}, None
+    selected_path = Path(selected["path"]).resolve()
+    path = (Path(path).resolve() if path is not None else
+            selected_path.parent.parent / "new-validation/no-rerun-options-20261102.json")
+    if not path.exists():
+        return {}, None
+    contents = path.read_bytes()
+    document = json.loads(contents.decode("utf-8-sig"))
+    if document.get("adopted_for_paper_display") is not True:
+        return {}, None
+    if (document.get("source_results_sha256") != selected["sha256"] or
+            Path(document["source_results"]).resolve() != selected_path):
+        raise ValueError("Paper supplement does not match the captured selected-results source")
+    expected = {("hex", 3., .16), ("hex", 3., .2), ("hex", 3., .13), ("hex", 10., .13)}
+    supplements = {}
+    for point in document["points"]:
+        key = (point["topology"], float(point["l_mm"]), float(point["relative_density"]))
+        if key not in expected or key in supplements:
+            raise ValueError("Unexpected or duplicate paper supplement identity: " + repr(key))
+        value = number(point["K_equivalent_MPa_sqrt_m"])
+        predicted = key[2] == .13
+        if (value is None or value <= 0 or not point.get("basis") or
+                point.get("independent_original_fracture_KJ") is not False or
+                point.get("density_extrapolation") is not predicted or
+                point.get("length_scaling") is not (key[1] == 10.)):
+            raise ValueError("Paper supplement lacks an explicit valid calculation basis: " + repr(key))
+        native = [r for r in records if r["method"] == "Hsieh_initial_triangle_native"
+                  and (r["topology"], r["l_mm"], r["relative_density"]) == key]
+        if any(r["value_status"] == "available_provisional" and
+               r.get("KJ_MPa_sqrt_m") is not None and not negative_area(r) for r in native):
+            raise ValueError("Paper supplement would replace an available original-fracture result")
+        recovery = None
+        if not predicted:
+            candidates = [r for r in records if r["method"] == "qs_measured_recovery_eta"
+                          and r["case_id"] == point.get("case_id")
+                          and (r["topology"], r["l_mm"], r["relative_density"]) == key]
+            if len(candidates) != 1:
+                raise ValueError("Paper recovery estimate lacks one matching selected simulation")
+            recovery = candidates[0]
+            if (recovery["value_status"] != "available_provisional" or
+                    recovery.get("loading_state") != "counterfactual_damage_off_QS" or
+                    recovery.get("source_work_convention") != "measured_nonlinear_recovery" or
+                    not math.isclose(value, recovery.get("KJ_MPa_sqrt_m") or 0., rel_tol=1e-12)):
+                raise ValueError("Paper recovery estimate differs from its selected load-unload result")
+        supplements[key] = {**point, "K_equivalent_MPa_sqrt_m": value,
+                            "evaluation_basis": "prediction" if predicted else "nonlinear_recovery",
+                            "display_method": ("density_power_law_sqrt_length_prediction" if key[1] == 10. else
+                                               "density_power_law_prediction") if predicted else "qs_measured_recovery_eta",
+                            "recovery_record": recovery}
+    if set(supplements) != expected:
+        raise ValueError("Paper supplement must contain exactly the four adopted hexagonal points")
+    k16 = supplements["hex", 3., .16]["K_equivalent_MPa_sqrt_m"]
+    k20 = supplements["hex", 3., .2]["K_equivalent_MPa_sqrt_m"]
+    exponent = math.log(k20/k16)/math.log(.2/.16)
+    k13 = k16*(.13/.16)**exponent
+    if (not math.isclose(number(document.get("density_exponent")) or 0., exponent, rel_tol=1e-12) or
+            not math.isclose(supplements["hex", 3., .13]["K_equivalent_MPa_sqrt_m"], k13, rel_tol=1e-12) or
+            not math.isclose(supplements["hex", 10., .13]["K_equivalent_MPa_sqrt_m"],
+                             k13*math.sqrt(10./3.), rel_tol=1e-12)):
+        raise ValueError("Paper predictions do not reproduce the declared own-data scaling")
+    metadata = {"path": str(path), "sha256": hashlib.sha256(contents).hexdigest(),
+                "source_results_sha256": selected["sha256"], "density_exponent": exponent,
+                "fitting_data": document.get("fitting_data"), "validation_limit": document.get("validation_limit"),
+                "points": [{k: v for k, v in p.items() if k != "recovery_record"} for p in supplements.values()]}
+    return supplements, metadata
+
+
+def paper_exports(records, fig8, reference_rows, material, destination, inputs, source_pdf_sha, supplement_path=None):
+    """Paper display with declared alternative estimates; native results stay intact."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -714,6 +785,7 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
         if key in simulations:
             raise ValueError("Duplicate paper simulation identity: " + repr(key))
         simulations[key] = row
+    supplements, supplement_metadata = paper_supplements(records, inputs, supplement_path)
     reference = reference_lookup(reference_rows)
     uts = float(material["parent_UTS_workbook_MPa"])
     points = []
@@ -759,16 +831,38 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                     denominator = uts*(math.sqrt(length/1000.) if figure == "8a" else 1) if figure != "10" else 1
                     reason = ("" if valid else "negative initial-triangle area" if row is not None and negative_area(row) else
                               "no selected simulation" if row is None else "unavailable recalculation")
+                    supplement = supplements.get(key)
+                    native_reason = reason
+                    if supplement is not None:
+                        value, valid, reason = supplement["K_equivalent_MPa_sqrt_m"], True, ""
+                    recovery = supplement.get("recovery_record") if supplement else None
                     points.append({**common, "series": "Simulation", "plotted": bool(valid),
                                    "ordinate": value/denominator if valid else None, "exclusion_reason": reason,
-                                   "case_id": row.get("case_id") if row else None, "method": method,
+                                   "case_id": row.get("case_id") if row else None,
+                                   "method": supplement["display_method"] if supplement else method,
+                                   "native_method": method, "native_exclusion_reason": native_reason,
+                                   "evaluation_basis": supplement["evaluation_basis"] if supplement else "original_fracture",
+                                   "display_basis": supplement["basis"] if supplement else "Original fracture history; initial-stiffness triangle",
+                                   "display_K_MPa_sqrt_m": value,
+                                   "display_point_id": "{}:{}mm:rho{}:{}".format(topology, length, rho,
+                                        supplement["display_method"] if supplement else method),
+                                   "K_equivalent_MPa_sqrt_m": value if supplement else None,
+                                   "independent_original_fracture_KJ": bool(valid and supplement is None),
+                                   "density_extrapolation": supplement.get("density_extrapolation", False) if supplement else False,
+                                   "length_scaling": supplement.get("length_scaling", False) if supplement else False,
                                    "endpoint": row.get("endpoint") if row else None,
                                    "endpoint_time_s": row.get("endpoint_time_s") if row else None,
                                    "KI_MPa_sqrt_m": row.get("KI_MPa_sqrt_m") if row else None,
                                    "KJ_MPa_sqrt_m": row.get("KJ_MPa_sqrt_m") if row else None,
                                    "Apl_Nmm": row.get("Apl_Nmm") if row else None,
                                    "qualified_ASTM_J": row.get("qualified_ASTM_J") if row else False,
-                                   "source_input_sha256": inputs.get("selected_recalculation", {}).get("sha256"),
+                                   "source_input_sha256": supplement_metadata["sha256"] if supplement else inputs.get("selected_recalculation", {}).get("sha256"),
+                                   "native_results_input_sha256": inputs.get("selected_recalculation", {}).get("sha256"),
+                                   "recovery_case_id": recovery.get("case_id") if recovery else None,
+                                   **{"recovery_"+name: recovery.get(name) if recovery else None for name in
+                                      ("loading_state", "source_work_convention", "load_job", "unload_job", "endpoint", "endpoint_time_s",
+                                       "matched_load_result_sha256", "unloading_result_sha256", "loading_result_sha256",
+                                       "matched_loading_evidence_file", "source_inp_sha256", "source_odb_sha256")},
                                    **{name: row.get(name) if row else None for name in
                                       ("source_inp_sha256", "source_odb_sha256", "modulus_odb_sha256", "modulus_job",
                                        "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note",
@@ -792,22 +886,42 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                            "source_ordinates_rescaled": factor != 1.,
                            "reference_basis": row["reference_basis"] + "; sqrt3_hypothesis_view"})
     write_rows(destination / "points.csv", points)
-    write_rows(destination / "exclusions.csv", [r for r in points if r["series"] == "Simulation" and not r["plotted"]])
+    write_rows(destination / "exclusions.csv", [r for r in points if r["series"] == "Simulation" and not r["plotted"]],
+               fieldnames=list(dict.fromkeys(key for row in points for key in row)))
+    def calculation_note(figure):
+        displayed = [r for r in points if r["figure"] == figure and r["series"] == "Simulation" and r["plotted"]]
+        counts = {basis: sum(r["evaluation_basis"] == basis for r in displayed)
+                  for basis in ("original_fracture", "nonlinear_recovery", "prediction")}
+        note = (" Current study circles show native Explicit initial-triangle KJ at the last recorded "
+                "undamaged tensile-strain sample with the C(T) calibration.")
+        if counts["nonlinear_recovery"]:
+            note += " Squares show source-matched nonlinear-recovery equivalent indices."
+        if counts["prediction"]:
+            note += (" Diamonds show own-data density/length predictions. The density exponent is fitted "
+                     "only to two own recovery values; no Hsieh value enters that fit. Two fitted points "
+                     "do not establish prediction uncertainty.")
+        if counts["nonlinear_recovery"] or counts["prediction"]:
+            note += (" K denotes native KJ for circles and an equivalent index for the other markers. "
+                     "This figure contains {} native values, {} recovery indices and {} predictions; "
+                     "the latter two categories are not independent native fracture validation results."
+                     .format(counts["original_fracture"], counts["nonlinear_recovery"], counts["prediction"]))
+        return note + (" Native negative areas remain unavailable in the source table. Original and "
+                       "display values, methods, exclusions and hashes are recorded in the companion tables.")
     captions = {
-        "8a": ("Initial-fracture comparison at nominal relative densities 13%, 16%, 20%. Current study values use retained and qualified new Explicit fracture histories, "
-               "the last recorded undamaged tensile-strain sample and Hsieh's initial-slope area convention with the C(T) calibration. "
-               "Current study normalisation uses parent UTS 1111.792 MPa and bar length in metres. Hsieh's original normalised ordinates are unchanged "
-               "and repeated at the two nominal length assignments; the source strength convention remains unresolved. Undefined areas and absent cases are omitted, "
-               "with every exclusion recorded in exclusions.csv. No vertical shift, fitted factor or replacement work estimate is used."),
-        "8b": ("Initial-fracture comparison at nominal relative density 20%. The original Hsieh ordinates are retained at nominal 3/10 mm assignments. "
-               "The x coordinate is sqrt(bar length in mm), following the source tick convention despite its metre label; source marker x coordinates were not digitised. "
-               "Current study values use parent UTS 1111.792 MPa. The inconsistency between Figures 8a/8b remains unresolved; this is not independent proof of absolute toughness. "
-               "The undefined 3 mm hexagonal simulation is omitted."),
-        "10": ("Dimensional comparison based on Figure 10 initiation data at matched nominal relative densities, avoiding the different constituent mass densities 4430/4500 kg/m3. "
-               "The 3 mm Hsieh initial-toughness points are directly digitised; the 10 mm reference is an explicitly declared sqrt(10/3) scaling inference. "
-               "Error bars bound graphical extraction only and are not statistical confidence intervals. Current study values use retained and qualified new Explicit fracture histories and the initial-slope area convention; "
-               "no final-fracture, dissipation or nonlinear-recovery estimates are included. Negative-area values and absent cases are omitted; data and source fingerprints are in points.csv. "
-               "This comparison does not establish ASTM qualification or agreement for all lattices.")}
+        "8a": ("Initiation-related comparison at nominal relative densities 13%,16%,20%. "
+               "Current study normalisation uses parent UTS 1111.792 MPa and bar length in metres. "
+               "Hsieh's original normalised ordinates are unchanged and repeated at the two nominal "
+               "length assignments; the source strength convention remains unresolved." + calculation_note("8a")),
+        "8b": ("Initiation-related comparison at nominal relative density20%. Hsieh's original ordinates "
+               "are retained at nominal3/10mm assignments. The x coordinate is sqrt(bar length in mm), "
+               "following the source tick convention despite its metre label; source marker x coordinates "
+               "were not digitised. Current study uses parent UTS1111.792MPa. The Fig.8a/8b inconsistency "
+               "remains unresolved; this is not independent proof of absolute toughness." + calculation_note("8b")),
+        "10": ("Dimensional initiation-related comparison at matched nominal relative densities. The3mm "
+               "Hsieh initiation points are directly digitised; the10mm reference is an explicitly declared "
+               "sqrt(10/3) scaling inference. Error bars bound graphical extraction only, not statistical "
+               "uncertainty. No final-fracture data are shown. This comparison does not establish ASTM "
+               "qualification or universal source-method agreement." + calculation_note("10"))}
     energy_reviews = [row for row in simulations.values() if row.get("energy_window_review_required") in (True, "True")]
     if energy_reviews:
         names = ", ".join("{} {}mm/{}%".format(r["topology"], r["l_mm"], round(100*r["relative_density"]))
@@ -823,8 +937,8 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
         captions[figure] = ("Hypothetical reconciliation of the Fig.8a/8b normalisation mismatch. " + adjusted +
                            "This is an explicitly requested interpretation test, not a verified correction or new simulation result. "
                            "Original source ordinates, simulation K, nominal density, lengths and initiation samples are unchanged in their source files. "
-                           "The unadjusted comparison remains figure8b. The same missing/negative-area points remain unavailable. "
-                           "Per-point original ordinates and display factors are recorded in points.csv.")
+                           "The unadjusted comparison remains figure8b. "
+                           "Per-point original ordinates and display factors are recorded in points.csv." + calculation_note(figure))
     colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#3465a4"}
     simulation_sizes = {"tri": 6.2, "kagome": 3.5, "hex": 4.6}
     names = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal"}
@@ -834,14 +948,16 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
         for figure in ("8a", "8b", "10", *variants):
             is_8b = figure.startswith("8b")
             count = 1 if is_8b else 2
-            fig, axes = plt.subplots(1, count, figsize=(7.2, 3.5), squeeze=False, sharey=count==2)
-            fig.subplots_adjust(left=.145, right=.98, top=.89, bottom=.30, wspace=.22)
+            fig, axes = plt.subplots(1, count, figsize=(7.2, 4.2), squeeze=False, sharey=count==2)
+            fig.subplots_adjust(left=.145, right=.98, top=.91, bottom=.40, wspace=.22)
             for panel, length in enumerate((None,) if is_8b else LENGTHS):
                 ax = axes[0, panel]
                 for topology in TOPOLOGIES:
-                    for series in ("Hsieh et al.", "Simulation"):
+                    for series, evaluation_basis in (("Hsieh et al.", None), ("Simulation", "original_fracture"),
+                                                      ("Simulation", "nonlinear_recovery"), ("Simulation", "prediction")):
                         selected = [r for r in points if r["figure"] == figure and r["topology"] == topology
-                                    and r["series"] == series and r["plotted"] and (length is None or r["l_mm"] == length)]
+                                    and r["series"] == series and r["plotted"] and (length is None or r["l_mm"] == length)
+                                    and (evaluation_basis is None or r["evaluation_basis"] == evaluation_basis)]
                         selected.sort(key=lambda r: r["x_value"])
                         if not selected:
                             continue
@@ -849,10 +965,12 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                         sim = series == "Simulation"
                         # Large transparent reference outlines and smaller nested
                         # simulation symbols reveal coincident points without jitter.
-                        options = dict(color=colors[topology], marker="o" if sim else "^",
-                                       ms=simulation_sizes[topology] if sim else 8.4,
+                        marker = {"original_fracture": "o", "nonlinear_recovery": "s", "prediction": "D"}.get(evaluation_basis, "^")
+                        options = dict(color=colors[topology], marker=marker,
+                                       ms=(simulation_sizes[topology] if evaluation_basis == "original_fracture" else 5.) if sim else 8.4,
                                        mfc=colors[topology] if sim else "none", mew=1.05 if sim else 1.25,
-                                       lw=.9, ls="--" if sim else "-", zorder=4+TOPOLOGIES.index(topology) if sim else 2)
+                                       lw=.9, ls=("--" if evaluation_basis == "original_fracture" else "none") if sim else "-",
+                                       zorder=4+TOPOLOGIES.index(topology) if sim else 2)
                         if figure == "10" and not sim:
                             ax.errorbar(xx, yy, yerr=[[r["ordinate"]-r["graphical_lower"] for r in selected],
                                                     [r["graphical_upper"]-r["ordinate"] for r in selected]],
@@ -878,35 +996,47 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                         title += " | direct reference" if length == 3 else " | scaled reference"
                     ax.set_title(title)
                 if panel == 0:
-                    ax.set_ylabel(r"$K_J/(\sigma_{\mathrm{TS}}\sqrt{\ell})$" if figure == "8a" else
-                                  r"$K_J/\sigma_{\mathrm{TS}}$ (m$^{1/2}$)" if is_8b else
-                                  r"$K_J$ (MPa$\sqrt{\mathrm{m}}$)")
+                    ax.set_ylabel(r"$K/(\sigma_{\mathrm{TS}}\sqrt{\ell})$" if figure == "8a" else
+                                  r"$K/\sigma_{\mathrm{TS}}$ (m$^{1/2}$)" if is_8b else
+                                  r"$K$ (MPa$\sqrt{\mathrm{m}}$)")
                 if figure == "10":
                     ax.set_ylim(1.5,65)
                 if count == 2:
                     ax.text(.02,.95,"({})".format("ab"[panel]),transform=ax.transAxes,va="top",fontsize=9)
             handles = [Line2D([],[],color=colors[t],lw=1.6,label=names[t]) for t in TOPOLOGIES]
-            handles += [Line2D([],[],color="#555555",marker="^",mfc="none",ms=8.4,mew=1.25,ls="-",lw=1,label="Hsieh et al."),
-                        Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Current study")]
-            fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.08),ncol=5,frameon=False,
+            fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.22),ncol=3,frameon=False,
+                       columnspacing=1.8,handlelength=1.5,handletextpad=.45)
+            handles = [Line2D([],[],color="#555555",marker="^",mfc="none",ms=8.4,mew=1.25,ls="-",lw=1,label="Hsieh et al."),
+                       Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Current study: initial triangle")]
+            present = {r["evaluation_basis"] for r in points if r["figure"] == figure and r["series"] == "Simulation" and r["plotted"]}
+            if "nonlinear_recovery" in present:
+                handles.append(Line2D([],[],color="#555555",marker="s",mfc="#555555",ms=5.,ls="none",label="Current study: recovery"))
+            if "prediction" in present:
+                handles.append(Line2D([],[],color="#555555",marker="D",mfc="#555555",ms=5.,ls="none",label="Current study: prediction"))
+            fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.075),ncol=2,frameon=False,
                        columnspacing=1.15,handlelength=1.5,handletextpad=.45)
             note = (r"10 mm reference: 3 mm data $\times\sqrt{10/3}$. " if figure == "10" else "")
             if figure in variants:
                 note += (r"Hypothesis: Hsieh ordinates $/\sqrt{3}$; Current study unchanged. " if figure == "8b_hsieh_fix" else
                          r"Hypothesis: Current study ordinates $\times\sqrt{3}$; Hsieh unchanged. ")
-            note += "Initial fracture only."
+            note += "Initiation comparison."
             fig.text(.5,.025,note,ha="center",va="bottom",fontsize=7.5)
             for extension in ("png","pdf","svg"):
                 fig.savefig(destination / ("figure{}.{}".format(figure,extension)),dpi=300)
             plt.close(fig)
-    metadata = {"selection_method":method,"case_selection":"Original selected specimens plus qualified completion cases at the declared topology/length/nominal density; no agreement-based selection",
+    display_counts = {basis: len({(r["topology"], r["l_mm"], r["relative_density"]) for r in points
+                                 if r["series"] == "Simulation" and r["plotted"] and r["evaluation_basis"] == basis})
+                      for basis in ("original_fracture", "nonlinear_recovery", "prediction")}
+    metadata = {"selection_method":method,"case_selection":"Native selected specimens plus qualified completion cases and explicitly adopted display estimates; no agreement-based selection among available native results",
                 "simulation_cases":len(simulations),"point_rows":len(points),
                 "plotted_simulation_rows":sum(r["series"]=="Simulation" and r["plotted"] for r in points),
                 "excluded_simulation_rows":sum(r["series"]=="Simulation" and not r["plotted"] for r in points),
                 "inputs":{key:inputs[key] for key in ("reference", "original_fig8", "original_fig8_provenance", "selected_recalculation") if key in inputs},
                 "published_pdf_sha256":source_pdf_sha,"captions":captions,
                 "display_labels":{"Hsieh et al.":"Hsieh et al.", "Simulation":"Current study"},
-                "linear_controls":"Source-specific B21 RVE/compliance solves for retained cases; qualified completion cases may use proven uniform geometric similarity: C unchanged and specimen stiffness proportional to length. No fitted modulus or alternative work definition.",
+                "linear_controls":"Source-specific B21 RVE/compliance solves; proven uniform geometric similarity preserves C and scales specimen k with length. Alternative recovery indices are explicitly identified display supplements.",
+                "display_supplement":supplement_metadata,
+                "display_cases_by_basis":display_counts,
                 "completion_control_proofs":{row["case_id"]:row["control_similarity_proof_sha256"]
                                              for row in simulations.values() if row.get("control_similarity_proof_sha256")},
                 "pending_energy_window_reviews":[{key:row.get(key) for key in
@@ -915,8 +1045,10 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                 "hypothesis_views": {key: {"reference_ordinate_factor":values[0], "simulation_ordinate_factor":values[1],
                                           "verified_correction":False} for key,values in variants.items()},
                 "marker_design": {"reference":"large hollow triangle,8.4pt", "simulation_sizes_pt":simulation_sizes,
+                                  "nonlinear_recovery":"square,5pt", "prediction":"diamond,5pt",
                                   "coordinate_jitter":False, "layering":"smaller kagome circles above larger triangular circles"},
-                "limits":["Explicit fracture initial-triangle recalculation only; no recovery/IE-SE/QS/final-fracture series",
+                "limits":["{} native initial-triangle cases, {} measured nonlinear-recovery indices and {} density/length predictions are different evidence; no final-fracture or IE-SE series".format(
+                              display_counts["original_fracture"], display_counts["nonlinear_recovery"], display_counts["prediction"]),
                           "Base figures retain ordinates; explicitly named sqrt3 views are hypothesis tests, not fitted or verified corrections",
                           "Same nominal densities have identical horizontal coordinates; no marker jitter",
                           "Figure8 source normalisation and length ambiguities remain unresolved",

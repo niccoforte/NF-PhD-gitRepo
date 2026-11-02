@@ -47,13 +47,15 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   early reviews, pending reference capture and temporary evidence dependencies.
   It never deletes. Continuation `-status.json` receipts are not submission plans.
   Refresh it before final cleanup.
-- Publication views from `validation_comparison.py` use only original-simulation
-  initial-triangle results and Hsieh initiation data. They live in `audit/paper`
-  as PNG/PDF/SVG with point/exclusion tables and captions. Fig.10 comparisons use
-  nominal relative density, not different constituent mass-density conversions;
-  3mm is direct and10mm reference scaling is explicitly declared. Omit invalid
-  negative-area points and keep the alternative work/control methods in the
-  separate diagnostic figures. Simplifying presentation must not change K.
+- Publication views from `validation_comparison.py` use native initial-triangle
+  results plus the explicitly adopted four-point supplement in
+  `audit/new-validation/no-rerun-options-20261102.json`. Bind it to the selected
+  CSV hash: two matched nonlinear-recovery indices and two density/length
+  predictions remain distinct markers, methods and captions, never invented
+  native fracture KJ or source events. Native negative areas stay unavailable.
+  Exports live in `audit/paper` as PNG/PDF/SVG with point/exclusion tables and
+  captions. Fig.10 uses nominal relative density;3mm references are direct and
+  10mm reference scaling is declared. Simplifying presentation must not change K.
   The separately named Fig.8b sqrt(3) hypothesis views may rescale displayed
   ordinates only with explicit per-point factors and captions; keep the base
   comparison unchanged and never promote either view to a verified correction.
