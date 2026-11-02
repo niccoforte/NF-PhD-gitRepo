@@ -74,6 +74,10 @@ In practical terms:
   controls with explicit parent evidence; changed density requires new controls.
   Workbook FTval remains historical until explicitly reconciled to the accepted
   method; the notebook's corrected CSV route does not update shared calcFT.
+- Periodic material C is the ordered reference, not each disordered specimen's
+  stiffness or fracture modulus. Recover UAT stiffness from its own elastic
+  response; one slope does not determine the full tensor. Match material state
+  before transferring constants. Specimen C(T) compliance k0 is a separate control.
 - Preserve file naming, sample-id alignment, and processed CSV/NPZ schemas unless the task explicitly asks for a migration.
 - For any producer/consumer change, use `review-p1-p2-data-contract`; its reference owns the detailed names, shapes, metadata, and consumer map.
 - Keep active p1 scripts and notebooks lean. Remove abandoned approaches, stale cells, obsolete helper paths, and superseded experiments as work progresses.

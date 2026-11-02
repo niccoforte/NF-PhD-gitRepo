@@ -64,7 +64,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   does not reproduce the published work definition; IE-SE dissipation and
   recovery eta-J estimates remain separate from source-convention calculations.
   Selected plots read `audit/final/validation-results.csv`; no source/paper
-  values are replaced. Kagome retains a material residual discrepancy.
+  values are replaced. The researcher accepts the quantified kagome comparison;
+  no further kagome agreement campaign is required.
 - Full Figs8a/8b/10 overlays and dimensional comparisons are integrated into
   ValConvPlots. Fig10 provides18 digitised points with graphical bounds; only
   3mm comparisons are direct, while10mm values require declared sqrt(l) scaling.
@@ -115,6 +116,17 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   unsolved13% cases and two completed3mm hexagonal negative-area cases; the
   rate control addresses an existing10mm16% point. Keep measured/derived/scaled
   result provenance explicit when finalising the paper comparison.
+  A no-rerun option is calculated separately: existing3mm hex16/20% recovery
+  indices3.0710/4.6112 and exploratory13%3/10mm predictions2.1039/3.8411.
+  Alternative linear-density extrapolation gives1.9159/3.4980; these two
+  predictions are not independent validation points and are not in paper plots.
+  The49completed mapped ordered conversion controls pass current source/input
+  checks, SPD and work/energy closure. All236 historical StiffMatrix INPs use
+  physical123000MPa,.3 material. Retention is conditional on the correct source
+  state, not the folder name. Periodic C cannot represent disorder softening;
+  own UAT stiffness and existing representative tensor evidence remain necessary
+  before production conversion. Filtering replacement and UAT fit repair are
+  still pending; the validation Butterworth/modal helpers already exist.
   Clean initiation-only paper exports now separate original-simulation results
   from diagnostic energy/unloading comparisons; they use nominal relative
   density to match Hsieh's. The underlying original-simulation calculation

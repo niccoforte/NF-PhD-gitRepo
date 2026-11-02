@@ -23,13 +23,16 @@ indices and length-scaled estimates retain their actual calculation provenance.
 - [x] Complete/process hexagonal10mm/16%: KJ=5.349MPa sqrt(m), positive area,
   endpoint KE/IE=.464%; included provisionally in Figs8a/10. Earlier transients
   require the separate rate check below; this is not full quasistatic qualification.
-- [ ] Complete/process hexagonal3mm/13% restart and10mm/13% run.
+- [ ] Close the missing13% hexagonal cases using the declared no-rerun scope.
   [Queue state](Z:/p1/sims/Ti/Validation/audit/new-validation/queue-resume-20261102/state.json).
   The3mm restart and both workers subsequently exited without a known cause;
   field21/200 and solver time.01068s are saved. No solver remains active at the
   18:40London2November check. Partial sources remain intact;10mm13% never started.
   [Execution review](Z:/p1/sims/Ti/Validation/audit/new-validation/deadline-execution-review-20261102.json).
-- [ ] Process the slower hexagonal10mm/16% rate check, armed after those two jobs
+  No further full fracture retry is recommended for this deadline. These
+  interrupted launches do not demonstrate a physical impossibility of the model.
+- [ ] Delimit10mm/16% loading-rate qualification without making the closeout
+  depend on the unstarted slower-rate job. It was armed after those two jobs
   through the [serial continuation](Z:/p1/sims/Ti/Validation/audit/serial-continuation-20261102-status.json),
   now stopped for review because its worker exited. This control has not started.
   Time is3.333times longer, with the same end displacement and material/mesh.
@@ -38,14 +41,19 @@ indices and length-scaled estimates retain their actual calculation provenance.
 - [ ] Resolve the hexagonal negative-area limitation: establish a defensible
   fracture-energy calibration or explicitly delimit unavailable source-convention
   results. Do not clip area or substitute dissipation/unloading work as ASTM J.
-- [ ] Finalise the existing agreement/error table. Kagome retains the density
-  trend with direct3mm errors+9.82%,+14.02%,+19.42%; report these rather than
-  requiring closer agreement. No kagome rerun is justified by these residuals alone.
+- [x] Close kagome agreement assessment: researcher accepts the current results.
+  Retain direct3mm errors+19.42%,+9.82%,+14.02% at13%,16%,20% and move on.
 - [ ] Freeze one final calculation/event/filter/modulus definition and verdict.
   Four unique points remain absent from the current plot: hex3mm13% and10mm13%
   need new simulation prefixes; hex3mm16% and20% have completed histories but
   negative initial-triangle area. The third planned job checks10mm16% rate
   sensitivity and cannot fill either negative-area point.
+- [x] Calculate a separate no-rerun option from existing own results: hex3mm16/20%
+  nonlinear-recovery indices3.0710/4.6112MPa sqrt(m); two-point density scaling
+  predicts13%3mm2.1039 and13%10mm3.8411. These are two derived indices and two
+  predictions, not four new fracture simulations. A linear-density model gives
+  1.9159/3.4980 instead, so the13% extrapolation is not independently validated.
+  [Calculation and provenance](Z:/p1/sims/Ti/Validation/audit/new-validation/no-rerun-options-20261102.json).
 - [ ] Make direct3mm Fig.10 validation primary; describe10mm as a sqrt(10/3)
   length-scaled reference. Keep Fig.8b sqrt(3) adjustments labelled hypotheses.
 
@@ -53,6 +61,9 @@ indices and length-scaled estimates retain their actual calculation provenance.
 
 - [ ] Replace superseded production exporter, initiation, filtering, stiffness and
   modulus logic in place; do not retain selectable wrong/legacy calculation paths.
+  Butterworth/modal helpers are implemented and tested in validation only.
+  Production replacement, continuous-pair phase/endpoint and work-sensitivity
+  checks across the dataset are not implemented/completed yet.
 - [ ] Bind each production endpoint to its intended observable and source material
   law. Hsieh's surface-initiation threshold must not silently redefine complete
   deletion labels, UT endpoints or other materials' failure thresholds.
@@ -67,6 +78,21 @@ indices and length-scaled estimates retain their actual calculation provenance.
   consumer replacement. Existing physical-material FCC controls cannot substitute
   for mapped FCC tensors; retain them only for a referenced analytical comparison
   or minimal provenance after direct mapped controls become authoritative.
+- [x] Verify retained mapped ordered controls against current sources:49tensors
+  (48original plus freshhex13%) have matching material/input hashes, positive
+  eigenvalues and macro-work/elastic-energy closure at worst1.189e-7 relative.
+  All236 inspected historical StiffMatrix INPs use physical123000MPa,.3; they
+  cannot simply be relabelled as mapped plane-strain controls.
+  [Retention verification](Z:/p1/sims/Ti/Validation/audit/controls/retention-review-20261102.json).
+- [ ] Keep periodic C as the ordered reference; account for each disorder's
+  stiffness loss using its own UAT response and existing representative tensor
+  evidence. One directional UAT slope does not determine nu,G or general M.
+  Match material state and specimen axes before conversion; preserve the declared
+  quasi-isotropic approximation and test its scope rather than imposing periodic E.
+- [ ] Organise final retained controls under StiffMatrix/periodic-material/
+  plane-strain/<case> and StiffMatrix/specimen-compliance/CT/plane-strain/<case>,
+  with one index binding source, assigned material, tensor/k0 and consumers.
+  This is the consolidation target; files have not been moved or duplicated.
 - [ ] Replace historical Excel FTval values/placeholders and obsolete audit sheets,
   notebook cells, charts and paper references with the accepted results/workflow.
 - [ ] Integrate final methods, caveats, notation and figures into the actual paper.
