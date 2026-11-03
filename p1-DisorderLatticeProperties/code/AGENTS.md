@@ -97,6 +97,11 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - Active lattice names include `FCC`, `tri`, `kagome`, and `hex`; older helpers also know about `square` and `45square`.
 - Detailed transfer names, processed schemas, sample alignment, field metadata, and downstream consumers are maintained in the `review-p1-p2-data-contract` skill reference. Use it whenever those boundaries change.
 
+- `validation_previews.py` reads current saved property/curve CSVs and the
+  source-bound fitting pilot, restricts original IDs 1-1000 with ID 0 separate,
+  and writes three labelled PNG/PDF/SVG examples plus source/point tables under
+  audit/previews. They do not replace corrected paper plots or population values.
+
 ## Shared Calculation Checks
 
 - `test_validation_shared.py` verifies corrected Ortega's approximate isotropic
@@ -106,9 +111,13 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - Orthotropic SiC replay must use source B20mm and assigned418197MPa,.162791,
   already mapped. Saved damage criterion is DUCTCRT; Ti LE=.1105 does not apply.
   Use source W/a/axes and native times, not current Geometry defaults or padding.
-- PSC scope includes28UAT plus28FT sources. The Al/tri UAT benchmark remains
-  material-specific; later Results figures and disorder ranges are checklist
-  tasks after final population recalculation, not current validation evidence.
+- Mesh refinement is a separate UAT/FT gate before PSC (168 retained model sets);
+  PSC includes28UAT plus28FT sources. The Al/tri benchmark remains material-
+  specific. Preview layouts are allowed; final Results integration stays pending.
+- Current curve paths do not support NaN tails: distinguish field valid masks,
+  curve targets and network inputs. Preserve observed prefixes per metric and
+  migrate masks end-to-end before overwriting MLdata. C.3 shows normalised
+  Mohr-diagnostic ratios; do not infer invariant M or CT k0 from those plots.
 
 ## Shared Helpers To Respect
 

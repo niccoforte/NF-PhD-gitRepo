@@ -456,6 +456,11 @@ preserve calculation origins. Native KJ and negative areas are unchanged.
 The exports provide PNG/PDF/SVG, captions and point/exclusion CSVs.
 Paper legends identify the simulation series as Current study; internal
 `Simulation` series keys in the point tables remain stable identifiers.
+`python p1-DisorderLatticeProperties/code/validation_previews.py` separately
+reproduces three real-data fit/layout examples in `audit/previews`. Population
+previews use current saved values, explicitly pending recalculation, not corrected
+results or substitutes for the paper figures. Their tables retain per-metric
+IDs 1-1000, a separate periodic ID0, missing counts and source hashes.
 `validation_completion.py --extract-finished --include-interrupted` reads the
 finished new jobs into a separate `new-validation/results` catalogue with native
 histories, initiation/damage evidence and pinned extraction hashes. A reviewed

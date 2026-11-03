@@ -39,6 +39,18 @@ re-export; existing producer output defaults are not current read dependencies.
 - Preserve the periodic/reference row with id `0` unless the task explicitly changes that scientific baseline.
 - For `MULTI`, UT and FT train/validation/test membership must stay aligned where the data supports paired samples.
 
+## Incomplete curve histories
+
+Current curve products are not NaN-tail compatible: the producer drops NaN rows
+and matching inputs, DUAL_DATA rejects nonfinite curves and curve losses are
+unmasked. Field-target valid masks are a different supported contract. Preserve
+native history length/timestamps, observed initiation and per-property censoring
+in audit evidence; do not equate solver termination with 25%/1% crossings.
+A future incomplete-curve migration must coordinate producer, finite tensor
+representation, explicit masks, scalers, any curve-input encoder, losses,
+derivatives/areas, metrics and IDs. Mask before arithmetic; zero times NaN is
+not a valid masking strategy. Do not change frozen datasets/runs in place.
+
 ## Curve and manifest boundary
 
 - Processed curve products and manifests are written beside the selected p1 data root.

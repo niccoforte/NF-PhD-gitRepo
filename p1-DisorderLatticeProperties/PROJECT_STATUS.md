@@ -17,7 +17,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   is under Validation/audit/shared; production formulas remain unchanged.
   PSC scope now includes28UAT and28FT sources. Future Results-section UT/FT
   validation figures, FCC inclusion and disorder-population ranges are recorded
-  explicitly as deferred work after final recalculation, not authorised edits now.
+  explicitly as deferred final work. Separate real-data layout/fit previews are
+  now requested and retained in audit/previews; they use labelled historical
+  population values without replacing paper figures. Current code is not NaN-
+  curve compatible. The C.3 ratio/Zener diagnostic does not support automatic
+  UAT-slope scaling of FCC M; quantify representative full tensors first.
+  Mesh convergence is now explicitly included before PSC, reusing 168 source sets.
 
 - The manuscript revision has a common compliance/notation description and an
   implemented FCC prismatic plane-strain elastic route. At nominal20% physical
@@ -137,14 +142,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   physical123000MPa,.3 material. Retention is conditional on the correct source
   state, not the folder name. Periodic C cannot represent disorder softening;
   own UAT stiffness and existing representative tensor evidence remain necessary
-  before production conversion. The concrete disorder proposal is own-body-gauge
-  elastic-window fitting, checked quasi-isotropic M for tri/kagome/hex, and a
-  representative-tested scalar tensor-shape model for FCC. These are proposed,
-  not implemented. Grip travel/bodyH slopes require gauge/compliance checks.
+  before production conversion. Own-body-gauge elastic-window fitting remains
+  the UAT proposal. Fracture M must be checked against representative full
+  tensors; the earlier automatic scalar FCC tensor-shape proposal is not the
+  default after C.3's Zener variation. Grip slopes do not determine CT k0 or M.
   Filtering replacement and UAT fit repair remain pending.
   The ordered gates in the unique checklist now put shared definitions and
   orthotropic/FCC validation before PSC, a production pilot and the full original
-  IDs1-1000 population pass; Excel/paper replacement and cleanup follow.
+  IDs 1-1000 population pass; Excel/paper replacement and cleanup follow.
   Eight square/45square SiC sources and all28 PSC FT cases are retained for reuse.
   The validation Butterworth/modal helpers already exist.
   Corrections'32-deck manuscript sample coversIDs1/1000 only. Four read-only

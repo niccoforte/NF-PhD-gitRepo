@@ -118,7 +118,7 @@ def cleanup_review(audit, repo, scratch_roots):
          "paths": [str(path) for path in sorted(audit.glob("workbook-before*"))],
          "reason": "Do not discard the only verified before-state while paper/workbook reconciliation remains open."},
         {"component": "Diagnostic plots, tables and reports", "action": "consolidate_after_final_review",
-         "paths": [str(audit / name) for name in ("calculations", "modal", "diagnostics", "work-partition", "shared", "report-history", "benchmark-review.md")] + [str(EARLY_REVIEW)],
+         "paths": [str(audit / name) for name in ("calculations", "modal", "diagnostics", "work-partition", "shared", "previews", "report-history", "benchmark-review.md")] + [str(EARLY_REVIEW)],
          "reason": "Retain the minimal evidence supporting event, modulus and negative-work decisions; remove superseded renders/tables after checking all report and notebook dependencies."},
         {"component": "Auxiliary solver results", "action": "review_minimal_retention_after_acceptance",
          "paths": [str(audit / "controls"), str(audit / "work-partition")],
@@ -208,7 +208,7 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
     for reference in REFERENCES:
         if reference.exists():
             rows.append(record(reference, "published_source", "retain", "Source equations, failure criterion and specimen calibration"))
-    scratch_roots = sorted({path for pattern in ("codex-p1-review-20261026", "codex-p1-final-check-20261028-*", "codex-p1-validation-*", "codex-p1-shared-*")
+    scratch_roots = sorted({path for pattern in ("codex-p1-review-20261026", "codex-p1-final-check-20261028-*", "codex-p1-validation-*", "codex-p1-shared-*", "codex-p1-followup-*")
                             for path in Path(temp).glob(pattern) if path.is_dir()})
     cleanup_review(audit, Path(repo), scratch_roots)
     if REFERENCE_INTAKE.exists():

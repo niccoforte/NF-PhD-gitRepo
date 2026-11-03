@@ -27,13 +27,16 @@ indices and length-scaled estimates retain their actual calculation provenance.
    separate gate: elastic agreement does not establish plastic J. Inspect an
    asymmetric linear elastic control only if retaining a general unequal-axis
    formula; ordered square/45square/FCC alone have equal axial moduli.
-4. Recalculate both28 UAT and28 FT retained PSC cases in Z:/p1/sims/Ti/PSC/10
+4. Check retained UAT/FT mesh refinement first (Z:/p1/sims/Ti/MeshConv:
+   21 configurations, 168 INP/ODB/OUT sets), distinguishing numerical resolution
+   from changes to softening/characteristic length, loading and mass scaling.
+   Then recalculate both28 UAT and28 FT PSC cases in Z:/p1/sims/Ti/PSC/10
    (four topologies at nx10,16,20,26,30,36,40). Check the calculations and
    charts with the final method; keep approved specimen sizes/criteria.
    Screen the existing Al UAT/UTval benchmark with the same repaired processing;
    recover its one missing transfer from the existing ODB if that case is used.
 5. Replace superseded production helpers in place and run a representative
-   end-to-end pilot; then recalculate the agreed population, originalIDs1-1000
+   end-to-end pilot; then recalculate the agreed population, originalIDs 1-1000
    per topology/design, ID0 reference only. Preserve exact UT/FT IDs and
    native validity; document missing/censored properties without imputation.
 6. Replace Excel/notebook/plot results and recompute paired populations and
@@ -105,6 +108,30 @@ sets their dependency order, not a second checklist.
 
 - [ ] Freeze the final production calculation/event/filter/modulus definition,
   including a consistent work/eta interpretation after orthotropic/FCC checks.
+- [x] Audit current NaN support: curve producer drops NaN rows and matching
+  inputs, paired property processing drops incomplete rows, DUAL_DATA rejects
+  nonfinite curves, and ordinary/weighted curve losses propagate NaNs. Existing
+  field masks do not establish curve-mask support. Runtime probe retained.
+- [ ] Migrate incomplete curves with native timestamps/observed masks and
+  metric-specific validity before changing MLdata. Native audit storage may
+  retainNaN; ML tensors need finite placeholders plus explicit masks, with
+  scaling, encoder inputs, losses, derivatives, areas and metrics respecting
+  them. Select valid entries before arithmetic; zero*NaN is not safe masking.
+  Preserve observed initiation even when25%/1%crossings are censored. Keep
+  last valid index/solver stop separate from an unobserved threshold crossing.
+  Update producer/consumer paths together, preserving exact IDs and frozen runs.
+- [ ] Qualify one continuous-curve filter rule: low-order Butterworth/SOS with
+  documented offline phase handling, paired force/displacement and fixed raw
+  material events. Start from matched periodic modal controls; choose one cutoff
+  per topology/size/density/loading/mesh/mass/BC family after a representative
+  disorder and half/double-cutoff check. Do not run a modal job for every case.
+  Check native work and endpoint sensitivity, Nyquist/alias and edge effects;
+  do not smooth STATUS or select cutoff from agreement with literature.
+- [ ] Qualify each disordered C(T) initial k0 from its own elastic interval,
+  with a fast exact-geometry linear control where unresolved. A raw 12-point
+  kagome FT ID 1 screen is 29% below periodic, not a verified replacement k0.
+  Accept a shared periodic approximation only if representative k0/KJ/work
+  sensitivity supports it; material-tensor ratios do not establish CT compliance.
 - [ ] Replace superseded production exporter, initiation, filtering, stiffness and
   modulus logic in place; do not retain selectable wrong/legacy calculation paths.
   Butterworth/modal helpers are implemented and tested in validation only.
@@ -125,7 +152,7 @@ sets their dependency order, not a second checklist.
   UAT.200061-.200153 andFT.199999-.200001. This supports nominal20% in this
   sample; it is not a complete first1000density audit. Durable source metadata:
   [32-case input audit](<C:/Users/exy053/OneDrive - Queen Mary, University of London/Documents/Research/p1-Lattices/writing/codex-review/p1-first1000-input-sample-audit.json>).
-- [ ] Complete production-source checks for originalIDs1-1000 after Hsieh
+- [ ] Complete production-source checks for originalIDs 1-1000 after Hsieh
   closeout: actual material/damage cards, gauge/area conventions and genuine
   histories, specimen B/W/a and paired density accounting. Existing bounded
   cases do not certify the population. Do not change source laws or rescale
@@ -179,11 +206,19 @@ sets their dependency order, not a second checklist.
   M under the declared quasi-isotropic approximation, with no second reduction.
   Check low/median/high stiffness representatives per design for transverse and
   shear response; own UAT softening must survive this conversion.
-- [ ] For FCC, test the economical C_i=s_i*C_ref model with
-  s_i=E_body,i/E_body,ref and hence M_i=s_i*M_ref. This is conditional on an
-  invariant normalised tensor shape, not established by one slope. Compare
-  representative shear/Poisson/coupling terms; use grouped or specimen-specific
-  tensors if the shape assumption fails. No1000-RVE campaign is proposed.
+- [x] Trace current disorder M and Appendix C source. Recompute path uses one
+  periodic/default tensor and M per configuration; current load=True reads
+  historical saved results. It does not recompute C for every architecture.
+  C.3 row d tests C22/C11, not absolute stiffness, and its Zener changes from
+  about 1.41 to 1.20-1.27. These are Mohr axial-affine diagnostics, not independent
+  bending-aware FE tensors. The strict scalar tensor-shape hypothesis is not
+  supported as a default. C.4 fraction/percent and Voigt labels need reconciliation.
+- [ ] Quantify disorder-dependent M using source-compatible representative full
+  tensors and the existing disorder evidence before replacing the periodic
+  baseline. Do not multiply M by a UAT apparent-slope ratio automatically.
+  Assess M and resulting KJ sensitivity; retain a justified common M if variation
+  is negligible, otherwise use a supported grouped/per-specimen correction.
+  No 1000-RVE programme is proposed from the current diagnostic alone.
 - [ ] Organise final retained controls under StiffMatrix/periodic-material/
   plane-strain/<case> and StiffMatrix/specimen-compliance/CT/plane-strain/<case>,
   with one index binding source, assigned material, tensor/k0 and consumers.
@@ -202,6 +237,12 @@ sets their dependency order, not a second checklist.
 
 ## Orthotropic/FCC execution plan and subsequent PSC
 
+- [ ] Consolidate the paper's fracture section into one common elastic-plastic
+  formulation, with the source-corrected Ortega elastic calibration for aligned
+  cases inside its fit range and the ASTM isotropic comparison in an appendix.
+  Sub-1% agreement does not by itself establish full ASTM compliance: retain
+  explicit plastic-work, specimen/crack and qualification boundaries. This
+  presentation/final-route decision does not alter production results yet.
 - [x] Check the current Ortega elastic implementation against AppendixA.5/A.6
   and the appended2015corrigendum. All45 coefficients and exponent placement
   agree. At lambda=chi=1 geometry factors are a fit, not an exact ASTM identity:
@@ -228,8 +269,8 @@ sets their dependency order, not a second checklist.
   cannot by themselves settle reciprocal lambda/source-axis ambiguity.
 - [ ] Obtain exact-source mapped ordered FCC C (xx,yy,shear), verify raw reaction/
   energy closure and propagate the same tensor through M, geometry and callers.
-  Test representative disorder tensor-shape/gauge transfer before adopting
-  C_i=s_i*C_ref. Here i is the paired architecture/simulation ID.
+  Quantify representative disorder tensor, gauge and M variation without
+  assuming that a single UAT slope scales every tensor component.
   Existing54 inspected StiffMatrix FCC inputs use physical123000MPa,.3 and
   remain a source-state comparison, not mapped replacements. Reuse only after
   material/geometry/BC agreement; this task owns their final propagation.
@@ -250,6 +291,11 @@ sets their dependency order, not a second checklist.
   502 are removed by that fit failure, leaving454 paired rows. Repair the
   verified elastic-window calculation; do not impute or rerun516 simulations.
   [Read-only evidence](C:/Users/exy053/AppData/Local/Temp/p1-corrections-coordination-20261102/hex-stiffness-readonly.json).
+- [ ] Mesh convergence audit for UAT and FT before the size check: reuse the
+  168 retained model/output sets and MeshConv workbook/notebook provenance;
+  compare event, stiffness/strength/work and FT quantities with the final method.
+  Verify mesh-dependent damage regularisation and loading/energy consistency.
+  No new mesh runs or change to agreed study settings without an actual issue.
 - [ ] PSC UAT and FT calculation/chart audit using all56 retained cases; keep
   approved sizes and convergence criteria. Check UAT modulus, strength,25%
   ductility and1%work endpoint/censoring alongside FT event/work/M calculations.
@@ -268,12 +314,14 @@ sets their dependency order, not a second checklist.
   do not present an unreferenced FCC result as an additional Hsieh validation.
 - [ ] Move UAT and FT validation from the appendix into Results, integrated with
   research-result panels and captions, in coordination with Corrections. This is
-  a later figure/manuscript task; do not edit or regenerate those figures now.
+  a later final figure/manuscript task. Researcher now requested separate
+  preliminary examples: those are allowed in audit/previews and must not replace
+  the paper figures or mix corrected periodic values with legacy distributions.
 - [ ] Show periodic FT and disorder-population ranges for10mm/20% across the four
   topologies, separating full and mechanism-based disorder. Proposed display:
   periodic marker, median/IQR and5-95% interval, optionally faint full min-max.
   Define these as population spread, not measurement uncertainty or confidence
-  intervals. Use final valid originalIDs1-1000, report counts and censoring;
+  intervals. Use final valid originalIDs 1-1000, report counts and censoring;
   ID0 supplies the periodic reference, not a member of the distribution.
 - [ ] Expand UAT beyond the current triangular stress-strain validation panel:
   retain a clearly labelled Al benchmark panel; add Ti research panels covering
@@ -282,6 +330,13 @@ sets their dependency order, not a second checklist.
   strain-grid alignment and genuine/censored support; never zero-pad missing
   tails to manufacture population quantiles. Compare Al/Ti on one axis only
   after a scientifically justified normalisation; do not pool them silently.
+- [x] Produce three real-data previews: initial UAT fits, saved FT population
+  ranges, and saved periodic UAT/ductility distributions. Source hashes and IDs
+  are pinned; current saved values are labelled pending recalculation. These
+  illustrate layout, not the corrected population or a new FCC benchmark.
+- [ ] Handle the plastic-calibration/PSC/UTval execution when those stages arrive,
+  as explicitly requested. Use local serial jobs if needed and report the queue;
+  the approval is not a request to launch them during this preview/source check.
 - [ ] Select final figure layout and spread statistic after results are settled;
   preserve direct3mm FT validation and declared10mm reference scaling, and use
   the final agreed initiation-metric notation throughout paper and captions.
