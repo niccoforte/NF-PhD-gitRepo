@@ -51,3 +51,11 @@ onset endpoints and signed strut motion, FT tip box, examples, costs and log
 histories. Fresh full-feature controls bridge the earlier CNN2 results. Confirm
 meaningful removals across seeds before changing the accepted feature contract;
 curve-stage feature attribution remains a distinct later study.
+
+`review_feature_ablation.py` verifies the 15-run download inventory, saved
+per-task masks, unchanged architecture/training/data/scalers and canonical
+validation metrics. It updates the existing feature-audit README with global,
+TRAIN-mean/variation, actual STATUS-region errors, large examples, costs and
+distinct fixed-validation/objective histories. One seed remains attribution
+screening; do not combine separate removal gains or silently promote a winner.
+`test_feature_review.py` checks reader identities without Torch or research data.

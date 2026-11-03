@@ -116,6 +116,14 @@ new serial-workflow winner. No accepted default is promoted by this study.
 bash p2-DisorderML/HPC/studies/Locality/B4_CNNSpatial.sh cnn-spatial-depth-261102
 ```
 
+`review_cnn_spatial.py` verifies the ten new downloads, reuses the declared
+three-seed CNN2 controls/CNN3 seed42 and updates the existing Locality report.
+The fresh feature-study seed42 controls expose any numerical repeat variation;
+never hide it or assert bitwise reproducibility from seed equality. Global and
+actual-fracture errors, training cost, TRAIN mean/variation, examples and log
+histories remain separate. Paired seed/specimen bootstrap intervals are
+descriptive validation evidence, not final-test significance or curve gains.
+
 ## Original completed confirmation and depth screen
 
 `B4_Locality-confirmation.sh SUITE [--submit]` previews ten final fits: control

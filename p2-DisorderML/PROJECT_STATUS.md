@@ -1,20 +1,28 @@
 # p2 Implementation Status
 
-- 2 November accuracy continuation: researcher authorised immediate nodal-feature
-  attribution and useful non-HPO follow-ups. The feature audit was a plan, not a
-  submitted study. Implemented15 CNN2/MSE field-only feature fits (UT6/FT9),
-  including raw-present/all-context controls with operational absence masks
-  preserved and pin suppression after specimen refresh. Also prepared six
-  CNN2+spatial fits (UT all-edge0.1, FT fixed-box0.001; seeds42/43/44) and four
-  missing CNN3/MSE seeds43/44. No field-source/curve/HPO changes are bundled.
-  Submitted immutable0fec8bf: feature gate35173267 and fits35173268–35173282;
-  CNN/spatial gate35173283 and fits35173284–35173293. Gates initially pending;
-  production waits afterok and cancels on invalid dependencies.51 model/staging
-  regressions plus five guidance tests pass; changed-range24 non-failing/0failed.
-  Model-side masks survive refresh/reload. Existing accepted WINNER is unchanged;
-  recommendation is CNN2 fields/MSE for both tasks, with task-specific losses
-  still conditional. New TRAIN-only OOF/Mixed curve evaluation is required
-  before claiming improved serial predictions. HPO requires separate approval.
+- 3 November: all 25 new production fits and both gates completed 0:0;
+  queue empty. Immutable 0fec8bf: Features gate35173267/fits35173268–35173282;
+  CNN/spatial gate35173283/fits35173284–35173293. Downloaded 450 files /
+  7,117,810,778 bytes to external Z:/p2; all SHA256 match and saved reloads pass.
+  Existing feature-audit/Locality visual reports now cover full global, TRAIN
+  mean/variation, actual STATUS-event, cost, example and loss-history evidence.
+  CNN2+spatial vs CNN2: UT global−1.09%, endpoints−3.88%, strut motion−3.91%;
+  endpoint/strut gains hold across all three seeds. CNN3 vs CNN2: FT global−2.20%,
+  endpoints−1.66%, strut motion−1.33%; global gains hold across three seeds,
+  endpoint error rises0.47% at seed42. CNN2/MSE remains the conservative replicated
+  field architecture; incremental shortlist: UT CNN2+spatial0.1, FT CNN3/MSE.
+  All incremental global bootstrap intervals cross zero, so no decisive promotion.
+  New OOF/Mixed curve
+  fits must resolve curve/peak/work performance. UT CNN3 local errors worsen
+  at seed44; FT CNN2+box-spatial has a small seed43 global/strut deterioration.
+  Feature removals are seed42 only: all UT removals worsen global error;
+  FT no_xy improves global2.15%/endpoints2.09%, a confirmation candidate only.
+  Keep full context pending replicated attribution on the chosen FT depth.
+  Fresh/reused CNN2 seed42 controls differ−0.24% UT/+1.35% FT despite matching
+  IDs/scalers/masks; paired global intervals and repeat caveat are reported.
+  WINNER.md unchanged pending acceptance. HPO sequence agreed, submission still
+  requires explicit approval; no new fits or locked-test evaluation this turn.
+  Remote filesystem organisation/cleanup is owned by the HPC Cleanup chat.
 
 - 29 October: all remaining66 production fits completed0:0/reload passed and
   were downloaded to external Z:/p2:886 files/6,046,392,078 bytes match HPC SHA256.

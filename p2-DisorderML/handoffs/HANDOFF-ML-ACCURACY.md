@@ -8,7 +8,7 @@ optimisation are separate tasks. This brief owns model accuracy, loss machinery,
 experiment review, regression-test examples and diagnostic notebooks.
 It has not been dispatched automatically. New submissions require explicit scope.
 
-## Current priority order (29 October; supersedes older next-step wording)
+## Current priority order (3 November; supersedes older next-step wording)
 
 ### 2 November authorised continuation
 
@@ -16,18 +16,25 @@ It has not been dispatched automatically. New submissions require explicit scope
   no-interfaces/no-present/no-context; FT control/no-xy/no-designable/no-pins/
   no-tip/no-tip-offsets/no-tip-distance/no-present/no-context. Seed42;
   post-refresh model-side suppression preserves operational masks and width.
-  Immutable0fec8bf; gate35173267, fits35173268–35173282; check gate/results.
+  Immutable0fec8bf; gate35173267, fits35173268–35173282; all complete0:0/reload passed.
 - [x] Submit six CNN2+spatial fits, UT0.1 all-edge/FT0.001 fixed-tip-box,
   seeds42/43/44; and missing CNN3/MSE seeds43/44 (four). Reuse verified CNN2
   and CNN3 seed42 evidence; fresh feature controls provide same-revision bridge.
-  Immutable0fec8bf; gate35173283, fits35173284–35173293; check gate/results.
-- [ ] Review these against matched task/seed CNN2 controls using global,
-  confirmed STATUS-event, TRAIN-mean/variation, cost and existing safeguards.
-  Only then choose task-specific features/losses and regenerate TRAIN-only OOF
-  banks/Mixed curves for retained fields. No new serial-curve gain is assumed.
-- [ ] HPO proposal only: independent UT/FT field searches after this small
-  decision set, then independent Mixed curve searches on the frozen new OOF
-  sources; explicit approval required before HPO submission.
+  Immutable0fec8bf; gate35173283, fits35173284–35173293; all complete0:0/reload passed.
+- [x] Download/verify/review all25 fits:450 files/7.12GB SHA256 matched. Updated
+  feature-audit and Locality reports use matched controls, actual STATUS regions,
+  TRAIN mean/variation and cost. Proposed field shortlist: UT CNN2+spatial0.1,
+  FT CNN3/MSE. Feature attribution is one seed; retain full context until FT
+  no_xy is confirmed on the chosen depth. Fresh/reused CNN2 repeat differences
+  and descriptive global intervals are explicit. WINNER remains unchanged.
+- [ ] Accept task-specific field configuration; if pruning FT inputs, confirm
+  no_xy with matched full-context fits/seeds on that depth rather than assuming
+  CNN2 gains transfer to CNN3. Avoid an additional broad feature sweep.
+- [ ] Agreed HPO sequence: separate UT/FT field searches (about30 trials each),
+  then freeze generators, regenerate TRAIN-only OOF fields and tune independent
+  Predicted+True curves; confirm seeds, locked test last. Explicit submission
+  approval remains outstanding. No new serial-curve gain is assumed; UT spatial
+  peak-height/location safeguards still require downstream evaluation on CNN2.
 - [ ] Defer signed second-difference supervision (change between recorded
   displacement increments) until CNN/spatial/feature results resolve. It is
   distinct from target-derived sudden-motion weighting. If revisited, invert
@@ -204,11 +211,9 @@ combining changes; only then pay for OOF banks and Mixed curve adaptation.
 
 ## Cleanup
 
-- [ ] **HIGH PRIORITY — researcher manual review:** personally inspect remote
-  home `/data/home/exy053`, scratch `/gpfs/scratch/exy053`, and archive
-  `/data/SEMS-TaoLab/Niccolo-Forte/p2`. Check that folders, retained runs, names,
-  source snapshots and logs follow your intended ordering and conventions.
-  This is your manual sign-off task; automated checks do not complete it.
+- **Owner: HPC Cleanup chat** (researcher clarification3 November). Remote
+  home/scratch/archive ordering, conventions and manual sign-off belong there.
+  Do not duplicate that audit or filesystem cleanup in this Accuracy chat.
 
 ## Case 1(i) follow-ups
 

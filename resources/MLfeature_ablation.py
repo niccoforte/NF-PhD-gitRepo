@@ -1,6 +1,4 @@
 """Opt-in physical-context ablations; preserve all geometry/validity masks."""
-from resources.MLlocality import configure_field_locality
-
 GROUPS={
     "no_xy":("x0","y0"),"no_designable":("designable",),
     "no_present":("present",),"no_interfaces":("bottom_interface","top_interface"),
@@ -15,6 +13,7 @@ CASES=tuple((mode,variant) for mode,variants in (
 
 def configure_context_ablation(network,data,args):
     """CNN2/MSE baseline; one input group suppressed, not physical site removal."""
+    from resources.MLlocality import configure_field_locality
     if (args.mode,args.variant) not in CASES:raise ValueError("Unsupported task/feature ablation")
     configure_field_locality(network,data,"cnn2")
     if args.variant=="control":return
