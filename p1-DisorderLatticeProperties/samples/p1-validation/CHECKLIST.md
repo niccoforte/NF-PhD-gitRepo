@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat 01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated 2 November 2026. [Evidence and figures](README.md).
+Updated 3 November 2026. [Evidence and figures](README.md).
 This file owns task completion; PROJECT_STATUS and the cleanup register link here.
 
 Researcher requests a3November cutoff for the Hsieh phase. Finish with the
@@ -93,7 +93,9 @@ sets their dependency order, not a second checklist.
   [Calculation and provenance](Z:/p1/sims/Ti/Validation/audit/new-validation/no-rerun-options-20261102.json).
 - [x] Adopt the four no-rerun values for explicit mixed-evidence plot display;
   bind measured recovery points to their existing selected rows and predictions
-  to their two-point density/length model. Preserve native negative areas and KJ.
+  to their two-point density/length model. Use the two-entry Hsieh et al./Current
+  study legend and common circles; retain case-specific provenance in captions
+  and tables. Preserve native negative areas and KJ.
 - [x] Make direct3mm Fig.10 validation primary; describe10mm as a sqrt(10/3)
   length-scaled reference. Keep Fig.8b sqrt(3) adjustments labelled hypotheses.
 

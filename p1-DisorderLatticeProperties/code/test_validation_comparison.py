@@ -149,12 +149,13 @@ class PaperSupplement(unittest.TestCase):
                 self.assertGreater((out / f"figure{figure}.{extension}").stat().st_size, 1000)
             svg = ET.parse(out / f"figure{figure}.svg")
             text = " ".join(svg.getroot().itertext())
-            self.assertIn("Current study: recovery", text)
-            if figure in ("8a", "10"):
-                self.assertIn("Current study: prediction", text)
-            else:
-                self.assertNotIn("Current study: prediction", text)
+            self.assertIn("Hsieh et al.", text)
+            self.assertIn("Current study", text)
+            self.assertNotIn("Current study:", text)
             self.assertNotIn("Simulation", text)
+        self.assertEqual(meta["marker_design"]["legend_entries"], ["Hsieh et al.", "Current study"])
+        self.assertIn("hex 3mm/16%", meta["captions"]["10"])
+        self.assertIn("hex 3mm/13%", meta["captions"]["10"])
 
 
 if __name__ == "__main__":

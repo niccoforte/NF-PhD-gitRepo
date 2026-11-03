@@ -51,7 +51,7 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   results plus the explicitly adopted four-point supplement in
   `audit/new-validation/no-rerun-options-20261102.json`. Bind it to the selected
   CSV hash: two matched nonlinear-recovery indices and two density/length
-  predictions remain distinct markers, methods and captions, never invented
+  predictions retain distinct methods and case-specific captions, never invented
   native fracture KJ or source events. Native negative areas stay unavailable.
   Exports live in `audit/paper` as PNG/PDF/SVG with point/exclusion tables and
   captions. Fig.10 uses nominal relative density;3mm references are direct and
@@ -60,8 +60,9 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   ordinates only with explicit per-point factors and captions; keep the base
   comparison unchanged and never promote either view to a verified correction.
   Use hollow reference outlines and layered simulation sizes without x jitter.
-  Paper display labels use Current study; retain internal Simulation series
-  identifiers so a presentation edit does not migrate numerical tables.
+  Use exactly Hsieh et al. and Current study in the source legend, with common
+  Current study circles. Identify topology beside the curves; retain internal
+  Simulation series identifiers and all point-level calculation provenance.
 - `validation_completion.py` prepares the seven absent length/density cases
   under `audit/new-validation`, using archived A1 INPs and verified dimensional
   scaling rather than today's A1 defaults. It never submits; the serial queue

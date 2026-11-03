@@ -120,7 +120,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   indices3.0710/4.6112 and exploratory13%3/10mm predictions2.1039/3.8411.
   Alternative linear-density extrapolation gives1.9159/3.4980; these two
   predictions are not independent validation points. The four values are now
-  adopted for mixed-evidence paper-figure display with separate markers/captions,
+  adopted for mixed-evidence display with common study markers and case-specific captions,
   source-bound to the unchanged native/recovery CSV; they are not four new native
   fracture results. Workbook and manuscript replacement remain pending.
   The49completed mapped ordered conversion controls pass current source/input

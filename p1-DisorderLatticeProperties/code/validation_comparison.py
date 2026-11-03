@@ -892,20 +892,25 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
         displayed = [r for r in points if r["figure"] == figure and r["series"] == "Simulation" and r["plotted"]]
         counts = {basis: sum(r["evaluation_basis"] == basis for r in displayed)
                   for basis in ("original_fracture", "nonlinear_recovery", "prediction")}
-        note = (" Current study circles show native Explicit initial-triangle KJ at the last recorded "
-                "undamaged tensile-strain sample with the C(T) calibration.")
+        note = (" Current study values combine the calculation bases specified here; common source markers "
+                "do not imply identical calculation methods. Native Explicit initial-triangle KJ uses the "
+                "last recorded undamaged tensile-strain sample with the C(T) calibration.")
         if counts["nonlinear_recovery"]:
-            note += " Squares show source-matched nonlinear-recovery equivalent indices."
+            cases = ", ".join("{} {}mm/{}%".format(r["topology"], int(r["l_mm"]), round(100*r["relative_density"]))
+                              for r in displayed if r["evaluation_basis"] == "nonlinear_recovery")
+            note += " Source-matched nonlinear-recovery equivalent indices are used for " + cases + "."
         if counts["prediction"]:
-            note += (" Diamonds show own-data density/length predictions. The density exponent is fitted "
+            cases = ", ".join("{} {}mm/{}%".format(r["topology"], int(r["l_mm"]), round(100*r["relative_density"]))
+                              for r in displayed if r["evaluation_basis"] == "prediction")
+            note += (" Own-data density/length predictions are used for " + cases + ". The density exponent is fitted "
                      "only to two own recovery values; no Hsieh value enters that fit. Two fitted points "
                      "do not establish prediction uncertainty.")
         if counts["nonlinear_recovery"] or counts["prediction"]:
-            note += (" K denotes native KJ for circles and an equivalent index for the other markers. "
+            note += (" K denotes native KJ or the equivalent index according to the case-specific basis. "
                      "This figure contains {} native values, {} recovery indices and {} predictions; "
                      "the latter two categories are not independent native fracture validation results."
                      .format(counts["original_fracture"], counts["nonlinear_recovery"], counts["prediction"]))
-        return note + (" Native negative areas remain unavailable in the source table. Original and "
+        return note + (" Connecting lines guide the eye. Native negative areas remain unavailable in the source table. Original and "
                        "display values, methods, exclusions and hashes are recorded in the companion tables.")
     captions = {
         "8a": ("Initiation-related comparison at nominal relative densities 13%,16%,20%. "
@@ -948,16 +953,14 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
         for figure in ("8a", "8b", "10", *variants):
             is_8b = figure.startswith("8b")
             count = 1 if is_8b else 2
-            fig, axes = plt.subplots(1, count, figsize=(7.2, 4.2), squeeze=False, sharey=count==2)
-            fig.subplots_adjust(left=.145, right=.98, top=.91, bottom=.40, wspace=.22)
+            fig, axes = plt.subplots(1, count, figsize=(7.2, 3.7), squeeze=False, sharey=count==2)
+            fig.subplots_adjust(left=.145, right=.98, top=.91, bottom=.32, wspace=.22)
             for panel, length in enumerate((None,) if is_8b else LENGTHS):
                 ax = axes[0, panel]
                 for topology in TOPOLOGIES:
-                    for series, evaluation_basis in (("Hsieh et al.", None), ("Simulation", "original_fracture"),
-                                                      ("Simulation", "nonlinear_recovery"), ("Simulation", "prediction")):
+                    for series in ("Hsieh et al.", "Simulation"):
                         selected = [r for r in points if r["figure"] == figure and r["topology"] == topology
-                                    and r["series"] == series and r["plotted"] and (length is None or r["l_mm"] == length)
-                                    and (evaluation_basis is None or r["evaluation_basis"] == evaluation_basis)]
+                                    and r["series"] == series and r["plotted"] and (length is None or r["l_mm"] == length)]
                         selected.sort(key=lambda r: r["x_value"])
                         if not selected:
                             continue
@@ -965,11 +968,10 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                         sim = series == "Simulation"
                         # Large transparent reference outlines and smaller nested
                         # simulation symbols reveal coincident points without jitter.
-                        marker = {"original_fracture": "o", "nonlinear_recovery": "s", "prediction": "D"}.get(evaluation_basis, "^")
-                        options = dict(color=colors[topology], marker=marker,
-                                       ms=(simulation_sizes[topology] if evaluation_basis == "original_fracture" else 5.) if sim else 8.4,
+                        options = dict(color=colors[topology], marker="o" if sim else "^",
+                                       ms=simulation_sizes[topology] if sim else 8.4,
                                        mfc=colors[topology] if sim else "none", mew=1.05 if sim else 1.25,
-                                       lw=.9, ls=("--" if evaluation_basis == "original_fracture" else "none") if sim else "-",
+                                       lw=.9, ls="--" if sim else "-",
                                        zorder=4+TOPOLOGIES.index(topology) if sim else 2)
                         if figure == "10" and not sim:
                             ax.errorbar(xx, yy, yerr=[[r["ordinate"]-r["graphical_lower"] for r in selected],
@@ -977,8 +979,17 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                                         capsize=2, elinewidth=.7, **options)
                         else:
                             ax.plot(xx, yy, **options)
+                    # Direct topology labels leave just the two requested source
+                    # entries in the legend. Values and horizontal positions stay fixed.
+                    labelled = [r for r in points if r["figure"] == figure and r["topology"] == topology
+                                and r["plotted"] and (length is None or r["l_mm"] == length)]
+                    if labelled:
+                        right = max(r["x_value"] for r in labelled)
+                        anchor = max(r["ordinate"] for r in labelled if r["x_value"] == right)
+                        ax.annotate(names[topology], (right, anchor), xytext=(-8, -19 if topology == "kagome" else 6),
+                                    textcoords="offset points", ha="right", va="center", color=colors[topology], fontsize=8)
                 ax.set_yscale("log")
-                ax.margins(y=.11)
+                ax.margins(y=.20)
                 ax.grid(alpha=.18, which="major", lw=.6)
                 ax.set_axisbelow(True)
                 if is_8b:
@@ -1003,16 +1014,8 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                     ax.set_ylim(1.5,65)
                 if count == 2:
                     ax.text(.02,.95,"({})".format("ab"[panel]),transform=ax.transAxes,va="top",fontsize=9)
-            handles = [Line2D([],[],color=colors[t],lw=1.6,label=names[t]) for t in TOPOLOGIES]
-            fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.22),ncol=3,frameon=False,
-                       columnspacing=1.8,handlelength=1.5,handletextpad=.45)
             handles = [Line2D([],[],color="#555555",marker="^",mfc="none",ms=8.4,mew=1.25,ls="-",lw=1,label="Hsieh et al."),
-                       Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Current study: initial triangle")]
-            present = {r["evaluation_basis"] for r in points if r["figure"] == figure and r["series"] == "Simulation" and r["plotted"]}
-            if "nonlinear_recovery" in present:
-                handles.append(Line2D([],[],color="#555555",marker="s",mfc="#555555",ms=5.,ls="none",label="Current study: recovery"))
-            if "prediction" in present:
-                handles.append(Line2D([],[],color="#555555",marker="D",mfc="#555555",ms=5.,ls="none",label="Current study: prediction"))
+                       Line2D([],[],color="#555555",marker="o",mfc="#555555",ms=4.6,ls="--",lw=1,label="Current study")]
             fig.legend(handles=handles,loc="lower center",bbox_to_anchor=(.5,.075),ncol=2,frameon=False,
                        columnspacing=1.15,handlelength=1.5,handletextpad=.45)
             note = (r"10 mm reference: 3 mm data $\times\sqrt{10/3}$. " if figure == "10" else "")
@@ -1045,7 +1048,9 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                 "hypothesis_views": {key: {"reference_ordinate_factor":values[0], "simulation_ordinate_factor":values[1],
                                           "verified_correction":False} for key,values in variants.items()},
                 "marker_design": {"reference":"large hollow triangle,8.4pt", "simulation_sizes_pt":simulation_sizes,
-                                  "nonlinear_recovery":"square,5pt", "prediction":"diamond,5pt",
+                                  "current_study":"filled circles for every calculation basis; topology-specific sizes expose overlaps",
+                                  "legend_entries":["Hsieh et al.", "Current study"],
+                                  "topology_identification":"direct labels beside curves",
                                   "coordinate_jitter":False, "layering":"smaller kagome circles above larger triangular circles"},
                 "limits":["{} native initial-triangle cases, {} measured nonlinear-recovery indices and {} density/length predictions are different evidence; no final-fracture or IE-SE series".format(
                               display_counts["original_fracture"], display_counts["nonlinear_recovery"], display_counts["prediction"]),

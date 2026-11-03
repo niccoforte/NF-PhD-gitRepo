@@ -450,8 +450,9 @@ Publication exports in `audit/paper` show14 native initial-triangle cases plus
 an explicitly adopted four-point display supplement:2 matched nonlinear-recovery
 indices and2 density/length predictions. The supplement JSON in
 `audit/new-validation/no-rerun-options-20261102.json` is bound to the selected CSV
-hash and rechecked against its source recovery rows; distinct markers/captions
-preserve these different origins. Native KJ and negative areas are unchanged.
+hash and rechecked against its source recovery rows. A two-entry source legend
+and common study circles simplify display; case-specific captions and data fields
+preserve calculation origins. Native KJ and negative areas are unchanged.
 The exports provide PNG/PDF/SVG, captions and point/exclusion CSVs.
 Paper legends identify the simulation series as Current study; internal
 `Simulation` series keys in the point tables remain stable identifiers.
