@@ -27,9 +27,11 @@ indices and length-scaled estimates retain their actual calculation provenance.
    separate gate: elastic agreement does not establish plastic J. Inspect an
    asymmetric linear elastic control only if retaining a general unequal-axis
    formula; ordered square/45square/FCC alone have equal axial moduli.
-4. Recalculate the28 retained PSC fracture cases in Z:/p1/sims/Ti/PSC/10
-   (four topologies at nx10,16,20,26,30,36,40). Check data, calculation and
-   chart against the final method; keep approved specimen sizes/criteria.
+4. Recalculate both28 UAT and28 FT retained PSC cases in Z:/p1/sims/Ti/PSC/10
+   (four topologies at nx10,16,20,26,30,36,40). Check the calculations and
+   charts with the final method; keep approved specimen sizes/criteria.
+   Screen the existing Al UAT/UTval benchmark with the same repaired processing;
+   recover its one missing transfer from the existing ODB if that case is used.
 5. Replace superseded production helpers in place and run a representative
    end-to-end pilot; then recalculate the agreed population, originalIDs1-1000
    per topology/design, ID0 reference only. Preserve exact UT/FT IDs and
@@ -128,6 +130,11 @@ sets their dependency order, not a second checklist.
   histories, specimen B/W/a and paired density accounting. Existing bounded
   cases do not certify the population. Do not change source laws or rescale
   data from co-located exporter code without actual native-output agreement.
+- [ ] Preserve the agreed25%ductility and1%work thresholds while explicitly
+  handling non-crossing/censored histories. Current get_ductileData leaves frac0
+  when25%is never reached and calcUT uses the final sample when1%is not reached;
+  these must not be reported as zero ductility or completed work. Migrate flags
+  and dependent filtering together without inventing post-termination samples.
 - [ ] Reconcile manuscript boundary/damage definitions with historical inputs:
   sampled UAT top/bottom rotations are constrained; softening terminal lengths
   vary by task/mesh/producer. Corrections owns wording/comments. For hexfullID1,
@@ -150,12 +157,19 @@ sets their dependency order, not a second checklist.
   All236 inspected historical StiffMatrix INPs use physical123000MPa,.3; they
   cannot simply be relabelled as mapped plane-strain controls.
   [Retention verification](Z:/p1/sims/Ti/Validation/audit/controls/retention-review-20261102.json).
-- [ ] Implement one per-specimen UAT stiffness estimator: longest verified
-  stable initial-loading window with at least5 distinct strains, positive slope,
-  intercept/residual/curvature checks and nested-window sensitivity. Set numeric
-  tolerances once on a representative pilot, then apply one fixed rule. If native
-  early samples are insufficient, flag the result or use an exact-geometry fast
-  linear elastic control; never fill with periodic stiffness.
+- [x] Audit the eight-curve UAT stiffness pilot (ordered and fullID1 per topology).
+  Five points alone is insufficient: hexfullID1 smoothing changes that slope7.69%
+  and removing its first point changes it12.41%. Twelve-point apparent kagome
+  slopes5765/7524MPa illustrate23.4% disorder softening, not accepted bulk moduli.
+  [Pilot evidence](Z:/p1/sims/Ti/Validation/audit/shared/uat-elastic-window-pilot.json).
+- [ ] Implement one per-specimen UAT stiffness estimator from a verified initial
+  pre-plastic/pre-damage interval after independently screened startup. Fit an
+  intercept; do not force artificial zero or search for the steepest segment.
+  Require at least5 distinct strains, target8-10 and adequate signal span. Check
+  nested-window/startup/filter slope sensitivity and residual curvature. Pilot
+  provisional2% slope stability and1-2% span-normalised RMS limits against exact-
+  geometry elastic controls, then freeze one rule. Flag unresolved cases rather
+  than using periodic E or extending into plasticity to obtain enough points.
 - [ ] Separate apparent UAT specimen stiffness from body material stiffness:
   current strain is grip travel/bodyH and includes grip compliance. Prefer genuine
   early body-gauge displacements where resolved; otherwise check a representative
@@ -186,33 +200,91 @@ sets their dependency order, not a second checklist.
   and safety dependencies; it is not a second task checklist. Protect running jobs,
   original observations and unique digitisation. Verify replacement before deletion.
 
-## Later work already in this chat's scope
+## Orthotropic/FCC execution plan and subsequent PSC
 
-- [ ] UT validation and any missing-stiffness processing issues.
+- [x] Check the current Ortega elastic implementation against AppendixA.5/A.6
+  and the appended2015corrigendum. All45 coefficients and exponent placement
+  agree. At lambda=chi=1 geometry factors are a fit, not an exact ASTM identity:
+  -0.7991% at a/W=.5; less than0.926% absolute over.2-.9. M reduces exactly
+  to1/S11, or physical isotropic E/(1-nu^2) after one plane-strain reduction.
+  No coefficient renormalisation or production formula edit is justified.
+  [Source/numeric audit](Z:/p1/sims/Ti/Validation/audit/shared/ortega-isotropic-limit.json).
+- [x] Inspect all8 SiC square/45square source decks and read their native output
+  structure. All use mapped E418197MPa,nu.162791,B21 and sectionB20mm. One short
+  45squareA has171native history samples versus201transfer rows. DUCTCRT is the
+  saved source criterion. Existing old Geometry defaults are not source geometry.
+  [Input inventory](Z:/p1/sims/Ti/Validation/audit/shared/ortho-material-and-psc-inventory.json).
+- [ ] Reprocess the8 square/45square cases from source coordinates, B20mm,
+  actual W/a/sections/BCs, paired opening displacement/reaction and genuine times.
+  Bind the last undamaged sample to SiC DUCTCRT/SDEG and deletion separately;
+  do not import Hsieh's Ti LE11=.1105 threshold. Review KE/IE through the intact
+  loading prefix and force/work sensitivity before accepting calculated points.
+- [ ] Verify source-compatible bending/shear-aware periodic C and specimen1N
+  compliance for these cases, then replay their elastic KI comparison against
+  the actual FTortho source data/normalisation. Use one already-reduced tensor
+  for M and the Ortega geometry factor with explicit crack/loading axes.
+- [ ] Complete an asymmetric linear elastic calibration if retaining the general
+  unequal-axis route. Ordered square/45square/FCC have equal axial moduli and
+  cannot by themselves settle reciprocal lambda/source-axis ambiguity.
+- [ ] Obtain exact-source mapped ordered FCC C (xx,yy,shear), verify raw reaction/
+  energy closure and propagate the same tensor through M, geometry and callers.
+  Test representative disorder tensor-shape/gauge transfer before adopting
+  C_i=s_i*C_ref. Here i is the paired architecture/simulation ID.
+  Existing54 inspected StiffMatrix FCC inputs use physical123000MPa,.3 and
+  remain a source-state comparison, not mapped replacements. Reuse only after
+  material/geometry/BC agreement; this task owns their final propagation.
+- [ ] Pilot the Corrections plastic-eta calibration on ordered FCC first:
+  establish an independent Jref and verified nonlinear constitutive response,
+  reproduce the elastic limit, then compare monotonic load levels and nearby
+  crack ratios with mesh/domain convergence and held-out cases. Fit
+  eta=B*b0/Apl*(Jref-KI^2/M) only where Apl is resolved and positive. A Standard
+  continuum J pilot needs a validated nonlinear orthotropic law, not just C;
+  the existing B21 Explicit jobs cannot directly request these contours.
+  Retain a comparative-index limit if independent calibration is not established;
+  do not tune eta against the same KJ data used to assess agreement.
+
+
+- [ ] Verify population inclusion after the shared UAT fitting repair.
   Corrections confirmed516 hexagonal stiffness NaNs despite finite201-sample
   curves: peak indices17-19 select only2fitpoints. Of956 common UT/FT IDs,
   502 are removed by that fit failure, leaving454 paired rows. Repair the
   verified elastic-window calculation; do not impute or rerun516 simulations.
   [Read-only evidence](C:/Users/exy053/AppData/Local/Temp/p1-corrections-coordination-20261102/hex-stiffness-readonly.json).
-- [ ] FCC elastic/fracture validation coordinated with Corrections.
-  Inventory existing material cards first; reuse mapped controls only when their
-  exact source matches. All54 inspected StiffMatrix FCC inputs, including the
-  three canonical periodic controls, use physical E=123000MPa,nu=.3, not mapped
-  material. This bounded inventory does not establish full-archive absence.
-  [FCC inventory](C:/Users/exy053/AppData/Local/Temp/p1-corrections-coordination-20261102/fcc-source-inventory-readonly.json).
-  Propagate the same measured C and its material state through FTprops/calcFT;
-  replacing a scalar alone does not settle the FCC calculation.
-- [ ] Square/45square orthotropic validation and specimen-axis calibration.
-  Eight retained SiC cases (four of each topology, A-D) include native inputs,
-  ODBs and transfers. Inspected45square inputs assign mapped418197MPa,.162791;
-  verify every replay's exact material state and avoid a second mapping. The
-  historical FTortho chart is not evidence of the new tensor/calibration route.
-- [ ] PSC calculation audit, especially fracture toughness; preserve the
-  supervisor-agreed specimen sizes and convergence criteria. All28 FT transfers
-  and source models are retained; replace historical workbook values and guide
-  curves only after the final method has been checked on those same cases.
+- [ ] PSC UAT and FT calculation/chart audit using all56 retained cases; keep
+  approved sizes and convergence criteria. Check UAT modulus, strength,25%
+  ductility and1%work endpoint/censoring alongside FT event/work/M calculations.
+  Replace historical workbook values and guide curves after this verification.
+- [ ] Light UAT/UTval validation screen and plot refresh after shared repairs.
+  Researcher confirmed VAT means UAT/UTval. The existing Al/tri study has7ODBs,
+  6OUTs;18-1.1 lacks a transfer. Re-export if needed, no nonlinear rerun proposed.
+  Preserve its Al material/reference identity, separate from the Ti population.
 - [ ] Revisit conditional lattice-foundation findings only where those later
   workflows actively use them; verify downstream p1/p2 dependencies.
+
+## Later Results-section figure integration (explicitly deferred)
+
+- [ ] Add the final FCC fracture result to the current-study presentation after
+  FCC verification and full population recalculation. Hsieh has no FCC benchmark;
+  do not present an unreferenced FCC result as an additional Hsieh validation.
+- [ ] Move UAT and FT validation from the appendix into Results, integrated with
+  research-result panels and captions, in coordination with Corrections. This is
+  a later figure/manuscript task; do not edit or regenerate those figures now.
+- [ ] Show periodic FT and disorder-population ranges for10mm/20% across the four
+  topologies, separating full and mechanism-based disorder. Proposed display:
+  periodic marker, median/IQR and5-95% interval, optionally faint full min-max.
+  Define these as population spread, not measurement uncertainty or confidence
+  intervals. Use final valid originalIDs1-1000, report counts and censoring;
+  ID0 supplies the periodic reference, not a member of the distribution.
+- [ ] Expand UAT beyond the current triangular stress-strain validation panel:
+  retain a clearly labelled Al benchmark panel; add Ti research panels covering
+  all four topologies, periodic stress-strain/25%ductility markers and separate
+  disorder ductility distributions. If adding stress-strain envelopes, define
+  strain-grid alignment and genuine/censored support; never zero-pad missing
+  tails to manufacture population quantiles. Compare Al/Ti on one axis only
+  after a scientifically justified normalisation; do not pool them silently.
+- [ ] Select final figure layout and spread statistic after results are settled;
+  preserve direct3mm FT validation and declared10mm reference scaling, and use
+  the final agreed initiation-metric notation throughout paper and captions.
 
 Corrections owns manuscript/notation work and read-only paired-population checks;
 SimCheck owns this calculation/solver migration. Agree exact shared-file edits

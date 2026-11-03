@@ -97,6 +97,19 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - Active lattice names include `FCC`, `tri`, `kagome`, and `hex`; older helpers also know about `square` and `45square`.
 - Detailed transfer names, processed schemas, sample alignment, field metadata, and downstream consumers are maintained in the `review-p1-p2-data-contract` skill reference. Use it whenever those boundaries change.
 
+## Shared Calculation Checks
+
+- `test_validation_shared.py` verifies corrected Ortega's approximate isotropic
+  geometry limit (about-.8% at a/W=.5), exact isotropic M and tensor-scale
+  homogeneity. These mathematical checks do not validate a disorder constitutive
+  model or the plastic eta factor. Source/evidence review lives in `audit/shared`.
+- Orthotropic SiC replay must use source B20mm and assigned418197MPa,.162791,
+  already mapped. Saved damage criterion is DUCTCRT; Ti LE=.1105 does not apply.
+  Use source W/a/axes and native times, not current Geometry defaults or padding.
+- PSC scope includes28UAT plus28FT sources. The Al/tri UAT benchmark remains
+  material-specific; later Results figures and disorder ranges are checklist
+  tasks after final population recalculation, not current validation evidence.
+
 ## Shared Helpers To Respect
 
 - `resources/data_processing.py` owns conversion from raw `transfer/` files into processed p1 CSV/NPZ files and manifests.

@@ -9,6 +9,15 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   deferred UT/FCC/orthotropic/PSC work. The report is in this paper's samples,
   not p2. Final integration replaces superseded methods/results rather than
   retaining selectable legacy variants; it remains pending the scientific verdict.
+  Shared elastic audit: corrected Ortega matches its source; lambda=chi=1 gives
+  an approximately-.8% geometry-fit residual, while M has the exact isotropic
+  limit. All8 SiC sources use mapped418197MPa,.162791 and actualB20mm; native
+  short histories and material-specific initiation must be retained. The8-curve
+  UAT pilot shows five points alone is not an adequate modulus rule. Evidence
+  is under Validation/audit/shared; production formulas remain unchanged.
+  PSC scope now includes28UAT and28FT sources. Future Results-section UT/FT
+  validation figures, FCC inclusion and disorder-population ranges are recorded
+  explicitly as deferred work after final recalculation, not authorised edits now.
 
 - The manuscript revision has a common compliance/notation description and an
   implemented FCC prismatic plane-strain elastic route. At nominal20% physical

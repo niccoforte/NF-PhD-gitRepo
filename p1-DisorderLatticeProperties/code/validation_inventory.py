@@ -118,7 +118,7 @@ def cleanup_review(audit, repo, scratch_roots):
          "paths": [str(path) for path in sorted(audit.glob("workbook-before*"))],
          "reason": "Do not discard the only verified before-state while paper/workbook reconciliation remains open."},
         {"component": "Diagnostic plots, tables and reports", "action": "consolidate_after_final_review",
-         "paths": [str(audit / name) for name in ("calculations", "modal", "diagnostics", "work-partition", "report-history", "benchmark-review.md")] + [str(EARLY_REVIEW)],
+         "paths": [str(audit / name) for name in ("calculations", "modal", "diagnostics", "work-partition", "shared", "report-history", "benchmark-review.md")] + [str(EARLY_REVIEW)],
          "reason": "Retain the minimal evidence supporting event, modulus and negative-work decisions; remove superseded renders/tables after checking all report and notebook dependencies."},
         {"component": "Auxiliary solver results", "action": "review_minimal_retention_after_acceptance",
          "paths": [str(audit / "controls"), str(audit / "work-partition")],
@@ -144,7 +144,7 @@ def cleanup_review(audit, repo, scratch_roots):
               "inventory": str(audit / "file-inventory.csv"), "canonical_workbook": workbook,
               "task_checklist": str(repo / "p1-DisorderLatticeProperties/samples/p1-validation/CHECKLIST.md"),
               "components": components, "automatic_deletion": False,
-              "scope": "All validation audit outputs, new/modified code and notebook cells, workbook additions/legacy values, auxiliary solver evidence and named temporary work. PSC and orthotropic work remain deferred."}
+              "scope": "Validation and shared-calculation evidence, code/notebooks, workbook reconciliation, auxiliary controls and named scratch. Orthotropic/FCC/PSC reprocessing and Results-section figure integration remain pending in the unique checklist."}
     (audit / "cleanup-review.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
 
 
@@ -208,7 +208,7 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
     for reference in REFERENCES:
         if reference.exists():
             rows.append(record(reference, "published_source", "retain", "Source equations, failure criterion and specimen calibration"))
-    scratch_roots = sorted({path for pattern in ("codex-p1-review-20261026", "codex-p1-final-check-20261028-*", "codex-p1-validation-*")
+    scratch_roots = sorted({path for pattern in ("codex-p1-review-20261026", "codex-p1-final-check-20261028-*", "codex-p1-validation-*", "codex-p1-shared-*")
                             for path in Path(temp).glob(pattern) if path.is_dir()})
     cleanup_review(audit, Path(repo), scratch_roots)
     if REFERENCE_INTAKE.exists():

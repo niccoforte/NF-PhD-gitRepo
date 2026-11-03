@@ -42,7 +42,7 @@ In practical terms:
   point to a selected representative ODB. Read the index rather than assuming
   every old companion filename still exists after exact content deduplication.
   Preserve original exports while auditing calculations. PSC sizes and accepted
-  convergence criteria remain fixed; PSC is deferred from the validation review.
+  convergence criteria remain fixed; the later PSC audit covers UAT and FT.
 - Native validation analysis is an opt-in route in `code/validation_*.py`, with
   original ODBs/exports preserved and results under `Validation/audit`. The
   README documents commands, exact modal/compliance and periodic B21
