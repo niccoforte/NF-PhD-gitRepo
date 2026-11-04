@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat 01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated 3 November 2026. [Evidence and figures](README.md).
+Updated 4 November 2026. [Evidence and figures](README.md).
 This file owns task completion; PROJECT_STATUS and the cleanup register link here.
 
 Researcher requests a3November cutoff for the Hsieh phase. Finish with the
@@ -235,14 +235,43 @@ sets their dependency order, not a second checklist.
   and safety dependencies; it is not a second task checklist. Protect running jobs,
   original observations and unique digitisation. Verify replacement before deletion.
 
+## Accepted processing direction and measured pilot
+
+- [x] Adopt first local tensile material initiation as the validation event;
+  SiC uses first DUCTCRT>=1 with an undamaged-field/history bracket. Ti retains
+  its source critical-strain criterion. STATUS and force maxima are diagnostics,
+  not competing active initiation definitions.
+- [x] Run the72-curve/48-native-event filtering pilot. At0.4sample-Nyquist,
+  median roughness falls about78%UAT/81%FT, with fixed-endpoint work changes
+  below.48%. This is useful denoising evidence, not a universal physical cutoff
+  or proof of prediction improvement. Whole-history zero-phase filtering can
+  contaminate initiation; retain native work/events and qualify ML labels by family.
+- [x] Test initial-window stability on36UAT curves:9/9tri,kagome,FCC have
+  numerical candidates;0/9hex. Larger caps do not rescue hex. First nonzero
+  BODYSET field is already plastic for hex/kagome ID1; do not average windows
+  into a claimed elastic modulus. Use source-exact linear response where unresolved.
+- [ ] Verify the source-exact UAT linear-compliance fallback on representative
+  cases, including grip/body gauge, before applying it to unresolved population
+  stiffness. Keep each specimen's own C(T) k0. Fracture M needs representative
+  full-tensor checks, not automatic UAT-slope scaling or a hidden periodic fill.
+- [ ] Migrate finite curve tensors plus observation masks through producer,
+  scalers, loaders, losses, derivatives/areas and metrics. Preserve each metric
+  independently and separate observed termination from physical failure.
+  Keep unknown termination masks out of geometry-only model inputs. Compare
+  raw/moving-average/qualified-Butterworth targets with matched folds/seeds and
+  complete-curve truncation controls before replacing an existing ML winner.
+
 ## Orthotropic/FCC execution plan and subsequent PSC
 
-- [ ] Consolidate the paper's fracture section into one common elastic-plastic
-  formulation, with the source-corrected Ortega elastic calibration for aligned
-  cases inside its fit range and the ASTM isotropic comparison in an appendix.
-  Sub-1% agreement does not by itself establish full ASTM compliance: retain
-  explicit plastic-work, specimen/crack and qualification boundaries. This
-  presentation/final-route decision does not alter production results yet.
+- [ ] Corrections will integrate one common fracture-methods section and a
+  dedicated ASTM-comparison appendix; this chat owns its numerical evidence.
+  Methods will use corrected Ortega where its calibration is qualified and
+  link to the appendix. Include elastic f/M/J limits, a/W sweep, the independent
+  plastic-work/eta calibration and its hold-out checks. Researcher accepts the
+  crack/specimen/qualification arrangements as the study premise; do not reopen
+  that generic review. Document any concrete inconsistency actually found.
+  The plastic calibration is authorised work, not an already completed check.
+  Results will combine validation, periodic points and disorder ranges.
 - [x] Check the current Ortega elastic implementation against AppendixA.5/A.6
   and the appended2015corrigendum. All45 coefficients and exponent placement
   agree. At lambda=chi=1 geometry factors are a fit, not an exact ASTM identity:
@@ -255,15 +284,33 @@ sets their dependency order, not a second checklist.
   45squareA has171native history samples versus201transfer rows. DUCTCRT is the
   saved source criterion. Existing old Geometry defaults are not source geometry.
   [Input inventory](Z:/p1/sims/Ti/Validation/audit/shared/ortho-material-and-psc-inventory.json).
-- [ ] Reprocess the8 square/45square cases from source coordinates, B20mm,
+- [x] Recover native histories/events for all8 source square/45square cases,
+  pin all24 original ODB/INP/export hashes and preserve actual history lengths.
+  [Native replay](Z:/p1/sims/SiC/Validation/audit/orthotropic-extraction.json).
+- [x] Complete the elastic comparison from source coordinates, B20mm,
   actual W/a/sections/BCs, paired opening displacement/reaction and genuine times.
   Bind the last undamaged sample to SiC DUCTCRT/SDEG and deletion separately;
   do not import Hsieh's Ti LE11=.1105 threshold. Review KE/IE through the intact
   loading prefix and force/work sensitivity before accepting calculated points.
-- [ ] Verify source-compatible bending/shear-aware periodic C and specimen1N
+- [x] Verify source-compatible bending/shear-aware periodic C and specimen1N
   compliance for these cases, then replay their elastic KI comparison against
   the actual FTortho source data/normalisation. Use one already-reduced tensor
   for M and the Ortega geometry factor with explicit crack/loading axes.
+- [x] Confirm source-matched square periodicity and mapped B21 tensors.
+  All8 tensors are stable but outside Ortega's fitted chi=.1-10 range.
+  Algebraic positive definiteness (chi>-1) does not establish fitted accuracy.
+- [x] Qualify direct linear C(T) calibration:2 isotropic and16 orthotropic
+  controls plus one necessary increment refinement. Isotropic f is within.34%
+  of ASTM; selected mesh changes below.21%, derivative changes below.21% after
+  refinement, with verified source/delivery/energy and force balance. Replace
+  out-of-domain fitted factors in the single comparison with these values.
+  [Calibration](Z:/p1/sims/SiC/Validation/audit/elastic-calibration/calibration-summary.json).
+- [x] Close the empirical orthotropic assessment with reported10-26% residuals
+  and the source boundary-layer versus C(T) limits:600l reference model,
+  shear-lag lengths6-11l /155-287l versus ligaments8l /11.3l. No justified
+  normalisation or phase correction was found. Keep sizes fixed and use existing
+  fields/linear K-dominance checks first if tighter agreement is required.
+  No coefficient fitting or nonlinear reruns simply to force agreement.
 - [ ] Complete an asymmetric linear elastic calibration if retaining the general
   unequal-axis route. Ordered square/45square/FCC have equal axial moduli and
   cannot by themselves settle reciprocal lambda/source-axis ambiguity.
@@ -314,9 +361,9 @@ sets their dependency order, not a second checklist.
   do not present an unreferenced FCC result as an additional Hsieh validation.
 - [ ] Move UAT and FT validation from the appendix into Results, integrated with
   research-result panels and captions, in coordination with Corrections. This is
-  a later final figure/manuscript task. Researcher now requested separate
-  preliminary examples: those are allowed in audit/previews and must not replace
-  the paper figures or mix corrected periodic values with legacy distributions.
+  a later manuscript task. Production formatting is implemented under
+  audit/property-figures; accepted population recalculation must supply its
+  final values before manuscript replacement. Keep periodic/population methods consistent.
 - [ ] Show periodic FT and disorder-population ranges for10mm/20% across the four
   topologies, separating full and mechanism-based disorder. Proposed display:
   periodic marker, median/IQR and5-95% interval, optionally faint full min-max.
@@ -330,13 +377,14 @@ sets their dependency order, not a second checklist.
   strain-grid alignment and genuine/censored support; never zero-pad missing
   tails to manufacture population quantiles. Compare Al/Ti on one axis only
   after a scientifically justified normalisation; do not pool them silently.
-- [x] Produce three real-data previews: initial UAT fits, saved FT population
-  ranges, and saved periodic UAT/ductility distributions. Source hashes and IDs
-  are pinned; current saved values are labelled pending recalculation. These
-  illustrate layout, not the corrected population or a new FCC benchmark.
+- [x] Replace the three display examples with production-style property figures:
+  tighter ranges, Hsieh hollow triangles, macroscopic E/Sigma and ductility D,
+  vertical ductility guides, and clean legends. One helper/output set replaces
+  the superseded display route. Captions/metadata retain historical-value status
+  until accepted full-population recalculation supplies the final numbers.
 - [ ] Handle the plastic-calibration/PSC/UTval execution when those stages arrive,
   as explicitly requested. Use local serial jobs if needed and report the queue;
-  the approval is not a request to launch them during this preview/source check.
+  execute them after the current elastic/shared-definition gates are settled.
 - [ ] Select final figure layout and spread statistic after results are settled;
   preserve direct3mm FT validation and declared10mm reference scaling, and use
   the final agreed initiation-metric notation throughout paper and captions.

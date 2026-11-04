@@ -97,10 +97,20 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - Active lattice names include `FCC`, `tri`, `kagome`, and `hex`; older helpers also know about `square` and `45square`.
 - Detailed transfer names, processed schemas, sample alignment, field metadata, and downstream consumers are maintained in the `review-p1-p2-data-contract` skill reference. Use it whenever those boundaries change.
 
-- `validation_previews.py` reads current saved property/curve CSVs and the
-  source-bound fitting pilot, restricts original IDs 1-1000 with ID 0 separate,
-  and writes three labelled PNG/PDF/SVG examples plus source/point tables under
-  audit/previews. They do not replace corrected paper plots or population values.
+- `validation_property_figures.py` owns the three production-style property
+  figures under Ti Validation/audit/property-figures. Their captions/metadata
+  retain calculation status and the length-scaled Hsieh reference. Original
+  IDs 1-1000 supply spread; ID0 is separate. Recalculation still precedes paper use.
+- `validation_orthotropic.py` owns SiC replay/control extraction and comparison
+  under SiC Validation/audit. First DUCTCRT>=1 defines material onset; use the
+  last undamaged field/history bracket. ValConvPlots calls this route, replacing
+  FTortho literals. The eight tensors exceed Ortega's fitted chi range, so use
+  qualified `validation_elastic_calibration.py` factors and retain extrapolations
+  only as diagnostics. Report reference field/shear-lag limits. A hash-bound
+  usable result never changes its original failed-wrapper queue status.
+- `validation_curve_processing.py` is an opt-in real-data filter/fit pilot,
+  not a production migration. Native paired work and material events remain
+  independent of filtered ML targets; masks must not leak test-time termination.
 
 ## Shared Calculation Checks
 

@@ -108,8 +108,14 @@ def prepare(args):
         for control in controls:
             name = "{}_{}_{}_rho{}_nx{}_{}".format(
                 "stiffness" if control == "unit_load" else "modal",
-                case["topology"], case["l_mm"], case["nominal_relative_density"].replace(".", "p"),
+                case["topology"], case["l_mm"].replace(".", "p"), case["nominal_relative_density"].replace(".", "p"),
                 case["nnx"], control)
+            # SiC batch identity is unique within this indexed validation set;
+            # compact names avoid Abaqus' Windows restart-file path limit.
+            if (case.get("campaign") == "Orthotropic SiC validation"
+                    and case["topology"] in ("square", "45square") and case.get("batch") in ("A", "B", "C", "D")):
+                name = ("stiff_{}_{}".format(case["topology"], case["batch"]) if control == "unit_load"
+                        else "modal_{}_{}_{}".format(case["topology"], case["batch"], control))
             directory = job_directory(out, name)
             directory.mkdir(exist_ok=True)
             inp = directory / (name + ".inp")

@@ -1,6 +1,7 @@
-"""Real-data layout previews, explicitly separate from recalculated paper results.
+"""Reproducible material-property figures with source and calculation provenance.
 
 Read current saved properties for original IDs1-1000 and the ordered reference.
+Calculation readiness is recorded in metadata/captions; plot styling is separate.
 No source data, processing defaults, validation plots or manuscript is changed.
 """
 import argparse
@@ -28,7 +29,7 @@ def read_frame(path, role, sources, **kwargs):
     source_hash = hashlib.sha256(contents).hexdigest()
     key = str(path.resolve())
     if key in sources and sources[key]["sha256"] != source_hash:
-        raise ValueError("Source changed between preview reads: " + key)
+        raise ValueError("Source changed between figure reads: " + key)
     sources[key] = {"path": key, "sha256": source_hash, "role": role}
     return pd.read_csv(io.StringIO(contents.decode("utf-8-sig")), **kwargs)
 
@@ -104,12 +105,33 @@ def plot_ranges(ax, summaries, periodic, mode):
         ax.plot(position, periodic[topology, mode], "D", color="#111111", ms=6, zorder=5)
     ax.set_xticks(range(4), [NAMES[t] for t in TOPOLOGIES])
     ax.set_xlim(-.5, 3.5)
-    ax.set_ylim(bottom=0)
+    values = [float(row[key]) for row in summaries if row["mode"] == mode
+              for key in ("min", "max") if row[key] is not None]
+    values += [periodic[topology, mode] for topology in TOPOLOGIES]
+    span = max(values)-min(values)
+    ax.set_ylim(max(0., min(values)-.08*span), max(values)+.08*span)
     ax.grid(axis="y", alpha=.2)
     ax.set_axisbelow(True)
     ax.text(-.055, -.10, "n =", transform=ax.transAxes, va="top", fontsize=8)
     return [Line2D([], [], color=color, lw=6, label=name) for _, name, _, color in DESIGNS] + [
-        Line2D([], [], marker="D", color="#111111", ls="none", ms=6, label="Periodic, ID 0")]
+        Line2D([], [], marker="D", color="#111111", ls="none", ms=6, label="Periodic lattice")]
+
+
+def reference_records(root, sources):
+    """Reuse the already digitised and declared length-scaled Fig.10 reference."""
+    path = root / "audit/paper/points.csv"
+    frame = read_frame(path, "existing_Hsieh_reference_comparison", sources)
+    chosen = frame[(frame["figure"].astype(str) == "10") &
+                   (frame["series"] == "Hsieh et al.") &
+                   np.isclose(frame["l_mm"], 10.) &
+                   np.isclose(frame["relative_density"], .2)]
+    if set(chosen["topology"]) != {"tri", "kagome", "hex"} or len(chosen) != 3:
+        raise ValueError("Expected exactly three 10 mm / 20% Fig.10 reference points")
+    if not chosen["reference_basis"].eq("published_3mm_times_sqrt_10_over_3_inference").all():
+        raise ValueError("Review changed Hsieh reference length basis")
+    fields = ["topology", "l_mm", "relative_density", "ordinate", "graphical_lower",
+              "graphical_upper", "reference_basis", "reference_point_id", "published_pdf_sha256"]
+    return chosen[fields].to_dict("records")
 
 
 def save_figure(fig, output, name):
@@ -132,6 +154,7 @@ def run(root, data_root, output):
     sources[str(pilot_path.resolve())] = {"path": str(pilot_path.resolve()), "role": "prior_source_bound_window_pilot",
                                         "sha256": hashlib.sha256(pilot_bytes).hexdigest()}
     points, summaries, periodic = property_records(data_root, sources)
+    references = reference_records(root, sources)
     fit_rows, curve_rows, crossing_rows = [], [], []
     style = {"font.size": 9, "axes.labelsize": 10, "legend.fontsize": 8,
              "pdf.fonttype": 42, "svg.fonttype": "none"}
@@ -165,33 +188,39 @@ def run(root, data_root, output):
                     curve_rows.append({"figure": "elastic_fit", "topology": topology, "kind": kind,
                                        "sample": sample, "strain": float(strain), "stress_MPa": float(stress)})
             ax.set_title(NAMES[topology])
-            ax.set_xlabel("Grip-displacement/body-height strain (%)")
-            ax.set_ylabel("Stress (MPa)")
+            ax.set_xlabel(r"Macroscopic strain, $\mathcal{E}$ (%)")
+            ax.set_ylabel(r"Macroscopic stress, $\Sigma$ (MPa)")
             ax.grid(alpha=.18)
             ax.text(.03, .97, "\n".join(text), transform=ax.transAxes, va="top", fontsize=8,
                     bbox={"facecolor": "white", "edgecolor": "none", "alpha": .86})
-        fig.suptitle("Real UAT initial-loading examples: window sensitivity", y=.985, fontsize=12)
+        fig.suptitle("Initial loading: elastic-fit window sensitivity", y=.985, fontsize=12)
         handles = [Line2D([], [], color="#555555", marker="o", ms=3, label="Ordered raw response"),
                    Line2D([], [], color="#bca384", marker="o", ms=3, label="Full-disorder ID 1 raw response")]
         handles += [Line2D([], [], color=color, label="Full ID 1 fit: {} points".format(n)) for n, color in fit_colors.items()]
-        fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .045), ncol=3, frameon=False)
-        fig.text(.5, .014, "Illustrative fits with an intercept; not accepted elastic intervals. E_app includes grip compliance.",
-                 ha="center", fontsize=8)
-        fig.subplots_adjust(top=.92, bottom=.20, left=.09, right=.98, hspace=.42, wspace=.28)
-        save_figure(fig, output, "uat-elastic-fit-examples")
+        fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .02), ncol=3, frameon=False)
+        fig.subplots_adjust(top=.92, bottom=.17, left=.09, right=.98, hspace=.42, wspace=.28)
+        save_figure(fig, output, "uat-elastic-fits")
         plt.close(fig)
 
         fig, ax = plt.subplots(figsize=(8.2, 4.9))
         handles = plot_ranges(ax, summaries, periodic, "FT")
-        ax.set_ylabel(r"Saved $K_J$ (MPa$\sqrt{\mathrm{m}}$)")
-        ax.set_title("FT population layout preview | Ti, nominal 10 mm / 20%")
-        fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .13), ncol=3, frameon=False)
-        fig.text(.5, .072, "Median circle; thick IQR; 5-95% interval; thin full min-max. Numbers show available saved values.",
-                 ha="center", fontsize=8)
-        fig.text(.5, .025, "CURRENT SAVED VALUES - RECALCULATION PENDING. No new M or toughness calculation; no FCC literature benchmark.",
-                 ha="center", fontsize=8, color="#913e25")
-        fig.subplots_adjust(left=.11, right=.98, top=.90, bottom=.30)
-        save_figure(fig, output, "ft-population-layout-preview")
+        for row in references:
+            x = TOPOLOGIES.index(row["topology"])
+            ax.errorbar(x, row["ordinate"],
+                        yerr=[[row["ordinate"]-row["graphical_lower"]],
+                              [row["graphical_upper"]-row["ordinate"]]],
+                        fmt="^", ms=8, mfc="white", mec="#111111", mew=1.2,
+                        ecolor="#111111", elinewidth=.7, capsize=2, zorder=6)
+        low = min(row["graphical_lower"] for row in references)
+        upper = max(ax.get_ylim()[1], max(row["graphical_upper"] for row in references))
+        ax.set_ylim(max(0., low-.06*(upper-low)), upper)
+        handles += [Line2D([], [], marker="^", color="#111111", mfc="white", ls="none",
+                           ms=7, label="Hsieh et al.")]
+        ax.set_ylabel(r"Initial fracture toughness, $K_{JIC}$ (MPa$\sqrt{\mathrm{m}}$)")
+        ax.set_title(r"$\ell=10$ mm, $\overline{\rho}=20\%$")
+        fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .025), ncol=2, frameon=False)
+        fig.subplots_adjust(left=.115, right=.98, top=.91, bottom=.27)
+        save_figure(fig, output, "ft-population")
         plt.close(fig)
 
         fig, axes = plt.subplots(1, 2, figsize=(10.2, 4.8))
@@ -203,7 +232,7 @@ def run(root, data_root, output):
                 raise ValueError("Expected strain row and periodic ID0 response in saved UAT table")
             x, y = frame.iloc[0, 1:].to_numpy(float), frame.iloc[1, 1:].to_numpy(float)
             if not np.isfinite(x).all() or not np.isfinite(y).all():
-                raise ValueError("Saved periodic preview contains nonfinite values")
+                raise ValueError("Periodic figure source contains nonfinite values")
             peak = int(np.argmax(y))
             zero = np.flatnonzero(y[peak:] <= 0)
             stop = int(peak+zero[0]) if len(zero) else len(y)
@@ -212,6 +241,8 @@ def run(root, data_root, output):
             valid_cross = bool(cross is not None and y[cross] > 0)
             ax.plot(100*x[:stop], y[:stop], color=COLORS[topology], label=NAMES[topology], lw=1.2)
             if valid_cross:
+                ax.vlines(100*x[cross], 0., y[cross], color=COLORS[topology],
+                          lw=.8, ls="--", alpha=.85)
                 ax.plot(100*x[cross], y[cross], "o", mfc="white", mec=COLORS[topology], ms=5)
                 if not math.isclose(100*x[cross], periodic[topology, "UT"], rel_tol=1e-9):
                     raise ValueError("Saved periodic ductility and saved processed crossing do not match")
@@ -223,44 +254,56 @@ def run(root, data_root, output):
             for sample in range(stop):
                 curve_rows.append({"figure": "periodic_UAT_saved_curve", "topology": topology, "kind": "ordered",
                                    "sample": sample, "strain": float(x[sample]), "stress_MPa": float(y[sample])})
-        ax.set_xlabel("Saved grip-displacement/body-height strain (%)")
-        ax.set_ylabel("Stress (MPa)")
-        ax.set_title("(a) Saved periodic Ti responses")
+        ax.set_xlabel(r"Macroscopic strain, $\mathcal{E}$ (%)")
+        ax.set_ylabel(r"Macroscopic stress, $\Sigma$ (MPa)")
+        ax.set_title("(a) Periodic lattices")
         ax.grid(alpha=.18)
         ax.legend(frameon=False, fontsize=8)
         handles = plot_ranges(axes[1], summaries, periodic, "UT")
-        axes[1].set_ylabel(r"Saved $\varepsilon_{25}$ (%)")
-        axes[1].set_title("(b) Saved ductility distributions")
-        handles += [Line2D([], [], color="#555555", marker="o", mfc="white", ls="none", label="Saved 25% crossing")]
-        fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .13), ncol=4, frameon=False)
-        fig.text(.5, .073, "Population intervals: median/IQR, 5-95%, full min-max. Native-tail and censoring audit pending.",
-                 ha="center", fontsize=8)
-        fig.text(.5, .025, "CURRENT SAVED VALUES - RECALCULATION PENDING. Al/triangular validation remains a separate material-labelled panel.",
-                 ha="center", fontsize=8, color="#913e25")
-        fig.subplots_adjust(left=.07, right=.98, top=.91, bottom=.32, wspace=.30)
-        save_figure(fig, output, "uat-population-layout-preview")
+        axes[1].set_ylabel(r"Ductility, $\mathcal{D}$ (%)")
+        axes[1].set_title("(b) Ductility")
+        fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .025), ncol=3, frameon=False)
+        fig.subplots_adjust(left=.075, right=.98, top=.91, bottom=.23, wspace=.30)
+        save_figure(fig, output, "uat-population")
         plt.close(fig)
 
     if any(hashlib.sha256(Path(path).read_bytes()).hexdigest() != row["sha256"] for path, row in sources.items()):
-        raise ValueError("A preview source changed during generation")
-    write_rows(output / "population-preview-points.csv", points)
-    write_rows(output / "population-preview-summary.csv", summaries)
+        raise ValueError("A figure source changed during generation")
+    write_rows(output / "population-points.csv", points)
+    write_rows(output / "population-summary.csv", summaries)
     write_rows(output / "elastic-fit-example-results.csv", fit_rows)
-    write_rows(output / "curve-preview-points.csv", curve_rows)
+    write_rows(output / "curve-points.csv", curve_rows)
+    write_rows(output / "hsieh-reference-points.csv", references)
     write_rows(output / "periodic-UAT-crossings.csv", crossing_rows)
-    metadata = {"status": "Exploratory real-data examples; current saved values, pending final reprocessing",
+    metadata = {"status": "Production figure styling; current historical population values pending final reprocessing",
                 "population_scope": "Original IDs1-1000 separately per topology/design/metric; ID0 reference only. No paired-complete-case or outlier filtering.",
                 "normalisation": {"FT": "Saved MPa sqrt(mm) divided by sqrt(1000)", "UT": "Saved strain multiplied by100"},
                 "range_definition": "Median/IQR, central5-95percentiles and full observed min-max; population spread, not confidence or measurement uncertainty.",
                 "eligibility": "Finite positive values of each current saved metric; existing source omissions remain missing, not recovered or imputed.",
                 "sources": list(sources.values()), "summaries": summaries, "periodic_UAT_crossings": crossing_rows,
+                "Hsieh_reference": references,
+                "manuscript_symbols": {"strain": "mathcal E", "stress": "Sigma", "ductility": "mathcal D"},
                 "limits": ["Historical metrics may change substantially after the accepted scientific corrections.",
                            "No new modulus/toughness method, source substitution, field reconstruction or FEA execution.",
                            "Initial fit windows are sensitivity examples and do not establish pre-plastic linearity or body material modulus.",
                            "Periodic curves are saved processed responses; display truncation does not attest native solver history length.",
                            "No synthetic stress-strain bands or padded missing observations; Al benchmark data are not pooled with Ti.",
-                           "These previews do not replace current paper validation exports or establish FCC benchmark agreement."]}
-    (output / "preview-metadata.json").write_text(json.dumps(metadata, indent=2, allow_nan=False)+"\n", encoding="utf-8")
+                           "Figure styling does not replace the remaining population recalculation or establish FCC benchmark agreement."]}
+    (output / "metadata.json").write_text(json.dumps(metadata, indent=2, allow_nan=False)+"\n", encoding="utf-8")
+    captions = (
+        "FT population. Periodic lattice and disorder distributions at nominal bar length 10 mm and relative density 20%. "
+        "White circles indicate medians, thick bars the interquartile range, narrower intervals the 5–95 percentiles, and thin lines the full available range. "
+        "Counts are per metric; population spread is not measurement uncertainty. Hollow triangles are Hsieh et al. Fig.10 initiation values digitised at 3 mm "
+        "and multiplied by sqrt(10/3), with graphical digitisation bounds scaled consistently. These are length-scaled references, not independently published 10 mm values. "
+        "No FCC reference is supplied by Hsieh. Current study population and periodic values use the same historical saved calculation and remain pending the accepted reprocessing.\n\n"
+        "UAT population. (a) Periodic titanium macroscopic stress–strain responses; circles and dashed lines mark the defined ductility strain. "
+        "(b) Periodic ductility and disorder distributions, using the same population interval definitions as FT. "
+        "Engineering strain is grip displacement divided by body height; grip compliance remains included. "
+        "The aluminium triangular validation belongs in a separate material-labelled panel. Current historical endpoints await native-tail/censoring and processing reconciliation.\n\n"
+        "Elastic fits. Initial raw UAT responses of the periodic lattice and full-disorder ID 1, with intercept fits over 5, 8 and 12 points. "
+        "These window sensitivities do not by themselves qualify pre-plastic intervals or body material moduli; apparent slopes include grip compliance.\n"
+    )
+    (output / "captions.txt").write_text(captions, encoding="utf-8")
     return metadata
 
 
@@ -270,5 +313,5 @@ if __name__ == "__main__":
     parser.add_argument("--data-root", type=Path, default=Path("Z:/p1/data/Ti"))
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
-    result = run(args.root, args.data_root, args.out or args.root / "audit/previews")
-    print("Wrote3 labelled real-data preview figures from{} source files.".format(len(result["sources"])))
+    result = run(args.root, args.data_root, args.out or args.root / "audit/property-figures")
+    print("Wrote 3 material-property figures from {} source files.".format(len(result["sources"])))

@@ -11,8 +11,62 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+import numpy as np
+
 from validation_controls import compliance_values, gather_compliance, gather_completion_controls, similarity_controls
+from validation_diagnostics import condense, periodic_patch
 from validation_modal import prepare, sha256
+
+
+class SquarePeriodicPatchTests(unittest.TestCase):
+    @staticmethod
+    def source_grid(rotated=False):
+        length = 1.7
+        spacing = length / math.sqrt(2) if rotated else length
+        points = {(i, j): (i*spacing, j*spacing) for i in range(17) for j in range(17)
+                  if not rotated or (i+j) % 2 == 0}
+        labels = {point: index+1 for index, point in enumerate(points)}
+        nodes = {labels[point]: value for point, value in points.items()}
+        elements = []
+        for i, j in points:
+            for delta in (((1, 1), (1, -1)) if rotated else ((1, 0), (0, 1))):
+                end = (i+delta[0], j+delta[1])
+                if end in labels:
+                    elements.append([len(elements)+1, labels[i, j], labels[end]])
+        return nodes, elements, length
+
+    def test_square_period_and_axial_beam_modulus(self):
+        nodes, elements, length = self.source_grid()
+        coords, edges, classes, periods, _, mismatch = periodic_patch(nodes, elements, "square", length)
+        np.testing.assert_allclose(periods, [length, length])
+        self.assertLess(mismatch, length*1e-10)
+        result = condense(coords, edges, classes, periods, [20., .13], [418197., .162791], False)
+        C = np.asarray(result["C_MPa"])
+        np.testing.assert_allclose(np.diag(C)[:2], 418197*.13/length, rtol=1e-10)
+        self.assertLess(abs(C[0, 1]), C[0, 0]*1e-10)
+        self.assertGreater(C[2, 2], 0.)
+
+    def test_rotated_square_period_and_tensor_rotation(self):
+        source = self.source_grid()
+        rotated = self.source_grid(rotated=True)
+        tensors = []
+        for lat, (nodes, elements, length) in (("square", source), ("45square", rotated)):
+            coords, edges, classes, periods, _, mismatch = periodic_patch(nodes, elements, lat, length)
+            expected_period = length if lat == "square" else math.sqrt(2)*length
+            np.testing.assert_allclose(periods, [expected_period, expected_period])
+            self.assertLess(mismatch, length*1e-10)
+            tensors.append(np.asarray(condense(coords, edges, classes, periods,
+                                               [20., .13], [418197., .162791], False)["C_MPa"]))
+        axial, shear = tensors[0][0, 0], tensors[0][2, 2]
+        expected = np.array([[axial/2+shear, axial/2-shear, 0.],
+                             [axial/2-shear, axial/2+shear, 0.],
+                             [0., 0., axial/2]])
+        np.testing.assert_allclose(tensors[1], expected, rtol=1e-9, atol=axial*1e-10)
+
+    def test_unknown_periodicity_is_rejected(self):
+        nodes, elements, length = self.source_grid()
+        with self.assertRaisesRegex(ValueError, "periodicity is not verified"):
+            periodic_patch(nodes, elements, "unverified", length)
 
 
 class ComplianceControlTests(unittest.TestCase):
@@ -98,6 +152,36 @@ fixity, 2, 2
         self.assertEqual(len(a), 3)
         self.assertEqual(a, b)
         self.assertEqual(len(list(self.stage("modal_default").glob("*/*.inp"))), 2)
+
+    def test_decimal_source_length_uses_a_queue_safe_name(self):
+        index = self.root / "case-index.csv"
+        with index.open(newline="") as stream:
+            records = list(csv.DictReader(stream))
+        records[0]["l_mm"] = "1.26"
+        with index.open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(records[0]))
+            writer.writeheader()
+            writer.writerows(records)
+        out = self.stage("decimal", controls=("unit_load",))
+        metadata = json.loads(next(out.glob("*/source.json")).read_text())
+        self.assertIn("_1p26_", metadata["job"])
+        self.assertNotIn(".", metadata["job"])
+        self.assertEqual(metadata["source_inp_sha256"], self.original_hash)
+
+    def test_indexed_sic_batch_has_a_compact_name_without_changing_mechanics(self):
+        baseline = next(self.stage("baseline", controls=("unit_load",)).glob("*/*.inp")).read_bytes()
+        index = self.root / "case-index.csv"
+        with index.open(newline="") as stream:
+            records = list(csv.DictReader(stream))
+        records[0].update(l_mm="1.26", topology="45square", batch="A", campaign="Orthotropic SiC validation")
+        with index.open("w", newline="") as stream:
+            writer = csv.DictWriter(stream, fieldnames=list(records[0]))
+            writer.writeheader()
+            writer.writerows(records)
+        out = self.stage("compact", controls=("unit_load",))
+        metadata = json.loads(next(out.glob("*/source.json")).read_text())
+        self.assertEqual(metadata["job"], "stiff_45square_A")
+        self.assertEqual(next(out.glob("*/*.inp")).read_bytes(), baseline)
 
     def test_invalid_or_duplicate_control_selection_is_rejected(self):
         for controls in ((), ("bad",), ("unit_load", "unit_load")):

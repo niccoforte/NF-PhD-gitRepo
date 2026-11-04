@@ -456,11 +456,19 @@ preserve calculation origins. Native KJ and negative areas are unchanged.
 The exports provide PNG/PDF/SVG, captions and point/exclusion CSVs.
 Paper legends identify the simulation series as Current study; internal
 `Simulation` series keys in the point tables remain stable identifiers.
-`python p1-DisorderLatticeProperties/code/validation_previews.py` separately
-reproduces three real-data fit/layout examples in `audit/previews`. Population
-previews use current saved values, explicitly pending recalculation, not corrected
-results or substitutes for the paper figures. Their tables retain per-metric
-IDs 1-1000, a separate periodic ID0, missing counts and source hashes.
+`python p1-DisorderLatticeProperties/code/validation_property_figures.py`
+reproduces the three property figures in `audit/property-figures`, including
+Hsieh length-scaled reference triangles and population intervals. Captions and
+metadata retain historical-value status until final population recalculation.
+One maintained helper/output set owns these figures.
+`validation_orthotropic.py --extract` (Abaqus Python) replays the eight SiC ODBs
+read-only under `Z:/p1/sims/SiC/Validation/audit`; `--extract-controls` verifies
+their mapped periodic tensors and unit-load compliance. `--analyse` and `--plot`
+use the qualified direct factors from `validation_elastic_calibration.py`,
+whose isotropic/mesh/crack-step gates replace the out-of-range square fit.
+The resulting comparison retains its10-26% benchmark residuals.
+`validation_curve_processing.py` runs the opt-in real-data filter/initial-window
+pilot without rewriting MLdata or promoting a trained model.
 `validation_completion.py --extract-finished --include-interrupted` reads the
 finished new jobs into a separate `new-validation/results` catalogue with native
 histories, initiation/damage evidence and pinned extraction hashes. A reviewed

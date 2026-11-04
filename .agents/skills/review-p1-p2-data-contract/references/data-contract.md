@@ -49,7 +49,11 @@ in audit evidence; do not equate solver termination with 25%/1% crossings.
 A future incomplete-curve migration must coordinate producer, finite tensor
 representation, explicit masks, scalers, any curve-input encoder, losses,
 derivatives/areas, metrics and IDs. Mask before arithmetic; zero times NaN is
-not a valid masking strategy. Do not change frozen datasets/runs in place.
+not a valid masking strategy. Do not change frozen datasets/runs in place. Do not supply an unknown
+test-time termination/valid-target mask as a geometry-only network input: it
+reveals response-derived information. Qualify denoising with matched folds,
+seeds, observed-support and mechanical-property metrics; preserve physical
+initiation labels independently of a filtered curve target.
 
 ## Curve and manifest boundary
 

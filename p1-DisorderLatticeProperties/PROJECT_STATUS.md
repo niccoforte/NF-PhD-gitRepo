@@ -17,12 +17,24 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   is under Validation/audit/shared; production formulas remain unchanged.
   PSC scope now includes28UAT and28FT sources. Future Results-section UT/FT
   validation figures, FCC inclusion and disorder-population ranges are recorded
-  explicitly as deferred final work. Separate real-data layout/fit previews are
-  now requested and retained in audit/previews; they use labelled historical
-  population values without replacing paper figures. Current code is not NaN-
-  curve compatible. The C.3 ratio/Zener diagnostic does not support automatic
-  UAT-slope scaling of FCC M; quantify representative full tensors first.
-  Mesh convergence is now explicitly included before PSC, reusing 168 source sets.
+  explicitly as deferred final work. Production figure styling is ready under
+  audit/property-figures, including
+  Hsieh triangles and manuscript symbols; numerical population replacement is
+  still pending. One maintained property-figure route replaces the superseded display set.
+  Native replay of all8 SiC ODBs is complete with unchanged source hashes.
+  Source-matched periodic controls confirm chi outside Ortega's fit range
+  (rotated about-.90 to-.97; square about39-128). Direct elastic calibration
+  now replaces those extrapolated factors: isotropic agreement within.34%,
+  paired-mesh/energy/crack-step checks pass, including one refined increment.
+  Eight comparisons remain10-26%above the digitised reference; report that
+  residual without tuning. Source fracture simulations remain reusable.
+  The72-curve filter pilot preserves work much better than peak/endpoints;
+  it does not justify one universal cutoff or automatic ML promotion.
+  Stable initial windows fail for9/9 sampled hex cases; sparse native plasticity
+  fields prevent declaring an extended/averaged slope an elastic body modulus.
+  Current curves need an end-to-end mask migration; C.3 does not justify scaling
+  FCC M from one UAT slope. Mesh convergence remains before PSC (168source sets).
+
 
 - The manuscript revision has a common compliance/notation description and an
   implemented FCC prismatic plane-strain elastic route. At nominal20% physical

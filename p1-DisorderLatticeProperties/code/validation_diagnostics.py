@@ -106,8 +106,16 @@ def clip_segment(a, b, lower, upper):
 def periodic_patch(nodes, elements, lat, length):
     # Periods follow the actual source beam-angle families. A shifted cut avoids
     # coincident boundary bars, so no thickness/energy half-weighting is needed.
-    periods = np.array([2 * length, 2 * np.sqrt(3) * length]) if lat == "kagome" else np.array([
-        np.sqrt(3) * length, (3 if lat == "hex" else 1) * length])
+    if lat == "kagome":
+        periods = np.array([2 * length, 2 * np.sqrt(3) * length])
+    elif lat in ("tri", "hex"):
+        periods = np.array([np.sqrt(3) * length, (3 if lat == "hex" else 1) * length])
+    elif lat == "square":
+        periods = np.array([length, length])
+    elif lat == "45square":
+        periods = np.full(2, np.sqrt(2) * length)
+    else:
+        raise ValueError("Source periodicity is not verified for topology " + str(lat))
     maximum = np.max(list(nodes.values()), axis=0)
     origin = np.floor(maximum * [.7, .2] / periods) * periods + [.137 * length, .193 * length]
     patch, edges = [], []
@@ -197,7 +205,7 @@ def condense(coords, edges, classes, periods, section, elastic, shear):
 
 
 def prepare_rve(out, case, source, coords, edges, classes, periods, section, elastic):
-    name = "rve_{}_{}_rho{}_nx{}".format(case["topology"], case["l_mm"],
+    name = "rve_{}_{}_rho{}_nx{}".format(case["topology"], case["l_mm"].replace(".", "p"),
                                              case["nominal_relative_density"].replace(".", "p"), case["nnx"])
     directory = out / name; directory.mkdir(exist_ok=True)
     macro = [len(coords)+i+1 for i in range(3)]

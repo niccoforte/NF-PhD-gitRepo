@@ -112,17 +112,20 @@ def cleanup_review(audit, repo, scratch_roots):
          "paths": [str(audit / "new-validation")],
          "reason": "These complete absent fracture cases and are new research simulations, not disposable audit controls. Preserve source/generated INPs, prepared identities and verified delivered results. Active marker-owned queue scratch is protected; bounded datacheck intermediates are reviewed separately after delivery."},
         {"component": "Workbook legacy results", "action": "reconcile_after_method_is_accepted",
-         "paths": [str(WORKBOOK)], "areas": ["FTval", "Deshpande", "Validation audit"],
+         "paths": [str(WORKBOOK)], "areas": ["FTval", "FTortho", "Deshpande", "Validation audit"],
          "reason": "FTval still holds historical values/placeholders. The added Validation audit sheet contains sensitivity controls, not final results. Decide its replacement/removal and update affected notebook/chart links only after the final method is settled. Preserve original reference cells and Deshpande!A50:L73 digitisation."},
         {"component": "Workbook backups", "action": "retain_until_integration_and_original_recovery_are_verified",
          "paths": [str(path) for path in sorted(audit.glob("workbook-before*"))],
          "reason": "Do not discard the only verified before-state while paper/workbook reconciliation remains open."},
         {"component": "Diagnostic plots, tables and reports", "action": "consolidate_after_final_review",
-         "paths": [str(audit / name) for name in ("calculations", "modal", "diagnostics", "work-partition", "shared", "previews", "report-history", "benchmark-review.md")] + [str(EARLY_REVIEW)],
+         "paths": [str(audit / name) for name in ("calculations", "modal", "diagnostics", "work-partition", "shared", "property-figures", "curve-processing", "report-history", "benchmark-review.md")] + [str(EARLY_REVIEW)],
          "reason": "Retain the minimal evidence supporting event, modulus and negative-work decisions; remove superseded renders/tables after checking all report and notebook dependencies."},
         {"component": "Auxiliary solver results", "action": "review_minimal_retention_after_acceptance",
          "paths": [str(audit / "controls"), str(audit / "work-partition")],
          "reason": "Retain source-matched INPs, essential numerical outputs and receipts. Review bulky auxiliary ODB/log retention separately from original research ODBs; failed controls are evidence, not successful validation."},
+        {"component": "Orthotropic SiC validation", "action": "retain_one_source_bound_replacement_route",
+         "paths": [str(audit.parent.parent.parent / "SiC/Validation/audit")],
+         "reason": "One native history/event catalogue, sixteen usable tensor/compliance controls and one comparison table. Keep original sources in place. The out-of-range Ortega comparison requires direct elastic calibration. Retire duplicate prepared/solved INPs and obsolete failed-path preparations only after all immutable queue receipts and current consumers are reconciled; a reviewed wrapping failure remains a failure in its original queue."},
         {"component": "Stiffness controls and duplicate implementations", "action": "consolidate_after_source_and_consumer_verification",
          "paths": [str(audit.parent.parent / "StiffMatrix"), str(audit / "controls/retention-review-20261102.json")],
          "reason": "Retain the49 source-matched mapped ordered controls and required cracked-specimen compliance controls. Consolidate under periodic-material/plane-strain and specimen-compliance/CT/plane-strain with one source/consumer index. The236 historical physical-material INPs are not mapped replacements: inspect their disorder reactions and referenced analytical uses first, then remove superseded solver bulk and overlapping active implementations after verified replacement. No whole-directory deletion is authorized by this plan."},
@@ -208,7 +211,7 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
     for reference in REFERENCES:
         if reference.exists():
             rows.append(record(reference, "published_source", "retain", "Source equations, failure criterion and specimen calibration"))
-    scratch_roots = sorted({path for pattern in ("codex-p1-review-20261026", "codex-p1-final-check-20261028-*", "codex-p1-validation-*", "codex-p1-shared-*", "codex-p1-followup-*")
+    scratch_roots = sorted({path for pattern in ("codex-p1-review-20261026", "codex-p1-final-check-20261028-*", "codex-p1-validation-*", "codex-p1-shared-*", "codex-p1-followup-*", "codex-p1-ortho-*")
                             for path in Path(temp).glob(pattern) if path.is_dir()})
     cleanup_review(audit, Path(repo), scratch_roots)
     if REFERENCE_INTAKE.exists():
