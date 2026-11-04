@@ -229,10 +229,40 @@ def verified_delivery(out, manifest, job):
     return source,run/(job['job']+'.odb'),entries[job['job']+'.odb']['sha256'],receipt
 
 
+def reduced_tensor_input(template, C):
+    """Place an already-reduced law in the verified CPS geometry, in global axes."""
+    import numpy as np
+    from validation_diagnostics import blocks, key
+
+    C=np.asarray(C,dtype=float)
+    if C.shape!=(3,3) or not np.isfinite(C).all() or not np.allclose(C,C.T) or np.linalg.eigvalsh(C).min()<=0:
+        raise ValueError('Positive-definite symmetric reduced C required')
+    if np.max(np.abs(C[:2,2]))>1e-10*np.max(np.abs(C)):
+        raise ValueError('Aligned orthotropy required')
+    S=np.linalg.inv(C)
+    E1,E2=1/S[0,0],1/S[1,1]
+    nu12=-S[0,1]/S[0,0]
+    G12=1/S[2,2]
+    constants=[E1,E2,math.sqrt(E1*E2),nu12,0.,0.,G12,G12,G12]
+    elastic=('*Elastic, type=ENGINEERING CONSTANTS\n'
+             '{:.14g}, {:.14g}, {:.14g}, {:.14g}, 0., 0., {:.14g}, {:.14g}\n{:.14g}\n').format(
+                 E1,E2,constants[2],nu12,G12,G12,G12)
+    generated=[]
+    for block in blocks(Path(template).read_text()):
+        if key(block)=='*elastic':
+            generated.append(elastic)
+        elif key(block)=='*solid section':
+            generated.append('*Orientation, name=SOURCE_AXES\n1.,0.,0.,0.,1.,0.\n3,0.\n')
+            header,rest=block.split('\n',1)
+            generated.append(header+', orientation=SOURCE_AXES\n'+rest)
+        else:
+            generated.append(block)
+    return ''.join(generated).replace('isotropic_verification','source_mapped_tensor'),constants
+
+
 def prepare_orthotropic(out=ROOT):
     """Reuse the verified continuum meshes with each measured reduced tensor."""
     import numpy as np
-    from validation_diagnostics import blocks, key
 
     out=Path(out)
     isotropic=json.loads((out/'isotropic-results.json').read_text())
@@ -261,15 +291,6 @@ def prepare_orthotropic(out=ROOT):
         case=tensor['case_id']
         topology,batch=case.split('-')[1],case.split('-')[3]
         C=np.array(tensor['C_aligned_MPa'])
-        S=np.linalg.inv(C)
-        E1,E2=1/S[0,0],1/S[1,1]
-        nu12=-S[0,1]/S[0,0]
-        G12=1/S[2,2]
-        # CPS plane stress uses this already-constrained in-plane constitutive
-        # law. The uncoupled third direction is unused, not a second reduction.
-        elastic=('*Elastic, type=ENGINEERING CONSTANTS\n'
-                 '{:.14g}, {:.14g}, {:.14g}, {:.14g}, 0., 0., {:.14g}, {:.14g}\n{:.14g}\n').format(
-                     E1,E2,math.sqrt(E1*E2),nu12,G12,G12,G12)
         for mesh in ('medium','fine'):
             parent=out/('ct_iso_'+mesh)
             template=parent/('ct_iso_'+mesh+'.inp')
@@ -279,25 +300,14 @@ def prepare_orthotropic(out=ROOT):
             name='ct_{}_{}_{}'.format(topology,batch,mesh[0])
             job_dir=directory/name
             job_dir.mkdir(exist_ok=True)
-            generated=[]
-            for block in blocks(template.read_text()):
-                if key(block)=='*elastic':
-                    generated.append(elastic)
-                elif key(block)=='*solid section':
-                    generated.append('*Orientation, name=SOURCE_AXES\n1.,0.,0.,0.,1.,0.\n3,0.\n')
-                    header,rest=block.split('\n',1)
-                    generated.append(header+', orientation=SOURCE_AXES\n'+rest)
-                else:
-                    generated.append(block)
-            text=''.join(generated)
-            text=text.replace('isotropic_verification','source_mapped_tensor')
+            text,constants=reduced_tensor_input(template,C)
             inp=job_dir/(name+'.inp')
             inp.write_text(text,encoding='ascii')
             metadata={k:source[k] for k in ('W_mm','B_mm','P_N','steps','pin_node','global_seed_mm','tip_seed_mm')}
             metadata.update(job=name,input=str(inp),input_sha256=digest(inp),case_id=case,mesh=mesh,
                             state='prepared_not_submitted',M_MPa=tensor['M_I_pe_MPa'],
                             C_state='already_reduced_2D_law_in_CPS_surrogate',C_MPa=C.tolist(),
-                            engineering_constants=[E1,E2,math.sqrt(E1*E2),nu12,0.,0.,G12,G12,G12],
+                            engineering_constants=constants,
                             tensor_results_sha256=digest(tensor_path),source_tensor_odb_sha256=tensor['source_odb_sha256'],
                             template=str(template),template_sha256=digest(template),
                             isotropic_gate_sha256=digest(out/'isotropic-results.json'))
@@ -309,6 +319,164 @@ def prepare_orthotropic(out=ROOT):
     manifest={'abaqus':'C:/SIMULIA/Commands/abaqus.bat','queue_root':str(directory/'queue'),'jobs':jobs}
     manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
     return manifest
+
+
+def compliance_from_parameters(lam, chi, scale=10000., coupling=.2):
+    """Construct an SPD engineering-shear law with the requested lambda/chi.
+
+    The normalised off-diagonal compliance is -coupling. This is a numerical
+    constitutive check, not a new lattice material or a fitted reference curve.
+    """
+    import numpy as np
+    if not all(math.isfinite(x) for x in (lam,chi,scale,coupling)) or min(lam,scale)<=0 or not 0<=coupling<1 or chi+coupling<=0:
+        raise ValueError('Stable positive constitutive parameters required')
+    s11,s22=1/scale,1/(lam*scale)
+    normal=math.sqrt(s11*s22)
+    return np.array([[s11,-coupling*normal,0.],[-coupling*normal,s22,0.],[0.,0.,2*(chi+coupling)*normal]])
+
+
+def prepare_fit_verification(out=ROOT):
+    """Independently test Ortega inside its domain, retaining its fitted f."""
+    import numpy as np
+    from resources.calculations import calc_FaW_aniso
+    from resources.lattices import calc_anisoParams, prismatic_plane_strain
+
+    out=Path(out)
+    directory=out/'ortega-verification'
+    directory.mkdir(exist_ok=True)
+    manifest_path=directory/'manifest.json'
+    if manifest_path.exists():
+        manifest=json.loads(manifest_path.read_text())
+        if any(digest(j['input'])!=j['input_sha256'] for j in manifest['jobs']):
+            raise ValueError('Prepared fitted-equation verification changed')
+        return manifest
+    parameters=[('c025',1.,.25),('c05',1.,.5),('fcc',1.,.57457199),('c2',1.,2.),('c5',1.,5.),
+                ('l025c05',.25,.5),('l025c2',.25,2.),('l4c05',4.,.5),('l4c2',4.,2.)]
+    jobs=[]
+    for tag,lam,chi in parameters:
+        S=compliance_from_parameters(lam,chi)
+        C=np.linalg.inv(S)
+        measured=calc_anisoParams(S=S)
+        if not np.allclose(measured,(lam,chi),rtol=1e-12):
+            raise ValueError('Constructed material does not reproduce requested parameters')
+        M=prismatic_plane_strain(C,C_state='plane_strain')['M_I_pe']
+        predicted=float(calc_FaW_aniso(.5,1.,S=S))
+        swapped=S[np.ix_((1,0,2),(1,0,2))]
+        reciprocal=float(calc_FaW_aniso(.5,1.,S=swapped))
+        for mesh in ('medium','fine'):
+            template=out/('ct_iso_'+mesh)/('ct_iso_'+mesh+'.inp')
+            source=json.loads((template.parent/'source.json').read_text())
+            if digest(template)!=source['input_sha256']:
+                raise ValueError('Verified mesh template changed')
+            name='ov_{}_{}'.format(tag,mesh[0])
+            path=directory/name
+            path.mkdir(exist_ok=True)
+            text,constants=reduced_tensor_input(template,C)
+            inp=path/(name+'.inp')
+            inp.write_text(text,encoding='ascii')
+            metadata={k:source[k] for k in ('W_mm','B_mm','P_N','steps','pin_node','global_seed_mm','tip_seed_mm')}
+            metadata.update(job=name,input=str(inp),input_sha256=digest(inp),case_id=tag,mesh=mesh,
+                            state='prepared_not_submitted',M_MPa=float(M),C_state='already_reduced_2D_law_in_CPS_surrogate',
+                            S_MPa_inverse=S.tolist(),C_MPa=C.tolist(),engineering_constants=constants,
+                            lambda_requested=lam,chi_requested=chi,
+                            Ortega_f_current_axes=predicted,Ortega_f_reciprocal_axes=reciprocal,
+                            template=str(template),template_sha256=digest(template),
+                            purpose='Validate the fitted Ortega equation against independent linear compliance inside its published parameter domain.')
+            (path/'source.json').write_text(json.dumps(metadata,indent=2)+'\n')
+            jobs.append({'job':name,'input':str(inp),'input_sha256':metadata['input_sha256'],
+                         'cpus':8,'allow_solver_failure':False,'required_outputs':['.odb','.dat'],
+                         'kind':'Ortega_fitted_equation_verification',
+                         'purpose':'Independent in-domain fitted-equation check; no fracture reference values or coefficient tuning.'})
+    manifest={'abaqus':'C:/SIMULIA/Commands/abaqus.bat','queue_root':str(directory/'queue'),'jobs':jobs,
+              'reused_isotropic_results':str(out/'isotropic-results.json')}
+    manifest_path.write_text(json.dumps(manifest,indent=2)+'\n')
+    return manifest
+
+
+def source_consistent_ortega(S_xy, f_crack_axis):
+    """Compare Ortega's loading-axis convention through invariant elastic J.
+
+    The independently solved factor uses the crack-axis mode-I modulus.
+    Ortega calls axis 1 the loading direction (Eq. 10), and its Eq. 12
+    conversion must use that same order.  A geometry factor and modulus
+    from different conventions must never be combined for unequal moduli.
+    """
+    import numpy as np
+    from resources.calculations import calc_FaW_aniso
+    from resources.lattices import calc_anisoParams, prismatic_plane_strain
+    S_xy=np.asarray(S_xy,dtype=float)
+    # prismatic_plane_strain validates positive definiteness, alignment and units.
+    M_crack=prismatic_plane_strain(np.linalg.inv(S_xy),C_state='plane_strain')['M_I_pe']
+    S_source=S_xy[np.ix_((1,0,2),(1,0,2))]
+    lam_source,chi=calc_anisoParams(S=S_source)
+    M_source=math.sqrt(2*lam_source**1.5/(1+chi))/S_source[0,0]
+    f_source=float(calc_FaW_aniso(.5,1.,S=S_source))
+    f_converted=f_source*math.sqrt(M_crack/M_source)
+    relative=f_converted/f_crack_axis-1
+    return {'Ortega_source_axis1':'loading y','Ortega_source_axis2':'crack x',
+            'Ortega_source_lambda':float(lam_source),'Ortega_source_chi':float(chi),
+            'Ortega_Eq12_M_MPa':float(M_source),'crack_axis_M_MPa':float(M_crack),
+            'Ortega_f_source_convention':f_source,
+            'independent_f_source_convention':float(f_crack_axis*math.sqrt(M_source/M_crack)),
+            'Ortega_f_converted_to_crack_axis_M':float(f_converted),
+            'source_consistent_K_relative_error':float(relative),
+            'source_consistent_J_relative_error':float((1+relative)**2-1)}
+
+
+def compare_fit_verification(out=ROOT):
+    """Compare independent solved factors to the unchanged fitted equation."""
+    out=Path(out)
+    directory=out/'ortega-verification'
+    results_path=directory/'orthotropic-results.json'
+    data=json.loads(results_path.read_text())
+    results=[]
+    for case in sorted({r['case_id'] for r in data}):
+        pair=[r for r in data if r['case_id']==case]
+        if len(pair)!=2:raise ValueError('Both mesh results required')
+        medium=next(r for r in pair if r['mesh']=='medium')
+        fine=next(r for r in pair if r['mesh']=='fine')
+        metadata=json.loads((directory/fine['job']/'source.json').read_text())
+        f=float(fine['f_fine'])
+        fit=metadata['Ortega_f_current_axes']
+        inverse=metadata['Ortega_f_reciprocal_axes']
+        source_comparison=source_consistent_ortega(metadata['S_MPa_inverse'],f)
+        mesh_change=f/medium['f_fine']-1
+        energy=max(r['elastic_energy_relative_difference'] for p in pair for r in p['steps'])
+        artificial=max(r['artificial_to_strain_energy_ratio'] for p in pair for r in p['steps'])
+        results.append({'case_id':case,'lambda':metadata['lambda_requested'],'chi':metadata['chi_requested'],
+                        'M_MPa':metadata['M_MPa'],'f_independent_fine':f,'f_independent_medium':medium['f_fine'],
+                        'a_over_W':.5,'crack_axis':'global x','opening_axis':'global y',
+                        'mesh_factor_relative_change':mesh_change,
+                        'crack_derivative_relative_change':fine['difference_step_relative_change'],
+                        'Ortega_f_current_axes':fit,'Ortega_f_reciprocal_axes':inverse,
+                        'current_axes_K_relative_error':fit/f-1,'reciprocal_axes_K_relative_error':inverse/f-1,
+                        'current_axes_J_relative_error':(fit/f)**2-1,
+                        'reciprocal_axes_J_relative_error':(inverse/f)**2-1,
+                        'fine_source_odb_sha256':fine['odb_sha256'],
+                        'max_energy_closure':energy,'max_artificial_to_strain':artificial,
+                        **source_comparison,
+                        'independent_FE_qualified':bool(abs(mesh_change)<.01 and fine['difference_step_relative_change']<.005
+                                                       and energy<1e-5 and artificial<.05)})
+    result={'scope':'Independent fitted-equation verification inside the published domain; no lattice-fracture or plastic-J validation.',
+            'rows':results,'source_results_sha256':digest(results_path),
+            'reused_isotropic_results':json.loads((out/'isotropic-results.json').read_text()),
+            'coefficients_changed':False,'reference_values_used_to_fit':False,
+            'axis_verdict':('Ortega Eq10 states E11 is along loading. Evaluate both its fitted factor and Eq12 modulus '
+                            'in loading-y/crack-x source order. Compare J=f_source^2/M_source; if reporting K with '
+                            'the crack-x/opening-y modulus, first convert f=f_source*sqrt(M_crack/M_source). '
+                            'Swapping only the fitted factor leaves an inconsistent unequal-modulus calculation.'),
+            'primary_source':{'paper':'Ortega et al., Composites Part A 63 (2014) 85-93, Eqs10,12,16 and Appendix A',
+                              'corrigendum':'Composites Part A 74 (2015) 140, amended Eq16',
+                              'coefficients_or_reference_data_tuned':False},
+            'summary':{'all_FE_qualified':all(row['independent_FE_qualified'] for row in results),
+                       'max_absolute_source_consistent_K_error':max(abs(row['source_consistent_K_relative_error']) for row in results),
+                       'max_absolute_source_consistent_J_error':max(abs(row['source_consistent_J_relative_error']) for row in results)},
+            'action':('Retain the fitted Ortega equation inside its domain. Equal-axial-modulus cases are unaffected by '
+                      'source-axis conversion. Unequal-axial-modulus callers must use the matched source f/M pair or '
+                      'the explicitly converted factor. These tests do not qualify extrapolation to square lattices '
+                      'outside chi=0.1..10 or calibrate plastic J.')}
+    (directory/'fit-comparison.json').write_text(json.dumps(result,indent=2)+'\n')
+    return result
 
 
 def extract(out=ROOT):
@@ -433,9 +601,13 @@ if __name__ == "__main__":
     action.add_argument("--extract",action="store_true")
     action.add_argument("--prepare-orthotropic",action="store_true")
     action.add_argument("--qualify",action="store_true")
+    action.add_argument("--prepare-fit-verification",action="store_true")
+    action.add_argument("--compare-fit-verification",action="store_true")
     arguments = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else sys.argv[1:]
     # CAE inserts its own launcher flags before the user arguments.
     args = parser.parse_known_args(arguments)[0] if "-cae" in arguments else parser.parse_args(arguments)
     print(json.dumps(prepare(args.out) if args.prepare else
                      prepare_orthotropic(args.out) if args.prepare_orthotropic else
+                     prepare_fit_verification(args.out) if args.prepare_fit_verification else
+                     compare_fit_verification(args.out) if args.compare_fit_verification else
                      qualify(args.out) if args.qualify else extract(args.out),indent=2))

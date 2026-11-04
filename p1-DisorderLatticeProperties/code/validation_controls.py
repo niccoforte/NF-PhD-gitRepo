@@ -31,6 +31,296 @@ def write_json(path, value):
     temporary.replace(path)
 
 
+def verified_control_delivery(meta, queue, completed):
+    """Bind an extracted control to unchanged sources and its serial receipt."""
+    if sha(meta["source_inp"]) != meta["source_sha256"] or sha(meta["input"]) != meta["input_sha256"]:
+        raise ValueError("Control source/input changed")
+    if meta["job"] not in completed:
+        raise ValueError("Control job has not completed")
+    run = job_directory(Path(queue) / "runs", meta["job"])
+    receipt_path = run / "delivery.json"
+    receipt = json.loads(receipt_path.read_text())
+    if receipt["job"] != meta["job"] or receipt.get("required_outputs_missing"):
+        raise ValueError("Incomplete control delivery")
+    delivered = {item["file"]: item for item in receipt["files"]}
+    for suffix in (".inp", ".odb", ".dat"):
+        filename = meta["job"] + suffix
+        if filename not in delivered or sha(run / filename) != delivered[filename]["sha256"]:
+            raise ValueError("Control delivery file differs from receipt")
+    if sha(run / (meta["job"] + ".inp")) != meta["input_sha256"]:
+        raise ValueError("Solved control input differs")
+    return run / (meta["job"] + ".odb"), receipt_path
+
+
+def body_tensor_source(source):
+    """Extract the existing BodySet graph and its actual four outer side sets."""
+    parsed = blocks(Path(source).read_text(encoding="ascii"))
+    nodes, elements, body_sets, sections, materials = {}, {}, [], [], []
+    sides = {name: [] for name in ("set-left", "set-right", "set-topbody", "set-bottombody")}
+    in_instance, instances = False, 0
+
+    def parameters(item):
+        return dict(piece.strip().lower().split("=", 1) for piece in item.splitlines()[0].split(",")[1:]
+                    if "=" in piece)
+
+    def labels(item):
+        values = [[int(v.strip()) for v in line.split(",") if v.strip()] for line in rows(item)]
+        if "generate" in item.splitlines()[0].lower():
+            if any(len(row) != 3 or row[2] <= 0 or row[1] < row[0] for row in values):
+                raise ValueError("Invalid generated body/set labels")
+            return {v for row in values for v in range(row[0], row[1]+1, row[2])}
+        return {v for row in values for v in row}
+
+    for item in parsed:
+        kind, params = key(item), parameters(item)
+        if kind == "*include":
+            raise ValueError("Body tensor controls require self-contained sources")
+        if kind == "*instance":
+            instances += 1
+            in_instance = True
+            if rows(item):
+                raise ValueError("Transformed source instances need separate review")
+        elif kind == "*end instance":
+            in_instance = False
+        elif kind == "*node":
+            if not in_instance:
+                raise ValueError("Expected the archived mesh inside one instance")
+            for line in rows(item):
+                values = [v.strip() for v in line.split(",")]
+                label = int(values[0])
+                if label in nodes:
+                    raise ValueError("Duplicate source node")
+                if len(values) > 3 and any(float(v) != 0 for v in values[3:] if v):
+                    raise ValueError("Only planar B21 source coordinates are supported")
+                nodes[label] = [float(values[1]), float(values[2])]
+        elif kind == "*element":
+            if not in_instance or params.get("type") != "b21":
+                raise ValueError("Body tensor controls require exact B21 elements")
+            for line in rows(item):
+                values = [int(v.strip()) for v in line.split(",")]
+                if len(values) != 3 or values[0] in elements:
+                    raise ValueError("Invalid/duplicate B21 source element")
+                elements[values[0]] = values[1:]
+        elif kind == "*elset" and params.get("elset") == "bodyset":
+            body_sets.append(labels(item))
+        elif kind == "*nset" and params.get("nset") in sides:
+            sides[params["nset"]].append(labels(item))
+        elif kind == "*beam section" and params.get("elset") == "bodyset":
+            if params.get("section") != "rect" or len(rows(item)) != 2:
+                raise ValueError("One rectangular BodySet section is required")
+            sections.append(item)
+        elif kind == "*elastic":
+            materials.append(item)
+    if instances != 1 or in_instance or len(body_sets) != 1 or len(sections) != 1 or len(materials) != 1:
+        raise ValueError("One source instance, BodySet, body section and elastic material are required")
+    ids = body_sets[0]
+    if not ids or not ids.issubset(elements):
+        raise ValueError("BodySet contains unknown/empty elements")
+    selected = {label: elements[label] for label in sorted(ids)}
+    connected = {node for edge in selected.values() for node in edge}
+    if not connected.issubset(nodes):
+        raise ValueError("BodySet connectivity contains missing source nodes")
+    body_nodes = {label: nodes[label] for label in sorted(connected)}
+    boundary_sides = {}
+    for name, candidates in sides.items():
+        if len(candidates) != 1:
+            raise ValueError("One explicit source set required for each body side")
+        if not candidates[0].issubset(nodes):
+            raise ValueError("Body side set contains unknown source nodes")
+        boundary_sides[name] = sorted(candidates[0] & connected)
+        if len(boundary_sides[name]) < 2:
+            raise ValueError("Each body side must retain at least two connected nodes")
+    boundary = sorted(set().union(*(set(v) for v in boundary_sides.values())))
+    bounds = np.array(list(body_nodes.values()), dtype=float)
+    lower, upper = bounds.min(axis=0), bounds.max(axis=0)
+    section = [float(v.strip()) for v in rows(sections[0])[0].split(",")]
+    elastic = [float(v.strip()) for v in rows(materials[0])[0].split(",")]
+    if len(section) != 2 or min(section) <= 0 or len(elastic) != 2 or elastic[0] <= 0 or not -1 < elastic[1] < .5:
+        raise ValueError("Invalid body section or elastic constituent")
+    if not np.isfinite(bounds).all() or min(upper-lower) <= 0:
+        raise ValueError("Body tensor needs a finite two-dimensional body")
+    return {"nodes": body_nodes, "elements": selected, "boundary_sides": boundary_sides,
+            "boundary_nodes": boundary, "bounds_mm": [lower.tolist(), upper.tolist()],
+            "section_card": sections[0], "section_B_t_mm": section, "elastic_MPa_nu": elastic}
+
+
+def prepare_body_tensor(source, out, name, macrostrain=1e-4):
+    """Three exact-source body-only B21 KUBC solves; preparation never submits."""
+    if not math.isfinite(macrostrain) or macrostrain <= 0:
+        raise ValueError("Positive finite body macrostrain required")
+    source = Path(source).resolve()
+    original_hash = sha(source)
+    mesh = body_tensor_source(source)
+    material = dict(piece.strip().lower().split("=", 1)
+                    for piece in mesh["section_card"].splitlines()[0].split(",")[1:] if "=" in piece)["material"]
+    contents = ["*Heading\n** Exact archived body-only B21 finite-body KUBC control\n*Node\n"]
+    contents += ["%d, %.17g, %.17g\n" % (label, *coord) for label, coord in mesh["nodes"].items()]
+    contents += ["*Element, type=B21, elset=BodySet\n"]
+    contents += ["%d, %d, %d\n" % (label, *edge) for label, edge in mesh["elements"].items()]
+    contents += [mesh["section_card"].rstrip()+"\n", "*Material, name="+material+"\n*Elastic\n",
+                 "%.17g, %.17g\n" % tuple(mesh["elastic_MPa_nu"]), "*Nset, nset=BodyBoundary\n"]
+    boundary = mesh["boundary_nodes"]
+    contents += [", ".join(str(v) for v in boundary[i:i+16])+"\n" for i in range(0, len(boundary), 16)]
+    origin = np.mean(np.asarray(mesh["bounds_mm"]), axis=0)
+    for column, label in enumerate(("Exx", "Eyy", "Gxy")):
+        contents += ["*Step, name=%s, nlgeom=NO\n*Static\n1., 1.\n*Boundary, op=NEW\n" % label]
+        for node in boundary:
+            x, y = np.asarray(mesh["nodes"][node])-origin
+            displacement = ((macrostrain*x, 0.), (0., macrostrain*y),
+                            (.5*macrostrain*y, .5*macrostrain*x))[column]
+            contents += ["%d, %d, %d, %.17g\n" % (node, dof, dof, displacement[dof-1]) for dof in (1, 2)]
+        contents += ["*Output, field\n*Node Output, nset=BodyBoundary\nU, RF\n"
+                     "*Output, history\n*Energy Output\nALLSE, ALLWK\n*End Step\n"]
+    contents = "".join(contents)
+    directory = job_directory(out, name)
+    directory.mkdir(parents=True, exist_ok=True)
+    inp = directory / (name+".inp")
+    if inp.exists() and inp.read_text(encoding="ascii") != contents:
+        raise ValueError("Refuse different existing body tensor input")
+    inp.write_text(contents, encoding="ascii")
+    width, height = np.diff(np.asarray(mesh["bounds_mm"]), axis=0)[0]
+    metadata = {"job": name, "input": str(inp), "input_sha256": sha(inp),
+                "source_inp": str(source), "source_sha256": original_hash,
+                "analysis": "finite_body_B21_KUBC_tensor", "state": "prepared_not_submitted",
+                "macrostrain": macrostrain, "elastic_MPa_nu": mesh["elastic_MPa_nu"],
+                "section_B_t_mm": mesh["section_B_t_mm"], "source_section_card": mesh["section_card"],
+                "body_element_labels": list(mesh["elements"]), "body_node_labels": list(mesh["nodes"]),
+                "boundary_nodes": boundary, "boundary_sides": mesh["boundary_sides"],
+                "bounds_mm": mesh["bounds_mm"], "origin_mm": origin.tolist(),
+                "width_mm": float(width), "height_mm": float(height),
+                "volume_mm3": float(width*height*mesh["section_B_t_mm"][0]),
+                "volume_definition": "gross body-node bounding-box width*height*source B",
+                "boundary_condition": "affine translations on actual four source body-side sets intersected with BodySet connected nodes; all rotations and interior translations free",
+                "engineering_shear": "ux=gamma*y/2; uy=gamma*x/2",
+                "tensor_order": "xx, yy, engineering xy; raw columns are independent load cases",
+                "retains": "original BodySet element/node labels, coordinates, connectivity, rectangular section and mapped constituent E/nu",
+                "limits": ["Finite-body kinematic upper-bound sensitivity, not an infinite periodic homogenisation",
+                           "No Mohr axial-affine sum; interior bending, shear and rotations relax",
+                           "No forced C11=C22, C12=C21 or zero normal/shear coupling",
+                           "A coupled tensor does not automatically qualify the aligned orthotropic M formula"]}
+    if sha(source) != original_hash:
+        raise ValueError("Archived body source changed during preparation")
+    write_json(directory / "source.json", metadata)
+    return metadata
+
+
+def prepare_body_tensors(root, out, macrostrain=1e-4):
+    """Prepare only the four reviewed hex/kagome periodic/full-ID1 pilots."""
+    root, out = Path(root).resolve(), Path(out).resolve()
+    uat = root / "audit/controls/uat-initial-response"
+    records = []
+    for suffix in ("hex_per", "hex_full1", "kag_per", "kag_full1"):
+        parent = uat / ("uat_"+suffix) / "source.json"
+        previous = json.loads(parent.read_text())
+        if sha(previous["source_inp"]) != previous["source_sha256"]:
+            raise ValueError("UAT parent source changed before body pilot")
+        record = prepare_body_tensor(previous["source_inp"], out, "body_"+suffix, macrostrain)
+        record.update(parent_source_json=str(parent), parent_source_json_sha256=sha(parent))
+        write_json(Path(record["input"]).parent / "source.json", record)
+        records.append(record)
+    manifest = {"jobs": [{"job": item["job"], "input": item["input"], "input_sha256": item["input_sha256"],
+                          "kind": item["analysis"], "purpose": "Body-tensor disorder/M sensitivity pilot; finite-size KUBC",
+                          "cpus": 8, "allow_solver_failure": False, "required_outputs": [".odb", ".dat"]}
+                         for item in records], "queue_root": str(out / "queue"),
+                "abaqus": "C:/SIMULIA/Commands/abaqus.bat"}
+    proposal = out / "serial-body-tensor-proposal.json"
+    if proposal.exists() and json.loads(proposal.read_text()) != manifest:
+        raise ValueError("Refuse different existing body pilot proposal")
+    write_json(proposal, manifest)
+    write_json(out / "preflight.json", {"state": "prepared_not_submitted", "jobs": records,
+               "manifest": str(proposal), "source_inputs_changed": False,
+               "review_required_before_submission": True})
+    return {"prepared_jobs": len(records), "manifest": str(proposal), "preflight": str(out / "preflight.json")}
+
+
+def body_tensor_values(coordinates, reactions, macrostrain, volume, stored_energies):
+    """Recover all raw C entries from boundary virtual work, without projection."""
+    xy, forces, energies = (np.asarray(value, dtype=float) for value in (coordinates, reactions, stored_energies))
+    if (xy.ndim != 2 or xy.shape[1] != 2 or len(xy) < 3 or forces.shape != (3, len(xy), 2)
+            or energies.shape != (3,) or not all(np.isfinite(v).all() for v in (xy, forces, energies))
+            or not math.isfinite(macrostrain) or macrostrain <= 0 or not math.isfinite(volume) or volume <= 0):
+        raise ValueError("Invalid body reaction/strain/volume arrays")
+    x, y = xy.T
+    virtual = np.array([np.column_stack((x, np.zeros_like(x))),
+                        np.column_stack((np.zeros_like(y), y)), np.column_stack((y/2, x/2))])
+    C = np.einsum("knd,jnd->kj", virtual, forces) / (volume*macrostrain)
+    symmetry = float(np.max(np.abs(C-C.T))/max(np.max(np.abs(C)), 1e-30))
+    eigenvalues = np.linalg.eigvalsh((C+C.T)/2)
+    checks = []
+    for column, label in enumerate(("Exx", "Eyy", "Gxy")):
+        work = .5*volume*macrostrain**2*C[column, column]
+        relative = abs(energies[column]-work)/max(abs(work), 1e-30)
+        force_scale = np.linalg.norm(forces[column], axis=1).sum()
+        force_balance = float(np.linalg.norm(forces[column].sum(axis=0))/max(force_scale, 1e-30))
+        torque = float(np.sum(x*forces[column, :, 1]-y*forces[column, :, 0]))
+        torque_balance = abs(torque)/max(force_scale*np.linalg.norm(np.ptp(xy, axis=0)), 1e-30)
+        if work <= 0 or relative > 1e-5 or max(force_balance, torque_balance) > 1e-5:
+            raise ValueError("Body tensor reaction balance or work-energy check failed")
+        checks.append({"load_case": label, "ALLSE_N_mm": float(energies[column]),
+                       "macro_work_N_mm": float(work), "relative_error": float(relative),
+                       "force_balance_relative": force_balance, "torque_balance_relative": float(torque_balance)})
+    if symmetry > 1e-4 or eigenvalues.min() <= 0:
+        raise ValueError("Body tensor is asymmetric/nonpositive")
+    S = np.linalg.inv(C)
+    return {"C_MPa_raw": C.tolist(), "S_per_MPa_raw": S.tolist(), "energy_checks": checks,
+            "major_symmetry_relative_error": symmetry, "symmetric_part_eigenvalues_MPa": eigenvalues.tolist(),
+            "E_x_MPa": float(1/S[0, 0]), "E_y_MPa": float(1/S[1, 1]),
+            "normal_shear_coupling_relative": float(np.max(np.abs(C[:2, 2]))/np.max(np.abs(C))),
+            "projection_applied": False, "conversion_M_status": "not selected; retain full tensor and assess coupling/finite-body sensitivity first"}
+
+
+def gather_body_tensors(out, queue):
+    """Receipt-verified, read-only extraction of the four body-tensor pilots."""
+    from odbAccess import openOdb
+    out, queue = Path(out).resolve(), Path(queue).resolve()
+    completed = {item["job"] for item in json.loads((queue / "state.json").read_text())["jobs"]
+                 if item["status"] == "completed"}
+    records = []
+    for path in sorted(out.glob("body_*/source.json")):
+        meta = json.loads(path.read_text())
+        odb_path, receipt_path = verified_control_delivery(meta, queue, completed)
+        mesh = body_tensor_source(meta["source_inp"])
+        labels = meta["boundary_nodes"]
+        xy = np.array([mesh["nodes"][label] for label in labels])-np.array(meta["origin_mm"])
+        before = sha(odb_path)
+        odb = openOdb(str(odb_path), readOnly=True)
+        reactions, stored, external = [], [], []
+        try:
+            for column, label in enumerate(("Exx", "Eyy", "Gxy")):
+                step = odb.steps[label]
+                frame = step.frames[-1]
+                rf = {value.nodeLabel: list(value.data[:2]) for value in frame.fieldOutputs["RF"].values}
+                uu = {value.nodeLabel: list(value.data[:2]) for value in frame.fieldOutputs["U"].values}
+                if set(rf) != set(labels) or set(uu) != set(labels):
+                    raise ValueError("Incomplete or unexpected body boundary fields")
+                x, y = xy.T
+                target = (np.column_stack((x, np.zeros_like(x))), np.column_stack((np.zeros_like(y), y)),
+                          np.column_stack((y/2, x/2)))[column]*meta["macrostrain"]
+                if not np.allclose(np.array([uu[node] for node in labels]), target, rtol=1e-6, atol=1e-10):
+                    raise ValueError("Body boundary displacement differs from prescribed macrostrain")
+                reactions.append([rf[node] for node in labels])
+                energies = [region.historyOutputs for region in step.historyRegions.values()
+                            if "ALLSE" in region.historyOutputs and "ALLWK" in region.historyOutputs]
+                if len(energies) != 1:
+                    raise ValueError("Unique whole-model body energy history required")
+                se, wk = (float(energies[0][field].data[-1][1]) for field in ("ALLSE", "ALLWK"))
+                if abs(se-wk)/max(abs(se), 1e-30) > 1e-5:
+                    raise ValueError("Body stored/external work mismatch")
+                stored.append(se)
+                external.append(wk)
+        finally:
+            odb.close()
+        if sha(odb_path) != before:
+            raise ValueError("Body tensor ODB changed during read-only extraction")
+        result = dict(meta, **body_tensor_values(xy, reactions, meta["macrostrain"], meta["volume_mm3"], stored),
+                      ALLWK_N_mm=external, state="completed_and_extracted", read_only=True,
+                      odb=str(odb_path), odb_sha256=before, delivery_sha256=sha(receipt_path))
+        write_json(path.parent / "result.json", result)
+        records.append(result)
+    write_json(out / "body-tensor-summary.json", records)
+    return records
+
+
 def compliance_values(displacement, fixed_reaction, load=1.):
     if not all(math.isfinite(value) for value in (displacement, fixed_reaction, load)) or displacement <= 0 or load <= 0:
         raise ValueError("Positive finite unit-load compliance required")
@@ -40,6 +330,135 @@ def compliance_values(displacement, fixed_reaction, load=1.):
     return {"load_N": load, "compliance_mm_N": displacement / load,
             "static_stiffness_N_mm": load / displacement, "fixed_pin_reaction_y_N": fixed_reaction,
             "force_balance_relative": balance}
+
+
+def prepare_uat_linear(source, out, name, travel=1e-4):
+    """Exact archived UAT clamp geometry, undeformed elastic tangent only.
+
+    Prescribed equal clamp travel preserves the original boundary conditions;
+    distributing a nominal force across grip nodes would be a different test.
+    This calculation supplies a grip-to-grip slope, not a full material tensor.
+    """
+    if not math.isfinite(travel) or travel <= 0:
+        raise ValueError("Positive finite clamp travel required")
+    source = Path(source).resolve()
+    parsed = blocks(source.read_text(encoding="ascii"))
+    starts = [i for i, item in enumerate(parsed) if key(item) == "*step"]
+    if len(starts) != 1:
+        raise ValueError("Expected one archived UAT step")
+    model, step = parsed[:starts[0]], parsed[starts[0]:]
+    if any(key(item) in ("*boundary", "*include") for item in model):
+        raise ValueError("Initial constraints/includes need separate review")
+    boundaries = [line.replace(" ", "").lower() for item in step if key(item) == "*boundary"
+                  for line in rows(item)]
+    expected = {"set-top,1,1", "set-top,2,2,1.", "set-top,6,6",
+                "set-bottom,1,1", "set-bottom,2,2", "set-bottom,6,6"}
+    if len(boundaries) != 6 or set(boundaries) != expected:
+        raise ValueError("Unfamiliar UAT clamp constraints")
+    materials = [rows(item) for item in model if key(item) == "*elastic"]
+    if len(materials) != 1 or len(materials[0]) != 1:
+        raise ValueError("One homogeneous elastic constituent required")
+    sections = [item for item in model if key(item) == "*beam section"]
+    if not sections or any("section=rect" not in item.splitlines()[0].lower().replace(" ", "")
+                           for item in sections):
+        raise ValueError("Only reviewed rectangular B21 sections are supported")
+    types = [item.splitlines()[0].lower().replace(" ", "") for item in model if key(item) == "*element"]
+    if not types or any("type=b21" not in item for item in types):
+        raise ValueError("Only exact B21 mesh controls are supported")
+    ignored = {"*amplitude", "*plastic", "*damage initiation", "*damage evolution"}
+    prefix = "".join(item for item in model if key(item) not in ignored)
+    contents = prefix.rstrip() + ("\n*Step, name=UATLinear, nlgeom=NO\n*Static\n1., 1.\n"
+        "*Boundary\nSet-bottom, 1, 2\nSet-bottom, 6, 6\n"
+        "Set-top, 1, 1\nSet-top, 6, 6\nSet-top, 2, 2, %.16g\n"
+        "*Output, field\n*Node Output\nU, RF\n*Output, history\n"
+        "*Energy Output\nALLSE, ALLWK\n*End Step\n") % travel
+    directory = job_directory(out, name)
+    directory.mkdir(parents=True, exist_ok=True)
+    inp = directory / (name + ".inp")
+    if inp.exists() and inp.read_text(encoding="ascii") != contents:
+        raise ValueError("Refuse different existing UAT linear input")
+    inp.write_text(contents, encoding="ascii")
+    metadata = {"job": name, "input": str(inp), "input_sha256": sha(inp),
+                "source_inp": str(source), "source_sha256": sha(source),
+                "analysis": "initial_linear_UAT_clamp_response", "travel_mm": travel,
+                "elastic_MPa_nu": [float(v) for v in materials[0][0].split(",")],
+                "section_cards": sections, "source_mesh_and_clamp_BCs_retained": True,
+                "removed": sorted(ignored), "fit_interval": "none; undeformed linear solve"}
+    write_json(directory / "source.json", metadata)
+    return metadata
+
+
+def uat_linear_values(travel, top_force, bottom_force, body_travel, height, width, thickness):
+    """Convert a qualified clamp solution using the original gross-area gauge."""
+    values = [travel, top_force, body_travel, height, width, thickness]
+    if not all(math.isfinite(value) and value > 0 for value in values) or not math.isfinite(bottom_force):
+        raise ValueError("Positive finite UAT displacement/force/gauge required")
+    balance = abs(top_force + bottom_force) / top_force
+    if balance > 1e-5 or body_travel > travel * (1 + 1e-8):
+        raise ValueError("UAT balance or body/clamp travel inconsistent")
+    area = width * thickness
+    return {"force_N": top_force, "bottom_force_N": bottom_force,
+            "force_balance_relative": balance, "body_travel_mm": body_travel,
+            "body_height_mm": height, "gross_width_mm": width, "B_mm": thickness,
+            "gross_area_mm2": area, "clamp_stiffness_N_mm": top_force / travel,
+            "E_apparent_MPa": height * top_force / (area * travel),
+            "E_body_gauge_MPa": height * top_force / (area * body_travel),
+            "body_to_clamp_travel": body_travel / travel}
+
+
+def gather_uat_linear(out, queue):
+    """Read-only, receipt-verified extraction; original source INPs are untouched."""
+    from odbAccess import openOdb
+    out, queue = Path(out).resolve(), Path(queue).resolve()
+    state = json.loads((queue / "state.json").read_text())
+    completed = {item["job"] for item in state["jobs"] if item["status"] == "completed"}
+    records = []
+    for path in sorted(out.glob("uat_*/source.json")):
+        meta = json.loads(path.read_text())
+        odb_path, receipt_path = verified_control_delivery(meta, queue, completed)
+        before = sha(odb_path)
+        odb = openOdb(str(odb_path), readOnly=True)
+        try:
+            frame = odb.steps["UATLinear"].frames[-1]
+            assembly = odb.rootAssembly
+            def field(component, set_name):
+                return [float(v.data[component]) for v in frame.fieldOutputs[
+                    "RF" if set_name.endswith("_RF") else "U"].getSubset(
+                        region=assembly.nodeSets[set_name.removesuffix("_RF")]).values]
+            top_u = field(1, "SET-TOP")
+            if not np.allclose(top_u, meta["travel_mm"], rtol=1e-6, atol=1e-12):
+                raise ValueError("Clamp travel differs from prescribed control")
+            body_delta = float(np.mean(field(1, "SET-TOPBODY")) - np.mean(field(1, "SET-BOTTOMBODY")))
+            def node_coords(name):
+                groups = assembly.nodeSets[name].nodes
+                return [node.coordinates for group in groups for node in group]
+            top, bottom = node_coords("SET-TOPBODY"), node_coords("SET-BOTTOMBODY")
+            left, right = node_coords("SET-LEFT"), node_coords("SET-RIGHT")
+            height = float(np.mean([v[1] for v in top]) - np.mean([v[1] for v in bottom]))
+            width = float(np.mean([v[0] for v in right]) - np.mean([v[0] for v in left]))
+            thicknesses = [float(rows(card)[0].split(",")[0]) for card in meta["section_cards"]]
+            if not np.allclose(thicknesses, thicknesses[0], rtol=0, atol=0):
+                raise ValueError("Nonuniform out-of-plane thickness")
+            result = uat_linear_values(meta["travel_mm"], sum(field(1, "SET-TOP_RF")),
+                sum(field(1, "SET-BOTTOM_RF")), body_delta, height, width, thicknesses[0])
+            histories = [region.historyOutputs for region in odb.steps["UATLinear"].historyRegions.values()
+                         if "ALLSE" in region.historyOutputs and "ALLWK" in region.historyOutputs]
+            if len(histories) != 1:
+                raise ValueError("Unique whole-model work/energy history required")
+            stored = float(histories[0]["ALLSE"].data[-1][1])
+            work = float(histories[0]["ALLWK"].data[-1][1])
+            result["work_energy_relative"] = abs(stored-work) / max(abs(work), 1e-30)
+            result["clamp_work_energy_relative"] = abs(stored-.5*result["force_N"]*meta["travel_mm"]) / max(abs(stored), 1e-30)
+            if max(result["work_energy_relative"], result["clamp_work_energy_relative"]) > 1e-5:
+                raise ValueError("UAT linear energy mismatch")
+        finally:
+            odb.close()
+        if before != sha(odb_path):
+            raise ValueError("UAT control ODB changed during extraction")
+        records.append(dict(meta, **result, state="completed_and_extracted", read_only=True,
+                            odb=str(odb_path), odb_sha256=before, delivery_sha256=sha(receipt_path)))
+    write_json(out / "uat-linear-summary.json", records)
+    return records
 
 
 def similarity_controls(root, case, generation_record, *, parent_cases=None, control_paths=None):
@@ -561,12 +980,23 @@ def gather(root, out):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("prepare", "gather", "prepare-compliance", "gather-compliance",
-                                           "prepare-completion", "gather-completion"))
+                                           "prepare-completion", "gather-completion",
+                                           "prepare-body-tensors", "gather-body-tensors"))
     parser.add_argument("--root", type=Path, default=Path("Z:/p1/sims/Ti/Validation"))
     parser.add_argument("--out", type=Path, default=Path("Z:/p1/sims/Ti/Validation/audit/controls"))
     parser.add_argument("--queue-root", type=Path)
+    parser.add_argument("--macrostrain", type=float, default=1e-4)
     args = parser.parse_args()
-    if args.action == "prepare-completion":
+    if args.action == "prepare-body-tensors":
+        print(json.dumps(prepare_body_tensors(args.root, args.out, args.macrostrain), indent=2))
+    elif args.action == "gather-body-tensors":
+        if args.queue_root is None:
+            parser.error("gather-body-tensors requires --queue-root")
+        records = gather_body_tensors(args.out, args.queue_root)
+        print(json.dumps([{key: row[key] for key in ("job", "state", "E_x_MPa", "E_y_MPa",
+            "normal_shear_coupling_relative", "major_symmetry_relative_error")}
+            for row in records], indent=2))
+    elif args.action == "prepare-completion":
         print(json.dumps(prepare_completion_controls(args.root), indent=2))
     elif args.action == "gather-completion":
         print(json.dumps(gather_completion_controls(args.root, args.queue_root), indent=2))

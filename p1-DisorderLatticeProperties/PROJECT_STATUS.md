@@ -30,8 +30,26 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   residual without tuning. Source fracture simulations remain reusable.
   The72-curve filter pilot preserves work much better than peak/endpoints;
   it does not justify one universal cutoff or automatic ML promotion.
-  Stable initial windows fail for9/9 sampled hex cases; sparse native plasticity
-  fields prevent declaring an extended/averaged slope an elastic body modulus.
+  The later in-domain Ortega check is complete:18 elastic jobs/9 tensors,
+  max errors .883%K/1.773%J, including unequal axes. Source-loading f/M must
+  remain paired; shared calcFT now converts f to the Bao crack-axis convention.
+  Old square baseline workbook values replay isotropic ASTM, not Ortega;
+  two plotted D literals contain unexplained additive offsets. The direct
+  square C(T) comparison is a separate lattice check, not fit validation.
+  Four exact-source UAT linear controls now replace speculation about failed
+  hex fits: no fitting interval, actual B21 bending/shear, prescribed .0001mm
+  clamp travel. Hex periodic/full-ID1 Eapp=1.574/1.528GPa; kagome7.448/5.625GPa.
+  Body-gauge values are separate; these are not full material tensors.
+  Four additional body-only beam jobs recover full raw tensors through3strain
+  cases each; all numerical checks pass. Kagome full-ID1 E_y drops23.7%; raw
+  normal/shear coupling remains.69%hex/1.03%kagome, not forced to zero.
+  Population solution is exact-source beam FE (UAT tangent, CT compliance,
+  body tensor), pending bounded body-boundary/coupling qualification; no Mohr
+  hex fallback or UAT-slope scaling. All26 new elastic jobs are complete.
+  Full-history .4-Nyquist Butterworth changes hex-ID1 ductility10.736%; it is
+  not approved for property labels. Actual24-source example figures and masks
+  are under audit/curve-processing/filtered-curves. Mask actual strain/opening
+  support, not frame count; no validated periodic-modal transfer is claimed.
   Current curves need an end-to-end mask migration; C.3 does not justify scaling
   FCC M from one UAT slope. Mesh convergence remains before PSC (168source sets).
 

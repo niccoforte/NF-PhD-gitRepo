@@ -13,9 +13,69 @@ from unittest.mock import patch
 
 import numpy as np
 
-from validation_controls import compliance_values, gather_compliance, gather_completion_controls, similarity_controls
+from validation_controls import (compliance_values, gather_compliance, gather_completion_controls,
+                                 similarity_controls, prepare_uat_linear, uat_linear_values,
+                                 body_tensor_values)
 from validation_diagnostics import condense, periodic_patch
 from validation_modal import prepare, sha256
+
+
+class BodyTensorTests(unittest.TestCase):
+    def test_virtual_work_recovers_coupled_tensor_without_projection(self):
+        xy = np.array([[-1., -1.], [1., -1.], [1., 1.], [-1., 1.]])
+        C = np.array([[10., 2., .4], [2., 8., -.3], [.4, -.3, 3.]])
+        strain, volume = .001, 4.
+        virtual = np.array([np.column_stack((xy[:, 0], np.zeros(4))),
+                            np.column_stack((np.zeros(4), xy[:, 1])),
+                            np.column_stack((xy[:, 1]/2, xy[:, 0]/2))]).reshape(3, -1)
+        # Construct equilibrated boundary forces from the continuum virtual work.
+        reactions = (np.linalg.pinv(virtual) @ (volume*strain*C)).T.reshape(3, 4, 2)
+        energies = .5*volume*strain**2*np.diag(C)
+        result = body_tensor_values(xy, reactions, strain, volume, energies)
+        np.testing.assert_allclose(result['C_MPa_raw'], C, atol=1e-14)
+        self.assertFalse(result['projection_applied'])
+        self.assertGreater(result['normal_shear_coupling_relative'], 0)
+        with self.assertRaisesRegex(ValueError, 'work-energy'):
+            body_tensor_values(xy, reactions, strain, volume, 2*energies)
+        reactions[0, 0, 0] += .1
+        with self.assertRaises(ValueError):
+            body_tensor_values(xy, reactions, strain, volume, energies)
+
+
+class UATLinearTests(unittest.TestCase):
+    def test_gross_area_and_grip_compliance_are_distinct(self):
+        result = uat_linear_values(.0001, 2., -2., .00008, 100., 20., 2.)
+        self.assertAlmostEqual(result['E_apparent_MPa'], 50000.)
+        self.assertAlmostEqual(result['E_body_gauge_MPa'], 62500.)
+        self.assertAlmostEqual(result['clamp_stiffness_N_mm'], 20000.)
+        self.assertEqual(result['force_balance_relative'], 0.)
+
+    def test_unbalanced_or_inconsistent_control_is_rejected(self):
+        for travel, reaction, body in ((.0001, -1.9, .00008), (.0001, -2., .0002), (0., -2., .00008)):
+            with self.assertRaises(ValueError):
+                uat_linear_values(travel, 2., reaction, body, 100., 20., 2.)
+
+    def test_exact_geometry_and_clamps_survive_preparation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            source = Path(temporary) / 'source.inp'
+            text = ('*Heading\n*Node\n1,0,0\n2,0,1\n*Element,type=B21\n1,1,2\n'
+                    '*Beam Section,elset=BodySet,material=ti,section=RECT\n2.,.1\n0.,0.,-1.\n'
+                    '*Material,name=ti\n*Elastic\n135165.,.428571\n*Plastic\n1.,0.\n'
+                    '*Amplitude,name=Amp-1\n0.,0.,1.,1.\n*Step\n*Dynamic,Explicit\n,1.\n'
+                    '*Boundary,amplitude=Amp-1\nSet-top,1,1\nSet-top,2,2,1.\nSet-top,6,6\n'
+                    '*Boundary,amplitude=Amp-1\nSet-bottom,1,1\nSet-bottom,2,2\nSet-bottom,6,6\n*End Step\n')
+            source.write_text(text)
+            metadata = prepare_uat_linear(source, Path(temporary) / 'out', 'uat_test')
+            prepared = Path(metadata['input']).read_text()
+            self.assertIn('*Element,type=B21\n1,1,2', prepared)
+            self.assertIn('Set-top, 2, 2, 0.0001', prepared)
+            self.assertNotIn('*Plastic', prepared)
+            self.assertNotIn('*Amplitude', prepared)
+            self.assertEqual(source.read_text(), text)
+            self.assertEqual(metadata['fit_interval'], 'none; undeformed linear solve')
+            source.write_text(text.replace('Set-top,6,6', 'Set-top,6,6,1.'))
+            with self.assertRaises(ValueError):
+                prepare_uat_linear(source, Path(temporary) / 'out2', 'uat_bad')
 
 
 class SquarePeriodicPatchTests(unittest.TestCase):

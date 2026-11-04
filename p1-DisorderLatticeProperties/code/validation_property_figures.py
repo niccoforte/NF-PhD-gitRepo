@@ -18,9 +18,9 @@ import pandas as pd
 
 TOPOLOGIES = ("tri", "kagome", "hex", "FCC")
 NAMES = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal", "FCC": "FCC"}
-COLORS = {"tri": "#c43b3b", "kagome": "#333333", "hex": "#3465a4", "FCC": "#67853b"}
-DESIGNS = (("full", "Full disorder", "", "#3974a8"),
-           ("mechanism", "Mechanism-based disorder", "Target-xs", "#d48332"))
+COLORS = {"tri": "#ff0000", "kagome": "#000000", "hex": "#008000", "FCC": "#0000ff"}
+DESIGNS = (("full", "Full disorder", "", "#ff7f0e"),
+           ("mechanism", "Mechanism-based disorder", "Target-xs", "#1f77b4"))
 
 
 def read_frame(path, role, sources, **kwargs):
@@ -160,7 +160,7 @@ def run(root, data_root, output):
              "pdf.fonttype": 42, "svg.fonttype": "none"}
     with plt.rc_context(style):
         fig, axes = plt.subplots(2, 2, figsize=(9.4, 7.1))
-        fit_colors = {5: "#c46d23", 8: "#3c85af", 12: "#864d99"}
+        fit_styles = {5: ":", 8: "-.", 12: "-"}
         for ax, topology in zip(axes.flat, TOPOLOGIES):
             text = []
             for kind in ("ordered", "full_id1"):
@@ -171,13 +171,13 @@ def run(root, data_root, output):
                 if not np.isfinite(raw[:14]).all():
                     raise ValueError("Fit example lacks a genuine finite initial interval")
                 x, y = raw[:14].T
-                ax.plot(100*x, y, "o-", color="#555555" if kind == "ordered" else "#bca384", ms=3,
+                ax.plot(100*x, y, "o-", color=COLORS[topology] if kind == "ordered" else DESIGNS[0][3], ms=3,
                         lw=.9, alpha=.8)
                 for n in ((12,) if kind == "ordered" else (5, 8, 12)):
                     slope, intercept = np.polyfit(x[:n], y[:n], 1)
-                    color = "#555555" if kind == "ordered" else fit_colors[n]
+                    color = COLORS[topology] if kind == "ordered" else DESIGNS[0][3]
                     ax.plot(100*x[:n], slope*x[:n]+intercept, color=color,
-                            ls="--" if kind == "ordered" else "-", lw=1.3)
+                            ls="--" if kind == "ordered" else fit_styles[n], lw=1.3)
                     fit_rows.append({"topology": topology, "kind": kind, "samples": n, "E_app_MPa": float(slope),
                                      "intercept_MPa": float(intercept), "last_strain": float(x[n-1]),
                                      "source": case["path"], "source_sha256": case["sha256"],
@@ -188,15 +188,15 @@ def run(root, data_root, output):
                     curve_rows.append({"figure": "elastic_fit", "topology": topology, "kind": kind,
                                        "sample": sample, "strain": float(strain), "stress_MPa": float(stress)})
             ax.set_title(NAMES[topology])
-            ax.set_xlabel(r"Macroscopic strain, $\mathcal{E}$ (%)")
+            ax.set_xlabel(r"Macroscopic strain, $\varepsilon_L$ (%)")
             ax.set_ylabel(r"Macroscopic stress, $\Sigma$ (MPa)")
             ax.grid(alpha=.18)
             ax.text(.03, .97, "\n".join(text), transform=ax.transAxes, va="top", fontsize=8,
                     bbox={"facecolor": "white", "edgecolor": "none", "alpha": .86})
         fig.suptitle("Initial loading: elastic-fit window sensitivity", y=.985, fontsize=12)
-        handles = [Line2D([], [], color="#555555", marker="o", ms=3, label="Ordered raw response"),
-                   Line2D([], [], color="#bca384", marker="o", ms=3, label="Full-disorder ID 1 raw response")]
-        handles += [Line2D([], [], color=color, label="Full ID 1 fit: {} points".format(n)) for n, color in fit_colors.items()]
+        handles = [Line2D([], [], color="#111111", marker="o", ms=3, label="Periodic raw response (topology colour)"),
+                   Line2D([], [], color=DESIGNS[0][3], marker="o", ms=3, label="Full-disorder ID 1 raw response")]
+        handles += [Line2D([], [], color=DESIGNS[0][3], ls=style, label="Full ID 1 fit: {} points".format(n)) for n, style in fit_styles.items()]
         fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .02), ncol=3, frameon=False)
         fig.subplots_adjust(top=.92, bottom=.17, left=.09, right=.98, hspace=.42, wspace=.28)
         save_figure(fig, output, "uat-elastic-fits")
@@ -206,13 +206,9 @@ def run(root, data_root, output):
         handles = plot_ranges(ax, summaries, periodic, "FT")
         for row in references:
             x = TOPOLOGIES.index(row["topology"])
-            ax.errorbar(x, row["ordinate"],
-                        yerr=[[row["ordinate"]-row["graphical_lower"]],
-                              [row["graphical_upper"]-row["ordinate"]]],
-                        fmt="^", ms=8, mfc="white", mec="#111111", mew=1.2,
-                        ecolor="#111111", elinewidth=.7, capsize=2, zorder=6)
-        low = min(row["graphical_lower"] for row in references)
-        upper = max(ax.get_ylim()[1], max(row["graphical_upper"] for row in references))
+            ax.plot(x, row["ordinate"], "^", ms=8, mfc="white", mec="#111111", mew=1.2, zorder=6)
+        low = min(row["ordinate"] for row in references)
+        upper = max(ax.get_ylim()[1], max(row["ordinate"] for row in references))
         ax.set_ylim(max(0., low-.06*(upper-low)), upper)
         handles += [Line2D([], [], marker="^", color="#111111", mfc="white", ls="none",
                            ms=7, label="Hsieh et al.")]
@@ -254,7 +250,7 @@ def run(root, data_root, output):
             for sample in range(stop):
                 curve_rows.append({"figure": "periodic_UAT_saved_curve", "topology": topology, "kind": "ordered",
                                    "sample": sample, "strain": float(x[sample]), "stress_MPa": float(y[sample])})
-        ax.set_xlabel(r"Macroscopic strain, $\mathcal{E}$ (%)")
+        ax.set_xlabel(r"Macroscopic strain, $\varepsilon_L$ (%)")
         ax.set_ylabel(r"Macroscopic stress, $\Sigma$ (MPa)")
         ax.set_title("(a) Periodic lattices")
         ax.grid(alpha=.18)
@@ -282,7 +278,13 @@ def run(root, data_root, output):
                 "eligibility": "Finite positive values of each current saved metric; existing source omissions remain missing, not recovered or imputed.",
                 "sources": list(sources.values()), "summaries": summaries, "periodic_UAT_crossings": crossing_rows,
                 "Hsieh_reference": references,
-                "manuscript_symbols": {"strain": "mathcal E", "stress": "Sigma", "ductility": "mathcal D"},
+                "manuscript_symbols": {"strain": "varepsilon_L", "stress": "Sigma", "ductility": "mathcal D",
+                                       "strain_authority": "Explicit author correction; replaces historical mathcal E figure labels."},
+                "colours": {"topology": COLORS, "disorder": {row[0]: row[3] for row in DESIGNS},
+                            "topology_authority": "Existing ValConvPlots.ipynb convergence curves: triangular red, kagome black, hexagonal green, FCC blue."},
+                "Hsieh_reference_bounds": {"displayed": False, "kind": "Graphical digitisation bounds, not experimental error bars or statistical intervals.",
+                                           "origin": "validation_benchmark.graphical_bounds: marker-centre/window controls and bounded one-pixel axis-anchor perturbations.",
+                                           "retained": "Unchanged graphical_lower/graphical_upper fields in hsieh-reference-points.csv and Hsieh_reference metadata."},
                 "limits": ["Historical metrics may change substantially after the accepted scientific corrections.",
                            "No new modulus/toughness method, source substitution, field reconstruction or FEA execution.",
                            "Initial fit windows are sensitivity examples and do not establish pre-plastic linearity or body material modulus.",
@@ -294,7 +296,8 @@ def run(root, data_root, output):
         "FT population. Periodic lattice and disorder distributions at nominal bar length 10 mm and relative density 20%. "
         "White circles indicate medians, thick bars the interquartile range, narrower intervals the 5–95 percentiles, and thin lines the full available range. "
         "Counts are per metric; population spread is not measurement uncertainty. Hollow triangles are Hsieh et al. Fig.10 initiation values digitised at 3 mm "
-        "and multiplied by sqrt(10/3), with graphical digitisation bounds scaled consistently. These are length-scaled references, not independently published 10 mm values. "
+        "and multiplied by sqrt(10/3). Graphical digitisation bounds are retained in the companion reference data but are not plotted as error bars; they are not statistical uncertainty. "
+        "These are length-scaled references, not independently published 10 mm values. "
         "No FCC reference is supplied by Hsieh. Current study population and periodic values use the same historical saved calculation and remain pending the accepted reprocessing.\n\n"
         "UAT population. (a) Periodic titanium macroscopic stress–strain responses; circles and dashed lines mark the defined ductility strain. "
         "(b) Periodic ductility and disorder distributions, using the same population interval definitions as FT. "

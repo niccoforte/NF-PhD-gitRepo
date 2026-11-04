@@ -35,8 +35,12 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - `validation_failure_audit.py` binds each of the48 native tensile-strain
   initiation brackets to saved section damage and source fingerprints.
   `validation_controls.py` prepares/extracts exact-source B21 conversion and
-  initial-compliance controls. `validation_work_partition.py` measures matched
-  nonlinear unloading separately from native IE-SE dissipation estimates.
+  initial-compliance controls.
+  `prepare_uat_linear` retains exact UAT clamps/sections and computes the initial
+  tangent by elastic travel/reaction, never a fit through unresolved plasticity.
+  A body-gauge slope is not the full conversion tensor. No D Mohr fallback.
+  `validation_work_partition.py` measures matched nonlinear unloading separately
+  from native IE-SE dissipation estimates.
   `validation_results.py` verifies extraction attestations, event indices/times,
   undamaged prefixes and source-specific controls before writing the selected
   comparison CSV. Hsieh Appendix D uses an initial-slope triangle: negative

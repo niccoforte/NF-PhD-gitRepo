@@ -4,10 +4,49 @@ import json
 import tempfile
 from pathlib import Path
 
-from validation_elastic_calibration import digest, elastic_factor, verified_delivery
+from validation_elastic_calibration import (digest, elastic_factor, verified_delivery,
+                                          compliance_from_parameters, reduced_tensor_input,
+                                          source_consistent_ortega)
 
 
 class HalfCTCalibration(unittest.TestCase):
+    def test_source_axis_conversion_preserves_elastic_J_for_unequal_moduli(self):
+        for lam in (.25,1.,4.):
+            S=compliance_from_parameters(lam,.5)
+            value=source_consistent_ortega(S,10.)
+            source_J=value['Ortega_f_source_convention']**2/value['Ortega_Eq12_M_MPa']
+            crack_J=value['Ortega_f_converted_to_crack_axis_M']**2/value['crack_axis_M_MPa']
+            self.assertAlmostEqual(source_J,crack_J)
+            self.assertAlmostEqual(value['Ortega_source_lambda'],1/lam)
+            self.assertAlmostEqual(value['crack_axis_M_MPa']/value['Ortega_Eq12_M_MPa'],lam**.5)
+            self.assertAlmostEqual(value['source_consistent_J_relative_error'],
+                                   source_J/(10.**2/value['crack_axis_M_MPa'])-1)
+
+    def test_requested_anisotropy_is_stable_for_reciprocal_axis_pairs(self):
+        import numpy as np
+        from resources.lattices import calc_anisoParams
+        for lam in (.25,1.,4.):
+            for chi in (.25,.5,2.,5.):
+                S=compliance_from_parameters(lam,chi)
+                self.assertGreater(np.linalg.eigvalsh(S).min(),0.)
+                np.testing.assert_allclose(calc_anisoParams(S=S),(lam,chi),rtol=1e-12)
+
+    def test_material_substitution_declares_global_axes_and_preserves_constraints(self):
+        import numpy as np
+        with tempfile.TemporaryDirectory() as folder:
+            path=Path(folder)/'template.inp'
+            original='*Solid Section, elset=BODY, material=isotropic_verification\n1.\n*Material, name=isotropic_verification\n*Elastic\n10000.,.3\n*Boundary\nPIN,1,1\n'
+            path.write_text(original)
+            C=np.linalg.inv(compliance_from_parameters(.25,.5))
+            text,constants=reduced_tensor_input(path,C)
+            self.assertEqual(path.read_text(),original)
+            self.assertIn('*Orientation, name=SOURCE_AXES\n1.,0.,0.,0.,1.,0.\n3,0.\n',text)
+            self.assertIn('orientation=SOURCE_AXES',text)
+            self.assertIn('*Boundary\nPIN,1,1\n',text)
+            E1,E2,_,nu12,_,_,G12,_,_=constants
+            S=np.array([[1/E1,-nu12/E1,0.],[-nu12/E1,1/E2,0.],[0.,0.,1/G12]])
+            np.testing.assert_allclose(np.linalg.inv(S),C,rtol=1e-12,atol=1e-12)
+
     def test_smaller_crack_increment_preserves_an_affine_compliance_derivative(self):
         ratios=(.495,.4975,.5,.5025,.505)
         compliance=[.002+.0001*20*r for r in ratios]

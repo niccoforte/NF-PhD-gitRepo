@@ -67,6 +67,9 @@ initiation labels independently of a filtered curve target.
   Exact-source RVE moduli, modal cutoffs and initiation brackets do not propagate
   into shared calcFT defaults or saved labels. FCC foundation repairs preserve
   the canonical 10 mm UT/FT edges used by existing graph/loss consumers.
+  Shared FCC calcFT converts Ortega's loading-axis factor into the Bao
+  crack-axis convention using sqrt(M_Bao/M_source) before K^2/M. Both moduli
+  use the same reduced tensor; equal-axis outputs and data schemas are unchanged.
   Selected validation CSVs/plots remain external audit products, not training
   labels. They distinguish native dynamic histories from damage-off QS controls
   and Hsieh's initial-triangle convention from dissipation/nonlinear-recovery

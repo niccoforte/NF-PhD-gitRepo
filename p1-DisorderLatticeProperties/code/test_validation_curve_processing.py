@@ -5,7 +5,8 @@ import unittest
 
 import numpy as np
 
-from validation_curve_processing import initial_fit, paired_filter, transfer_prefix
+from validation_curve_processing import (initial_fit, paired_filter, transfer_prefix,
+                                         query_support_mask, event_segmented_filter)
 
 
 class CurveQualification(unittest.TestCase):
@@ -42,6 +43,24 @@ class CurveQualification(unittest.TestCase):
             self.assertEqual(support["first_partial_STATUS_deletion_row"], 2)
             self.assertEqual(support["first_all_zero_STATUS_row"], 3)
             self.assertIn("not_attested", support["native_support"])
+
+    def test_query_mask_uses_physical_support_not_sample_count(self):
+        observations = np.linspace(0, .10375, 126)
+        query = np.linspace(0, .1, 201)
+        self.assertTrue(query_support_mask(observations, query).all())
+        self.assertEqual(query_support_mask(np.linspace(0, .08, 126), query).sum(), 161)
+
+    def test_segment_filter_does_not_mix_a_resolved_force_jump(self):
+        x = np.linspace(0, 1, 80)
+        y = np.r_[np.ones(40)*10, np.ones(40)*2]
+        (xx, yy), support = event_segmented_filter(x, y, 40, .4)
+        np.testing.assert_allclose(yy, y, atol=1e-12)
+        self.assertFalse(support['endpoint_pinning'])
+
+    def test_short_event_segment_is_explicitly_unresolved(self):
+        x = np.arange(40, dtype=float)
+        _, support = event_segmented_filter(x, x, 8, .4)
+        self.assertEqual(support['status'], 'short_side_kept_raw_unresolved')
 
 
 if __name__ == "__main__":

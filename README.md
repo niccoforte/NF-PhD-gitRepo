@@ -461,6 +461,10 @@ reproduces the three property figures in `audit/property-figures`, including
 Hsieh length-scaled reference triangles and population intervals. Captions and
 metadata retain historical-value status until final population recalculation.
 One maintained helper/output set owns these figures.
+Use the manuscript conventions: tri red,kagome black,hex green,FCC blue;
+full disorder orange,mechanism-based blue; macrostrain varepsilon_L and stress
+Sigma. Hsieh triangles show digitised central values, with graphical bounds
+retained in metadata rather than interpreted as experimental error bars.
 `validation_orthotropic.py --extract` (Abaqus Python) replays the eight SiC ODBs
 read-only under `Z:/p1/sims/SiC/Validation/audit`; `--extract-controls` verifies
 their mapped periodic tensors and unit-load compliance. `--analyse` and `--plot`
@@ -469,6 +473,16 @@ whose isotropic/mesh/crack-step gates replace the out-of-range square fit.
 The resulting comparison retains its10-26% benchmark residuals.
 `validation_curve_processing.py` runs the opt-in real-data filter/initial-window
 pilot without rewriting MLdata or promoting a trained model.
+Its `--examples` view exports actual raw/Butterworth/old-average comparisons;
+.4 sample Nyquist is a denoising sensitivity, not verified modal transfer.
+Whole-history filtering can alter ductility materially despite stable work.
+`validation_elastic_calibration.py --compare-fit-verification` separately
+checks Ortega inside its fitted domain:18 paired-mesh jobs/9 tensors agree
+within.883%K/1.773%J after consistent source-axis f/M conversion.
+`validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
+clamps and B21 bending/shear, computing the initial tangent from prescribed
+small travel and reaction, without a curve-fit interval. Four hex/kagome
+periodic/full-ID1 controls are verified; these do not recalculate the population.
 `validation_completion.py --extract-finished --include-interrupted` reads the
 finished new jobs into a separate `new-validation/results` catalogue with native
 histories, initiation/damage evidence and pinned extraction hashes. A reviewed
@@ -582,6 +596,9 @@ convention; Ortega's text assigns axis1 to loading. Canonical FCC has equal
 axial moduli, so lambda=1 under either ordering. Unequal axial moduli require
 an explicitly verified `ortega_axis1` map before applying the fitted C(T)
 factor; an explicit numerical sensitivity choice does not validate that map.
+The independent unequal-axis checks confirm pairing Ortega f with its
+source-ordered M, or converting f by sqrt(M_Bao/M_source) before using Bao M.
+Shared FCC calcFT implements this conversion; equal-axis outputs are unchanged.
 
 The other topologies' legacy scaling/affine estimates and the48-case exact-source
 B21 validation route remain separate. No saved population result, p2 product,

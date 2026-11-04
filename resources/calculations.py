@@ -201,9 +201,12 @@ def calc_p_poly(lam_bar, chi_bar, a_W):
 def calc_FaW_aniso(a, W, C=None, S=None):
     """Ortega's fitted C(T) factor for explicitly supplied source-axis C or S.
 
-    C/S must already describe the intended constraint in order (1,2,6).
-    This pure fit does not infer plane strain or resolve the source's axis
-    ambiguity for unequal axial moduli. chi is Ortega's rho, not density.
+    C/S must already describe the intended constraint, with source axis1
+    along loading and axis2 along the crack, in order (1,2,6). The returned
+    factor uses Ortega's source-axis stress-intensity convention. Pair it
+    with the conversion modulus in that same order, or convert both to the
+    crack-axis1 convention. This pure fit does not infer plane strain or
+    reorder axes. chi is Ortega's rho, not density.
     """
     from resources.lattices import calc_anisoParams
     lambda_aniso, chi = calc_anisoParams(C=C, S=S)
@@ -228,7 +231,9 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
     modulus. FCC physical C is reduced using the prismatic mixture model;
     declare C_state='plane_strain' for already-reduced beam homogenisation.
     Unequal-axial-modulus FCC requires an explicit Ortega source-axis map
-    (0=x or 1=y). Equal axial moduli make that mapping immaterial.
+    (0=x or 1=y). Ortega's factor is converted to the crack-axis1 convention
+    of the supplied M by preserving K**2/M. Equal axial moduli make that
+    conversion immaterial.
     The plastic-area calibration and historical validation override are
     retained, not independently established by this elastic correction.
     """
@@ -246,7 +251,7 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
 
     fcc_elastic = None
     if geom.LAT.lower() == "fcc":
-        from resources.lattices import calcC_mohr, prismatic_plane_strain
+        from resources.lattices import calcC_mohr, calc_anisoParams, prismatic_plane_strain
         if C is None:
             if C_state != "plane_stress":
                 raise ValueError("Supply C explicitly when it is already plane-strain reduced.")
@@ -281,6 +286,12 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
                 order = [source_axis1, 1-source_axis1, 2]
                 S_ortega = fcc_elastic["S_xy_pe"][np.ix_(order, order)]
                 f_a_W = calc_FaW_aniso(ai[n], W, S=S_ortega)
+                lambda_source, chi_source = calc_anisoParams(S=S_ortega)
+                M_source = np.sqrt(2 * lambda_source**1.5 / (1 + chi_source)) / S_ortega[0, 0]
+                # Ortega Eq12 and its fitted K use the loading-axis1 order.
+                # Convert K before pairing it with Bao's crack-axis1 M.
+                # Both moduli remain in C's native stress units here.
+                f_a_W *= np.sqrt(fcc_elastic["M_I_pe"] / M_source)
             elif C is None:
                 from resources.lattices import calcC_mohr
                 C = calcC_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]

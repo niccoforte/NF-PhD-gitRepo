@@ -53,10 +53,10 @@ below expose imported functions/classes. Do not add job entry points here.
   `C_state="plane_strain"`. Invalid compliance and normal/shear coupling fail.
 - FCC `effProperties` returns directional E first and fracture M third; `calcFT`
   uses the same reduced tensor for M and its geometry factor. Bao uses crack1,
-  opening2; Ortega reverses them. Unequal axial moduli require verified
-  `ortega_axis1`; canonical FCC has lambda=1. `calc_FaW_aniso` only fits the
-  explicitly supplied source-axis C/S. Other-topology defaults, exact-source
-  B21 controls and stored results remain separate; no data schema changed.
+  opening2; Ortega reverses them. Pair source-axis f/M or convert f by
+  sqrt(M_Bao/M_source). Unequal axes require `ortega_axis1`; FCC has lambda=1.
+  `calc_FaW_aniso` fits supplied source-axis C/S. Other defaults, B21 controls
+  and stored results remain separate; no schema changed.
 - Scatter helpers only alter display. Use `synchronise_property_axes` on all
   comparable panels after plotting to share zero-origin limits; `K_STRENGTH`
   requires sample-aligned paired properties, never positional row pairing.

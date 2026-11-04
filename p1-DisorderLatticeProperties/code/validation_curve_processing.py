@@ -17,6 +17,7 @@ from resources.calculations import smooth
 
 
 TOPOLOGIES = {"tri": 30, "kagome": 20, "hex": 20, "FCC": 20}
+TOPOLOGY_COLORS = {"tri": "#ff0000", "kagome": "#000000", "hex": "#008000", "FCC": "#0000ff"}
 IDS = (1, 50, 500, 1000)
 
 
@@ -98,6 +99,44 @@ def first_crossing(y, fraction):
     peak = int(np.argmax(y))
     values = np.flatnonzero(np.asarray(y)[peak:] <= fraction*y[peak])
     return int(peak+values[0]) if len(values) else None
+
+
+def query_support_mask(observed_x, query_x):
+    """Observation support on a declared physical query axis, not frame count.
+
+    This helper accepts one verified contiguous prefix only. It does not bridge
+    missing intervals, infer a failed specimen's tail, or manufacture STATUS.
+    """
+    observed_x, query_x = np.asarray(observed_x, float), np.asarray(query_x, float)
+    if (len(observed_x) < 2 or not np.isfinite(observed_x).all()
+            or not np.isfinite(query_x).all() or np.any(np.diff(observed_x) < 0)):
+        raise ValueError('One finite nondecreasing observed support interval is required')
+    return (query_x >= observed_x[0]) & (query_x <= observed_x[-1])
+
+
+def event_segmented_filter(x, y, split, corner):
+    """Test filtering each side of a recorded deletion independently.
+
+    No endpoint is pinned and no artificial sample is introduced. Short sides
+    remain raw and are explicitly unresolved; this is a sensitivity control.
+    """
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    if split is None or not 0 < split < len(x):
+        return None, {'status': 'no_recorded_partial_STATUS_split'}
+    pieces, qualified = [], []
+    for start, stop in ((0, int(split)), (int(split), len(x))):
+        xx, yy = x[start:stop], y[start:stop]
+        if len(xx) > 12:
+            xx, yy = paired_filter(xx, yy, corner)
+            qualified.append(True)
+        else:
+            qualified.append(False)
+        pieces.append((xx, yy))
+    return tuple(np.concatenate([p[i] for p in pieces]) for i in (0, 1)), {
+        'status': 'tested_both_sides' if all(qualified) else 'short_side_kept_raw_unresolved',
+        'first_post_deletion_index': int(split), 'filtered_sides': qualified,
+        'event_basis': 'Transfer partial STATUS loss; native local initiation is not attested here.',
+        'endpoint_pinning': False}
 
 
 def numeric_metrics(x, y, fixed_end):
@@ -295,10 +334,173 @@ def run(root, data_root, out):
     return result
 
 
+def plot_examples(root, corner=.4):
+    """Actual periodic/disordered curves; the sample filter is not a modal claim."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    root=Path(root)
+    pilot_path=root/'audit/curve-processing/curve-processing.json'
+    pilot=json.loads(pilot_path.read_text())
+    out=pilot_path.parent/'filtered-curves'
+    out.mkdir(exist_ok=True)
+    chosen=[r for r in pilot['cases'] if r.get('status')=='analysed'
+            and ((r['design']=='periodic' and r['id']==0)
+                 or (r['design'] in ('full','mechanism') and r['id']==1))]
+    if len(chosen)!=24:
+        raise ValueError('Expected UAT/FT examples for four topologies and three designs')
+    names={'tri':'Triangular','kagome':'Kagome','hex':'Hexagonal','FCC':'FCC'}
+    designs=(('periodic','Periodic'),('full','Full disorder, ID 1'),
+             ('mechanism','Mechanism-based disorder, ID 1'))
+    points,metrics,sources=[],[],{}
+    with plt.rc_context({'font.size':9,'pdf.fonttype':42,'svg.fonttype':'none'}):
+        for mode,stem in (('Ductile','uat-filtered-curves'),('Fracture','ft-filtered-curves')):
+            fig,axes=plt.subplots(4,3,figsize=(12.3,11.7))
+            for row,topology in enumerate(TOPOLOGIES):
+                for column,(design,title) in enumerate(designs):
+                    record=next(r for r in chosen if (r['topology'],r['design'],r['mode'])==(topology,design,mode))
+                    source=Path(record['path'])
+                    before=sha(source)
+                    if before!=record['source_sha256']:
+                        raise ValueError('Curve source changed since the processing pilot: '+str(source))
+                    sources[str(source)]=before
+                    known=(record['support']['used_prefix_rows'] if record['support']['native_support'].startswith('native_prefix') else None)
+                    native,support=transfer_prefix(source,known)
+                    x,y=native.T
+                    xx,yy=paired_filter(x,y,corner)
+                    moving=np.asarray(smooth(smooth(y)))
+                    fixed_end=record['fixed_endpoint_index']
+                    raw=numeric_metrics(x,y,fixed_end)
+                    filtered=numeric_metrics(xx,yy,fixed_end)
+                    old=numeric_metrics(x,moving,fixed_end)
+                    def changes(values):
+                        return {'peak_change_percent':100*(values['peak']/raw['peak']-1),
+                                'paired_work_change_percent':100*(values['work_fixed_raw_endpoint']/raw['work_fixed_raw_endpoint']-1),
+                                'fixed_endpoint_force_change_percent':100*(values['end_load_fixed_raw_endpoint']/raw['end_load_fixed_raw_endpoint']-1) if raw['end_load_fixed_raw_endpoint'] else None,
+                                'ductility_change_percent':100*(values['ductility_25']/raw['ductility_25']-1) if mode=='Ductile' and values['ductility_25'] is not None and raw['ductility_25'] else None}
+                    metric={'mode':mode,'topology':topology,'design':design,'id':record['id'],
+                            'source':str(source),'source_sha256':before,'support':support,
+                            'fixed_endpoint_index':fixed_end,'endpoint_role':record['endpoint_role'],
+                            'raw':raw,'butterworth':filtered,'moving_average':old,
+                            'butterworth_change':changes(filtered),'moving_average_change':changes(old)}
+                    segmented, segmented_support = event_segmented_filter(
+                        x, y, support['first_partial_STATUS_deletion_row'], corner)
+                    metric['event_segmented_control'] = segmented_support
+                    if segmented is not None:
+                        segmented_values = numeric_metrics(*segmented, fixed_end)
+                        metric['event_segmented_control'].update(
+                            metrics=segmented_values, change=changes(segmented_values))
+                    metrics.append(metric)
+                    for index in range(len(x)):
+                        points.append({'mode':mode,'topology':topology,'design':design,'id':record['id'],
+                                       'sample':index,'raw_x':float(x[index]),'raw_y':float(y[index]),
+                                       'butterworth_x':float(xx[index]),'butterworth_y':float(yy[index]),
+                                       'moving_average_y':float(moving[index]),
+                                       'source_sha256':before,'support':support['native_support']})
+                    ax=axes[row,column]
+                    xscale,yscale=(100.,1.) if mode=='Ductile' else (1.,.001)
+                    ax.plot(x*xscale,y*yscale,color='.62',lw=.8,alpha=.9,zorder=1)
+                    ax.plot(x*xscale,moving*yscale,color='#9467bd',lw=1.,ls='--',alpha=.85,zorder=2)
+                    ax.plot(xx*xscale,yy*yscale,color=TOPOLOGY_COLORS[topology],lw=1.25,zorder=3)
+                    if row==0:ax.set_title(title,pad=10)
+                    if column==0:
+                        ax.text(.025,.95,names[topology],transform=ax.transAxes,va='top',fontweight='bold',
+                                bbox={'facecolor':'white','edgecolor':'none','alpha':.8})
+                    ax.grid(alpha=.15)
+                    ax.set_axisbelow(True)
+                    ax.tick_params(labelsize=8)
+                    if row==3:
+                        ax.set_xlabel(r'Macroscopic strain, $\varepsilon_L$ (%)' if mode=='Ductile' else 'Opening displacement (mm)')
+                    if column==0:
+                        ax.set_ylabel(r'Macroscopic stress, $\Sigma$ (MPa)' if mode=='Ductile' else 'Reaction force (kN)')
+            handles=[Line2D([],[],color='.62',lw=1.,label='Raw response'),
+                     Line2D([],[],color='#111111',lw=1.4,label='Butterworth (topology colour)'),
+                     Line2D([],[],color='#9467bd',lw=1.,ls='--',label='Previous moving average')]
+            fig.legend(handles=handles,loc='lower center',bbox_to_anchor=(.5,.015),ncol=3,frameon=False)
+            fig.suptitle(('UAT' if mode=='Ductile' else 'C(T)')+' responses: raw and filtered',y=.985,fontsize=13)
+            fig.text(.5,.95,r'Second-order SOS, forward/backward; $f_c=0.4f_{\mathrm{Nyquist}}$ in sample space',ha='center',fontsize=9)
+            fig.subplots_adjust(top=.91,bottom=.075,left=.085,right=.985,hspace=.29,wspace=.23)
+            for extension in ('png','pdf','svg'):
+                fig.savefig(out/(stem+'.'+extension),dpi=220)
+            plt.close(fig)
+    if any(sha(path)!=value for path,value in sources.items()):
+        raise ValueError('A source changed during figure generation')
+    with (out/'points.csv').open('w',newline='',encoding='utf-8') as stream:
+        writer=csv.DictWriter(stream,fieldnames=list(points[0]));writer.writeheader();writer.writerows(points)
+    modal=json.loads((root/'audit/modal/summary.json').read_text())
+    replay_path=root/'audit/production/native-normalisation-replay-20261102.json'
+    replay=json.loads(replay_path.read_text())
+    hex_replay=next(r for r in replay['cases'] if r['lat']=='hex')
+    native_hex_end=hex_replay['mean_top_U2_last_mm']/hex_replay['inferred_height_median_mm']
+    query_example=np.linspace(0.,.1,201)
+    # This is an explicit proposed query grid, not the per-specimen legacy grid.
+    hex_mask=query_support_mask([0.,native_hex_end],query_example)
+    comparison=[]
+    for topology,nx in TOPOLOGIES.items():
+        controls=[r for r in modal if r['job'].startswith('modal_'+topology+'_')]
+        comparison.append({'topology':topology,'example_nx':nx,
+                           'available_FT_modal_jobs':[r['job'] for r in controls],
+                           'source_matched_modal_transfer_to_examples':False,
+                           'reason':'Existing FT controls have different specimen sizes; no UAT or disorder modal transfer is established.' if controls else 'No corresponding retained modal control was found.'})
+    metadata={'source_sha256':sources,'all_sources_unchanged':True,'source_pilot_sha256':sha(pilot_path),
+              'filter':{'order':2,'corner_fraction_sample_Nyquist':corner,'implementation':'SOS forward/backward, paired continuous x/y',
+                        'physical_Hz_frequency_assigned':False,'origin':'Sample-domain denoising sensitivity; not a periodic natural-frequency prescription.'},
+              'modal_transfer_check':comparison,'metrics':metrics,
+              'figure_conventions':{'strain_symbol':'varepsilon_L','topology_colours':TOPOLOGY_COLORS,
+                                    'colour_authority':'Author correction and existing ValConvPlots.ipynb convergence curves.',
+                                    'raw_colour':'grey','previous_moving_average_colour':'purple',
+                                    'disorder_design':'Explicit column headings; curve colour identifies topology, not disorder design.'},
+              'axes':{'Ductile':'Engineering strain from grip displacement/body height; stress MPa.',
+                      'Fracture':'Opening mm and reaction force kN, original transfer values scaled only for plotting.'},
+              'support':'Four full-ID1 UAT prefixes have retained native replay bounds. Other examples are transfer-only support, with artificial all-zero tails excluded; no absent observations invented.',
+              'property_interpretation':'Peak/work/ductility changes are numerical sensitivities at a fixed raw endpoint; these examples do not independently certify material onset or a physical cutoff.',
+              'mask_contract':{'axis_grid':'201 declared strain/opening locations per task/configuration',
+                               'targets':'One finite filtered continuous-response value per observed query location.',
+                               'mask':'Boolean [specimen,query]; true only within contiguous genuine native support. No STATUS interpolation.',
+                               'placeholder':'Zero in normalised target space for masked positions; never a physical zero-force observation.',
+                               'loss':'Mean over specimens of sum(mask*squared_error)/sum(mask), selecting valid entries before arithmetic.',
+                               'derivative_mask':'Both adjacent query masks must be true; never cross a missing interval.',
+                               'scalers':'Fit only observed entries in training folds.',
+                               'property_masks':'Separate validity for onset, strength,25%-ductility and1%-work; uncrossed criteria remain censored.',
+                               'network_inputs':'Geometry and declared query locations only; unknown termination masks are not model inputs.'},
+              'actual_support_example':{
+                  'case':'Hexagonal full-disorder UAT ID 1',
+                  'native_receipt':str(replay_path),'receipt_sha256':sha(replay_path),
+                  'native_samples':hex_replay['native_samples'],
+                  'retained_transfer_samples':hex_replay['compared_genuine_prefix_samples'],
+                  'native_last_strain':native_hex_end,
+                  'native_last_time_s':hex_replay['last_time_s'],
+                  'proposed_query_grid_definition':'201 equally spaced strain locations from 0 to 0.1, illustrative migration example',
+                  'proposed_query_grid':query_example.tolist(),
+                  'support_mask':hex_mask.tolist(),'observed_query_count':int(hex_mask.sum()),
+                  'why_frame_count_is_wrong':'126 genuine time samples cover all 201 proposed physical strain queries. A first-126-queries mask would incorrectly discard measured support.',
+                  'legacy_grid':'UT-UT CSV stores a strain row and stress row per specimen, with a leading endpoint index. These are specimen-specific coordinates, not a common physical query grid.',
+                  'exporter_limit':'The retained CSV omits the final genuine native sample. Plotted prefix has125 samples; recover the native126th sample before production migration.'},
+              'property_filter_verdict':'Whole-history denoising is shown for visibility. It is not qualified as an automatic replacement for peak,25%-ductility or initiation force. Event-segmented controls are separate measured sensitivities; short segments remain unresolved. Native paired work and independently observed events remain authoritative pending a frozen endpoint rule.'}
+    (out/'metadata.json').write_text(json.dumps(metadata,indent=2,allow_nan=False)+'\n')
+    (out/'captions.txt').write_text(
+        'Actual titanium periodic and disordered responses at nominal10mm/20%, with the four supervisor-selected specimen sizes. '
+        'Raw is grey, the tested second-order Butterworth uses the topology colour (triangular red, kagome black, hexagonal green, FCC blue), and the previous repeated moving average is dashed purple. '
+        'The Butterworth corner is0.4 of sample Nyquist; these panels do not use a verified periodic modal frequency. '
+        'Forward/backward filtering is applied to the retained continuous paired coordinates/response. '
+        'Unobserved all-zero transfer tails are excluded, not treated as measured zero response. '
+        'Source support and individual peak/work/ductility sensitivities are recorded in metadata.json. '
+        'Only the four full-disorder ID1 UAT prefixes have native replay attestation here; the remaining plotted transfer support is explicitly unverified. '
+        'The plots demonstrate denoising and preserve raw data; they do not establish that every raw spike is physical or that one modal cutoff transfers to disorder.\n',encoding='utf-8')
+    return metadata
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path("Z:/p1/sims/Ti/Validation"))
     parser.add_argument("--data-root", type=Path, default=Path("Z:/p1/data/Ti"))
+    parser.add_argument("--examples",action="store_true",help="Plot the actual periodic/full/mechanism examples without rerunning the pilot")
     args = parser.parse_args()
-    result = run(args.root, args.data_root, args.root/"audit/curve-processing")
-    print("Completed", len(result["source_sha256"]), "source reads and", len(result["filters"]), "filter comparisons")
+    if args.examples:
+        result=plot_examples(args.root)
+        print('Wrote two actual-curve comparison figures from',len(result['source_sha256']),'unchanged sources')
+    else:
+        result = run(args.root, args.data_root, args.root/"audit/curve-processing")
+        print("Completed", len(result["source_sha256"]), "source reads and", len(result["filters"]), "filter comparisons")

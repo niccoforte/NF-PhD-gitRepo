@@ -145,6 +145,37 @@ class PlaneStrainTests(unittest.TestCase):
         b = calcFT(df,geom,p['M_I_pe'],C=C,ortega_axis1=1)
         self.assertNotAlmostEqual(a[2][0],b[2][0])
 
+    def test_calcft_unequal_axes_preserve_ortega_elastic_energy(self):
+        geom = SimpleNamespace(LAT='FCC',rD=.2,ftcalc_done=True,W=2.,B=1.,ai=[1.],iso=False)
+        df = pd.DataFrame({'x':[3.,0.,.1,.2,.3,.4], 'y_sm':[3.,0.,1.,2.,2.5,2.]})
+        for E1, E2 in ((10e9, 5e9), (5e9, 10e9)):
+            for stress_scale in (1., 1e-6):
+                with self.subTest(E1=E1, E2=E2, stress_scale=stress_scale):
+                    C = inplane_stiffness(E1, E2, .2, 2e9)*stress_scale
+                    E_s = 123e9*stress_scale
+                    p = prismatic_plane_strain(C, .2, E_s=E_s)
+                    source_order = [1, 0, 2]
+                    S_source = p['S_xy_pe'][np.ix_(source_order, source_order)]
+                    source_K = 2.5/np.sqrt(2)*calc_FaW_aniso(1.,2.,S=S_source)
+                    # Swapping the two normal compliance axes gives the
+                    # independent identities M_crack/M_source=sqrt(lambda)
+                    # and K_crack/K_source=lambda**(1/4).
+                    lambda_crack = p['lambda_pe']
+                    M_source = p['M_I_pe']/np.sqrt(lambda_crack)
+                    to_MPa = 1e-6 if stress_scale == 1. else 1.
+                    source_J = source_K**2/(M_source*to_MPa)
+                    result = calcFT(df,geom,p['M_I_pe'],C=C,E=E_s,ortega_axis1=1)
+                    self.assertAlmostEqual(result[2][0]/source_K,lambda_crack**.25)
+                    self.assertAlmostEqual(result[2][0]**2/(p['M_I_pe']*to_MPa)/source_J,1.)
+                    # Omitting the K conversion must fail conspicuously for
+                    # these unequal-axis controls, even with the correct M.
+                    unconverted_J = source_K**2/(p['M_I_pe']*to_MPa)
+                    self.assertGreater(abs(unconverted_J/source_J-1.),.1)
+                    mapped = calcFT(df,geom,p['M_I_pe'],
+                                    C=np.linalg.inv(p['S_xy_pe']),
+                                    C_state='plane_strain',E=E_s,ortega_axis1=1)
+                    np.testing.assert_allclose(result[2:],mapped[2:],rtol=1e-12)
+
 
 if __name__ == '__main__':
     unittest.main()

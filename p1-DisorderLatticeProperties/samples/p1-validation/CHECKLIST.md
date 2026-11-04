@@ -25,8 +25,9 @@ indices and length-scaled estimates retain their actual calculation provenance.
    the0/90 and+/-45 elastic validation; reconcile FCC tensor, axes and M with
    the same assigned material state. Treat plastic eta-work calibration as a
    separate gate: elastic agreement does not establish plastic J. Inspect an
-   asymmetric linear elastic control only if retaining a general unequal-axis
-   formula; ordered square/45square/FCC alone have equal axial moduli.
+   asymmetric linear elastic check is now complete: nine in-domain tensors,
+   eighteen paired-mesh jobs, with source-consistent Ortega f/M. Square-lattice
+   fracture agreement remains a separate comparison outside the fitted domain.
 4. Check retained UAT/FT mesh refinement first (Z:/p1/sims/Ti/MeshConv:
    21 configurations, 168 INP/ODB/OUT sets), distinguishing numerical resolution
    from changes to softening/characteristic length, loading and mass scaling.
@@ -311,9 +312,42 @@ sets their dependency order, not a second checklist.
   normalisation or phase correction was found. Keep sizes fixed and use existing
   fields/linear K-dominance checks first if tighter agreement is required.
   No coefficient fitting or nonlinear reruns simply to force agreement.
-- [ ] Complete an asymmetric linear elastic calibration if retaining the general
-  unequal-axis route. Ordered square/45square/FCC have equal axial moduli and
-  cannot by themselves settle reciprocal lambda/source-axis ambiguity.
+- [x] Independently verify Ortega within its fitted domain:18 completed elastic
+  C(T) jobs covering9 tensors, including unequal axes and FCC-like chi=.57457.
+  Max errors .883%K/1.773%J; mesh change .144%, crack-step sensitivity .296%.
+  Resolve source-loading versus Bao-crack convention by paired f/M or factor
+  conversion sqrt(M_Bao/M_source). Shared FCC calcFT corrected in place and
+  regression-tested; equal-axis outputs, datasets and schemas unchanged.
+- [x] Reconstruct old square comparison: all8 unshifted workbook baselines
+  reproduce smoothed pre-STATUS force with isotropic ASTM factor9.659078631.
+  Two plotted D literals additionally contain .004/.010 offsets of unknown
+  provenance. Better old agreement is not evidence validating Ortega's fit.
+  Evidence: SiC/Validation/audit/original-result-reconciliation.json.
+- [x] Verify actual UAT initial tangent without fitting noisy hex curves:
+  four archived B21 meshes, hex/kagome periodic/full-ID1, source clamp BCs,
+  mapped constituent and sections, linear static imposed travel .0001mm.
+  Apparent moduli hex1.574/1.528GPa and kagome7.448/5.625GPa; body-gauge
+  values remain separately identified. No D Mohr/axial-only approximation.
+- [ ] Use exact-source linear UAT and cracked-specimen controls as the single
+  initial-tangent replacement in population processing; no periodic k0 fill.
+  Body-tensor pilot is completed:4 jobs/12 strain cases, actual B21 bending/
+  shear, full raw tensor; kagome E_y reduction23.7%. Qualify finite-body boundary
+  effects and coupling before assigning scalar M. No UAT-slope tensor scaling.
+- [x] Produce actual raw/Butterworth/old-average UAT/FT examples across4
+  topologies and periodic/full/mechanism-ID1. Whole-history smoothing changes
+  hex full-ID1 ductility10.736% despite small work change: not accepted for
+  property-label replacement. Periodic modal cutoffs do not yet match these
+  population models; the examples use .4 sample Nyquist, not a claimed Hz rule.
+- [ ] Recover native UAT material events and verify event-segmented filtering
+  before replacing peak/ductility labels. Native paired work/event definitions
+  remain authoritative where qualified; smoother plots do not prove raw spikes
+  or filtered threshold crossings physical. Mask by observed strain/opening
+  support, not frame count. Freeze query coordinates, finite storage, train-only
+  scaling, masked losses/metrics and censoring together before ML migration.
+- [x] Apply manuscript display conventions to the5 revised property/filter figures: full
+  disorder orange, mechanism blue; tri red,kagome black,hex green,FCC blue;
+  macroscopic strain varepsilon_L, stress Sigma. Hsieh graphical digitisation
+  bounds remain metadata; no statistical error bars inferred from them.
 - [ ] Obtain exact-source mapped ordered FCC C (xx,yy,shear), verify raw reaction/
   energy closure and propagate the same tensor through M, geometry and callers.
   Quantify representative disorder tensor, gauge and M variation without
