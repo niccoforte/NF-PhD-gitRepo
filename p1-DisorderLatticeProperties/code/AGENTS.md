@@ -105,13 +105,10 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   figures under Ti Validation/audit/property-figures. Their captions/metadata
   retain calculation status and the length-scaled Hsieh reference. Original
   IDs 1-1000 supply spread; ID0 is separate. Recalculation still precedes paper use.
-- `validation_orthotropic.py` owns SiC replay/control extraction and comparison
-  under SiC Validation/audit. First DUCTCRT>=1 defines material onset; use the
-  last undamaged field/history bracket. ValConvPlots calls this route, replacing
-  FTortho literals. The eight tensors exceed Ortega's fitted chi range, so use
-  qualified `validation_elastic_calibration.py` factors and retain extrapolations
-  only as diagnostics. Report reference field/shear-lag limits. A hash-bound
-  usable result never changes its original failed-wrapper queue status.
+- Square/45square is retired from active Ortega validation: out-of-domain chi.
+  `validation_orthotropic.py` retains rejection evidence; no plot CLI. ValConvPlots
+  calls `validation_elastic_calibration.py --plot-verification`: published FEM
+  markers and own FE checks remain distinct. Failed queue status stays unchanged.
 - `validation_curve_processing.py` is an opt-in real-data filter/fit pilot,
   not a production migration. Native paired work and material events remain
   independent of filtered ML targets; masks must not leak test-time termination.
@@ -144,7 +141,7 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   return `M_I_pe`. For measured C from modified beam inputs, declare the
   already-reduced state instead. Current FCC corrections do not rewrite stored
   population metrics or the separate48-case validation route. The source-axis
-  ambiguity for unequal moduli must be resolved before generalising the C(T) fit.
+  loading-axis factor must be converted consistently before using crack-axis M.
 
 ## How To Work Here
 

@@ -1,7 +1,8 @@
-"""Source-bound SiC orthotropic validation replay; --extract uses Abaqus Python.
+"""Retired square-comparison forensic replay; --extract uses Abaqus Python.
 
 Reuse native history exports. Material onset, whole-element deletion and global
-force maximum remain distinct. No solver, ODB upgrade or original-data write.
+force maximum remain distinct. Not an active Ortega validation/paper plot.
+No solver, ODB upgrade or original-data write.
 """
 import argparse
 import csv
@@ -460,58 +461,11 @@ def analyse(root=ROOT):
         'native_replay_sha256':sha(audit/'orthotropic-extraction.json'),
         'source':reference['benchmark'],
         'reference_comparison_limit':'Reference600l K-field boundary layer versus finite CT ligaments8l/11.3l; long square shear-lag lengths are a source-supported possible contributor, not a fitted correction.',
-        'status':'Eight source-bound elastic comparisons use directly calibrated factors, with benchmark residuals retained.',
+        'status':'Retired from active Ortega validation: square parameters exceed the published fitted domain. Numerical rejection evidence only.',
         'selected_event':'First local tensile material initiation; use last history at or before last undamaged field. No peak-force selection.',
-        'next_gate':'Report the remaining benchmark differences without tuning calibration to the literature; proceed to FCC and shared population definitions.'})
+        'next_gate':'Use the published Ortega FEM-marker comparison and separately identified independent numerical verification. Review square source/control bulk at final cleanup.'})
     print('Calculated eight source-bound elastic comparisons using directly calibrated factors.',flush=True)
     return result
-
-
-def plot(root=ROOT):
-    """Production formatting; caption carries the calibration qualification."""
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-
-    out=Path(root)/'audit/comparison'
-    data=json.loads((out/'comparison.json').read_text())
-    with plt.rc_context({'font.size':10,'pdf.fonttype':42,'svg.fonttype':'none'}):
-        fig,axes=plt.subplots(1,2,figsize=(8,3.7))
-        for ax,topology,title in zip(axes,('square','45square'),(r'(a) $0/90^\circ$ square',r'(b) $\pm45^\circ$ square')):
-            xx,yy=np.array(data['reference_points'][topology]).T
-            ax.plot(xx,yy,color='0.25',lw=1.2)
-            for row in data['points']:
-                if row['topology']!=topology: continue
-                y=row['K_normalised']
-                low=min(y,row['recorded_bracket_K_normalised_min'])
-                high=max(y,row['recorded_bracket_K_normalised_max'])
-                ax.errorbar(row['relative_density'],y,yerr=[[y-low],[high-y]],fmt='o',
-                            ms=5,color='#3067a3',capsize=3,lw=1.1)
-            ax.set_title(title)
-            ax.set_xlabel(r'Relative density, $\bar\rho$')
-            ax.set_xlim(.15,.345)
-            ax.set_ylim(bottom=.025)
-            ax.grid(alpha=.2)
-        axes[0].set_ylabel(r'$K_{I,\mathrm{init}}/(\sigma_f\sqrt{\ell})$')
-        fig.legend(handles=[Line2D([],[],color='0.25',lw=1.2,label='Romijn & Fleck'),
-                            Line2D([],[],marker='o',ls='none',color='#3067a3',label='Current study')],
-                   loc='lower center',ncol=2,frameon=False)
-        fig.subplots_adjust(left=.10,right=.98,top=.88,bottom=.24,wspace=.27)
-        for ext in ('png','pdf','svg'):
-            fig.savefig(out/('orthotropic-validation.'+ext),dpi=250)
-        plt.close(fig)
-    (out/'caption.txt').write_text(
-        'Elastic initiation comparison with original digitised Romijn & Fleck (2007) Fig.8a. '
-        'Densities use the source slender-beam convention 2t/l, with solid tensile strength 550 MPa. '
-        'Current study points use native paired load/opening at the last saved history at the last undamaged field. '
-        'Bars show the recorded load range across the local DUCTCRT=1 field bracket, not statistical uncertainty. '
-        'The mapped B21 tensors are already constrained and are used once. All eight chi values lie outside '
-        'Ortega\'s fitted parameter range, so the factors are obtained directly from linear C(T) compliance '
-        'using the measured reduced tensors. Independent isotropic, mesh, crack-step and energy checks '
-        'are recorded in calibration-summary.json. Differences from the boundary-layer reference remain '
-        'reported, without a fitted correction. No source simulations '
-        'or historical workbook values have been overwritten.\n',encoding='utf-8')
 
 
 if __name__ == "__main__":
@@ -521,14 +475,11 @@ if __name__ == "__main__":
     action.add_argument("--extract", action="store_true")
     action.add_argument("--extract-controls", action="store_true")
     action.add_argument("--analyse", action="store_true")
-    action.add_argument("--plot", action="store_true")
     parser.add_argument("--queue-root", type=Path)
     args = parser.parse_args()
     if args.extract_controls:
         extract_controls(args.root, args.queue_root)
     elif args.analyse:
         analyse(args.root)
-    elif args.plot:
-        plot(args.root)
     else:
         extract(args.root)

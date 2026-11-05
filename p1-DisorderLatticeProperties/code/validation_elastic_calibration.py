@@ -479,6 +479,189 @@ def compare_fit_verification(out=ROOT):
     return result
 
 
+def figure7_markers(page):
+    """Recover published FEM marker centres from Ortega Fig.7 vector objects.
+
+    Uses the original PDF's axes, not fitted-result matching. Coordinates remain
+    in PDF points and are preserved alongside their affine data coordinates.
+    """
+    x0, x1, y0, y250 = 87.727, 279.059, 215.138, 73.284
+    groups = {'cross': {}, 'triangle': {}, 'circle': {}}
+    for kind, objects in (('curve', page.curves), ('line', page.lines)):
+        for index, item in enumerate(objects):
+            width, height = item['x1']-item['x0'], item['bottom']-item['top']
+            if not item.get('stroke') or not (100 < item['x0'] < 260 and 90 < item['top'] < 214):
+                continue
+            colour = item.get('stroking_color')
+            marker = None
+            if kind == 'line' and 1.8 < width < 2.1 and 1.8 < height < 2.1 and colour == (0.,0.,0.,1.):
+                marker = 'cross'
+            elif kind == 'curve' and 3.1 < width < 3.3 and 2.6 < height < 2.8 and len(item['pts']) == 4:
+                marker = 'triangle'
+            elif kind == 'curve' and 2.8 < width < 3.1 and 2.8 < height < 3.1 and len(item['pts']) == 6:
+                marker = 'circle'
+            if marker is None:
+                continue
+            x = (item['x0']+item['x1'])/2
+            y = (item['top']+item['bottom'])/2
+            if marker == 'triangle':
+                # An equilateral triangle's plotting anchor is its geometric
+                # centroid, not the midpoint of its bounding box.
+                vertices=item['pts'][:3]
+                x=sum(value[0] for value in vertices)/3
+                y=sum(value[1] for value in vertices)/3
+            point = {'pdf_x_pt': x, 'pdf_y_top_pt': y, 'object_kind': kind,
+                     'object_index': index, 'marker': marker,
+                     'a_over_W': .1 + .9*(x-x0)/(x1-x0),
+                     'Kbar_published_FEM': 250*(y0-y)/(y0-y250),
+                     'graphical_halfheight_Kbar': 250*height/(2*(y0-y250))}
+            # The cross is two diagonal paths whose rounded PDF coordinates
+            # can differ by0.0005pt. Coalesce that one graphic symbol only.
+            groups[marker][(round(x,2),round(y,2))] = point
+    parameters = {'cross':(.03162,10.),'triangle':(10.,.1),'circle':(1.,10.)}
+    result=[]
+    for marker, values in groups.items():
+        points=sorted(values.values(),key=lambda row:row['a_over_W'])
+        if len(points) != 71 or not .199 < points[0]['a_over_W'] < .201 or not .889 < points[-1]['a_over_W'] < .901:
+            raise ValueError('Review changed source Fig7 marker inventory: '+marker+' '+str(len(points)))
+        for point in points:
+            point.update(lambda_Ortega=parameters[marker][0],chi_Ortega=parameters[marker][1])
+            result.append(point)
+    return result
+
+
+def digitise_figure7(out=ROOT, paper=None):
+    """Run once with a PDF-capable Python; retain source-bound vector readings."""
+    import pdfplumber
+    paper=Path(paper or ('C:/Users/exy053/OneDrive - Queen Mary, University of London/Documents/Research/00-Literature/'
+        '08_Standards_Test_Methods_And_Data_Reduction/Test_Geometry_And_Specimens/'
+        'Ortega2014_CompactTensionSpecimenForOrthotropicMaterials.pdf'))
+    before=digest(paper)
+    with pdfplumber.open(paper) as pdf:
+        points=figure7_markers(pdf.pages[4])
+    if digest(paper)!=before:
+        raise ValueError('Published source changed during read-only digitisation')
+    path=Path(out)/'ortega-verification/published-figure7.json'
+    record={'source_pdf':str(paper),'source_sha256':before,
+            'source_figure':'Fig7, printed page89 (PDF page5)',
+            'source_doi':'10.1016/j.compositesa.2014.04.012','points':points,
+            'method':'Recover original vector FEM marker centres; triangle centroid, circle centre and deduplicated cross diagonals. No fitted/reference ordinate adjustment.',
+            'axis_calibration':{'x_data':[.1,1.],'x_pdf_pt':[87.727,279.059],
+                                'Kbar_data':[0.,250.],'y_pdf_top_pt':[215.138,73.284]},
+            'published_markers':len(points),'source_unchanged':True}
+    path.write_text(json.dumps(record,indent=2)+'\n')
+    return {'source_unchanged':True,'published_markers':len(points),'digitisation':str(path)}
+
+
+def plot_fit_verification(out=ROOT):
+    """Published Fig7 FEM markers, independent FE check and axis conversion."""
+    import csv
+    import numpy as np
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from resources.calculations import calc_FaW_aniso
+
+    out=Path(out)
+    directory=out/'ortega-verification'
+    data_path=directory/'fit-comparison.json'
+    data=json.loads(data_path.read_text())
+    source=json.loads((directory/'published-figure7.json').read_text())
+    paper=Path(source['source_pdf'])
+    before=digest(paper)
+    if before!=source['source_sha256'] or not source['source_unchanged']:
+        raise ValueError('Published source differs from vector digitisation')
+    points=source['points']
+    for point in points:
+        S=compliance_from_parameters(point['lambda_Ortega'],point['chi_Ortega'])
+        a=point['a_over_W']
+        point['Kbar_current_implementation']=float(calc_FaW_aniso(a,1.,S=S)/np.sqrt(a))
+        point['relative_difference']=point['Kbar_current_implementation']/point['Kbar_published_FEM']-1
+    with (directory/'published-figure7-points.csv').open('w',newline='',encoding='utf-8') as stream:
+        writer=csv.DictWriter(stream,fieldnames=list(points[0]));writer.writeheader();writer.writerows(points)
+    rows=data['rows']
+    with plt.rc_context({'font.size':9,'pdf.fonttype':42,'svg.fonttype':'none'}):
+        fig,axes=plt.subplots(1,3,figsize=(15.8,4.8),gridspec_kw={'width_ratios':[1.2,1.1,1.]})
+        ax=axes[0]
+        symbols={'cross':'x','triangle':'^','circle':'o'}
+        colours={'cross':'#222222','triangle':'#777777','circle':'#0000ff'}
+        for marker in symbols:
+            selected=[row for row in points if row['marker']==marker]
+            first=selected[0]
+            a=np.linspace(selected[0]['a_over_W'],selected[-1]['a_over_W'],200)
+            S=compliance_from_parameters(first['lambda_Ortega'],first['chi_Ortega'])
+            curve=[calc_FaW_aniso(value,1.,S=S)/np.sqrt(value) for value in a]
+            ax.plot(a,curve,color=colours[marker],lw=1.2,
+                    label=r'$\lambda_O=%g,\ \chi=%g$'%(first['lambda_Ortega'],first['chi_Ortega']))
+            shown=selected[::5]+selected[-1:]
+            ax.plot([row['a_over_W'] for row in shown],[row['Kbar_published_FEM'] for row in shown],
+                    ls='',marker=symbols[marker],mfc='none',mec=colours[marker],ms=4,mew=.8)
+        ax.set(xlabel=r'$a/W$',ylabel=r'Dimensionless SIF, $\overline{K}_I$',xlim=(.18,.91),ylim=(0,240),
+               title='(a) Published Ortega Fig. 7')
+        handles,labels=ax.get_legend_handles_labels()
+        handles += [Line2D([],[],color='black',lw=1.2),Line2D([],[],color='black',marker='o',mfc='none',ls='',ms=4)]
+        labels += ['Current implementation','Published FEM markers']
+        ax.legend(handles,labels,frameon=False,fontsize=7.5,loc='upper left')
+        ax=axes[1]
+        xx=np.arange(len(rows))
+        labels=[r'$%g,%g$'%(row['lambda'],row['chi']) for row in rows]
+        published=[row['Ortega_f_source_convention']**2/row['Ortega_Eq12_M_MPa'] for row in rows]
+        independent=[row['f_independent_fine']**2/row['crack_axis_M_MPa'] for row in rows]
+        ax.plot(xx,published,'^',mfc='none',mec='black',ms=7,label='Published equation')
+        ax.plot(xx,independent,'o',color='#0000ff',ms=3.5,label='Current study FE')
+        ax.set(xlabel=r'Test tensor $(\lambda_{\rm crack},\chi)$',ylabel=r'$J_{\rm el}B^2W/P^2$ (MPa$^{-1}$)',
+               title='(b) Independent FE verification')
+        ax.set_xticks(xx,labels,rotation=60,ha='right',fontsize=7)
+        ax.legend(frameon=False,fontsize=7.5)
+        ax=axes[2]
+        choices=[next(row for row in rows if row['case_id']==case) for case in ('l025c05','fcc','l4c05')]
+        xx=np.arange(3)
+        wrong=[100*(row['Ortega_f_source_convention']**2/row['crack_axis_M_MPa'])/
+               (row['f_independent_fine']**2/row['crack_axis_M_MPa'])-100 for row in choices]
+        corrected=[100*row['source_consistent_J_relative_error'] for row in choices]
+        ax.axhline(0,color='.7',lw=.8)
+        ax.plot(xx,wrong,'x',color='#a63c32',ms=7,label=r'Mixed $f_O^2/M_B$')
+        ax.plot(xx,corrected,'o',color='#0000ff',ms=4,label=r'Matched $f_O^2/M_O=f_B^2/M_B$')
+        ax.set_xticks(xx,[r'$0.25$','FCC-like\n'+r'$1$',r'$4$'])
+        ax.set(xlabel=r'$\lambda_{\rm crack}$',ylabel=r'Difference in elastic $J$ from FE (%)',
+               title='(c) Why the axis conversion matters')
+        ax.legend(frameon=False,fontsize=7,loc='upper left')
+        for ax in axes:
+            ax.grid(alpha=.18);ax.set_axisbelow(True)
+        fig.subplots_adjust(left=.06,right=.99,bottom=.26,top=.9,wspace=.37)
+        for extension in ('png','pdf','svg'):
+            fig.savefig(directory/('ortega-verification.'+extension),dpi=220)
+        plt.close(fig)
+    if digest(paper)!=before:
+        raise ValueError('Published source changed during read-only digitisation')
+    metadata={'source_pdf':str(paper),'source_sha256':before,'source_figure':'Fig7, printed page89 (PDF page5)',
+              'source_doi':'10.1016/j.compositesa.2014.04.012',
+              'published_data':'213 FEM marker centres recovered from original vector paths; not generated equation samples',
+              'coordinate_calibration':{'x_data':[.1,1.],'x_pdf_pt':[87.727,279.059],
+                                        'Kbar_data':[0.,250.],'y_pdf_top_pt':[215.138,73.284]},
+              'graphical_uncertainty':'CSV preserves original marker half-height as conservative ordinate uncertainty; finite publication drawing precision remains.',
+              'implementation':'Current corrected Eq16 returns f=K B sqrt(W)/P; published Fig7 uses Kbar=f/sqrt(a/W).',
+              'independent_FE':'Current study18 solved C(T) jobs/9 designed in-domain SPD test tensors; not experimental or published raw FE data.',
+              'axis_example':choices,'own_FE_source_sha256':digest(data_path),
+              'published_comparison_max_absolute_relative_error':max(abs(row['relative_difference']) for row in points),
+              'no_parameters_fitted':True,'no_new_jobs_submitted':True,
+              'scope':'Published equation/FEM reproduction and independent elastic numerical verification only; not plastic-J or lattice-failure validation.'}
+    (directory/'ortega-verification.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    (directory/'ortega-verification-caption.txt').write_text(
+        'Elastic C(T) verification. (a) Original FEM marker centres from Ortega et al. (2014), Fig.7, '
+        'compared with the current implementation of the corrected published equation. The published ordinate '
+        'is Kbar=f/sqrt(a/W); source lambda and chi are in Ortega loading-axis order. For readability every '
+        'fifth marker is drawn; all213 recovered markers and their vector positions are retained in the CSV. '
+        '(b) The published equation is compared with independently solved current-study FE compliance derivatives '
+        'for nine designed in-domain tensors at a/W=.5; these are numerical verification cases, not invented '
+        'experimental observations or published raw data. (c) Using the source factor with the crack-axis modulus '
+        'mixes normalisations for unequal axes. Source-paired fO/MO and converted fB/MB preserve elastic J. '
+        'Equal axial moduli, including the FCC-like case, need no numerical conversion. These elastic comparisons '
+        'do not validate plastic eta, negative-area partitions or lattice-failure criteria.\n',encoding='utf-8')
+    return metadata
+
+
 def extract(out=ROOT):
     """Read settled delivered isotropic controls; do not submit or extrapolate."""
     from odbAccess import openOdb
@@ -603,6 +786,8 @@ if __name__ == "__main__":
     action.add_argument("--qualify",action="store_true")
     action.add_argument("--prepare-fit-verification",action="store_true")
     action.add_argument("--compare-fit-verification",action="store_true")
+    action.add_argument("--plot-verification",action="store_true")
+    action.add_argument("--digitise-published",action="store_true")
     arguments = sys.argv[sys.argv.index("--")+1:] if "--" in sys.argv else sys.argv[1:]
     # CAE inserts its own launcher flags before the user arguments.
     args = parser.parse_known_args(arguments)[0] if "-cae" in arguments else parser.parse_args(arguments)
@@ -610,4 +795,6 @@ if __name__ == "__main__":
                      prepare_orthotropic(args.out) if args.prepare_orthotropic else
                      prepare_fit_verification(args.out) if args.prepare_fit_verification else
                      compare_fit_verification(args.out) if args.compare_fit_verification else
+                     plot_fit_verification(args.out) if args.plot_verification else
+                     digitise_figure7(args.out) if args.digitise_published else
                      qualify(args.out) if args.qualify else extract(args.out),indent=2))

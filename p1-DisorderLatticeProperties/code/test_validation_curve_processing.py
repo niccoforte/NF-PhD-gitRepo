@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from validation_curve_processing import (initial_fit, paired_filter, transfer_prefix,
-                                         query_support_mask, event_segmented_filter)
+                                         query_support_mask, event_segmented_filter, threshold_details)
 
 
 class CurveQualification(unittest.TestCase):
@@ -61,6 +61,14 @@ class CurveQualification(unittest.TestCase):
         x = np.arange(40, dtype=float)
         _, support = event_segmented_filter(x, x, 8, .4)
         self.assertEqual(support['status'], 'short_side_kept_raw_unresolved')
+
+    def test_threshold_recorded_sample_is_not_replaced_by_interpolation(self):
+        result = threshold_details([0.,1.,2.,3.,4.],[0.,8.,6.,3.,1.])
+        self.assertEqual(result['threshold_MPa'],2.)
+        self.assertEqual(result['recorded_ductility'],4.)
+        self.assertEqual(result['interpolated_crossing_for_display'],3.5)
+        censored = threshold_details([0.,1.,2.],[0.,8.,6.])
+        self.assertIsNone(censored['recorded_ductility'])
 
 
 if __name__ == "__main__":

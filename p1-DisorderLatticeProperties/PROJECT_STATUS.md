@@ -4,55 +4,35 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) owns the
-  validation finish, production replacement, Excel/paper integration, cleanup and
-  deferred UT/FCC/orthotropic/PSC work. The report is in this paper's samples,
-  not p2. Final integration replaces superseded methods/results rather than
-  retaining selectable legacy variants; it remains pending the scientific verdict.
-  Shared elastic audit: corrected Ortega matches its source; lambda=chi=1 gives
-  an approximately-.8% geometry-fit residual, while M has the exact isotropic
-  limit. All8 SiC sources use mapped418197MPa,.162791 and actualB20mm; native
-  short histories and material-specific initiation must be retained. The8-curve
-  UAT pilot shows five points alone is not an adequate modulus rule. Evidence
-  is under Validation/audit/shared; production formulas remain unchanged.
-  PSC scope now includes28UAT and28FT sources. Future Results-section UT/FT
-  validation figures, FCC inclusion and disorder-population ranges are recorded
-  explicitly as deferred final work. Production figure styling is ready under
-  audit/property-figures, including
-  Hsieh triangles and manuscript symbols; numerical population replacement is
-  still pending. One maintained property-figure route replaces the superseded display set.
-  Native replay of all8 SiC ODBs is complete with unchanged source hashes.
-  Source-matched periodic controls confirm chi outside Ortega's fit range
-  (rotated about-.90 to-.97; square about39-128). Direct elastic calibration
-  now replaces those extrapolated factors: isotropic agreement within.34%,
-  paired-mesh/energy/crack-step checks pass, including one refined increment.
-  Eight comparisons remain10-26%above the digitised reference; report that
-  residual without tuning. Source fracture simulations remain reusable.
-  The72-curve filter pilot preserves work much better than peak/endpoints;
-  it does not justify one universal cutoff or automatic ML promotion.
-  The later in-domain Ortega check is complete:18 elastic jobs/9 tensors,
-  max errors .883%K/1.773%J, including unequal axes. Source-loading f/M must
-  remain paired; shared calcFT now converts f to the Bao crack-axis convention.
-  Old square baseline workbook values replay isotropic ASTM, not Ortega;
-  two plotted D literals contain unexplained additive offsets. The direct
-  square C(T) comparison is a separate lattice check, not fit validation.
-  Four exact-source UAT linear controls now replace speculation about failed
-  hex fits: no fitting interval, actual B21 bending/shear, prescribed .0001mm
-  clamp travel. Hex periodic/full-ID1 Eapp=1.574/1.528GPa; kagome7.448/5.625GPa.
-  Body-gauge values are separate; these are not full material tensors.
-  Four additional body-only beam jobs recover full raw tensors through3strain
-  cases each; all numerical checks pass. Kagome full-ID1 E_y drops23.7%; raw
-  normal/shear coupling remains.69%hex/1.03%kagome, not forced to zero.
-  Population solution is exact-source beam FE (UAT tangent, CT compliance,
-  body tensor), pending bounded body-boundary/coupling qualification; no Mohr
-  hex fallback or UAT-slope scaling. All26 new elastic jobs are complete.
-  Full-history .4-Nyquist Butterworth changes hex-ID1 ductility10.736%; it is
-  not approved for property labels. Actual24-source example figures and masks
-  are under audit/curve-processing/filtered-curves. Mask actual strain/opening
-  support, not frame count; no validated periodic-modal transfer is claimed.
-  Current curves need an end-to-end mask migration; C.3 does not justify scaling
-  FCC M from one UAT slope. Mesh convergence remains before PSC (168source sets).
-
+- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) and its
+  current report own the calculation finish, population replacement, manuscript
+  integration and cleanup. They are consolidated, not accumulating old plans.
+  Appendix C in the current Word manuscript supports retaining quasi-isotropic
+  tri/kagome/hex and orthotropic FCC. The20-realisation sensitivity study is not
+  a proof of unchanged modulus. Blanket per-realisation tensor controls are
+  withdrawn; no population queue is submitted. Short linear FE is an unresolved-
+  stiffness fallback, not a new isotropy study for every ID.
+  Measured costs: UAT10-11s,CT7-16s,three-step tensor10-11s. Blanket24000jobs
+  would take3-6days;517missingUAT values~2-3h,all1973hexUAT~6-12h if selected.
+  The4UAT and4body controls already completed are diagnostic evidence, not an
+  implemented population migration. Keep the Appendix C approximation separate
+  from choosing the scalar effective modulus used in fracture conversion.
+  Published Ortega Fig7 FEM markers are now digitised from213 original vector
+  objects; current equation differs at most1.602% graphically. Own18FE jobs are
+  separately labelled numerical verification, within.883%K/1.773%elastic J.
+  Source-consistent loading-axis f/M or the Bao conversion is implemented.
+  The square comparison is retired: no plot CLI, derived displays removed,
+  notebook caller replaced with the published-reference verification figure.
+  Orthotropic plastic eta/Jref remains incomplete; elastic checks do not cover it.
+  Native hex-ID1 gives raw ductility6.9271%,Butterworth7.6708%,old average~7.6709%.
+  The raw crossing is an isolated dip; the10.736% difference does not show that
+  filtering is wrong. Hsieh uses real-time Butterworth at2fn; our.4Nyquist trial
+  is not a qualified modal cutoff. Freeze the final filter before label migration.
+  ML migration is deferred: keep201common loading positions, no stretched
+  prefixes/private per-specimen axes, and per-specimen valid-mean loss weighting.
+  Material events, censoring, mesh-before-PSC, Al benchmark and full population
+  replacement remain on the checklist. Author-closed side investigations are
+  removed from scope without a new claim of numerical negligibility.
 
 - The manuscript revision has a common compliance/notation description and an
   implemented FCC prismatic plane-strain elastic route. At nominal20% physical
@@ -170,30 +150,10 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   The49completed mapped ordered conversion controls pass current source/input
   checks, SPD and work/energy closure. All236 historical StiffMatrix INPs use
   physical123000MPa,.3 material. Retention is conditional on the correct source
-  state, not the folder name. Periodic C cannot represent disorder softening;
-  own UAT stiffness and existing representative tensor evidence remain necessary
-  before production conversion. Own-body-gauge elastic-window fitting remains
-  the UAT proposal. Fracture M must be checked against representative full
-  tensors; the earlier automatic scalar FCC tensor-shape proposal is not the
-  default after C.3's Zener variation. Grip slopes do not determine CT k0 or M.
-  Filtering replacement and UAT fit repair remain pending.
-  The ordered gates in the unique checklist now put shared definitions and
-  orthotropic/FCC validation before PSC, a production pilot and the full original
-  IDs 1-1000 population pass; Excel/paper replacement and cleanup follow.
-  Eight square/45square SiC sources and all28 PSC FT cases are retained for reuse.
-  The validation Butterworth/modal helpers already exist.
-  Corrections'32-deck manuscript sample coversIDs1/1000 only. Four read-only
-  native fullID1 UAT replays reproduce all checked stored prefix stresses/strains
-  with gross area and bodyH; no blanket thickness rescale is justified by stale
-  co-located scripts. HexfullID1density is.200151 with the fullbody envelope,
-  not.210686 from the narrower contact span; pairedFT is.200000 despite different
-  section t. Sampled UAT rotations are constrained, and terminal softening lengths
-  vary. All32sampled full-envelope densities support nominal20%: UAT.200061-
-  .200153 andFT.199999-.200001. This does not certify allfirst1000realisations.
-  These source/gauge/damage definitions remain production/paper gates,
-  not demonstrated whole-corpus numerical failures. Corrections owns manuscript
-  wording; SimCheck retains computational migration. Evidence is under
-  `Validation/audit/production`; no source data or paper values were changed.
+  state, not the folder name. Appendix C remains the symmetry approximation;
+  scalar stiffness/FT conversion and final filtering still require consistent
+  implementation. Mesh/PSC, population processing and paper replacement follow
+  the unique checklist. No new population solver programme is queued.
   Current paper exports distinguish native initial-triangle KJ, two accepted
   nonlinear-recovery indices and two explicit predictions at nominal relative
   density. Other energy controls stay diagnostic. The underlying native

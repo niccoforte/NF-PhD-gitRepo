@@ -54,6 +54,13 @@ test-time termination/valid-target mask as a geometry-only network input: it
 reveals response-derived information. Qualify denoising with matched folds,
 seeds, observed-support and mechanical-property metrics; preserve physical
 initiation labels independently of a filtered curve target.
+The current producer stores one periodic coordinate row and response-only
+disorder rows. Keep a common201-position loading/query schedule; never stretch
+each observed prefix to201 or supply a private per-specimen x-axis implicitly.
+For future masks, average valid-point loss within each specimen, then average
+specimens, so short histories are not downweighted merely by point count.
+The0-10% strain illustration is not an adopted grid; preserve native time and
+paired coordinates for physical properties. This migration remains deferred.
 
 ## Curve and manifest boundary
 

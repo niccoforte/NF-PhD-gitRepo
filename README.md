@@ -465,12 +465,12 @@ Use the manuscript conventions: tri red,kagome black,hex green,FCC blue;
 full disorder orange,mechanism-based blue; macrostrain varepsilon_L and stress
 Sigma. Hsieh triangles show digitised central values, with graphical bounds
 retained in metadata rather than interpreted as experimental error bars.
-`validation_orthotropic.py --extract` (Abaqus Python) replays the eight SiC ODBs
-read-only under `Z:/p1/sims/SiC/Validation/audit`; `--extract-controls` verifies
-their mapped periodic tensors and unit-load compliance. `--analyse` and `--plot`
-use the qualified direct factors from `validation_elastic_calibration.py`,
-whose isotropic/mesh/crack-step gates replace the out-of-range square fit.
-The resulting comparison retains its10-26% benchmark residuals.
+The square/45square comparison is retired from active Ortega validation because
+its tensors exceed the fitted domain. Its plot CLI/derived displays are removed;
+source/rejection evidence remains pending final cleanup. ValConvPlots now calls
+`validation_elastic_calibration.py --plot-verification`: published Ortega FEM
+markers are reference data, while the18 local FE jobs are separate numerical
+verification, not invented published measurements. Plastic calibration is open.
 `validation_curve_processing.py` runs the opt-in real-data filter/initial-window
 pilot without rewriting MLdata or promoting a trained model.
 Its `--examples` view exports actual raw/Butterworth/old-average comparisons;
@@ -483,6 +483,11 @@ within.883%K/1.773%J after consistent source-axis f/M conversion.
 clamps and B21 bending/shear, computing the initial tangent from prescribed
 small travel and reaction, without a curve-fit interval. Four hex/kagome
 periodic/full-ID1 controls are verified; these do not recalculate the population.
+Measured short-job timings are10-11s UAT,7-16s CT and10-11s per three-step body
+tensor. Blanket population controls would take3-6days; they are not scheduled.
+Retain Appendix C quasi-isotropy for tri/kagome/hex and orthotropic FCC. No
+per-realisation homogenisation is selected. Use exact FE only where scalar
+stiffness is unresolved; the unique checklist owns costs and final M convention.
 `validation_completion.py --extract-finished --include-interrupted` reads the
 finished new jobs into a separate `new-validation/results` catalogue with native
 histories, initiation/damage evidence and pinned extraction hashes. A reviewed

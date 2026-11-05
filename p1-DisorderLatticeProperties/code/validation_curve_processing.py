@@ -101,6 +101,167 @@ def first_crossing(y, fraction):
     return int(peak+values[0]) if len(values) else None
 
 
+def threshold_details(x, y, fraction=.25):
+    """Keep the recorded crossing distinct from a display-only interpolation."""
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    peak = int(np.argmax(y))
+    crossing = first_crossing(y, fraction)
+    threshold = float(fraction*y[peak])
+    result = {'peak_index': peak, 'peak_strain': float(x[peak]),
+              'peak_MPa': float(y[peak]), 'threshold_MPa': threshold,
+              'crossing_index': crossing, 'criterion': 'first recorded post-peak sample at or below 25% of that curve peak'}
+    if crossing is None:
+        return dict(result, recorded_ductility=None, interpolated_crossing_for_display=None)
+    interpolated = float(x[crossing])
+    if crossing > peak and y[crossing-1] != y[crossing]:
+        weight = (threshold-y[crossing-1])/(y[crossing]-y[crossing-1])
+        interpolated = float(x[crossing-1]+weight*(x[crossing]-x[crossing-1]))
+    return dict(result, recorded_ductility=float(x[crossing]),
+                interpolated_crossing_for_display=interpolated)
+
+
+def extract_hex_ductility_native(root):
+    """Abaqus Python: recover all126 genuine samples without solving/upgrading."""
+    from odbAccess import openOdb
+    root = Path(root)
+    receipt = root/'audit/production/native-normalisation-replay-20261102.json'
+    original = next(r for r in json.loads(receipt.read_text())['cases'] if r['lat']=='hex')
+    path = Path(original['source_odb'])
+    before = sha(path)
+    if before != original['after_sha256']:
+        raise ValueError('Native hex source differs from retained replay')
+    odb = openOdb(str(path), readOnly=True)
+    try:
+        if len(odb.steps) != 1:
+            raise ValueError('Expected one source step')
+        step = list(odb.steps.values())[0]
+        nodes = [node for group in odb.rootAssembly.nodeSets['SET-TOP'].nodes for node in group]
+        histories = []
+        for node in nodes:
+            matches = [(name, region) for name, region in step.historyRegions.items()
+                       if name.startswith('Node ') and name.endswith('.'+str(node.label))
+                       and 'RF2' in region.historyOutputs and 'U2' in region.historyOutputs]
+            if len(matches) != 1:
+                raise ValueError('Ambiguous source top-node history')
+            histories.append(matches[0])
+        time = np.array([t for t, _ in histories[0][1].historyOutputs['RF2'].data])
+        force, travel = [], []
+        for _, region in histories:
+            for name, values in (('RF2', force), ('U2', travel)):
+                data = region.historyOutputs[name].data
+                if not np.array_equal(time, np.array([t for t, _ in data])):
+                    raise ValueError('Native top history grids differ')
+                values.append([v for _, v in data])
+        stress = np.sum(force, axis=0)/original['inferred_area_median_mm2']
+        strain = np.mean(travel, axis=0)/original['inferred_height_median_mm']
+    finally:
+        odb.close()
+    if before != sha(path) or len(time) != original['native_samples']:
+        raise ValueError('Native source changed or sample count differs')
+    if not all(np.isfinite(v).all() for v in (time, strain, stress)):
+        raise ValueError('Finite genuine native prefix required')
+    result = {'scope':'Hexagonal full-disorder ID1 UAT; native top-clamp histories, no new simulation',
+              'source_odb':str(path),'source_odb_sha256':before,'source_unchanged':True,
+              'normalisation_receipt':str(receipt),'normalisation_receipt_sha256':sha(receipt),
+              'area_mm2':original['inferred_area_median_mm2'],
+              'gauge_height_mm':original['inferred_height_median_mm'],
+              'native_samples':len(time),'top_nodes':len(nodes),
+              'time_s':time.tolist(),'strain':strain.tolist(),'stress_MPa':stress.tolist(),
+              'recorded_time_step_range_s':[float(np.diff(time).min()),float(np.diff(time).max())],
+              'source_input':original['source_input'],'source_input_sha256':original['source_input_sha256'],
+              'read_only':True,'ODB_upgraded':False,'simulation_run':False}
+    out = root/'audit/curve-processing/filtered-curves/hex-ductility-filtering.json'
+    out.parent.mkdir(exist_ok=True)
+    out.write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
+    return result
+
+
+def plot_hex_ductility(root):
+    """Show the isolated raw threshold dip and a declared cutoff sensitivity."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+
+    path = Path(root)/'audit/curve-processing/filtered-curves/hex-ductility-filtering.json'
+    data = json.loads(path.read_text())
+    if sha(data['source_odb']) != data['source_odb_sha256']:
+        raise ValueError('Hex source changed since native extraction')
+    x, y = np.array(data['strain']), np.array(data['stress_MPa'])
+    raw = threshold_details(x,y)
+    selected_x, selected_y = paired_filter(x,y,.4)
+    selected = threshold_details(selected_x,selected_y)
+    old_y = np.asarray(smooth(smooth(y)))
+    old = threshold_details(x,old_y)
+    corners = (.1,.2,.3,.4,.5,.6,.8)
+    sensitivities = []
+    for corner in corners:
+        xx, yy = paired_filter(x,y,corner)
+        metric = threshold_details(xx,yy)
+        sensitivities.append(dict(metric, corner_fraction_Nyquist=corner,
+            equivalent_cutoff_Hz_if_median_native_dt=corner/(2*np.median(np.diff(data['time_s']))),
+            ductility_change_percent=100*(metric['recorded_ductility']/raw['recorded_ductility']-1)))
+    color = TOPOLOGY_COLORS['hex']
+    with plt.rc_context({'font.size':10,'pdf.fonttype':42,'svg.fonttype':'none'}):
+        fig, axes = plt.subplots(1,3,figsize=(13.2,3.8),gridspec_kw={'width_ratios':[1.12,1.12,1.]})
+        for ax in axes[:2]:
+            ax.plot(100*x,y,color='.55',lw=1.1,label='Raw')
+            ax.plot(100*selected_x,selected_y,color=color,lw=1.6,label='Butterworth')
+            ax.plot(100*x,old_y,color='#9467bd',lw=1.,ls=':',label='Previous moving average')
+            for metric, style, col, xx, yy in ((raw,'--','.45',x,y),(selected,'-',color,selected_x,selected_y)):
+                p, c = metric['peak_index'],metric['crossing_index']
+                ax.plot(100*xx[p],yy[p],'o',ms=4,mfc='white',mec=col)
+                ax.axhline(metric['threshold_MPa'],color=col,ls=style,lw=.9,alpha=.8)
+                ax.plot(100*xx[c],yy[c],'o',ms=5,mfc='white',mec=col)
+                ax.vlines(100*xx[c],0,yy[c],color=col,ls='--',lw=1.)
+            ax.set_xlabel(r'Macroscopic strain, $\varepsilon_L$ (%)')
+            ax.grid(alpha=.15)
+            ax.set_axisbelow(True)
+        axes[0].set_ylabel(r'Macroscopic stress, $\Sigma$ (MPa)')
+        axes[0].set_title('(a) Complete genuine history')
+        axes[0].set_ylim(bottom=0)
+        axes[0].legend(frameon=False,fontsize=8.5,loc='upper right')
+        axes[1].set_title('(b) Ductility threshold')
+        axes[1].set_xlim(6.4,8.2)
+        axes[1].set_ylim(0,10.5)
+        axes[1].text(.025,.95,'Raw: %.3f%%\nFiltered: %.3f%%\nChange: +%.2f%%' % (
+            100*raw['recorded_ductility'],100*selected['recorded_ductility'],
+            100*(selected['recorded_ductility']/raw['recorded_ductility']-1)),
+            transform=axes[1].transAxes,va='top',fontsize=9,
+            bbox={'facecolor':'white','edgecolor':'none','alpha':.88})
+        axes[2].plot(corners,[100*r['recorded_ductility'] for r in sensitivities],
+                     'o-',color=color,lw=1.2,ms=4)
+        axes[2].axhline(100*raw['recorded_ductility'],color='.45',ls='--',lw=1.,label='Raw')
+        axes[2].axhline(100*old['recorded_ductility'],color='#9467bd',ls=':',lw=1.,label='Previous moving average')
+        axes[2].plot(.4,100*selected['recorded_ductility'],'o',ms=7,mfc='white',mec=color,mew=1.3)
+        axes[2].set_xlabel(r'Corner / sample Nyquist, $f_c/f_N$')
+        axes[2].set_ylabel(r'Ductility, $\mathcal{D}$ (%)')
+        axes[2].set_title('(c) Cutoff sensitivity')
+        axes[2].grid(alpha=.15)
+        axes[2].legend(frameon=False,fontsize=8.5)
+        fig.suptitle('Hexagonal full disorder, ID 1',fontsize=12,y=.99)
+        fig.subplots_adjust(top=.82,bottom=.17,left=.055,right=.99,wspace=.32)
+        for extension in ('png','pdf','svg'):
+            fig.savefig(path.with_suffix('.'+extension),dpi=220)
+        plt.close(fig)
+    data.update(raw=raw,butterworth_corner_0p4=selected,previous_moving_average=old,
+                sensitivities=sensitivities,
+                filter={'order':2,'implementation':'SOS forward/backward on native paired samples',
+                        'selected_corner_fraction_Nyquist':.4,'corner_selection':'Gentlest of original pilot corners .1,.2,.4; not a modal or Hsieh calibration',
+                        'original_pilot_corners':[.1,.2,.4],
+                        'definition':'f_N=fs/2, so normalized .4 means fc=.2fs',
+                        'median_native_dt_s':float(np.median(np.diff(data['time_s']))),
+                        'equivalent_fc_Hz':float(.4/(2*np.median(np.diff(data['time_s'])))),
+                        'equivalent_Hz_interpretation':'Native output times are nearly uniform; this Hz value is explanatory, not an eigenfrequency-qualified cutoff.',
+                        'paired_coordinate_note':'Neither time nor strain range is stretched. The existing pilot filters both continuous paired channels; x-filter displacement near crossings is recorded separately.'},
+                prior_125_sample_transfer_comparison={'raw_ductility':.06927096247673034,
+                    'filtered_ductility':.0767079827406632,'change_percent':10.73612953830565,
+                    'reason':'Prior figure used125 genuine common CSV samples; this closeup recovers all126 native samples.'},
+                caption='Hexagonal full-disorder ID1 native UAT history. Grey raw and green second-order Butterworth at0.4 sample Nyquist are compared with the previous moving average (purple dotted). Hollow circles mark peaks and first recorded post-peak25%crossings; horizontal lines are25%of each respective peak, vertical guides mark the corresponding recorded ductility strain. The raw early crossing is an isolated dip; filtering delays the crossing, and the old moving average gives essentially the same later result. Panel(c) shows a predeclared broad cutoff sensitivity, not a cutoff fitted to a target ductility. Lines join recorded samples; interpolated crossing coordinates are retained separately for display/diagnosis and do not replace the recorded criterion. This is a filter sensitivity, not proof that either raw or filtered threshold is a physically validated target.')
+    path.write_text(json.dumps(data,indent=2,allow_nan=False)+'\n')
+    return data
+
+
 def query_support_mask(observed_x, query_x):
     """Observation support on a declared physical query axis, not frame count.
 
@@ -434,8 +595,9 @@ def plot_examples(root, corner=.4):
     replay=json.loads(replay_path.read_text())
     hex_replay=next(r for r in replay['cases'] if r['lat']=='hex')
     native_hex_end=hex_replay['mean_top_U2_last_mm']/hex_replay['inferred_height_median_mm']
-    query_example=np.linspace(0.,.1,201)
-    # This is an explicit proposed query grid, not the per-specimen legacy grid.
+    periodic_hex=next(r for r in chosen if (r['topology'],r['design'],r['mode'])==('hex','periodic','Ductile'))
+    query_example=np.loadtxt(periodic_hex['path'],delimiter=',',usecols=(0,))
+    # Audit the current common periodic axis; never stretch a short prefix.
     hex_mask=query_support_mask([0.,native_hex_end],query_example)
     comparison=[]
     for topology,nx in TOPOLOGIES.items():
@@ -456,7 +618,7 @@ def plot_examples(root, corner=.4):
                       'Fracture':'Opening mm and reaction force kN, original transfer values scaled only for plotting.'},
               'support':'Four full-ID1 UAT prefixes have retained native replay bounds. Other examples are transfer-only support, with artificial all-zero tails excluded; no absent observations invented.',
               'property_interpretation':'Peak/work/ductility changes are numerical sensitivities at a fixed raw endpoint; these examples do not independently certify material onset or a physical cutoff.',
-              'mask_contract':{'axis_grid':'201 declared strain/opening locations per task/configuration',
+              'mask_contract':{'axis_grid':'201 common reference positions per task/configuration; freeze shared planned-time/loading-progress meaning before migration, never specimen-wise rescaling',
                                'targets':'One finite filtered continuous-response value per observed query location.',
                                'mask':'Boolean [specimen,query]; true only within contiguous genuine native support. No STATUS interpolation.',
                                'placeholder':'Zero in normalised target space for masked positions; never a physical zero-force observation.',
@@ -464,7 +626,7 @@ def plot_examples(root, corner=.4):
                                'derivative_mask':'Both adjacent query masks must be true; never cross a missing interval.',
                                'scalers':'Fit only observed entries in training folds.',
                                'property_masks':'Separate validity for onset, strength,25%-ductility and1%-work; uncrossed criteria remain censored.',
-                               'network_inputs':'Geometry and declared query locations only; unknown termination masks are not model inputs.'},
+                               'network_inputs':'Existing geometry-only prediction can retain y-only outputs when all201 positions share one declared common axis. Unknown termination masks are not model inputs.'},
               'actual_support_example':{
                   'case':'Hexagonal full-disorder UAT ID 1',
                   'native_receipt':str(replay_path),'receipt_sha256':sha(replay_path),
@@ -472,11 +634,13 @@ def plot_examples(root, corner=.4):
                   'retained_transfer_samples':hex_replay['compared_genuine_prefix_samples'],
                   'native_last_strain':native_hex_end,
                   'native_last_time_s':hex_replay['last_time_s'],
-                  'proposed_query_grid_definition':'201 equally spaced strain locations from 0 to 0.1, illustrative migration example',
-                  'proposed_query_grid':query_example.tolist(),
+                  'reference_query_definition':'Actual201periodic strain values currently stored once bycreate_outputCSV; an audit illustration, not the selected final ML axis.',
+                  'reference_query_source':periodic_hex['path'],
+                  'reference_query':query_example.tolist(),
                   'support_mask':hex_mask.tolist(),'observed_query_count':int(hex_mask.sum()),
-                  'why_frame_count_is_wrong':'126 genuine time samples cover all 201 proposed physical strain queries. A first-126-queries mask would incorrectly discard measured support.',
-                  'legacy_grid':'UT-UT CSV stores a strain row and stress row per specimen, with a leading endpoint index. These are specimen-specific coordinates, not a common physical query grid.',
+                  'why_frame_count_is_wrong':'126genuine time samples support124queries on the existing periodic strain reference. Time-frame count and actual-strain support are different measures. No126-to201stretch is proposed.',
+                  'legacy_grid':'create_outputCSV stores the periodic strain row once, then the periodic stress row and stress-only disordered rows, each with a leading endpoint index. The model y-only output therefore relies on a shared reference-index meaning.',
+                  'recommended_migration':'Preserve201common planned-time/loading-progress positions and mask unavailable positions; keep actual native strain/displacement paired for property calculations. Freeze this axis contract before ML changes.',
                   'exporter_limit':'The retained CSV omits the final genuine native sample. Plotted prefix has125 samples; recover the native126th sample before production migration.'},
               'property_filter_verdict':'Whole-history denoising is shown for visibility. It is not qualified as an automatic replacement for peak,25%-ductility or initiation force. Event-segmented controls are separate measured sensitivities; short segments remain unresolved. Native paired work and independently observed events remain authoritative pending a frozen endpoint rule.'}
     (out/'metadata.json').write_text(json.dumps(metadata,indent=2,allow_nan=False)+'\n')
@@ -497,8 +661,17 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=Path, default=Path("Z:/p1/sims/Ti/Validation"))
     parser.add_argument("--data-root", type=Path, default=Path("Z:/p1/data/Ti"))
     parser.add_argument("--examples",action="store_true",help="Plot the actual periodic/full/mechanism examples without rerunning the pilot")
+    parser.add_argument("--extract-hex-ductility",action="store_true",help="Abaqus Python: recover the complete native hex-ID1 history without solving")
+    parser.add_argument("--hex-ductility",action="store_true",help="Plot native raw/filter thresholds and cutoff sensitivity")
     args = parser.parse_args()
-    if args.examples:
+    if args.extract_hex_ductility:
+        result=extract_hex_ductility_native(args.root)
+        print('Recovered',result['native_samples'],'unchanged native samples; no simulation run')
+    elif args.hex_ductility:
+        result=plot_hex_ductility(args.root)
+        print('Wrote native hex-ID1 threshold comparison; raw/filtered ductility:',
+              result['raw']['recorded_ductility'],result['butterworth_corner_0p4']['recorded_ductility'])
+    elif args.examples:
         result=plot_examples(args.root)
         print('Wrote two actual-curve comparison figures from',len(result['source_sha256']),'unchanged sources')
     else:
