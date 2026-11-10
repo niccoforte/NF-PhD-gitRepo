@@ -17,6 +17,7 @@ import numpy as np
 from resources.calculations import calc_FaW
 from resources.lattices import Geometry
 from validation_calculations import beam_conversion_modulus
+from validation_curve_processing import periodic_causal_filter
 from validation_work_partition import SELECTED_INPUTS, eta_energy_metrics, work
 
 
@@ -113,6 +114,7 @@ def native_record(root, case, event, rve, endpoint):
             "crossing_max_LE11": float(event["crossmaxLE11"]),
             "criterion_lower_time_s": float(event["prevtime_s"]), "criterion_upper_time_s": float(event["crosstime_s"]),
             "source_inp_sha256": case["inp_sha256"], "source_odb_sha256": case["odb_sha256"],
+            "source_inp": str((root / Path(case["inp"])).resolve()) if case.get("inp") else None,
             "modulus_odb_sha256": rve["source_odb_sha256"], "modulus_job": rve["job"],
             "energy_csv_sha256": sha(directory / "native_stored_energy.csv"),
             "curve_csv_sha256": sha(directory / "native_curve.csv")}
@@ -164,7 +166,116 @@ def triangle_record(record, compliance):
                KJ_MPa_sqrt_m=metric.get("K_eta_MPa_sqrt_m") if valid else None,
                value_status="available_source_work_convention" if valid else "unavailable_negative_area_or_state",
                quality_note="Hsieh Appendix D initial-slope work convention with this C(T) specimen's f(a/W), eta and exact-source linear compliance. Negative area remains invalid; finite-rotation/ASTM qualification is not established.")
+    if rec.get("response_processing") == "causal_Butterworth_paired_2fn":
+        rec["quality_note"] += (
+            " Endpoint force and integrated load-line work use paired causal second-order "
+            "Butterworth filtering at twice this periodic specimen's verified physical frequency; "
+            "DC startup, fixed native material-event index, and no future fracture samples.")
+    elif rec.get("filter_status") == "sampling_unresolved_cutoff_at_or_above_saved_Nyquist":
+        rec["quality_note"] += (
+            " The verified physical cutoff reaches or exceeds saved-history Nyquist; "
+            "native force and work are retained without filtering, clipping the cutoff, "
+            "or claiming reconstruction of Hsieh's real-time filter.")
     return rec
+
+
+def filtered_native_record(record, curve_path, modal):
+    """Process paired load-line observations at the unchanged material event.
+
+    Raw energy records remain separate. The modal source must be this exact
+    periodic input and original ODB; filtering never changes initiation, fills
+    missing samples, or transfers a different specimen's cutoff.
+    """
+    if (modal.get("source_sha256") != record["source_inp_sha256"]
+            or modal.get("source_odb_sha256") != record["source_odb_sha256"]
+            or modal.get("state") != "completed_source_qualified_released_physical_mode"
+            or not modal.get("read_only") or not modal.get("source_input_hash_verified")
+            or not isinstance(modal.get("modal_odb_sha256"), str)
+            or len(modal["modal_odb_sha256"]) != 64):
+        raise ValueError("Periodic frequency belongs to a different/unverified source")
+    source = record.get("source_inp")
+    if not source or sha(source) != record["source_inp_sha256"]:
+        raise ValueError("Original input differs from the filtered-response source")
+    if sha(modal["modal_receipt"]) != modal["modal_receipt_sha256"]:
+        raise ValueError("Periodic modal receipt differs from the verified frequency map")
+    if sha(curve_path) != record["curve_csv_sha256"]:
+        raise ValueError("Native curve differs from the verified response export")
+    curve = read_csv(curve_path)
+    index = int(record["native_index"])
+    if (not 0 <= index < len(curve)
+            or abs(float(curve[index]["time_s"]) - record["endpoint_time_s"]) > 1e-12):
+        raise ValueError("Filtered response must retain the native material-event index/time")
+    prefix = curve[:index + 1]
+    time = np.array([float(row["time_s"]) for row in prefix])
+    displacement = np.array([float(row["U2_mm"]) for row in prefix])
+    force = np.array([float(row["RF2_N"]) for row in prefix])
+    frequency = float(modal["natural_frequency_Hz"])
+    if (len(time) < 4 or not np.isfinite([time, displacement, force]).all()
+            or not np.isfinite(frequency) or frequency <= 0):
+        raise ValueError("Need a finite observed prefix and positive periodic frequency")
+    dt = np.diff(time)
+    if np.any(dt <= 0) or np.max(dt) > 1.5 * np.median(dt):
+        raise ValueError("Time grid is nonmonotone or contains a missing interval")
+    cutoff = 2 * frequency
+    nyquist = (len(time) - 1) / (2 * (time[-1] - time[0]))
+    provenance = {"filter_cutoff_Hz": cutoff, "physical_cutoff_Hz": cutoff,
+                  "saved_Nyquist_Hz": float(nyquist), "filter_natural_frequency_Hz": frequency,
+                  "filter_modal_job": modal["job"],
+                  "filter_modal_execution_state": modal.get("execution_state"),
+                  "filter_modal_odb_sha256": modal["modal_odb_sha256"],
+                  "filter_modal_receipt_sha256": modal["modal_receipt_sha256"],
+                  "filter_native_prefix_samples": len(prefix)}
+    if cutoff >= nyquist:
+        # Preserve observed quantities when an exact physical cutoff cannot be
+        # reconstructed from the saved signal. This is explicitly NOT filtered.
+        rec = dict(record)
+        rec.update(provenance, filter_applied=False,
+                   filter_status="sampling_unresolved_cutoff_at_or_above_saved_Nyquist",
+                   response_processing="native_unfiltered_sampling_unresolved")
+        return rec
+    # Restrict even the timestamp-jitter reconstruction to the observed prefix:
+    # a later fracture tail cannot influence the selected event or filter grid.
+    (filtered_u, filtered_p), info = periodic_causal_filter(
+        time, displacement, force, frequency)
+    _, ki = geometry_and_ki({"topology": record["topology"], "l_mm": record["l_mm"],
+                           "nnx": record["nnx"],
+                           "nominal_relative_density": record["relative_density"]}, filtered_p[-1])
+    rec = dict(record)
+    rec.update(provenance)
+    rec.update(force_N=float(filtered_p[-1]), displacement_mm=float(filtered_u[-1]),
+               loading_work_Nmm=work(filtered_u, filtered_p), KI_MPa_sqrt_m=ki,
+               KJ_MPa_sqrt_m=None, method="filtered_native_loadline",
+               response_processing="causal_Butterworth_paired_2fn",
+               filter_applied=True, filter_status="applied_causal_Butterworth_2fn",
+               filter_order=info["order"], filter_zero_phase=info["zero_phase"],
+               filter_startup=info["startup"], filter_cutoff_Hz=info["cutoff_Hz"],
+               filter_natural_frequency_Hz=info["natural_frequency_Hz"],
+               filter_max_time_remap_s=info["max_time_remap_s"],
+               filter_modal_job=modal["job"], filter_modal_odb_sha256=modal["modal_odb_sha256"],
+               filter_native_prefix_samples=len(prefix),
+               filter_modal_receipt_sha256=modal["modal_receipt_sha256"])
+    return rec
+
+
+def native_triangle_record(record, compliance, curve_path, frequencies, selected=False):
+    """Require verified filtering for selected available native triangle points."""
+    raw = triangle_record(record, compliance)
+    modal = frequencies.get(record.get("source_inp_sha256"))
+    if selected and (modal is not None or raw.get("value_status", "").startswith("available")):
+        if modal is None:
+            raise ValueError("Selected available native triangle has no verified periodic frequency: "
+                             + record["case_id"])
+        return triangle_record(filtered_native_record(record, curve_path, modal), compliance)
+    raw["response_processing"] = ("native_unfiltered_unavailable" if selected
+                                  else "native_unfiltered_diagnostic")
+    raw["filter_applied"] = False
+    raw["filter_status"] = raw["response_processing"]
+    return raw
+
+
+def source_frequency_map(root):
+    path = Path(root) / "audit/modal/iso-periodic/source-frequency-map.json"
+    return json.loads(path.read_text()) if path.exists() else {}
 
 
 def measured_record(result, case, rve):
@@ -242,9 +353,12 @@ def qs_triangle_record(result, case, rve, compliance):
     return triangle_record(base, compliance)
 
 
-def completion_records(root):
+def completion_records(root, frequencies=None):
     """Add reviewed new-case prefixes without changing the original catalogue."""
     from validation_controls import completion_controls
+
+    if frequencies is None:
+        frequencies = source_frequency_map(root)
 
     base = Path(root) / "audit/new-validation"
     result_root = base / "results"
@@ -298,14 +412,23 @@ def completion_records(root):
                        quality_note=("IE-SE is a separate diagnostic work estimate; ALLPD and the new energy channels are recorded independently. Linear controls use verified source geometric similarity, not a new solve or a fitted modulus."
                                      if control_kind == "verified_geometric_similarity" else
                                      "IE-SE is a separate diagnostic work estimate; ALLPD and other energy channels are recorded independently. Linear controls are verified exact-source solves, not a fitted modulus."))
-        triangle = triangle_record(rows[0], compliance)
+        triangle = native_triangle_record(
+            rows[0], compliance, Path(proof["history_export_directory"]) / "native_curve.csv",
+            frequencies, selected=True)
+        filter_note = (" Paired causal second-order Butterworth at twice the verified periodic "
+                       "frequency supplies endpoint force and work at the unchanged native event."
+                       if triangle.get("response_processing") == "causal_Butterworth_paired_2fn" else
+                       " Native force and work are retained unfiltered because the verified physical "
+                       "cutoff reaches or exceeds saved-history Nyquist; the cutoff is not capped."
+                       if triangle.get("filter_status") == "sampling_unresolved_cutoff_at_or_above_saved_Nyquist"
+                       else "")
         triangle["quality_note"] = (
             "Hsieh initial-slope area with C(T) factors. Linear controls are inherited only after "
             "verified uniform geometric scaling of the same source mesh/material/BCs: C unchanged, "
             "k scaled with length. Parent control ODB hashes and the transformation proof are retained. "
-            "Negative area remains unavailable; no ASTM qualification is claimed.")
+            "Negative area remains unavailable; no ASTM qualification is claimed." + filter_note)
         if rve["source_kind"] != "verified_geometric_similarity":
-            triangle["quality_note"] = "Hsieh initial-slope area with C(T) factors and independently verified exact-source linear controls. Negative area remains unavailable; no ASTM qualification is claimed."
+            triangle["quality_note"] = "Hsieh initial-slope area with C(T) factors and independently verified exact-source linear controls. Negative area remains unavailable; no ASTM qualification is claimed." + filter_note
         # ALLPD is recorded in these new jobs; it remains a distinct diagnostic
         # and never replaces the initial-triangle work in the paper result.
         energy = read_csv(Path(proof["history_export_directory"]) / "native_stored_energy.csv")
@@ -345,6 +468,7 @@ def run(root):
     cases = [row for row in read_csv(root / "case-index.csv") if row["campaign"] == "Density campaign"
              and row["mode"] == "Fracture" and row["topology"] in ("tri", "kagome", "hex")]
     all_rows, selected, rejected = [], [], []
+    frequencies = source_frequency_map(root)
     for case in cases:
         if sha(root / case["inp"]) != case["inp_sha256"]:
             raise ValueError("Original input changed since indexing")
@@ -352,7 +476,11 @@ def run(root):
         rows = [native_record(root, case, events[case["case_id"]], rves[case["case_id"]], endpoint)
                 for endpoint in ("criterion_last_intact", "criterion_first_crossed")]
         if case["case_id"] in compliances:
-            rows.append(triangle_record(rows[0], compliances[case["case_id"]]))
+            curve_path = (root / "audit/history" / Path(case["odb"]).parent
+                          / Path(case["odb"]).stem / "native_curve.csv")
+            rows.append(native_triangle_record(
+                rows[0], compliances[case["case_id"]], curve_path, frequencies,
+                selected=case["inp"] in SELECTED_INPUTS))
         all_rows.extend(rows)
         if case["inp"] in SELECTED_INPUTS:
             selected.extend(row for row in rows if row["endpoint"] == "criterion_last_intact")
@@ -377,7 +505,7 @@ def run(root):
                 measured["unloading_result_sha256"] = sha(path)
                 measured["matched_loading_evidence_file"] = snapshot
                 selected.append(measured)
-    new_all, new_selected, new_unavailable = completion_records(root)
+    new_all, new_selected, new_unavailable = completion_records(root, frequencies)
     original_selected = len(selected)
     all_rows.extend(new_all)
     selected.extend(new_selected)
@@ -392,6 +520,14 @@ def run(root):
                "rule": "Native last recorded undamaged tensile LE11<.1105 bracket and separately verified QS precriterion peaks; exact-source linear controls or verified geometric similarity. Initial-triangle source convention and finite-geometry energy estimates remain distinct.",
                "native_PD_is_derived_not_measured": True, "ASTM_Apl_not_claimed": True,
                "new_native_ALLPD_is_recorded_separately": bool(new_all),
+               "selected_native_triangle_response": "Paired causal order2 Butterworth at2fn with DC startup where saved sampling permits. Otherwise unchanged native loadline is retained with explicit sampling-unresolved status; no cutoff is capped. Source and native material-event index remain verified.",
+               "selected_native_triangle_filter_counts": {
+                   status: sum(row.get("filter_status") == status for row in selected
+                               if row["method"] == "Hsieh_initial_triangle_native")
+                   for status in sorted({row.get("filter_status", "unspecified") for row in selected
+                                         if row["method"] == "Hsieh_initial_triangle_native"})},
+               "source_frequency_map_sha256": sha(root / "audit/modal/iso-periodic/source-frequency-map.json")
+                   if (root / "audit/modal/iso-periodic/source-frequency-map.json").exists() else None,
                "completion": "Recalculated available data only; native and counterfactual QS work estimates coexist and never replace each other's histories. Missing/invalid cases remain explicit.",
                "unavailable_unloading_controls": rejected,
                "compliance_results_sha256": sha(compliance_path) if compliance_path.exists() else None,

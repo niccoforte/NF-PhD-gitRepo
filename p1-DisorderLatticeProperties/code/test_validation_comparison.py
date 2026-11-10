@@ -98,7 +98,7 @@ class PaperSupplement(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     self.load()
 
-    def test_rejects_recovery_changes_and_available_native_replacement(self):
+    def test_rejects_recovery_changes_and_prefers_available_native(self):
         self.records[-1]["KJ_MPa_sqrt_m"] *= 2
         with self.assertRaisesRegex(ValueError, "load-unload"):
             self.load()
@@ -106,8 +106,11 @@ class PaperSupplement(unittest.TestCase):
         native = next(r for r in self.records if r["method"] == "Hsieh_initial_triangle_native"
                       and r["topology"] == "hex" and r["l_mm"] == 3.)
         native.update(value_status="available_provisional", KJ_MPa_sqrt_m=3., Apl_Nmm=1.)
-        with self.assertRaisesRegex(ValueError, "replace an available"):
-            self.load()
+        values, metadata = self.load()
+        key = (native["topology"], native["l_mm"], native["relative_density"])
+        self.assertNotIn(key, values)
+        self.assertIn(list(key), metadata["suppressed_by_available_native"])
+        self.assertEqual(native["KJ_MPa_sqrt_m"], 3.)
 
     def test_requires_explicit_adoption(self):
         self.document["adopted_for_paper_display"] = False
@@ -115,6 +118,12 @@ class PaperSupplement(unittest.TestCase):
         self.assertEqual(self.load(), ({}, None))
 
     def test_exports_normalisation_evidence_and_hypothesis_factors(self):
+        native = next(r for r in self.records if r["method"] == "Hsieh_initial_triangle_native"
+                      and r.get("KJ_MPa_sqrt_m") is not None and r["value_status"].startswith("available"))
+        native.update(filter_applied=False,
+                      filter_status="sampling_unresolved_cutoff_at_or_above_saved_Nyquist",
+                      filter_cutoff_Hz=1200., saved_Nyquist_Hz=1000.,
+                      filter_modal_receipt_sha256="synthetic-receipt")
         before = copy.deepcopy((self.records, self.references, self.fig8))
         out = self.root / "paper"
         paper_exports(self.records, self.fig8, self.references, {"parent_UTS_workbook_MPa": 1000.},
@@ -143,6 +152,12 @@ class PaperSupplement(unittest.TestCase):
             if row["figure"] == "8b_hsieh_fix" and row["series"] == "Hsieh et al.":
                 self.assertAlmostEqual(float(row["ordinate"]), .1/math.sqrt(3))
         meta = json.loads((out / "metadata.json").read_text())
+        self.assertEqual(meta["native_filter_counts"]["sampling_unresolved_cutoff_at_or_above_saved_Nyquist"], 1)
+        self.assertIn("filtering is explicitly unapplied", meta["captions"]["10"])
+        retained = [r for r in current if r.get("filter_modal_receipt_sha256") == "synthetic-receipt"]
+        self.assertTrue(retained)
+        self.assertTrue(all(r["filter_applied"] == "False" and float(r["filter_cutoff_Hz"]) == 1200.
+                            for r in retained))
         self.assertEqual(meta["display_cases_by_basis"], {"original_fracture": 14, "nonlinear_recovery": 2, "prediction": 2})
         for figure in ("8a", "8b", "10", "8b_hsieh_fix", "8b_my_fix"):
             for extension in ("png", "pdf", "svg"):
@@ -154,6 +169,7 @@ class PaperSupplement(unittest.TestCase):
             self.assertNotIn("Current study:", text)
             self.assertNotIn("Simulation", text)
         self.assertEqual(meta["marker_design"]["legend_entries"], ["Hsieh et al.", "Current study"])
+        self.assertEqual(meta["topology_colors"], {"tri": "#c43b3b", "kagome": "#303030", "hex": "#4c8c50"})
         self.assertIn("hex 3mm/16%", meta["captions"]["10"])
         self.assertIn("hex 3mm/13%", meta["captions"]["10"])
 

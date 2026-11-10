@@ -95,6 +95,256 @@ def paired_filter(x, y, corner):
     return sosfiltfilt(sos, x), sosfiltfilt(sos, y)
 
 
+def periodic_causal_filter(time, x, y, natural_frequency_Hz):
+    """Hsieh cutoff rule with our specimen's periodic frequency, causal/DC SOS.
+
+    Order two and DC initialisation are explicit Abaqus-default reconstruction
+    choices, not filter settings disclosed by Hsieh. No missing data, event or
+    loading-axis resampling is created. Above-Nyquist cutoffs fail explicitly.
+    """
+    from validation_calculations import filter_force
+    if not np.isfinite(natural_frequency_Hz) or natural_frequency_Hz <= 0:
+        raise ValueError("A positive source-qualified periodic frequency is required")
+    xx, info = filter_force(time, x, 2*natural_frequency_Hz, order=2, zero_phase=False)
+    yy, _ = filter_force(time, y, 2*natural_frequency_Hz, order=2, zero_phase=False)
+    info.update(natural_frequency_Hz=float(natural_frequency_Hz), startup="DC",
+                policy="same source-qualified periodic cutoff for matching ordered/full/mechanism specimens",
+                histories="native timestamps and observations retained; no missing tail filled",
+                order_basis="Abaqus default reconstruction; Hsieh does not report order")
+    return (xx, yy), info
+
+
+def periodic_cutoff_registry(root, accept_physical_modes=False):
+    """Bind eight family cutoffs after numerical screen and mode-shape review."""
+    modal = Path(root)/"audit/modal/production-periodic"
+    records = []
+    for topology, nx in TOPOLOGIES.items():
+        for task in ("UT", "FT"):
+            folder = modal/("pm_{}_{}".format(topology.lower(), task.lower()))
+            path = folder/"modes.json"
+            if not path.exists():
+                records.append(dict(topology=topology, task=task, status="modal_output_pending"))
+                continue
+            data = json.loads(path.read_text())
+            selected = data.get("candidate_mode")
+            if not selected or not (folder/"mode_shapes.png").is_file():
+                raise ValueError("Physical-mode screen/plot unresolved: " + str(folder))
+            if sha(data["source_inp"]) != data["source_inp_sha256"]:
+                raise ValueError("Periodic source changed")
+            records.append(dict(topology=topology, task=task, nnx=nx, l_mm=10., nominal_relative_density=.2,
+                status="accepted_physical_mode" if accept_physical_modes else "requires_mode_shape_review",
+                mode=selected["mode"], natural_frequency_Hz=selected["frequency_Hz"],
+                cutoff_Hz=2*selected["frequency_Hz"], boundary=data["boundary"],
+                modal_record=str(path), modal_record_sha256=sha(path),
+                mode_shape_review=("Mode deformation, spatial support and constraints visually inspected" if accept_physical_modes else None),
+                source_inp=data["source_inp"], source_inp_sha256=data["source_inp_sha256"],
+                application="all IDs of matched periodic/full/mechanism family; no disorder-specific eigenproblems"))
+    result = dict(policy="Hsieh real-time Butterworth fc=2fn; periodic-only frequencies", order=2,
+                  startup="DC", zero_phase=False, families=records,
+                  accepted_periodic_cutoff_as_shared_disorder_approximation=True,
+                  scope="10mm20%; tri nx30; kagome/hex/FCC nx20; task and boundary specific",
+                  limits=["No inference that disordered frequencies equal periodic frequencies",
+                          "Saved history filtering cannot undo aliasing before output decimation",
+                          "Cutoffs at/above saved-history Nyquist are explicitly unresolved, never silently capped"])
+    out = Path(root)/"audit/curve-processing/periodic-cutoffs.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=2)+"\n")
+    return result
+
+
+def extract_periodic_cutoff_examples(root, archive_root, data_root):
+    """Abaqus read-only recovery of24 paired histories, no solver/submission.
+
+    Reuses each existing transfer's normalisation after checking it against
+    genuine ODB response. Final native samples are recovered rather than padded.
+    """
+    from odbAccess import openOdb
+    from validation_history_audit import field_summary
+    archive_root, data_root = Path(archive_root), Path(data_root)
+    out = Path(root)/"audit/curve-processing/periodic-cutoff-native"
+    out.mkdir(parents=True, exist_ok=True)
+    records = []
+    for topology, nx in TOPOLOGIES.items():
+        for task, label in (("UT", "Ductile"), ("FT", "Fracture")):
+            for design, group, transfer_group, token in (
+                    ("periodic", "per/0.0", "per", "per"),
+                    ("full", "disNodes/0.2", "disNodes/0.2", "20disNodes-lhs-all"),
+                    ("mechanism", "disNodes/Target-xs/0.2", "disNodes/Target-xs/0.2", "20disNodes-lhs-xs")):
+                stem = "{}-{}-{}-{}-1".format(label, topology, nx, token)
+                base = archive_root/group/topology
+                matches = [job/"zip"/(stem+".inp") for job in base.iterdir()
+                           if (job/"zip"/(stem+".inp")).is_file()]
+                if len(matches) != 1:
+                    raise ValueError("Ambiguous/missing native example: " + stem)
+                inp, transfer = matches[0], data_root/transfer_group/topology/"transfer"/("OUT-"+stem+".csv")
+                source, before = inp.with_suffix(".odb"), sha(inp.with_suffix(".odb"))
+                odb = openOdb(str(source), readOnly=True)
+                try:
+                    if len(odb.steps) != 1:
+                        raise ValueError("Expected one original nonlinear step")
+                    step = list(odb.steps.values())[0]
+                    if task == "FT":
+                        regions = [step.historyRegions["Node ASSEMBLY.1"]]
+                    else:
+                        nodes = [node for group_nodes in odb.rootAssembly.nodeSets["SET-TOP"].nodes for node in group_nodes]
+                        regions = []
+                        for node in nodes:
+                            matching = [r for name,r in step.historyRegions.items()
+                                        if name.startswith("Node PART-1-1.") and name.endswith("."+str(node.label))
+                                        and "U2" in r.historyOutputs and "RF2" in r.historyOutputs]
+                            if len(matching) != 1:
+                                raise ValueError("Ambiguous exact-source clamp node history")
+                            regions.append(matching[0])
+                    time = np.asarray([t for t,v in regions[0].historyOutputs["U2"].data])
+                    displacement, force = [], []
+                    for region in regions:
+                        for key, target in (("U2", displacement), ("RF2", force)):
+                            pairs = np.asarray(region.historyOutputs[key].data)
+                            if not np.array_equal(pairs[:,0], time):
+                                raise ValueError("Native force/displacement grids differ")
+                            target.append(pairs[:,1])
+                    x_native, y_native = np.mean(displacement, axis=0), np.sum(force, axis=0)
+                    status_event = None
+                    for frame in step.frames:
+                        if "STATUS" in frame.fieldOutputs and field_summary(frame.fieldOutputs["STATUS"])["min"] == 0:
+                            status_event = float(frame.frameValue)
+                            break
+                finally:
+                    odb.close()
+                if before != sha(source):
+                    raise ValueError("Read-only extraction changed source")
+                old = np.loadtxt(str(transfer), delimiter=",", usecols=(0,1))
+                common = min(len(time)-1, len(old))
+                scales, errors = [], []
+                for raw, previous in ((x_native, old[:,0]), (y_native, old[:,1])):
+                    eligible = (np.abs(raw[:common]) > np.max(np.abs(raw[:common]))*1e-7) & (previous[:common] != 0)
+                    scale = float(np.median(previous[:common][eligible]/raw[:common][eligible]))
+                    error = float(np.max(np.abs(previous[:common][eligible]-raw[:common][eligible]*scale))/np.max(np.abs(previous[:common][eligible])))
+                    if error > 2e-5:
+                        raise ValueError("Native/retained transfer normalisation differs: " + stem)
+                    scales.append(scale)
+                    errors.append(error)
+                x, y = x_native*scales[0], y_native*scales[1]
+                if not all(np.isfinite(v).all() for v in (time,x,y)) or np.any(np.diff(time) <= 0):
+                    raise ValueError("Finite strictly increasing native history required")
+                destination = out/("{}_{}_{}.npz".format(topology,task,design))
+                np.savez_compressed(str(destination), time=time, x=x, y=y)
+                row = dict(topology=topology, task=task, design=design, id=0 if design=="periodic" else 1,
+                           source_odb=str(source), source_odb_sha256=before, source_inp=str(inp), source_inp_sha256=sha(inp),
+                           transfer=str(transfer), transfer_sha256=sha(transfer), native=str(destination), native_sha256=sha(destination),
+                           samples=len(time), first_STATUS_deletion_time_s=status_event, time_start_s=float(time[0]),
+                           time_last_s=float(time[-1]), normalisation_factors=scales,
+                           native_transfer_relative_errors=errors, source_unchanged=True,
+                           observed_support_only=True, no_missing_samples_manufactured=True)
+                records.append(row)
+                (out/"index.json").write_text(json.dumps(records, indent=2)+"\n")
+                print(topology,task,design,len(time),flush=True)
+    return records
+
+
+def apply_periodic_examples(root):
+    """Apply accepted periodic cutoffs to genuine ID1 histories, preserve sources."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    root = Path(root)
+    folder = root/"audit/curve-processing"
+    registry_path = folder/"periodic-cutoffs.json"
+    registry = json.loads(registry_path.read_text())
+    controls = {(r['topology'],r['task']):r for r in registry['families']}
+    source_index = folder/"periodic-cutoff-native/index.json"
+    records = json.loads(source_index.read_text())
+    out = folder/"filtered-curves"
+    out.mkdir(parents=True,exist_ok=True)
+    results, figures = [], []
+    for task, stem in (("UT","uat-periodic-cutoff"),("FT","ft-periodic-cutoff")):
+        fig,axes=plt.subplots(4,3,figsize=(12.8,11.5),squeeze=False)
+        for row,topology in enumerate(TOPOLOGIES):
+            control=controls[(topology,task)]
+            if control['status'] != 'accepted_physical_mode':
+                raise ValueError('Periodic physical mode has not been reviewed')
+            for col,design in enumerate(('periodic','full','mechanism')):
+                record=next(r for r in records if r['topology']==topology and r['task']==task and r['design']==design)
+                if sha(record['native']) != record['native_sha256']:
+                    raise ValueError('Extracted native observations changed')
+                native=np.load(record['native'])
+                time,x,y=native['time'],native['x'],native['y']
+                nyquist=(len(time)-1)/(2*(time[-1]-time[0]))
+                event=record['first_STATUS_deletion_time_s']
+                endpoint=(max(1,int(np.searchsorted(time,event,side='left'))-1) if task=='FT' and event is not None else
+                          first_crossing(y,.25) if task=='UT' else len(y)-1)
+                endpoint=len(y)-1 if endpoint is None else endpoint
+                methods=[('native',x,y),('previous_twice_moving_average',x,np.asarray(smooth(smooth(y)))),
+                         ('previous_0p4_Nyquist_zero_phase',*paired_filter(x,y,.4))]
+                try:
+                    (xx,yy),information=periodic_causal_filter(time,x,y,control['natural_frequency_Hz'])
+                    methods.append(('periodic_causal_2fn',xx,yy))
+                    status='applied'
+                    reason=None
+                except ValueError as error:
+                    status='unresolved_at_saved_sampling'
+                    information=None
+                    reason=str(error)
+                axis=axes[row,col]
+                scale=1. if task=='UT' else .001
+                styles={'native':dict(color='.70',linewidth=.8,zorder=1),
+                        'previous_twice_moving_average':dict(color='.18',linestyle='--',linewidth=1.,zorder=3),
+                        'previous_0p4_Nyquist_zero_phase':dict(color='#9467bd',linestyle=':',linewidth=1.25,zorder=4),
+                        'periodic_causal_2fn':dict(color=TOPOLOGY_COLORS[topology],linewidth=1.35,zorder=5)}
+                comparison=[]
+                for method,xx,yy in methods:
+                    axis.plot(xx,yy*scale,**styles[method])
+                    metrics=numeric_metrics(xx,yy,endpoint)
+                    comparison.append(dict(method=method,**metrics))
+                    results.append(dict(topology=topology,task=task,design=design,id=record['id'],
+                        method=method,cutoff_Hz=control['cutoff_Hz'] if method=='periodic_causal_2fn' else None,
+                        natural_frequency_Hz=control['natural_frequency_Hz'],saved_nyquist_Hz=float(nyquist),
+                        periodic_filter_status=status,native_samples=len(time),fixed_endpoint_index=endpoint,
+                        fixed_endpoint_time_s=float(time[endpoint]),**metrics))
+                note=(r'$2f_n$ = '+format(control['cutoff_Hz'],'.1f')+' Hz')
+                if status!='applied':
+                    note+='\nAbove saved Nyquist; unapplied'
+                axis.text(.98,.96,note,ha='right',va='top',transform=axis.transAxes,fontsize=8,
+                          bbox=dict(facecolor='white',alpha=.82,edgecolor='none',pad=1.5))
+                axis.grid(alpha=.18)
+                axis.tick_params(labelsize=8)
+                axis.set_ylabel((topology.capitalize() if topology!='FCC' else topology)+'\n'+
+                                (r'$\Sigma$ (MPa)' if task=='UT' else 'Force (kN)'),fontsize=9)
+                if row==0:
+                    axis.set_title({'periodic':'Periodic','full':'Full disorder, ID 1','mechanism':'Mechanism-based, ID 1'}[design],
+                                   color={'periodic':'.1','full':'#ff7f0e','mechanism':'#1f77b4'}[design],fontsize=11)
+                record=dict(record,periodic_control=control,filter_status=status,reason=reason,
+                            filter_information=information,saved_nyquist_Hz=float(nyquist),comparisons=comparison)
+        legend=[Line2D([],[],color='.7',lw=1,label='Native response'),
+                Line2D([],[],color='.2',lw=1.5,label=r'Causal Butterworth, $2f_n$ (where resolved)'),
+                Line2D([],[],color='.18',ls='--',label='Previous twice-moving average'),
+                Line2D([],[],color='#9467bd',ls=':',label='Previous 0.4-Nyquist filter')]
+        fig.legend(handles=legend,loc='upper center',ncol=2,fontsize=9,frameon=False,bbox_to_anchor=(.5,1.))
+        fig.supxlabel(r'Macroscopic strain, $\varepsilon_L$' if task=='UT' else 'Load-line displacement (mm)',fontsize=11)
+        fig.tight_layout(rect=(0,.025,1,.95),h_pad=1.4,w_pad=1.7)
+        for extension in ('png','svg'):
+            path=out/(stem+'.'+extension)
+            fig.savefig(str(path),dpi=190)
+            figures.append(str(path))
+        plt.close(fig)
+    with (out/'periodic-cutoff-metrics.csv').open('w',newline='') as stream:
+        writer=csv.DictWriter(stream,fieldnames=list(results[0]))
+        writer.writeheader()
+        writer.writerows(results)
+    report=dict(periodic_registry=str(registry_path),registry_sha256=sha(registry_path),
+                native_index=str(source_index),native_index_sha256=sha(source_index),
+                figures=figures,measurements=results,
+                cutoff_source='Only the eight exact population-periodic specimens; same cutoff used for every matching design',
+                event_handling='Native STATUS event remains unfiltered. Fixed endpoint uses last native sample before STATUS for these curve comparisons, not a replacement material-initiation definition.',
+                axis_support='Every point retains its actual native timestamp and paired response; no stretching, padding or artificial tail',
+                limitation='Six of eight physical cutoffs exceed saved response Nyquist; no physical filter is applied to those families. Previous0.4-Nyquist and moving averages remain sensitivity comparisons, not Hsieh-calibrated results.',
+                methods='Physical filter: causal order2 DC-start Butterworth at2fn; previous0.4: order2 forward/backward; previousMA: twice resources.smooth',
+                production_data_unchanged=True)
+    (out/'periodic-cutoff-comparison.json').write_text(json.dumps(report,indent=2)+"\n")
+    return report
+
+
 def first_crossing(y, fraction):
     peak = int(np.argmax(y))
     values = np.flatnonzero(np.asarray(y)[peak:] <= fraction*y[peak])
@@ -663,8 +913,22 @@ if __name__ == "__main__":
     parser.add_argument("--examples",action="store_true",help="Plot the actual periodic/full/mechanism examples without rerunning the pilot")
     parser.add_argument("--extract-hex-ductility",action="store_true",help="Abaqus Python: recover the complete native hex-ID1 history without solving")
     parser.add_argument("--hex-ductility",action="store_true",help="Plot native raw/filter thresholds and cutoff sensitivity")
+    parser.add_argument("--periodic-cutoffs",action="store_true",help="Build authoritative periodic-only cutoff registry")
+    parser.add_argument("--accept-physical-modes",action="store_true",help="After visual mode review, accept screened periodic modes")
+    parser.add_argument("--extract-periodic-examples",action="store_true",help="Abaqus read-only extraction of24 genuine periodic/full/mechanism histories")
+    parser.add_argument("--archive-root",type=Path,default=Path("Z:/p1/HPCarchive/Ti/data"))
+    parser.add_argument("--apply-periodic-examples",action="store_true",help="Apply physical periodic cutoff to24 native histories; write two figures and metrics")
     args = parser.parse_args()
-    if args.extract_hex_ductility:
+    if args.apply_periodic_examples:
+        result=apply_periodic_examples(args.root)
+        print('Wrote',len(result['figures']),'figure files and',len(result['measurements']),'method metrics')
+    elif args.periodic_cutoffs:
+        result=periodic_cutoff_registry(args.root,args.accept_physical_modes)
+        print('Periodic family registry',len(result['families']))
+    elif args.extract_periodic_examples:
+        result=extract_periodic_cutoff_examples(args.root,args.archive_root,args.data_root)
+        print('Recovered',len(result),'native histories without submitting simulations')
+    elif args.extract_hex_ductility:
         result=extract_hex_ductility_native(args.root)
         print('Recovered',result['native_samples'],'unchanged native samples; no simulation run')
     elif args.hex_ductility:

@@ -446,8 +446,12 @@ without deleting anything. `audit/cleanup-review.json` extends that inventory
 to code/notebook cleanup, legacy workbook values and audit additions, competing
 early reviews, backup states and pending reference capture. Refresh both before
 final cleanup; source values and unique temporary evidence must be preserved.
-Publication exports in `audit/paper` show14 native initial-triangle cases plus
-an explicitly adopted four-point display supplement:2 matched nonlinear-recovery
+Publication exports in `audit/paper` now show13 available native initial-triangle
+cases, one displayed nonlinear-recovery index and2 declared predictions. The
+original four-point supplement is retained as prediction-fit evidence, but an
+available native result always takes display precedence over its recovery
+alternative. Two10mm hexagonal points have negative filtered areas and remain
+excluded. The retained supplement originally held2 matched nonlinear-recovery
 indices and2 density/length predictions. The supplement JSON in
 `audit/new-validation/no-rerun-options-20261102.json` is bound to the selected CSV
 hash and rechecked against its source recovery rows. A two-entry source legend
@@ -479,11 +483,28 @@ Whole-history filtering can alter ductility materially despite stable work.
 `validation_elastic_calibration.py --compare-fit-verification` separately
 checks Ortega inside its fitted domain:18 paired-mesh jobs/9 tensors agree
 within.883%K/1.773%J after consistent source-axis f/M conversion.
-These CPS4R models contain no lattice struts or fracture initiation; actual
-FCC beam-lattice energy/compliance verification remains a separate open step.
-Hsieh FT calculations use filtered mechanical curves, causal Butterworth at2fn;
-order2/DC is an explicit Abaqus-default reconstruction because the paper does
-not disclose order. Apply that protocol before replacing the current plots.
+These CPS4R models contain no lattice struts or fracture initiation.
+`validation_fcc.py` now prepares/gathers actual source-mesh FCC B21 controls:
+3elastic crack lengths, one source-compatible mapped periodic tensor, and a
+bounded6-run original/potential-material plastic feasibility pilot. The actual
+FCC elastic energy comparison differs by4.63-5.96% in equivalent K. This is
+numerical lattice verification; plastic qualification is a separate gate.
+`validation_literature.py --output-dir <audit/elastic-calibration/published-lattices>`
+compares Omidi/St-Pierre2023 snub-square TableC2 CT factors with Ortega:
+lambda1,chi3.16-7.65, within the fit domain; deviations3.51-6.75%. Reproducing
+the published discrete-beam fracture points still requires snub-square models.
+Hsieh FT calculations use causal paired Butterworth at2fn; order2/DC is a
+documented reconstruction because the source does not disclose order.
+`validation_modal.py prepare_periodic` prepares8 exact population-periodic
+UT/FT models; `prepare_iso` adds only missing selected ISO periodic sources.
+Submit immutable manifests through validation_queue, then Abaqus Python
+`validation_modal.py extract --out <campaign> --deliveries <queue/runs>`,
+`plot` for physical-mode review and `iso_map` for the source-frequency map.
+`validation_curve_processing.py --periodic-cutoffs --accept-physical-modes`
+records the8 accepted families; `--extract-periodic-examples` reads24 histories
+and `--apply-periodic-examples` plots paired causal filtering. No disordered
+modal jobs. Never cap2fn to saved Nyquist: above it, filtering is unresolved
+on those stored histories and must not be claimed applied or rewritten into MLdata.
 `validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
 clamps and B21 bending/shear, computing the initial tangent from prescribed
 small travel and reaction, without a curve-fit interval. Four hex/kagome

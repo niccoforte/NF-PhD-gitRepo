@@ -8,8 +8,10 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 - [x] Consolidate useful Ti validation sources, recover native histories and
   reconcile the20 Review lattices.py findings with verified foundation fixes.
-- [x] Close the Hsieh comparison display:14 native initial-triangle points,
-  2 measured nonlinear-recovery indices and2 predictions, with provenance.
+- [x] Recalculate source-matched Hsieh filtering and replace current views:
+  13available native initial-triangle points,1displayed recovery index and
+  2declared predictions. Available native values take precedence; hex10mm16/20%
+  filtered areas are negative and remain excluded. Before-state is fingerprinted.
   Direct3mm Fig10 is primary;10mm references are declared length-scaled values.
   No further full-fracture completion campaign is selected. No clipping negative Apl.
 - [x] Retain Appendix C quasi-isotropy approximation for tri/kagome/hex and
@@ -22,8 +24,12 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Record measured short-job costs and population counts in
   [runtime-budget.json](Z:/p1/sims/Ti/Validation/audit/shared/runtime-budget.json).
   UAT10-11s,CT7-16s,three-step tensor10-11s;8CPUs serial. No population queue.
-  Missing517UAT values:~2-3h queue plan. All1973hexUAT:~6-12h if needed.
-  Counts7877UT/7911FT,7788paired IDs; original scopeIDs1-1000,ID0 reference only.
+  The517NaNs are516hex-full and hex-mechanismID737; exactIDs in
+  audit/shared/uat-stiffness-missing.csv. Old endpoint int(.1*peakindex) can
+  leave only2samples and deliberately returnNaN. Finite values are not thereby
+  wrong: kagomefullID1 differs.074% from its exact linear solve. No517/1973
+  rerun programme is selected. Prior counts are restrictedIDs1-1000 snapshots;
+  newerFCC extensions are not silently added to the agreed population scope.
 - [x] Verify corrected Ortega approximate isotropic ASTM limit and exact M limit.
 - [x] Recover213 actual published FEM markers from Ortega2014Fig7, with source
   hash/vector coordinates. Current equation differs at most1.602% graphically.
@@ -31,13 +37,17 @@ This replaces accumulated superseded proposals; it is the single task register.
   .883%K/1.773%J. Never label designed own-FE tests as published measurements.
 - [x] Resolve loading-axis Ortega versus crack-axis Bao convention: paired f/M
   or fB=fO*sqrt(MB/MO). Shared FCC calculation corrected; equal-axis outputs stable.
-- [ ] Verify the actual FCC beam-lattice elastic conversion. The18 continuum
-  CPS4R jobs and published Ortega FEM points are not end-to-end lattice-fracture
-  validation. Start with3 actual orderedFCC B21 C(T) elastic models at a,a+h,
-  a+2h. Compare full-opening compliance energy over the same crack interval with
-  the interval-average Ortega KI^2/M; test h/2h sensitivity. No published matching
-  planarFCC initiation-toughness dataset is currently identified. Do not claim
-  this energy check independently validates a local fracture criterion.
+- [x] Quantify actual FCC beam-lattice elastic conversion with3 exact-source
+  B21 crack lengths a80/90/100mm and one source-CT periodic mapped tensor.
+  M8945.725MPa,lambda1,chi.590409. Interval-matched Ortega energy differs
+  by9.48-12.28%J, equivalent4.63-5.96%K; h/2h comparison retained. This is
+  numerical lattice verification, not independent local-failure validation.
+- [x] Find a published in-domain orthotropic lattice benchmark: Omidi/St-Pierre
+  2023 snub-square, lambda1,chi7.65/4.74/3.16, actualCTa/W=.25. Current
+  Ortega factors differ3.51-6.75% from published TableC2 factors.
+- [ ] Reproduce the3 published snub-square beam-fracture points if retained as
+  the end-to-end literature validation. New topology needed; do not relabel the
+  retired square/45square or continuum verification as these beam results.
 - [x] Retire square/45square from active Ortega validation: out-of-domain chi.
   Remove plot CLI/derived displays and replace notebook caller. Original source
   files and rejection receipts stay only pending final cleanup disposition.
@@ -56,10 +66,13 @@ This replaces accumulated superseded proposals; it is the single task register.
   Order2/DC is an explicit Abaqus-default reconstruction choice; the paper does
   not state the order. Moving averages and.4Nyquist forward/backward examples
   are diagnostics, not the selected primary method. Material events stay native.
-- [ ] Apply that protocol to matched native histories and regenerate validation
-  values/plots before final replacement. Reuse periodic modal controls, with a
-  bounded disorder check; no per-realisation modal programme. Saved-history
-  filtering cannot recreate unavailable integration-level data or undo aliasing.
+- [x] Apply the protocol to matched native ISO histories with15 verified
+  periodic sources. Previously available14:12filtered,2sampling-unresolved;
+  hex3mm16% becomes positive while hex10mm16/20% become negative. Available
+  native count14to13. All16events and31diagnostic/QS/recovery rows unchanged.
+  No cutoff capping, missing-frequency reconstruction or MLdata rewrite.
+- [ ] Resolve the reported work-partition/finite-sampling qualification before
+  production population replacement; filtering alone did not remove negative Apl.
 - [ ] Settle one scalar UAT stiffness rule from resolved early response; use
   exact-source linear FE only where unresolved. Do not average incompatible
   hex fits or use periodic E to erase disorder softening. The517NaN repair
@@ -75,19 +88,13 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Consolidate one final StiffMatrix workflow, retaining only controls used
   by the accepted calculations. Preserve distinct material tensor versus
   cracked-specimen compliance roles; retire duplicated unused implementations.
-- [ ] Complete orthotropic/FCC plastic calibration after the lattice elastic
-  check. Initial feasibility cap:6 orderedFCC beam models,3 admissible crack
-  lengths under original incremental plasticity and3 under a potential-based
-  nonlinear material fitted only to the source constituent response. Damage off,
-  stationary notches and monotonic loading through the existing initiation range.
-  Verify constitutive/local/global response equivalence and the elastic limit
-  before an independent fixed-displacement energy derivative is used as Jref.
-  Then evaluate eta=B*b0/Apl*(Jref-KI^2/M) over resolved positive Apl and held-out
-  loading levels; further crack-increment/mesh checks only if the pilot passes.
-  Six runs are feasibility, not completed validation. No independent orthotropic
-  plastic result exists yet. Do not equate ALLIE/ALLPD/unloading differences or
-  frozen-state deletion work with J. Time the first nonlinear pilot; the elastic
-  10s job timing is not a nonlinear runtime estimate. No pilot jobs launched here.
+- [ ] Complete orthotropic/FCC plastic calibration. All6 source-mesh nonlinear
+  jobs and4 elastic/tensor controls completed. Final conditional eta1.825/2.482/
+  2.180 depends on elastic subtraction versus ASTM2.261. Material/local unloading
+  and load/crack-stencil sensitivity prevent a qualified original-model factor;
+  do not promote the closest variant. An independently established original-law
+  discrete energy reference remains necessary. No arbitrary extra queue is
+  selected; preserve the full numerical sensitivity and source/delivery hashes.
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.

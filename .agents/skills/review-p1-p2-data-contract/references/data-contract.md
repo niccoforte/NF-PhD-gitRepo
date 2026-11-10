@@ -77,14 +77,20 @@ paired coordinates for physical properties. This migration remains deferred.
   Shared FCC calcFT converts Ortega's loading-axis factor into the Bao
   crack-axis convention using sqrt(M_Bao/M_source) before K^2/M. Both moduli
   use the same reduced tensor; equal-axis outputs and data schemas are unchanged.
+  Periodic modal maps bind original INP hashes and verified delivery receipts.
+  Matching disordered histories reuse the periodic2fn cutoff; no per-ID modes.
+  Paired causal filtering keeps native material-event indices fixed. Frequencies
+  at/above saved Nyquist remain unresolved, never silently capped or interpolated
+  into a claimed source-equivalent filter. MLdata migration remains deferred.
   Selected validation CSVs/plots remain external audit products, not training
   labels. They distinguish native dynamic histories from damage-off QS controls
   and Hsieh's initial-triangle convention from dissipation/nonlinear-recovery
   eta-J estimates. Source hashes, event brackets and invalid negative areas
   survive this comparison boundary. An alternate work estimate is not ASTM J.
-  Paper views select only original-simulation initial-triangle initiation values;
-  equal nominal relative densities share an x coordinate. Do not mix control
-  histories, final-failure data or force-fit literature ordinates into that view.
+  Paper views prefer available native initial-triangle values; explicitly
+  adopted recovery/prediction supplements retain separate point provenance.
+  Equal nominal densities share an x coordinate. Never silently substitute a
+  control history or force-fit literature ordinates; negative areas stay invalid.
   Explicit Fig.8b sqrt(3) hypothesis views carry per-row display factors and keep
   base/source values unchanged; these are not corrected labels or training data.
   New validation completion jobs have a separate catalogue and native exports;

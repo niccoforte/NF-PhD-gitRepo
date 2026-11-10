@@ -14,24 +14,25 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   strain with x/y coordinates and a shared signed scale. Confirm saved sample/frame
   provenance before exporting an initiation figure; the colour cap is not a
   beam-section damage threshold. Keep historical manuscript assets until matched.
-- `validation_history_audit.py` reads indexed density-campaign ODBs without upgrade,
-  retaining actual times, NaNs/validity, monitored STATUS and named ALLKE/ALLIE.
-  `validation_modal.py` explicitly prepares/runs local exact-input eigenproblems
-  and 1 N elastic-compliance controls; preparing/extracting is not submission.
-  `validation_calculations.py` compares native/old-CSV moving averages, causal
-  Butterworth and labelled sensitivities under `Validation/audit`; `--workbook`
-  reconciles FTval read-only. The README owns commands and coverage.
-- `validation_benchmark.py` digitises Hsieh Fig.10 with graphical bounds and an
-  overlay; `validation_comparison.py` joins those points to exact saved/native
-  identities. Only 3 mm is published in Fig.10; 10 mm scaling is an inference.
-  `validation_diagnostics.py` prepares/extracts exact-source B21 periodic and
-  nonlinear-work controls; `validation_queue.py` alone submits reviewed manifests
-  serially, verifies delivery, then removes marker-owned scratch. Windows
-  `launch` detaches a new reviewed queue; logs and serial-owner gates remain.
-  `validation_workbook_fig10.mjs` authors the additive Deshpande mirror with
-  Artifact Tool, backs up current bytes and verifies every existing package part
-  and cell before replacement. It refuses occupied target rows; do not rerun it
-  to overwrite an existing mirror. Canonical reference data remain the CSV.
+- Native history/failure audit helpers preserve original ODBs, timestamps,
+  validity, STATUS and named energies. `validation_benchmark.py` digitises Hsieh
+  Fig10; only3mm is direct,10mm scaling is declared. `validation_comparison.py`
+  joins saved identities. Workbook mirroring is additive and refuses occupied
+  rows; preserve its verified backup and canonical reference CSV.
+  `validation_queue.py` alone submits reviewed immutable manifests,8CPUs serial,
+  verifies delivery and cleans only owned scratch; each continuation has a
+  distinct queue root. Failed packaging remains failed pending pinned review.
+  Modal actions prepare_periodic/prepare_iso cover population8 and selected
+  ISO sources; iso_map joins verified frequencies. Use causal
+  order2/DC Butterworth at2fn for matching disorder, no disordered modal jobs.
+  A cutoff at/above saved Nyquist is unresolved, never silently capped; preserve
+  native values with truthful filter provenance. MLdata is not rewritten here.
+  `validation_fcc.py` owns source-mesh3crack elastic controls, one mapped periodic
+  tensor and6nonlinear feasibility jobs. Potential energy derivatives remain
+  conditional on constitutive/local/global agreement; no automatic plastic-J
+  qualification or population reruns. Use full pin opening, no half-model factor.
+  `validation_literature.py` compares Omidi2023 snub-square TableC2 geometry
+  factors with Ortega; this is not completed discrete-beam fracture validation.
 - `validation_failure_audit.py` binds each of the48 native tensile-strain
   initiation brackets to saved section damage and source fingerprints.
   `validation_controls.py` prepares/extracts exact-source B21 conversion and
@@ -51,22 +52,17 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   early reviews, pending reference capture and temporary evidence dependencies.
   It never deletes. Continuation `-status.json` receipts are not submission plans.
   Refresh it before final cleanup.
-- Publication views from `validation_comparison.py` use native initial-triangle
-  results plus the explicitly adopted four-point supplement in
-  `audit/new-validation/no-rerun-options-20261102.json`. Bind it to the selected
-  CSV hash: two matched nonlinear-recovery indices and two density/length
-  predictions retain distinct methods and case-specific captions, never invented
-  native fracture KJ or source events. Native negative areas stay unavailable.
-  Exports live in `audit/paper` as PNG/PDF/SVG with point/exclusion tables and
-  captions. Fig.10 uses nominal relative density;3mm references are direct and
-  10mm reference scaling is declared. Simplifying presentation must not change K.
-  The separately named Fig.8b sqrt(3) hypothesis views may rescale displayed
-  ordinates only with explicit per-point factors and captions; keep the base
-  comparison unchanged and never promote either view to a verified correction.
-  Use hollow reference outlines and layered simulation sizes without x jitter.
-  Use exactly Hsieh et al. and Current study in the source legend, with common
-  Current study circles. Identify topology beside the curves; retain internal
-  Simulation series identifiers and all point-level calculation provenance.
+- Paper views use selected native triangles plus the hash-bound supplement
+  `audit/new-validation/no-rerun-options-20261102.json`. Native values win:
+  13native,1recovery,2predictions; two10mmhex negative areas stay excluded.
+  Retain each calculation basis, fit evidence, source/event and filter status.
+  `audit/paper` holds PNG/PDF/SVG, point/exclusion tables and captions. Fig10
+  uses nominal density, direct3mm references and declared10mm length scaling.
+  Fig8b sqrt3 views alter display ordinates only, with factors/captions; base K
+  remains unchanged and neither hypothesis is a verified correction.
+  Use Hsieh et al./Current study source legends, hollow references, layered
+  Current study circles and direct topology labels without coordinate jitter.
+  Internal Simulation IDs and point provenance remain intact.
 - `validation_completion.py` prepares the seven absent length/density cases
   under `audit/new-validation`, using archived A1 INPs and verified dimensional
   scaling rather than today's A1 defaults. It never submits; the serial queue

@@ -6,10 +6,30 @@ import unittest
 import numpy as np
 
 from validation_curve_processing import (initial_fit, paired_filter, transfer_prefix,
-                                         query_support_mask, event_segmented_filter, threshold_details)
+                                         query_support_mask, event_segmented_filter, threshold_details,
+                                         periodic_causal_filter)
 
 
 class CurveQualification(unittest.TestCase):
+    def test_physical_filter_is_causal_and_does_not_leak_future_fracture(self):
+        time=np.arange(100)*.001
+        force=np.r_[np.ones(50)*10,np.zeros(50)]
+        (_, filtered),info=periodic_causal_filter(time,time,force,50.)
+        np.testing.assert_allclose(filtered[:50],10.,atol=1e-12)
+        self.assertFalse(info['zero_phase'])
+        self.assertEqual(info['cutoff_Hz'],100.)
+        self.assertEqual(info['startup'],'DC')
+
+    def test_physical_cutoff_cannot_be_silently_capped_to_saved_nyquist(self):
+        time=np.arange(100)*.001
+        with self.assertRaises(ValueError):
+            periodic_causal_filter(time,time,time,300.)
+
+    def test_physical_filter_keeps_paired_affine_work_coordinates(self):
+        time=np.arange(100)*.001
+        (x,y),_=periodic_causal_filter(time,time,3*time+2,50.)
+        np.testing.assert_allclose(y,3*x+2,atol=1e-12)
+
     def test_affine_elastic_response_is_recovered_with_nonzero_intercept(self):
         x = np.linspace(0, .004, 20)
         answer = initial_fit(x, 7300*x+.3)

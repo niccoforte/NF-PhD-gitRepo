@@ -22,9 +22,184 @@ PRIMARY_INPUTS = (
     "3/0.16/Fracture-hex-80-per-1.inp",
 )
 
+POPULATION_SIZES = {"tri": 30, "kagome": 20, "hex": 20, "FCC": 20}
+
+
+def periodic_contents(source, task, modes=10):
+    """Retain exact periodic source model; replace only nonlinear step/material.
+
+    UAT grips are held in their prescribed incremental displacement degrees of
+    freedom. C(T) retains the established released loading-pin natural-mode
+    convention. These are different specimen constraints, recorded explicitly.
+    """
+    if task not in ("UT", "FT") or modes < 1:
+        raise ValueError("Expected UT/FT and positive mode count")
+    all_blocks = blocks(Path(source).read_text(encoding="ascii"))
+    split = next(i for i, b in enumerate(all_blocks) if keyword(b) == "*step")
+    model, step = all_blocks[:split], all_blocks[split:]
+    if any(keyword(b) in ("*boundary", "*include") for b in model):
+        raise ValueError("Initial constraints/includes require source review")
+    if any("mass scaling" in b.splitlines()[0].lower() for b in all_blocks):
+        raise ValueError("Mass-scaled sources are not an exact physical eigenproblem")
+    observed = {line.replace(" ", "").lower() for b in step if keyword(b) == "*boundary"
+                for line in b.splitlines()[1:] if line.strip() and not line.startswith("**")}
+    expected = ({"load,1,1", "load,2,2,1.", "fixity,1,1", "fixity,2,2"} if task == "FT" else
+                {"set-top,1,1", "set-top,2,2,1.", "set-top,6,6", "set-bottom,1,1",
+                 "set-bottom,2,2", "set-bottom,6,6"})
+    if observed != expected:
+        raise ValueError("Unfamiliar exact-source constraints: " + repr(observed))
+    density = [float(numeric_line(b).split(",")[0]) for b in model if keyword(b) == "*density"]
+    elastic = [[float(v) for v in numeric_line(b).split(",") if v.strip()]
+               for b in model if keyword(b) == "*elastic"]
+    if len(density) != 1 or len(elastic) != 1 or density[0] <= 0:
+        raise ValueError("One physical density and elastic material required")
+    removed = {"*plastic", "*damage initiation", "*damage evolution", "*amplitude"}
+    prefix = "".join(b for b in model if keyword(b) not in removed)
+    constraints = ("fixity, 1, 2\nload, 1, 1\n" if task == "FT" else
+                   "Set-bottom, 1, 2\nSet-bottom, 6, 6\nSet-top, 1, 2\nSet-top, 6, 6\n")
+    suffix = ("\n*Step, name=Modal, perturbation\n"
+              "*Frequency, eigensolver=Lanczos, normalization=mass\n{},\n"
+              "*Boundary\n{}*Output, field\n*Node Output\nU, UR\n*End Step\n").format(modes, constraints)
+    return prefix.rstrip() + "\n" + suffix.lstrip("\n"), {
+        "density_tonne_mm3": density[0], "elastic_MPa_nu": elastic[0],
+        "control": "released" if task == "FT" else "held_grips",
+        "boundary": ("fixed pin U1/U2; loading pin U1 held, U2 released; pin rotations free" if task == "FT" else
+                     "both source clamps U1/U2/UR3 held; homogeneous incremental prescribed travel"),
+        "model_sha256": hashlib.sha256(prefix.encode("ascii")).hexdigest(),
+        "transformations": ["Exact source mesh, all beam sections including UAT brackets, material E/nu/density and couplings retained",
+                            "Plasticity, damage and amplitude removed for undeformed elastic perturbation",
+                            "Explicit step replaced by 10-mode Lanczos frequency extraction"],
+    }
+
+
+def prepare_periodic(args):
+    """Prepare exactly eight population periodic families; never submit."""
+    archive, out = Path(args.archive).resolve(), Path(args.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    records, jobs = [], []
+    for topology, nx in POPULATION_SIZES.items():
+        for task, label in (("UT", "Ductile"), ("FT", "Fracture")):
+            matches = list((archive / topology).glob("*/zip/{}-{}-{}-per-1.inp".format(label, topology, nx)))
+            if len(matches) != 1:
+                raise ValueError("Expected one population periodic source for {} {}: {}".format(topology, task, matches))
+            source = matches[0].resolve()
+            source.relative_to(archive)
+            name = "pm_{}_{}".format(topology.lower(), task.lower())
+            directory = job_directory(out, name)
+            directory.mkdir(exist_ok=True)
+            inp = directory / (name + ".inp")
+            contents, data = periodic_contents(source, task, args.modes)
+            if inp.exists() and inp.read_text(encoding="ascii") != contents:
+                raise ValueError("Prepared periodic modal input is immutable: " + str(inp))
+            inp.write_text(contents, encoding="ascii")
+            data.update(job=name, case_id="population-periodic:{}:{}".format(topology, task),
+                        task=task, topology=topology, nnx=nx, l_mm=10., nominal_relative_density=.2,
+                        source_inp=str(source), source_inp_sha256=sha256(source),
+                        source_odb=str(source.with_suffix(".odb")), input_sha256=sha256(inp),
+                        n_modes=args.modes, analysis="frequency", mass_scaling="none",
+                        units="N, mm, tonne, second; frequency in Hz",
+                        disorder_application="same periodic cutoff for every matching disorder ID; no disordered modal jobs")
+            (directory / "source.json").write_text(json.dumps(data, indent=2), encoding="utf-8")
+            records.append(data)
+            jobs.append({"job":name, "input":str(inp), "input_sha256":data["input_sha256"],
+                         "cpus":8, "required_outputs":[".odb", ".dat"]})
+    manifest = {"abaqus":args.abaqus, "queue_root":str(out / "queue"), "jobs":jobs}
+    (out / "manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    (out / "prepared-periodic.json").write_text(json.dumps(records, indent=2), encoding="utf-8")
+    print(str(out / "manifest.json"))
+
+
+def prepare_iso(args):
+    """Prepare missing exact periodic modal sources for selected native FT points."""
+    root, out = Path(args.root).resolve(), Path(args.out).resolve()
+    out.mkdir(parents=True, exist_ok=True)
+    with (root/"audit/paper/points.csv").open(newline="") as stream:
+        selected = {r["source_inp_sha256"]: r for r in csv.DictReader(stream)
+                    if r.get("method") == "Hsieh_initial_triangle_native" and r.get("plotted") == "True"}
+    with (root/"case-index.csv").open(newline="",encoding="utf-8-sig") as stream:
+        indexed = {r["inp_sha256"]:r for r in csv.DictReader(stream)}
+    existing = json.loads((root/"audit/modal/summary.json").read_text())
+    reused = {r["source_inp_sha256"]:r for r in existing if r["control"] == "released"}
+    records, jobs = [], []
+    for source_sha, row in selected.items():
+        if source_sha in reused:
+            continue
+        case = indexed.get(source_sha,{})
+        source = Path(row["source_inp"]) if row.get("source_inp") else root/case["inp"]
+        source_odb = Path(row["source_odb"]) if row.get("source_odb") else root/case["odb"]
+        if sha256(source) != source_sha:
+            raise ValueError("Selected original input hash mismatch")
+        length = float(row["l_mm"])
+        rho = float(row["relative_density"])
+        topology = row["topology"]
+        name = "im_{}{}_r{}".format({"tri":"t","kagome":"k","hex":"h"}[topology],int(length),round(rho*100))
+        directory = job_directory(out,name)
+        directory.mkdir(exist_ok=True)
+        inp = directory/(name+".inp")
+        contents, metadata = periodic_contents(source,"FT",args.modes)
+        if inp.exists() and inp.read_text(encoding="ascii") != contents:
+            raise ValueError("Prepared ISO modal input is immutable")
+        inp.write_text(contents,encoding="ascii")
+        metadata.update(job=name,case_id=row["case_id"],task="FT",topology=topology,l_mm=length,
+            nominal_relative_density=rho,source_inp=str(source),source_inp_sha256=source_sha,
+            source_odb=str(source_odb),source_odb_sha256=row.get("source_odb_sha256") or case["odb_sha256"],
+            input_sha256=sha256(inp),n_modes=args.modes,analysis="frequency",mass_scaling="none",
+            units="N, mm, tonne, second; frequency in Hz",
+            scope="Exact selected periodic validation specimen; no disorder-specific modal solves")
+        (directory/"source.json").write_text(json.dumps(metadata,indent=2),encoding="utf-8")
+        records.append(metadata)
+        jobs.append(dict(job=name,input=str(inp),input_sha256=metadata["input_sha256"],cpus=8,required_outputs=[".odb",".dat"]))
+    (out/"manifest.json").write_text(json.dumps(dict(abaqus=args.abaqus,queue_root=str(out/"queue"),jobs=jobs),indent=2))
+    (out/"prepared-iso.json").write_text(json.dumps(records,indent=2))
+    print("Prepared",len(jobs),"periodic jobs; retained",len(reused),"existing exact sources")
+    print(str(out/"manifest.json"))
+
+
+def iso_map(args):
+    """One original-INP-hash map for completed source-qualified released modes."""
+    root,out=Path(args.root),Path(args.out)
+    old=json.loads((root/"audit/modal/summary.json").read_text())
+    new=json.loads((out/"summary.json").read_text()) if (out/"summary.json").is_file() else []
+    mapping={}
+    for data in old+new:
+        if data["control"] != "released":
+            continue
+        folder=(out/data["job"] if data in new else root/"audit/modal"/data["job"])
+        if not data.get("candidate_mode") or not (folder/"mode_shapes.png").is_file():
+            raise ValueError("Modal physical screen/shape review absent")
+        source=Path(data["source_inp"])
+        if sha256(source) != data["source_inp_sha256"]:
+            raise ValueError("Original INP changed")
+        original_odb_sha=sha256(data["source_odb"])
+        if data.get("source_odb_sha256") and original_odb_sha != data["source_odb_sha256"]:
+            raise ValueError("Original fracture ODB changed")
+        record=folder/"modes.json"
+        modal_odb=Path(data.get("solved_odb") or folder/(data["job"]+".odb"))
+        modal_odb_sha=sha256(modal_odb)
+        if data.get("solved_odb_sha256") and modal_odb_sha != data["solved_odb_sha256"]:
+            raise ValueError("Extracted modal ODB changed")
+        mapping[data["source_inp_sha256"]]=dict(natural_frequency_Hz=data["candidate_mode"]["frequency_Hz"],
+            cutoff_Hz=data["cutoff_2fn_Hz"],job=data["job"],source_sha256=data["source_inp_sha256"],
+            source_odb_sha256=original_odb_sha,read_only=True,state="completed_source_qualified_released_physical_mode",
+            source_input_hash_verified=True,source_inp=str(source),source_odb=data["source_odb"],
+            modal_receipt=str(record),modal_receipt_sha256=sha256(record),
+            modal_odb=str(modal_odb),modal_odb_sha256=modal_odb_sha,boundary=data["boundary"],
+            execution_state=data.get("execution_state","completed"),
+            delivery_receipt=data.get("delivery_receipt"),
+            delivery_receipt_sha256=data.get("delivery_receipt_sha256"),
+            physical_mode_review="Lowest global deformational mode; mode shapes visually reviewed",mode=data["candidate_mode"]["mode"])
+    out.mkdir(parents=True,exist_ok=True)
+    path=out/"source-frequency-map.json"
+    path.write_text(json.dumps(mapping,indent=2)+"\n")
+    print("Mapped",len(mapping),"exact periodic original sources:",str(path))
+
 
 def sha256(path):
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    digest = hashlib.sha256()
+    with Path(path).open("rb") as stream:
+        for chunk in iter(lambda:stream.read(8*1024*1024),b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def blocks(text):
@@ -194,10 +369,46 @@ def extract(args):
         directory = job_directory(args.out, data["job"])
         if directory != metadata.parent.resolve():
             raise ValueError("Job name does not match its source directory")
-        odb_path = directory / (data["job"] + ".odb")
-        launcher = directory / "launcher.txt"
-        if not odb_path.exists() or not launcher.exists() or "COMPLETED" not in launcher.read_text(encoding="utf-8"):
+        delivery_root = getattr(args, "deliveries", None)
+        delivery_roots=([delivery_root]+(getattr(args,"extra_deliveries",None) or [])) if delivery_root else []
+        matches=[Path(item)/data["job"] for item in delivery_roots
+                 if (Path(item)/data["job"]/(data["job"]+".odb")).is_file()]
+        if len(matches)>1:
+            raise ValueError("Multiple delivered modal attempts require an explicit source choice")
+        solved=(matches[0] if matches else Path(delivery_root)/data["job"]) if delivery_root else directory
+        odb_path = solved / (data["job"] + ".odb")
+        launcher = solved / "launcher.txt"
+        if not odb_path.exists() or not launcher.exists():
             continue
+        launch_text=launcher.read_text(encoding="utf-8")
+        completed="COMPLETED" in launch_text.upper()
+        reviewed=data["job"] in (getattr(args,"accept_wrapup_job",None) or [])
+        if not completed and not reviewed:
+            continue
+        if reviewed and not completed:
+            dat=(solved/(data["job"]+".dat")).read_text(encoding="utf-8",errors="replace")
+            if ("THE ANALYSIS HAS BEEN COMPLETED" not in dat or "ANALYSIS COMPLETE" not in dat
+                    or "End Abaqus/Standard Analysis" not in launch_text
+                    or "SIM Wrap-up" not in launch_text or "MoveFileEx: Access is denied" not in launch_text):
+                raise ValueError("Only reviewed post-analysis SIM wrap failure may be extracted")
+        data["execution_state"]=("completed" if completed else "mechanically_completed_with_reviewed_SIM_wrap_failure")
+        if delivery_root:
+            delivery=solved/"delivery.json"
+            receipt=json.loads(delivery.read_text())
+            if receipt.get("required_outputs_missing"):
+                raise ValueError("Delivery is incomplete")
+            for suffix in (".inp",".odb",".dat"):
+                expected=next(r for r in receipt["files"] if r["file"]==data["job"]+suffix)
+                if sha256(solved/expected["file"]) != expected["sha256"]:
+                    raise ValueError("Retained delivery hash changed")
+            data["delivery_receipt"]=str(delivery)
+            data["delivery_receipt_sha256"]=sha256(delivery)
+        if sha256(data["source_inp"]) != data["source_inp_sha256"]:
+            raise ValueError("Source input changed after preparation")
+        if sha256(solved / (data["job"] + ".inp")) != data["input_sha256"]:
+            raise ValueError("Solved input differs from prepared input")
+        before_odb = sha256(odb_path)
+        data.update(solved_odb=str(odb_path), solved_odb_sha256=before_odb)
         odb = openOdb(str(odb_path), readOnly=True)
         try:
             if data.get("analysis") == "linear_static":
@@ -276,6 +487,8 @@ def extract(args):
             summaries.append(data)
         finally:
             odb.close()
+        if sha256(odb_path) != before_odb:
+            raise ValueError("Read-only modal extraction changed ODB")
     (Path(args.out) / "summary.json").write_text(json.dumps(summaries, indent=2), encoding="utf-8")
     (Path(args.out) / "static-summary.json").write_text(json.dumps(static_summaries, indent=2), encoding="utf-8")
     print("Extracted", len(summaries), "modal and", len(static_summaries), "static controls")
@@ -288,7 +501,8 @@ def plot(args):
     from matplotlib.collections import LineCollection
     import numpy as np
 
-    for file in Path(args.out).glob("*/modes.npz"):
+    files=list(Path(args.out).glob("*/modes.npz"))
+    for file in files:
         data = np.load(file)
         xy = data["coords"][:, :2]
         conn = data["elements"]
@@ -308,13 +522,36 @@ def plot(args):
         fig.suptitle(file.parent.name)
         fig.savefig(str(file.parent / "mode_shapes.png"), dpi=180)
         plt.close(fig)
+    if files:
+        rows=(len(files)+2)//3
+        fig,axes=plt.subplots(rows,3,figsize=(11.,3.6*rows),squeeze=False,constrained_layout=True)
+        for axis in axes.ravel():
+            axis.set_visible(False)
+        for axis,file in zip(axes.ravel(),files):
+            data=np.load(file)
+            xy,conn=data["coords"][:,:2],data["elements"]
+            u=data["u"][0]
+            scale=np.ptp(xy,axis=0).max()*.07/np.linalg.norm(u,axis=1).max()
+            axis.set_visible(True)
+            axis.add_collection(LineCollection(xy[conn],colors=".86",linewidths=.18))
+            axis.add_collection(LineCollection((xy+scale*u)[conn],colors="tab:blue",linewidths=.25))
+            axis.autoscale()
+            axis.set_aspect("equal")
+            axis.set_title(file.parent.name+"\nMode1: {:.3f} Hz".format(data["frequency_Hz"][0]),fontsize=9)
+            axis.tick_params(labelsize=7)
+        fig.savefig(str(Path(args.out)/"mode_overview.png"),dpi=150)
+        plt.close(fig)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("prepare", "run", "extract", "plot"))
+    parser.add_argument("action", choices=("prepare", "prepare_periodic", "prepare_iso", "iso_map", "run", "extract", "plot"))
     parser.add_argument("--root", default="Z:/p1/sims/Ti/Validation")
     parser.add_argument("--out", default="Z:/p1/sims/Ti/Validation/audit/modal")
+    parser.add_argument("--archive", default="Z:/p1/HPCarchive/Ti/data/per/0.0")
+    parser.add_argument("--deliveries", help="Serial queue runs directory for hash-bound read-only extraction")
+    parser.add_argument("--accept-wrapup-job",action="append",help="After explicit review only: extract mechanically completed job with known SIM MoveFileEx wrap failure; queue failure remains recorded")
+    parser.add_argument("--extra-deliveries",action="append",help="Additional distinct continuation queue runs directory; repeated job attempts are rejected")
     parser.add_argument("--inp", action="append", help="Case-index-relative INP; repeatable")
     parser.add_argument("--modes", type=int, default=10)
     parser.add_argument("--stiffness", action="store_true", help="Also prepare four 1 N elastic static controls")

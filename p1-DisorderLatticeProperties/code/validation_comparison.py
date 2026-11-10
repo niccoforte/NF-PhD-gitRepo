@@ -565,7 +565,7 @@ def plot_figure10_density(records, reference_rows, out):
     from matplotlib.lines import Line2D
     from matplotlib.ticker import NullFormatter
 
-    colors = {"tri": "#b8443e", "kagome": "#327aa5", "hex": "#4c8c50"}
+    colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#4c8c50"}
     names = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal"}
     fig, ax = plt.subplots(figsize=(11.2, 7.4), constrained_layout=True)
     output = []
@@ -714,7 +714,7 @@ def paper_supplements(records, inputs, path=None):
             Path(document["source_results"]).resolve() != selected_path):
         raise ValueError("Paper supplement does not match the captured selected-results source")
     expected = {("hex", 3., .16), ("hex", 3., .2), ("hex", 3., .13), ("hex", 10., .13)}
-    supplements = {}
+    supplements, native_available = {}, set()
     for point in document["points"]:
         key = (point["topology"], float(point["l_mm"]), float(point["relative_density"]))
         if key not in expected or key in supplements:
@@ -730,7 +730,7 @@ def paper_supplements(records, inputs, path=None):
                   and (r["topology"], r["l_mm"], r["relative_density"]) == key]
         if any(r["value_status"] == "available_provisional" and
                r.get("KJ_MPa_sqrt_m") is not None and not negative_area(r) for r in native):
-            raise ValueError("Paper supplement would replace an available original-fracture result")
+            native_available.add(key)
         recovery = None
         if not predicted:
             candidates = [r for r in records if r["method"] == "qs_measured_recovery_eta"
@@ -763,8 +763,10 @@ def paper_supplements(records, inputs, path=None):
     metadata = {"path": str(path), "sha256": hashlib.sha256(contents).hexdigest(),
                 "source_results_sha256": selected["sha256"], "density_exponent": exponent,
                 "fitting_data": document.get("fitting_data"), "validation_limit": document.get("validation_limit"),
-                "points": [{k: v for k, v in p.items() if k != "recovery_record"} for p in supplements.values()]}
-    return supplements, metadata
+                "points": [{k: v for k, v in p.items() if k != "recovery_record"} for p in supplements.values()],
+                "suppressed_by_available_native": [list(key) for key in sorted(native_available)],
+                "precedence": "An available native result takes precedence; recovery values remain only as declared prediction-fit evidence or separate diagnostics."}
+    return {key: value for key, value in supplements.items() if key not in native_available}, metadata
 
 
 def paper_exports(records, fig8, reference_rows, material, destination, inputs, source_pdf_sha, supplement_path=None):
@@ -868,6 +870,10 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                                        "compliance_odb_sha256", "initial_stiffness_N_per_mm", "modulus_MPa", "quality_note",
                                        "control_source_kind", "control_similarity_proof_sha256", "source_solver_state",
                                        "source_inp", "source_odb", "extraction_receipt_sha256",
+                                       "filter_applied", "filter_status", "filter_cutoff_Hz", "saved_Nyquist_Hz",
+                                       "filter_natural_frequency_Hz", "filter_modal_job", "filter_modal_odb_sha256",
+                                       "filter_modal_receipt_sha256", "filter_order", "filter_zero_phase", "filter_startup",
+                                       "filter_native_prefix_samples", "filter_max_time_remap_s",
                                        "precriterion_max_KE_IE", "startup_window_max_KE_IE", "energy_window_review_required")}})
     # Explicit interpretation tests; the captured source and calculated K stay
     # unchanged. The factor is prescribed from the Fig.8a/8b discrepancy, not fit.
@@ -895,6 +901,17 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
         note = (" Current study values combine the calculation bases specified here; common source markers "
                 "do not imply identical calculation methods. Native Explicit initial-triangle KJ uses the "
                 "last recorded undamaged tensile-strain sample with the C(T) calibration.")
+        native_displayed = [r for r in displayed if r["evaluation_basis"] == "original_fracture"]
+        filtered = sum(r.get("filter_applied") in (True, "True") for r in native_displayed)
+        unresolved = sum(r.get("filter_status") == "sampling_unresolved_cutoff_at_or_above_saved_Nyquist"
+                         for r in native_displayed)
+        if filtered or unresolved:
+            note += (" Paired causal second-order Butterworth filtering at twice the exact periodic "
+                     "specimen frequency is applied to {} native points. For {} points the verified "
+                     "cutoff reaches or exceeds saved-history Nyquist; observed native values are retained "
+                     "and filtering is explicitly unapplied. No cutoff is silently lowered and no omitted "
+                     "frequencies are reconstructed. Material-event indices are unchanged."
+                     .format(filtered, unresolved))
         if counts["nonlinear_recovery"]:
             cases = ", ".join("{} {}mm/{}%".format(r["topology"], int(r["l_mm"]), round(100*r["relative_density"]))
                               for r in displayed if r["evaluation_basis"] == "nonlinear_recovery")
@@ -924,17 +941,17 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                "remains unresolved; this is not independent proof of absolute toughness." + calculation_note("8b")),
         "10": ("Dimensional initiation-related comparison at matched nominal relative densities. The3mm "
                "Hsieh initiation points are directly digitised; the10mm reference is an explicitly declared "
-               "sqrt(10/3) scaling inference. Error bars bound graphical extraction only, not statistical "
-               "uncertainty. No final-fracture data are shown. This comparison does not establish ASTM "
+               "sqrt(10/3) scaling inference. Graphical extraction bounds remain in the source table; "
+               "no statistical error bars or final-fracture data are shown. This comparison does not establish ASTM "
                "qualification or universal source-method agreement." + calculation_note("10"))}
     energy_reviews = [row for row in simulations.values() if row.get("energy_window_review_required") in (True, "True")]
     if energy_reviews:
         names = ", ".join("{} {}mm/{}%".format(r["topology"], r["l_mm"], round(100*r["relative_density"]))
                           for r in energy_reviews)
         for figure in ("8a", "10"):
-            captions[figure] += (" Provisional loading-rate review: " + names +
+            captions[figure] += (" Recorded loading-history note: " + names +
                                  ". Low endpoint KE/IE does not certify quasistatic accumulated work; "
-                                 "pre-initiation transients require a slower-rate comparison.")
+                                 "the saved pre-initiation energy history remains part of the qualification evidence.")
     for figure in variants:
         adjusted = ("Hsieh's displayed Fig.8b ordinates divided by sqrt(3); Current study ordinates unchanged. "
                     if figure == "8b_hsieh_fix" else
@@ -944,7 +961,7 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                            "Original source ordinates, simulation K, nominal density, lengths and initiation samples are unchanged in their source files. "
                            "The unadjusted comparison remains figure8b. "
                            "Per-point original ordinates and display factors are recorded in points.csv." + calculation_note(figure))
-    colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#3465a4"}
+    colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#4c8c50"}
     simulation_sizes = {"tri": 6.2, "kagome": 3.5, "hex": 4.6}
     names = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal"}
     style = {"font.size": 9, "axes.labelsize": 10, "axes.titlesize": 10, "legend.fontsize": 8.5,
@@ -1037,9 +1054,14 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
                 "inputs":{key:inputs[key] for key in ("reference", "original_fig8", "original_fig8_provenance", "selected_recalculation") if key in inputs},
                 "published_pdf_sha256":source_pdf_sha,"captions":captions,
                 "display_labels":{"Hsieh et al.":"Hsieh et al.", "Simulation":"Current study"},
+                "topology_colors": colors,
                 "linear_controls":"Source-specific B21 RVE/compliance solves; proven uniform geometric similarity preserves C and scales specimen k with length. Alternative recovery indices are explicitly identified display supplements.",
                 "display_supplement":supplement_metadata,
                 "display_cases_by_basis":display_counts,
+                "native_filter_counts": {status: sum(row.get("filter_status") == status
+                     for row in simulations.values() if row.get("KJ_MPa_sqrt_m") is not None)
+                     for status in sorted({row.get("filter_status", "not_recorded")
+                                           for row in simulations.values()})},
                 "completion_control_proofs":{row["case_id"]:row["control_similarity_proof_sha256"]
                                              for row in simulations.values() if row.get("control_similarity_proof_sha256")},
                 "pending_energy_window_reviews":[{key:row.get(key) for key in
@@ -1119,7 +1141,11 @@ def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None):
                       "KJ_signed_area_diagnostic_MPa_sqrt_m", "upstream_value_status",
                       "reference_basis", "reference_K_MPa_sqrt_m", "reference_graphical_lower", "reference_graphical_upper",
                       "difference_from_reference_percent", "difference_reference_graphical_lower_percent",
-                      "difference_reference_graphical_upper_percent", "qualified_ASTM_J", "quality_note")
+                      "difference_reference_graphical_upper_percent", "qualified_ASTM_J", "quality_note",
+                      "filter_applied", "filter_status", "filter_cutoff_Hz", "saved_Nyquist_Hz",
+                      "filter_natural_frequency_Hz", "filter_modal_job", "filter_modal_odb_sha256",
+                      "filter_modal_receipt_sha256", "filter_order", "filter_zero_phase", "filter_startup",
+                      "filter_native_prefix_samples", "filter_max_time_remap_s")
     write_rows(out / "validation-selected-summary.csv", [{key: row.get(key) for key in summary_fields} for row in principal])
     fig8_path = root / "audit/benchmark/fig8-original-digitisation.csv"
     if fig8_path.exists():

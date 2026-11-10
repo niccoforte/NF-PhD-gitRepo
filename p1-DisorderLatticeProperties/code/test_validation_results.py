@@ -7,7 +7,9 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 
-from validation_results import completion_records, matched_loading_snapshot, measured_record, native_record, sha, triangle_record, verify_native_exports
+from validation_results import (completion_records, filtered_native_record, geometry_and_ki,
+                                matched_loading_snapshot, measured_record, native_record,
+                                native_triangle_record, sha, triangle_record, verify_native_exports)
 
 
 class NativeResultTests(unittest.TestCase):
@@ -258,6 +260,144 @@ class NativeResultTests(unittest.TestCase):
         archive.unlink()
         with self.assertRaisesRegex(ValueError, "unavailable"):
             matched_loading_snapshot(result)
+
+
+class FilteredNativeTriangleTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory(prefix="p1_filtered_result_")
+        self.root = Path(self.temp.name)
+        source = self.root / "specimen.inp"
+        source.write_text("Exact synthetic source fixture")
+        receipt = self.root / "modes.json"
+        receipt.write_text('{"frequency_Hz":40.0}')
+        self.curve_path = self.root / "native_curve.csv"
+        t = np.arange(101) / 1000.
+        self.curve = [{"time_s": float(tt), "U2_mm": float(3*tt + .002*np.sin(2*np.pi*300*tt)),
+                       "RF2_N": float(1000*tt + 10*np.sin(2*np.pi*300*tt))} for tt in t]
+        self.save()
+        self.record = {"case_id": "synthetic_tri", "topology": "tri", "l_mm": 10.,
+                       "relative_density": .2, "nnx": 30, "native_index": 80,
+                       "endpoint_time_s": .08, "endpoint": "criterion_last_intact",
+                       "loading_state": "native_dynamic", "source_inp": str(source),
+                       "source_inp_sha256": sha(source), "source_odb_sha256": "b"*64,
+                       "curve_csv_sha256": sha(self.curve_path),
+                       "force_N": self.curve[80]["RF2_N"],
+                       "displacement_mm": self.curve[80]["U2_mm"], "loading_work_Nmm": 9.6,
+                       "KI_MPa_sqrt_m": .001, "KJ_MPa_sqrt_m": .002, "modulus_MPa": 1000.,
+                       "value_status": "available_derived_assumptions", "qualified_ASTM_J": False,
+                       "ALLIE_Nmm": 100., "ALLSE_Nmm": 80., "derived_predamage_PD_Nmm": 20.,
+                       "surface_threshold_LE11": .1105, "previous_max_LE11": .109,
+                       "crossing_max_LE11": .115, "criterion_lower_time_s": .08,
+                       "criterion_upper_time_s": .081}
+        self.modal = {"source_sha256": sha(source), "source_odb_sha256": "b"*64,
+                      "state": "completed_source_qualified_released_physical_mode",
+                      "read_only": True, "source_input_hash_verified": True,
+                      "natural_frequency_Hz": 40., "job": "synthetic_modal",
+                      "modal_receipt": str(receipt), "modal_receipt_sha256": sha(receipt),
+                      "modal_odb_sha256": "e"*64}
+        self.compliance = {"source_sha256": sha(source), "state": "completed_and_extracted",
+                           "read_only": True, "source_input_hash_verified": True,
+                           "static_stiffness_N_mm": 10000., "source_odb_sha256": "f"*64,
+                           "job": "synthetic_compliance"}
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def save(self):
+        with self.curve_path.open("w", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(self.curve[0]))
+            writer.writeheader(); writer.writerows(self.curve)
+
+    def test_paired_causal_work_endpoint_and_material_event(self):
+        from scipy.signal import butter, sosfilt, sosfilt_zi
+        sos = butter(2, 80., fs=1000., output="sos")
+        x = np.array([row["U2_mm"] for row in self.curve[:81]])
+        p = np.array([row["RF2_N"] for row in self.curve[:81]])
+        xf, _ = sosfilt(sos, x, zi=sosfilt_zi(sos)*x[0])
+        pf, _ = sosfilt(sos, p, zi=sosfilt_zi(sos)*p[0])
+        filtered = filtered_native_record(self.record, self.curve_path, self.modal)
+        self.assertAlmostEqual(filtered["force_N"], pf[-1])
+        self.assertAlmostEqual(filtered["displacement_mm"], xf[-1])
+        self.assertAlmostEqual(filtered["loading_work_Nmm"], np.trapz(pf, xf))
+        _, expected_ki = geometry_and_ki(
+            {"topology": "tri", "l_mm": 10., "nnx": 30, "nominal_relative_density": .2}, pf[-1])
+        self.assertAlmostEqual(filtered["KI_MPa_sqrt_m"], expected_ki)
+        self.assertEqual(filtered["native_index"], 80)
+        self.assertEqual(filtered["endpoint_time_s"], .08)
+        self.assertFalse(filtered["filter_zero_phase"])
+        self.assertTrue(filtered["filter_applied"])
+        self.assertEqual(filtered["filter_native_prefix_samples"], 81)
+        for key in ("ALLIE_Nmm", "ALLSE_Nmm", "derived_predamage_PD_Nmm",
+                    "previous_max_LE11", "crossing_max_LE11"):
+            self.assertEqual(filtered[key], self.record[key])
+        self.assertEqual(self.record["force_N"], self.curve[80]["RF2_N"])
+        triangle = triangle_record(filtered, self.compliance)
+        self.assertAlmostEqual(triangle["Apl_Nmm"],
+                               np.trapz(pf, xf) - pf[-1]**2/(2*10000.))
+
+    def test_later_fracture_cannot_change_the_filtered_event(self):
+        before = filtered_native_record(self.record, self.curve_path, self.modal)
+        for row in self.curve[81:]:
+            row["RF2_N"] = 1e12
+            row["U2_mm"] = 1e9
+        self.save()
+        changed = dict(self.record, curve_csv_sha256=sha(self.curve_path))
+        after = filtered_native_record(changed, self.curve_path, self.modal)
+        for key in ("force_N", "displacement_mm", "loading_work_Nmm", "KI_MPa_sqrt_m"):
+            self.assertEqual(before[key], after[key])
+
+    def test_wrong_modal_source_or_unverified_state_is_rejected(self):
+        for key, bad in (("source_sha256", "a"*64), ("source_odb_sha256", "c"*64),
+                         ("state", "prepared_not_submitted"), ("read_only", False),
+                         ("modal_odb_sha256", None)):
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "frequency"):
+                filtered_native_record(self.record, self.curve_path, dict(self.modal, **{key: bad}))
+        Path(self.modal["modal_receipt"]).write_text("changed")
+        with self.assertRaisesRegex(ValueError, "modal receipt"):
+            filtered_native_record(self.record, self.curve_path, self.modal)
+
+    def test_changed_input_curve_or_event_time_is_rejected(self):
+        Path(self.record["source_inp"]).write_text("changed")
+        with self.assertRaisesRegex(ValueError, "Original input"):
+            filtered_native_record(self.record, self.curve_path, self.modal)
+        Path(self.record["source_inp"]).write_text("Exact synthetic source fixture")
+        with self.assertRaisesRegex(ValueError, "index/time"):
+            filtered_native_record(dict(self.record, endpoint_time_s=.081), self.curve_path, self.modal)
+        self.curve_path.write_text("changed")
+        with self.assertRaisesRegex(ValueError, "Native curve"):
+            filtered_native_record(self.record, self.curve_path, self.modal)
+
+    def test_selected_available_triangle_requires_map_but_diagnostics_do_not(self):
+        with self.assertRaisesRegex(ValueError, "no verified periodic frequency"):
+            native_triangle_record(self.record, self.compliance, self.curve_path, {}, selected=True)
+        diagnostic = native_triangle_record(self.record, self.compliance, self.curve_path, {})
+        self.assertEqual(diagnostic["response_processing"], "native_unfiltered_diagnostic")
+        result = native_triangle_record(self.record, self.compliance, self.curve_path,
+                                       {self.record["source_inp_sha256"]: self.modal}, selected=True)
+        self.assertEqual(result["response_processing"], "causal_Butterworth_paired_2fn")
+
+    def test_unavailable_negative_area_has_no_raw_fallback_claim(self):
+        control = dict(self.compliance, static_stiffness_N_mm=.001)
+        result = native_triangle_record(self.record, control, self.curve_path, {}, selected=True)
+        self.assertLess(result["Apl_Nmm"], 0)
+        self.assertIsNone(result["KJ_MPa_sqrt_m"])
+        self.assertEqual(result["response_processing"], "native_unfiltered_unavailable")
+
+    def test_cutoff_at_or_above_nyquist_preserves_native_observations_honestly(self):
+        for frequency in (250., 300.):
+            with self.subTest(frequency=frequency):
+                result = filtered_native_record(
+                    self.record, self.curve_path, dict(self.modal, natural_frequency_Hz=frequency))
+                for key in ("force_N", "displacement_mm", "loading_work_Nmm", "KI_MPa_sqrt_m",
+                            "native_index", "endpoint_time_s", "previous_max_LE11", "crossing_max_LE11"):
+                    self.assertEqual(result[key], self.record[key])
+                self.assertFalse(result["filter_applied"])
+                self.assertEqual(result["filter_status"],
+                                 "sampling_unresolved_cutoff_at_or_above_saved_Nyquist")
+                self.assertEqual(result["physical_cutoff_Hz"], 2*frequency)
+                self.assertEqual(result["saved_Nyquist_Hz"], 500.)
+                self.assertEqual(result["filter_modal_job"], self.modal["job"])
+                self.assertNotIn("filter_order", result)
 
 
 if __name__ == "__main__":

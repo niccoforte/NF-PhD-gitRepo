@@ -4,45 +4,40 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) and its
-  current report own the calculation finish, population replacement, manuscript
-  integration and cleanup. They are consolidated, not accumulating old plans.
-  Appendix C in the current Word manuscript supports retaining quasi-isotropic
-  tri/kagome/hex and orthotropic FCC. The20-realisation sensitivity study is not
-  a proof of unchanged modulus. Blanket per-realisation tensor controls are
-  withdrawn; no population queue is submitted. Short linear FE is an unresolved-
-  stiffness fallback, not a new isotropy study for every ID.
-  Measured costs: UAT10-11s,CT7-16s,three-step tensor10-11s. Blanket24000jobs
-  would take3-6days;517missingUAT values~2-3h,all1973hexUAT~6-12h if selected.
-  The4UAT and4body controls already completed are diagnostic evidence, not an
-  implemented population migration. Keep the Appendix C approximation separate
-  from choosing the scalar effective modulus used in fracture conversion.
-  Published Ortega Fig7 FEM markers are now digitised from213 original vector
-  objects; current equation differs at most1.602% graphically. Own18FE jobs are
-  separately labelled numerical verification, within.883%K/1.773%elastic J.
-  Source-consistent loading-axis f/M or the Bao conversion is implemented.
-  These18models are homogeneous CPS4R continua, with no lattice struts or
-  initiation. The actual orthotropic FCC lattice-to-continuum elastic check is
-  incomplete: next bounded test is3 source-mesh B21 crack lengths and compliance
-  energy versus interval-averaged Ortega KI^2/M. No new jobs are launched.
-  The square comparison is retired: no plot CLI, derived displays removed,
-  notebook caller replaced with the published-reference verification figure.
-  Orthotropic plastic eta/Jref remains incomplete. Initial6-job feasibility plan
-  compares original incremental-plastic and potential-based nonlinear beam
-  responses at3crack lengths; response equivalence and elastic limit must pass
-  before independent energy calibration. Six runs are not completed validation.
-  Native hex-ID1 gives raw ductility6.9271%,Butterworth7.6708%,old average~7.6709%.
-  The raw crossing is an isolated dip; the10.736% difference does not show that
-  filtering is wrong. Hsieh uses real-time Butterworth at2fn; our.4Nyquist trial
-  is not a qualified modal cutoff. User directs Hsieh-style filtered FT metrics:
-  causal Butterworth fc=2fn, consistent filtered P-v for load/work/J/KJ. Order2/DC
-  is a documented Abaqus-default reconstruction, not a reported Hsieh order.
-  Selected validation/population results have not yet been migrated to this rule.
-  ML migration is deferred: keep201common loading positions, no stretched
-  prefixes/private per-specimen axes, and per-specimen valid-mean loss weighting.
-  Material events, censoring, mesh-before-PSC, Al benchmark and full population
-  replacement remain on the checklist. Author-closed side investigations are
-  removed from scope without a new claim of numerical negligibility.
+- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) and the
+  adjacent single report own calculation completion, population replacement,
+  manuscript integration and cleanup. AppendixC quasi-isotropy for tri/kagome/hex
+  and orthotropicFCC remain accepted; no per-ID tensor or blanket stiffness
+  programme is selected. The517 missing UAT values are516hex-full and mechanism
+  ID737: the old peak-based fit can select only2points. Finite old values are
+  not automatically wrong; kagomeID1 differs.074% from its independent control.
+  The prior1973hex fallback is conditional and not queued. Original population
+  scopeIDs1-1000 remains distinct from laterFCC extensions.
+  Published Ortega213FEM markers and18 own CPS4R controls verify the elastic
+  implementation. Three actualFCC B21 compliance controls plus one source-
+  mapped periodic tensor now quantify the lattice conversion: M8945.725MPa,
+  lambda1,chi.590409; interval-equivalentK differences4.63-5.96%. A real published
+  in-domain lattice benchmark is Omidi/St-Pierre2023snub-square: currentOrtega
+  differs3.51-6.75% from its TableC2 calibration. Its discrete fracture points
+  have not yet been reproduced. Retiredsquare/45square stays outside active use.
+  All6 original/potentialFCC nonlinear feasibility jobs are completed. Global
+  baselineforce/work differ.48/.32%, but local unloading and constitutive
+  mismatch prevent automatic original-model plastic qualification. Only the
+  potential model supplies the conditional energy derivative; never label an
+  incremental loading-work derivative J. Conditional eta1.825/2.482/2.180
+  versus ASTM2.261 is not qualified; no factor is promoted to production.
+  Eight population periodic modal families are completed; no disorder modes.
+  Causal paired order2/DCButterworth at2fn is selected; exact ISO modal coverage
+  uses its own source-hash map. AllUAT and tri/FCCFT population cutoffs exceed
+  savedNyquist; native observations stay unchanged with explicit unapplied
+  status, no silent cutoff cap or aliasing reconstruction. ISO figures now show
+  13native,1recovery,2declared predictions. Hex10mm16/20% filtered areas are
+  negative; hex3mm16% gains a positive native value. No MLdata rewrite.
+  ML masks remain deferred:201common loading positions, no stretched prefixes,
+  and per-specimen valid-mean loss. Mesh-before-UAT/FTPSC, Al benchmark, full
+  population replacement, Results figures/manuscript and finalcleanup remain
+  registered. Author-closed side investigations are not reopened.
+
 
 - The manuscript revision has a common compliance/notation description and an
   implemented FCC prismatic plane-strain elastic route. At nominal20% physical

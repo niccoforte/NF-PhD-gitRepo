@@ -60,9 +60,9 @@ In practical terms:
   are separate calculations; a positive alternative work estimate does not
   establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
   records audit products and named temporary files without cleanup authority.
-- Paper exports in `audit/paper` show initiation-related comparisons:14 native
-  initial-triangle cases plus the accepted two nonlinear-recovery indices and
-  two density/length predictions. Their supplement is source-hash-bound and
+- Paper exports in `audit/paper` show13 available native initial-triangle
+  values, one recovery index and2 declared predictions. Available native values
+  take precedence over recovery; two10mmhex filtered negative areas stay excluded. Their supplement is source-hash-bound and
   displayed with common Current study circles and case-specific captions; it never overwrites native KJ or
   negative areas. Other diagnostic alternatives stay in `audit/benchmark`.
   Relative-density axes match the common nominal density without input changes.
