@@ -479,6 +479,11 @@ Whole-history filtering can alter ductility materially despite stable work.
 `validation_elastic_calibration.py --compare-fit-verification` separately
 checks Ortega inside its fitted domain:18 paired-mesh jobs/9 tensors agree
 within.883%K/1.773%J after consistent source-axis f/M conversion.
+These CPS4R models contain no lattice struts or fracture initiation; actual
+FCC beam-lattice energy/compliance verification remains a separate open step.
+Hsieh FT calculations use filtered mechanical curves, causal Butterworth at2fn;
+order2/DC is an explicit Abaqus-default reconstruction because the paper does
+not disclose order. Apply that protocol before replacing the current plots.
 `validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
 clamps and B21 bending/shear, computing the initial tangent from prescribed
 small travel and reaction, without a curve-fit interval. Four hex/kagome

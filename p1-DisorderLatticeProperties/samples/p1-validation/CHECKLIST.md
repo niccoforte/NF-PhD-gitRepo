@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated5November2026. [Current evidence and figures](README.md).
+Updated10November2026. [Current evidence and figures](README.md).
 This replaces accumulated superseded proposals; it is the single task register.
 
 ## Accepted scope and decisions
@@ -31,6 +31,13 @@ This replaces accumulated superseded proposals; it is the single task register.
   .883%K/1.773%J. Never label designed own-FE tests as published measurements.
 - [x] Resolve loading-axis Ortega versus crack-axis Bao convention: paired f/M
   or fB=fO*sqrt(MB/MO). Shared FCC calculation corrected; equal-axis outputs stable.
+- [ ] Verify the actual FCC beam-lattice elastic conversion. The18 continuum
+  CPS4R jobs and published Ortega FEM points are not end-to-end lattice-fracture
+  validation. Start with3 actual orderedFCC B21 C(T) elastic models at a,a+h,
+  a+2h. Compare full-opening compliance energy over the same crack interval with
+  the interval-average Ortega KI^2/M; test h/2h sensitivity. No published matching
+  planarFCC initiation-toughness dataset is currently identified. Do not claim
+  this energy check independently validates a local fracture criterion.
 - [x] Retire square/45square from active Ortega validation: out-of-domain chi.
   Remove plot CLI/derived displays and replace notebook caller. Original source
   files and rejection receipts stay only pending final cleanup disposition.
@@ -43,11 +50,16 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 ## Shared calculations before population replacement
 
-- [ ] Freeze one family-qualified Butterworth rule for continuous response and
-  performance extraction. Start from matched existing periodic modal evidence;
-  assess representative disorder and cutoff/phase/endpoint sensitivity, without
-  a full-population modal campaign. Preserve independently observed material
-  initiation and raw history. Smoothing must not manufacture missing samples.
+- [x] Adopt Hsieh's filtered mechanical response for FT performance calculations:
+  causal Butterworth,fc=2fn from the matched specimen's lowest physical mode.
+  Filtered endpoint load and filtered P-v work feed KI,Apl,J,KJ consistently.
+  Order2/DC is an explicit Abaqus-default reconstruction choice; the paper does
+  not state the order. Moving averages and.4Nyquist forward/backward examples
+  are diagnostics, not the selected primary method. Material events stay native.
+- [ ] Apply that protocol to matched native histories and regenerate validation
+  values/plots before final replacement. Reuse periodic modal controls, with a
+  bounded disorder check; no per-realisation modal programme. Saved-history
+  filtering cannot recreate unavailable integration-level data or undo aliasing.
 - [ ] Settle one scalar UAT stiffness rule from resolved early response; use
   exact-source linear FE only where unresolved. Do not average incompatible
   hex fits or use periodic E to erase disorder softening. The517NaN repair
@@ -63,11 +75,19 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Consolidate one final StiffMatrix workflow, retaining only controls used
   by the accepted calculations. Preserve distinct material tensor versus
   cracked-specimen compliance roles; retire duplicated unused implementations.
-- [ ] Complete orthotropic/FCC plastic calibration. Elastic verification does
-  not validate eta. Establish independent nonlinear Jref and positive resolved
-  Apl; verify the elastic limit and held-out levels/crack ratios before adopting
-  eta=B*b0/Apl*(Jref-KI^2/M). No independent orthotropic plastic result exists yet.
-  Existing B21 Explicit jobs cannot directly output conventional contour J.
+- [ ] Complete orthotropic/FCC plastic calibration after the lattice elastic
+  check. Initial feasibility cap:6 orderedFCC beam models,3 admissible crack
+  lengths under original incremental plasticity and3 under a potential-based
+  nonlinear material fitted only to the source constituent response. Damage off,
+  stationary notches and monotonic loading through the existing initiation range.
+  Verify constitutive/local/global response equivalence and the elastic limit
+  before an independent fixed-displacement energy derivative is used as Jref.
+  Then evaluate eta=B*b0/Apl*(Jref-KI^2/M) over resolved positive Apl and held-out
+  loading levels; further crack-increment/mesh checks only if the pilot passes.
+  Six runs are feasibility, not completed validation. No independent orthotropic
+  plastic result exists yet. Do not equate ALLIE/ALLPD/unloading differences or
+  frozen-state deletion work with J. Time the first nonlinear pilot; the elastic
+  10s job timing is not a nonlinear runtime estimate. No pilot jobs launched here.
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.

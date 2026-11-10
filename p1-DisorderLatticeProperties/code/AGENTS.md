@@ -110,8 +110,10 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   calls `validation_elastic_calibration.py --plot-verification`: published FEM
   markers and own FE checks remain distinct. Failed queue status stays unchanged.
 - `validation_curve_processing.py` is an opt-in real-data filter/fit pilot,
-  not a production migration. Native paired work and material events remain
-  independent of filtered ML targets; masks must not leak test-time termination.
+  not a production migration. Hsieh FT quantities must use causal Butterworth
+  P-v at2fn consistently; native events stay unfiltered. Order2/DC is a stated
+  Abaqus-default reconstruction, not a reported Hsieh order. Masks cannot leak
+  test-time termination. Continuum Ortega checks are not lattice FT validation.
 
 ## Shared Calculation Checks
 

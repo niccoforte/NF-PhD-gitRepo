@@ -21,13 +21,23 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   objects; current equation differs at most1.602% graphically. Own18FE jobs are
   separately labelled numerical verification, within.883%K/1.773%elastic J.
   Source-consistent loading-axis f/M or the Bao conversion is implemented.
+  These18models are homogeneous CPS4R continua, with no lattice struts or
+  initiation. The actual orthotropic FCC lattice-to-continuum elastic check is
+  incomplete: next bounded test is3 source-mesh B21 crack lengths and compliance
+  energy versus interval-averaged Ortega KI^2/M. No new jobs are launched.
   The square comparison is retired: no plot CLI, derived displays removed,
   notebook caller replaced with the published-reference verification figure.
-  Orthotropic plastic eta/Jref remains incomplete; elastic checks do not cover it.
+  Orthotropic plastic eta/Jref remains incomplete. Initial6-job feasibility plan
+  compares original incremental-plastic and potential-based nonlinear beam
+  responses at3crack lengths; response equivalence and elastic limit must pass
+  before independent energy calibration. Six runs are not completed validation.
   Native hex-ID1 gives raw ductility6.9271%,Butterworth7.6708%,old average~7.6709%.
   The raw crossing is an isolated dip; the10.736% difference does not show that
   filtering is wrong. Hsieh uses real-time Butterworth at2fn; our.4Nyquist trial
-  is not a qualified modal cutoff. Freeze the final filter before label migration.
+  is not a qualified modal cutoff. User directs Hsieh-style filtered FT metrics:
+  causal Butterworth fc=2fn, consistent filtered P-v for load/work/J/KJ. Order2/DC
+  is a documented Abaqus-default reconstruction, not a reported Hsieh order.
+  Selected validation/population results have not yet been migrated to this rule.
   ML migration is deferred: keep201common loading positions, no stretched
   prefixes/private per-specimen axes, and per-specimen valid-mean loss weighting.
   Material events, censoring, mesh-before-PSC, Al benchmark and full population
