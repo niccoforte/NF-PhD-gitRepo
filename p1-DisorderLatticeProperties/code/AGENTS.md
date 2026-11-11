@@ -52,10 +52,11 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   early reviews, pending reference capture and temporary evidence dependencies.
   It never deletes. Continuation `-status.json` receipts are not submission plans.
   Refresh it before final cleanup.
-- Paper views use selected native triangles plus the hash-bound supplement
-  `audit/new-validation/no-rerun-options-20261102.json`. Native values win:
-  13native,1recovery,2predictions; two10mmhex negative areas stay excluded.
-  Retain each calculation basis, fit evidence, source/event and filter status.
+- Final figures require explicit user approval before any change. Default
+  comparison refreshes never write them; --write-paper is approval-only.
+  The approved pre-filter display is restored:14native,2recovery,2predictions.
+  Its hash-bound recipe is audit/paper/approved-figure-recipe.json; forward
+  Butterworth calculations remain separate. Preserve every point's provenance.
   `audit/paper` holds PNG/PDF/SVG, point/exclusion tables and captions. Fig10
   uses nominal density, direct3mm references and declared10mm length scaling.
   Fig8b sqrt3 views alter display ordinates only, with factors/captions; base K
@@ -105,11 +106,12 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   `validation_orthotropic.py` retains rejection evidence; no plot CLI. ValConvPlots
   calls `validation_elastic_calibration.py --plot-verification`: published FEM
   markers and own FE checks remain distinct. Failed queue status stays unchanged.
-- `validation_curve_processing.py` is an opt-in real-data filter/fit pilot,
-  not a production migration. Hsieh FT quantities must use causal Butterworth
-  P-v at2fn consistently; native events stay unfiltered. Order2/DC is a stated
-  Abaqus-default reconstruction, not a reported Hsieh order. Masks cannot leak
-  test-time termination. Continuum Ortega checks are not lattice FT validation.
+- `validation_curve_processing.py` is opt-in, never an MLdata migration.
+  --prepare-paired-examples freezes the random seed/IDs; Abaqus Python
+  --extract-paired-examples reads native pairs; --paired-examples writes8galleries.
+  Hsieh FT uses paired causal2fn, order2/DC (our stated reconstruction), keeping
+  events native. Above-Nyquist cutoffs remain unapplied. No mask leakage or
+  continuum-only check falsely labelled discrete-lattice validation.
 
 ## Shared Calculation Checks
 

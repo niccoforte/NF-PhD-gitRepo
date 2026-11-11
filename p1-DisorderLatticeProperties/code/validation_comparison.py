@@ -1085,7 +1085,8 @@ def paper_exports(records, fig8, reference_rows, material, destination, inputs, 
     (destination / "captions.txt").write_text("\n\n".join("Figure {}. {}".format(k,v) for k,v in captions.items())+"\n",encoding="utf-8")
 
 
-def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None):
+def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None,
+        write_paper=False, paper_supplement=None):
     root = Path(root).resolve()
     out = Path(output).resolve() if output is not None else root / "audit/benchmark"
     out.mkdir(parents=True, exist_ok=True)
@@ -1159,12 +1160,15 @@ def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None):
             plot_fig8(principal,fig8,material,out,panel,principal=True)
             plot_fig8(controls,fig8,material,out,panel)
         plot_normalisation_sensitivity(records,fig8,material,out)
-        paper_exports(principal,fig8,reference_rows,material,paper_out,
-                      {name:{"path":str(path),"sha256":hashlib.sha256(snapshots[name]).hexdigest()}
-                       for name,path in sources.items()},fig8_provenance["published_pdf_sha256"])
+        if write_paper:
+            paper_exports(principal,fig8,reference_rows,material,paper_out,
+                          {name:{"path":str(path),"sha256":hashlib.sha256(snapshots[name]).hexdigest()}
+                           for name,path in sources.items()},fig8_provenance["published_pdf_sha256"],
+                          supplement_path=paper_supplement)
     provenance = {"inputs": {name: {"path": str(path), "sha256": hashlib.sha256(snapshots[name]).hexdigest()}
                              for name, path in sources.items()},
                   "paper_output_directory": str(paper_out),
+                  "paper_outputs_written": bool(write_paper),
                   "inputs_changed_after_capture": [name for name, path in sources.items()
                        if sha256(path) != hashlib.sha256(snapshots[name]).hexdigest()],
                   "selection": "Existing FTval exact case IDs plus prepared exact static controls; no fit to benchmark",
@@ -1194,6 +1198,9 @@ if __name__ == "__main__":
     parser.add_argument("--root", default="Z:/p1/sims/Ti/Validation")
     parser.add_argument("--out")
     parser.add_argument("--final-results", help="Explicit selected-rule CSV; defaults to audit/final/validation-results.csv when present")
+    parser.add_argument("--write-paper", action="store_true",
+                        help="Write final paper figures only after explicit user approval; default refreshes diagnostics only")
+    parser.add_argument("--paper-supplement", help="Explicit source-hash-bound display supplement")
     args = parser.parse_args()
-    values = run(args.root, args.out, args.final_results)
+    values = run(args.root, args.out, args.final_results, args.write_paper, args.paper_supplement)
     print("Wrote {} labelled historical/native controls".format(len(values)))

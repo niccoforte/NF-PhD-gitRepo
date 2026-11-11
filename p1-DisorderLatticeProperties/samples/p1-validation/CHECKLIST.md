@@ -8,10 +8,9 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 - [x] Consolidate useful Ti validation sources, recover native histories and
   reconcile the20 Review lattices.py findings with verified foundation fixes.
-- [x] Recalculate source-matched Hsieh filtering and replace current views:
-  13available native initial-triangle points,1displayed recovery index and
-  2declared predictions. Available native values take precedence; hex10mm16/20%
-  filtered areas are negative and remain excluded. Before-state is fingerprinted.
+- [x] Restore the author-approved pre-filter validation figures:14native,
+  2recovery and2declared predictions. Keep forward Butterworth calculation
+  outputs separate. Final figures require explicit permission before any change.
   Direct3mm Fig10 is primary;10mm references are declared length-scaled values.
   No further full-fracture completion campaign is selected. No clipping negative Apl.
 - [x] Retain Appendix C quasi-isotropy approximation for tri/kagome/hex and
@@ -73,11 +72,11 @@ This replaces accumulated superseded proposals; it is the single task register.
   No cutoff capping, missing-frequency reconstruction or MLdata rewrite.
 - [ ] Resolve the reported work-partition/finite-sampling qualification before
   production population replacement; filtering alone did not remove negative Apl.
-- [ ] Settle one scalar UAT stiffness rule from resolved early response; use
-  exact-source linear FE only where unresolved. Do not average incompatible
-  hex fits or use periodic E to erase disorder softening. The517NaN repair
-  alone does not validate all finite historical stiffness values. Give a bounded
-  cost before submitting any selected replacement population queue.
+- [x] Diagnose and repair the later two-point rejection: all1973 hexagonal
+  UT curves have finite stiffness under the corrected existing estimator;
+  all1456 already-finite values and other properties are unchanged. No FE reruns.
+- [ ] Recompute saved property columns and audit restored UT/FT pair membership
+  during the agreed population pass. No Props/MLdata rewrite has been performed.
 - [ ] Settle C(T) k0 extraction from reusable early histories; use short source
   controls only where needed. Appendix C symmetry does not itself give cracked-
   specimen compliance. No blanket all-ID control programme is selected.
@@ -128,7 +127,7 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Replace Excel/notebook values, population tables/statistics and figures
   together after acceptance; remove obsolete calculation cells/audit variants.
 
-## Manuscript and final cleanup
+## Manuscript integration
 
 - [ ] Coordinate one Ortega-based methods section and appendix showing published
   elastic verification, isotropic ASTM comparison and completed plastic check.
@@ -140,10 +139,8 @@ This replaces accumulated superseded proposals; it is the single task register.
   ranges using final values. Select final layout after numerical recalculation.
 - [ ] Replace manuscript numerical claims/figures only after final population
   outputs are accepted. Corrections owns direct manuscript editing.
-- [ ] Verify consumers, then remove superseded code/results, auxiliary solver
-  bulk, duplicated exports and all named task scratch. The
-  [cleanup register](Z:/p1/sims/Ti/Validation/audit/cleanup-review.json) owns paths;
-  preserve unique source evidence until its explicit final disposition is applied.
+Cleanup is deferred and tracked separately in [CLEANUP-CHECKLIST.md](CLEANUP-CHECKLIST.md).
+Do not remove audit evidence, worktrees or temporary files before that review.
 
 Author-closed side investigations are removed from this scope; existing evidence
 is not deleted or described as numerically negligible by that decision.

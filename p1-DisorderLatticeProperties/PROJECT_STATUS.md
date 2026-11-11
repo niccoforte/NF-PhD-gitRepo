@@ -8,10 +8,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   adjacent single report own calculation completion, population replacement,
   manuscript integration and cleanup. AppendixC quasi-isotropy for tri/kagome/hex
   and orthotropicFCC remain accepted; no per-ID tensor or blanket stiffness
-  programme is selected. The517 missing UAT values are516hex-full and mechanism
-  ID737: the old peak-based fit can select only2points. Finite old values are
-  not automatically wrong; kagomeID1 differs.074% from its independent control.
-  The prior1973hex fallback is conditional and not queued. Original population
+  programme is selected. The517 saved stiffness NaNs are a May2026 two-point
+  rejection artifact, not failed simulations:516hex-full and mechanismID737.
+  The guard is fixed; all1973 existing hex UT curves now yield finite estimates,
+  with1456 previously finite values and all other properties unchanged.
+  No nonlinear reruns are needed; saved Props/MLdata are not yet rewritten. Original population
   scopeIDs1-1000 remains distinct from laterFCC extensions.
   Published Ortega213FEM markers and18 own CPS4R controls verify the elastic
   implementation. Three actualFCC B21 compliance controls plus one source-
@@ -30,13 +31,17 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Causal paired order2/DCButterworth at2fn is selected; exact ISO modal coverage
   uses its own source-hash map. AllUAT and tri/FCCFT population cutoffs exceed
   savedNyquist; native observations stay unchanged with explicit unapplied
-  status, no silent cutoff cap or aliasing reconstruction. ISO figures now show
-  13native,1recovery,2declared predictions. Hex10mm16/20% filtered areas are
-  negative; hex3mm16% gains a positive native value. No MLdata rewrite.
+  status, no silent cutoff cap or aliasing reconstruction. At the author's
+  explicit request final validation figures are restored to the pre-filter
+  14native/2recovery/2prediction display. They require explicit approval before
+  any further change. Forward Butterworth outputs remain separate and unchanged.
+  Raw/Butterworth/legacy-MA galleries contain periodic+7paired random specimens
+  per lattice and task. Current Word/LaTeX methods already state Butterworth.
   ML masks remain deferred:201common loading positions, no stretched prefixes,
   and per-specimen valid-mean loss. Mesh-before-UAT/FTPSC, Al benchmark, full
   population replacement, Results figures/manuscript and finalcleanup remain
-  registered. Author-closed side investigations are not reopened.
+  registered. Cleanup has its separate CLEANUP-CHECKLIST.md for final review.
+  Author-closed side investigations are not reopened.
 
 
 - The manuscript revision has a common compliance/notation description and an

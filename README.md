@@ -446,29 +446,17 @@ without deleting anything. `audit/cleanup-review.json` extends that inventory
 to code/notebook cleanup, legacy workbook values and audit additions, competing
 early reviews, backup states and pending reference capture. Refresh both before
 final cleanup; source values and unique temporary evidence must be preserved.
-Publication exports in `audit/paper` now show13 available native initial-triangle
-cases, one displayed nonlinear-recovery index and2 declared predictions. The
-original four-point supplement is retained as prediction-fit evidence, but an
-available native result always takes display precedence over its recovery
-alternative. Two10mm hexagonal points have negative filtered areas and remain
-excluded. The retained supplement originally held2 matched nonlinear-recovery
-indices and2 density/length predictions. The supplement JSON in
-`audit/new-validation/no-rerun-options-20261102.json` is bound to the selected CSV
-hash and rechecked against its source recovery rows. A two-entry source legend
-and common study circles simplify display; case-specific captions and data fields
-preserve calculation origins. Native KJ and negative areas are unchanged.
-The exports provide PNG/PDF/SVG, captions and point/exclusion CSVs.
-Paper legends identify the simulation series as Current study; internal
-`Simulation` series keys in the point tables remain stable identifiers.
-`python p1-DisorderLatticeProperties/code/validation_property_figures.py`
-reproduces the three property figures in `audit/property-figures`, including
-Hsieh length-scaled reference triangles and population intervals. Captions and
-metadata retain historical-value status until final population recalculation.
-One maintained helper/output set owns these figures.
-Use the manuscript conventions: tri red,kagome black,hex green,FCC blue;
-full disorder orange,mechanism-based blue; macrostrain varepsilon_L and stress
-Sigma. Hsieh triangles show digitised central values, with graphical bounds
-retained in metadata rather than interpreted as experimental error bars.
+Final validation figures in `audit/paper` are frozen at the author's approved
+pre-filter values:14 native points,2 recovery indices and2 declared predictions.
+Their inputs and hashes are in `approved-figure-recipe.json`. The forward
+Butterworth calculation CSV remains separate and unchanged. **Never change final
+figures without explicit user approval.** `validation_comparison.py` defaults to
+diagnostics only; `--write-paper` is reserved for an explicitly approved figure
+operation and accepts `--final-results`/`--paper-supplement` source paths.
+ValConvPlots displays the frozen figures while refreshing diagnostics separately.
+The Fig8b sqrt3 hypothesis views keep their declared display factors; reference
+digitisation, calculation bases and prediction provenance remain identifiable.
+
 The square/45square comparison is retired from active Ortega validation because
 its tensors exceed the fitted domain. Its plot CLI/derived displays are removed;
 source/rejection evidence remains pending final cleanup. ValConvPlots now calls
@@ -502,8 +490,11 @@ Submit immutable manifests through validation_queue, then Abaqus Python
 `plot` for physical-mode review and `iso_map` for the source-frequency map.
 `validation_curve_processing.py --periodic-cutoffs --accept-physical-modes`
 records the8 accepted families; `--extract-periodic-examples` reads24 histories
-and `--apply-periodic-examples` plots paired causal filtering. No disordered
-modal jobs. Never cap2fn to saved Nyquist: above it, filtering is unresolved
+and `--apply-periodic-examples` plots paired causal filtering.
+For periodic plus7 random paired architectures per lattice, use
+`--prepare-paired-examples`, Abaqus Python `--extract-paired-examples`, then
+`--paired-examples`; the fixed seed and native histories produce8 UT/FT galleries.
+No disordered modal jobs. Never cap2fn to saved Nyquist: above it, filtering is unresolved
 on those stored histories and must not be claimed applied or rewritten into MLdata.
 `validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
 clamps and B21 bending/shear, computing the initial tangent from prescribed

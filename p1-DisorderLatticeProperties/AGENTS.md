@@ -60,9 +60,10 @@ In practical terms:
   are separate calculations; a positive alternative work estimate does not
   establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
   records audit products and named temporary files without cleanup authority.
-- Paper exports in `audit/paper` show13 available native initial-triangle
-  values, one recovery index and2 declared predictions. Available native values
-  take precedence over recovery; two10mmhex filtered negative areas stay excluded. Their supplement is source-hash-bound and
+- Final figures require explicit user approval before any change. The approved
+  pre-filter validation figures are restored (14native,2recovery,2predictions),
+  bound by audit/paper/approved-figure-recipe.json. Butterworth calculations
+  remain separate; ordinary notebook/CLI comparison refreshes cannot overwrite figures. Their supplement is source-hash-bound and
   displayed with common Current study circles and case-specific captions; it never overwrites native KJ or
   negative areas. Other diagnostic alternatives stay in `audit/benchmark`.
   Relative-density axes match the common nominal density without input changes.

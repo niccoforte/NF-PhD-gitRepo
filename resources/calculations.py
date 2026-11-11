@@ -95,10 +95,13 @@ def calcUT(df):
     idx_Smax = int(np.argmax(s_sm))
     
     stiff_end = int(0.1 * idx_Smax)
-    if stiff_end < 2 or len(np.unique(e[:stiff_end + 1])) < 2:
+    fit_e, fit_s = e[:stiff_end + 1], s_sm[:stiff_end + 1]
+    # A line needs two distinct finite samples, not three. Keep the same window.
+    if (stiff_end < 1 or not np.isfinite(fit_e).all() or not np.isfinite(fit_s).all()
+            or len(np.unique(fit_e)) < 2):
         stiffness = np.nan
     else:
-        stiffness, _ = np.polyfit(e[:stiff_end + 1], s_sm[:stiff_end + 1], 1)
+        stiffness, _ = np.polyfit(fit_e, fit_s, 1)
 
     idx_WoF = None
     for idx in range(idx_Smax, len(s_sm)):

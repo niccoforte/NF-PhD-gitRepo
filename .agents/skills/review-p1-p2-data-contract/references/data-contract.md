@@ -87,8 +87,10 @@ paired coordinates for physical properties. This migration remains deferred.
   and Hsieh's initial-triangle convention from dissipation/nonlinear-recovery
   eta-J estimates. Source hashes, event brackets and invalid negative areas
   survive this comparison boundary. An alternate work estimate is not ASTM J.
-  Paper views prefer available native initial-triangle values; explicitly
-  adopted recovery/prediction supplements retain separate point provenance.
+  Final figures are author-approved frozen outputs, requiring explicit approval
+  before changes. Their pre-filter input recipe remains separate from forward
+  Butterworth calculation CSVs; default comparison refreshes do not overwrite them.
+  Adopted recovery/prediction supplements retain separate point provenance.
   Equal nominal densities share an x coordinate. Never silently substitute a
   control history or force-fit literature ordinates; negative areas stay invalid.
   Explicit Fig.8b sqrt(3) hypothesis views carry per-row display factors and keep
@@ -192,3 +194,11 @@ resources.MLcurve_terms.load_curve_term_model. It stores one task Transformer,
 train-fitted DUAL_DATA contract, true-field source metadata and validation-only
 curve outputs. No placeholder field predictions are exported. It is distinct
 from both legacy MODEL and the assembled independent DUAL_MODEL container.
+
+The calcUT minimum-window repair accepts two distinct finite initial samples.
+Replaying all1973 existing hexagonal UT curves recovers517 stiffness values;
+1456 previously finite values and all other UT properties remain unchanged.
+Saved Props/MLdata are not rewritten by that code change. The prior guard could
+make MULTIprops.dropna exclude otherwise complete pairs; migrate saved properties
+and recheck pairing only during the agreed population recalculation, not by
+silently changing a frozen training dataset.

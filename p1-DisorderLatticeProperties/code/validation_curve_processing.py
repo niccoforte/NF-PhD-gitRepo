@@ -345,6 +345,235 @@ def apply_periodic_examples(root):
     return report
 
 
+def paired_gallery_selection(candidates, seed=20261110):
+    """Response-independent stratified sampling; the same pair serves UT/FT."""
+    import random
+    rng = random.Random(seed)
+    selected = []
+    for topology in TOPOLOGIES:
+        for design, count in (("full", 4), ("mechanism", 3)):
+            eligible = sorted(set(int(value) for value in candidates[topology][design]
+                                  if 1 <= int(value) <= 1000))
+            if len(eligible) < count:
+                raise ValueError("Insufficient paired sources for " + topology + "/" + design)
+            for identifier in sorted(rng.sample(eligible, count)):
+                selected.append(dict(topology=topology, design=design, id=identifier))
+    return selected
+
+
+def prepare_paired_gallery(root, archive_root, data_root, seed=20261110):
+    """Freeze seven paired architecture IDs per topology before reading responses."""
+    import re
+    archive_root, data_root = Path(archive_root), Path(data_root)
+    folder = Path(root)/"audit/curve-processing/paired-examples"
+    folder.mkdir(parents=True, exist_ok=True)
+    existing = json.loads((Path(root)/"audit/curve-processing/periodic-cutoff-native/index.json").read_text())
+    periodic = [row for row in existing if row["design"] == "periodic"]
+    candidates, sources, census = {}, {}, []
+    for topology, nx in TOPOLOGIES.items():
+        candidates[topology] = {}
+        for design, group, token in (("full", "disNodes/0.2", "20disNodes-lhs-all"),
+                                      ("mechanism", "disNodes/Target-xs/0.2", "20disNodes-lhs-xs")):
+            base = archive_root/group/topology
+            found = {}
+            pattern = re.compile(r"^(Ductile|Fracture)-"+re.escape(topology)+"-"+str(nx)+"-"+re.escape(token)+r"-(\d+)\.inp$")
+            for job in sorted(base.iterdir()):
+                zip_folder = job/"zip"
+                if not zip_folder.is_dir():
+                    continue
+                for inp in zip_folder.glob("*-"+topology+"-"+str(nx)+"-"+token+"-*.inp"):
+                    match = pattern.fullmatch(inp.name)
+                    if not match or not 1 <= int(match[2]) <= 1000:
+                        continue
+                    transfer = data_root/group/topology/"transfer"/("OUT-"+inp.stem+".csv")
+                    if inp.with_suffix(".odb").is_file() and transfer.is_file():
+                        task = "UT" if match[1] == "Ductile" else "FT"
+                        found.setdefault(int(match[2]), {}).setdefault(task, []).append((inp, transfer))
+            eligible = [identifier for identifier, values in found.items()
+                        if set(values) == {"UT", "FT"} and all(len(items) == 1 for items in values.values())]
+            candidates[topology][design] = eligible
+            for identifier in eligible:
+                for task in ("UT", "FT"):
+                    inp, transfer = found[identifier][task][0]
+                    sources[topology, design, identifier, task] = dict(
+                        source_inp=str(inp), source_odb=str(inp.with_suffix(".odb")), transfer=str(transfer))
+            census.append(dict(topology=topology, design=design, eligible_paired_count=len(eligible),
+                               eligibility="Both UT/FT original INP/ODB and retained transfer present, unique archive source; original IDs1-1000 only"))
+    selection = paired_gallery_selection(candidates, seed)
+    records = []
+    for item in selection:
+        for task in ("UT", "FT"):
+            row = dict(item, task=task, **sources[item["topology"], item["design"], item["id"], task])
+            row["native"] = str(folder/("{}_{}_{}_{}.npz".format(item["topology"], task, item["design"], item["id"])))
+            records.append(row)
+    manifest = dict(seed=seed, selection_rule="Stratified random:4full+3mechanism paired architecture IDs per topology; no response used in selection",
+                    census=census, selected_pairs=selection, periodic=periodic, records=records,
+                    native_support="No padding, stretching or shared private endpoint axes", new_solver_jobs=0)
+    path = folder/"selection.json"
+    if path.exists() and json.loads(path.read_text()) != manifest:
+        raise ValueError("Refusing to redraw a frozen paired-gallery selection")
+    path.write_text(json.dumps(manifest, indent=2)+"\n")
+    return manifest
+
+
+def sampled_odb_fingerprint(path):
+    """Cheap identity/read-only guard; explicitly not a full-file checksum."""
+    path = Path(path)
+    stat = path.stat()
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        digest.update(stream.read(65536))
+        stream.seek(max(0, stat.st_size-65536))
+        digest.update(stream.read(65536))
+    return dict(bytes=stat.st_size, mtime_ns=stat.st_mtime_ns,
+                first_and_last_64KiB_sha256=digest.hexdigest(), full_file_hash=False)
+
+
+def extract_paired_gallery(root):
+    """Abaqus native read-only histories for the frozen56 disordered task cases."""
+    from odbAccess import openOdb
+    folder = Path(root)/"audit/curve-processing/paired-examples"
+    selection = json.loads((folder/"selection.json").read_text())
+    index_path = folder/"native-index.json"
+    prior = {row["native"]: row for row in json.loads(index_path.read_text())} if index_path.exists() else {}
+    records = []
+    for row in selection["records"]:
+        inp, source, transfer, native = (Path(row[name]) for name in ("source_inp", "source_odb", "transfer", "native"))
+        before, inp_sha, transfer_sha = sampled_odb_fingerprint(source), sha(inp), sha(transfer)
+        old = prior.get(str(native))
+        if old and old["source_odb_fingerprint"] == before and old["source_inp_sha256"] == inp_sha and old["transfer_sha256"] == transfer_sha and native.exists() and old["native_sha256"] == sha(native):
+            records.append(old)
+            continue
+        odb = openOdb(str(source), readOnly=True)
+        try:
+            if len(odb.steps) != 1:
+                raise ValueError("Expected one original nonlinear step")
+            step = list(odb.steps.values())[0]
+            if row["task"] == "FT":
+                regions = [step.historyRegions["Node ASSEMBLY.1"]]
+            else:
+                nodes = [node for group in odb.rootAssembly.nodeSets["SET-TOP"].nodes for node in group]
+                regions = []
+                for node in nodes:
+                    found = [region for name, region in step.historyRegions.items()
+                             if name.startswith("Node PART-1-1.") and name.endswith("."+str(node.label))
+                             and "U2" in region.historyOutputs and "RF2" in region.historyOutputs]
+                    if len(found) != 1:
+                        raise ValueError("Ambiguous native clamp history")
+                    regions.append(found[0])
+            time = np.asarray([t for t, value in regions[0].historyOutputs["U2"].data])
+            displacement, reaction = [], []
+            for region in regions:
+                for variable, target in (("U2", displacement), ("RF2", reaction)):
+                    values = np.asarray(region.historyOutputs[variable].data)
+                    if not np.array_equal(values[:, 0], time):
+                        raise ValueError("Native paired histories have different timestamps")
+                    target.append(values[:, 1])
+            raw_x, raw_y = np.mean(displacement, axis=0), np.sum(reaction, axis=0)
+        finally:
+            odb.close()
+        if sampled_odb_fingerprint(source) != before:
+            raise ValueError("Native source changed during read-only extraction")
+        retained = np.loadtxt(str(transfer), delimiter=",", usecols=(0, 1))
+        common, scales, errors = min(len(time)-1, len(retained)), [], []
+        for raw, previous in ((raw_x, retained[:, 0]), (raw_y, retained[:, 1])):
+            eligible = (abs(raw[:common]) > np.max(abs(raw[:common]))*1e-7) & (previous[:common] != 0)
+            if not np.any(eligible):
+                raise ValueError("No native/transfer normalisation overlap")
+            factor = float(np.median(previous[:common][eligible]/raw[:common][eligible]))
+            error = float(np.max(abs(previous[:common][eligible]-raw[:common][eligible]*factor))/np.max(abs(previous[:common][eligible])))
+            if error > 2e-5:
+                raise ValueError("Native/transfer normalisation mismatch: " + str(transfer))
+            scales.append(factor); errors.append(error)
+        x, y = raw_x*scales[0], raw_y*scales[1]
+        if not all(np.isfinite(value).all() for value in (time, x, y)) or np.any(np.diff(time) <= 0):
+            raise ValueError("Native curve must be finite and time-increasing")
+        np.savez_compressed(str(native), time=time, x=x, y=y)
+        result = dict(row, source_odb_fingerprint=before, source_inp_sha256=inp_sha,
+                      transfer_sha256=transfer_sha, native_sha256=sha(native), samples=len(time),
+                      source_unchanged=True, read_only=True, normalisation_factors=scales,
+                      native_transfer_relative_errors=errors, observed_support_only=True)
+        records.append(result)
+        index_path.write_text(json.dumps(records, indent=2)+"\n")
+        print(row["topology"], row["task"], row["design"], row["id"], len(time), flush=True)
+    return records
+
+
+def plot_paired_gallery(root):
+    """Eight figures, each periodic+seven random paired architectures, no property edits."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    folder = Path(root)/"audit/curve-processing/paired-examples"
+    selection = json.loads((folder/"selection.json").read_text())
+    native = json.loads((folder/"native-index.json").read_text())
+    registry_path = Path(root)/"audit/curve-processing/periodic-cutoffs.json"
+    registry = json.loads(registry_path.read_text())
+    controls = {(row["topology"], row["task"]): row for row in registry["families"]}
+    result, figures = [], []
+    for topology in TOPOLOGIES:
+        pairs = [row for row in selection["selected_pairs"] if row["topology"] == topology]
+        for task in ("UT", "FT"):
+            current = [row for row in selection["periodic"] if row["topology"] == topology and row["task"] == task]
+            current += [next(row for row in native if row["topology"] == topology and row["task"] == task and row["design"] == pair["design"] and row["id"] == pair["id"]) for pair in pairs]
+            if len(current) != 8:
+                raise ValueError("One periodic plus seven paired models required")
+            control = controls[topology, task]
+            if control["status"] != "accepted_physical_mode":
+                raise ValueError("Periodic physical mode not accepted")
+            fig, axes = plt.subplots(4, 2, figsize=(13, 13.8), squeeze=False)
+            for axis, row in zip(axes.flat, current):
+                if sha(row["native"]) != row["native_sha256"]:
+                    raise ValueError("Native gallery extraction changed")
+                with np.load(row["native"], allow_pickle=False) as data:
+                    time, x, y = (data[key] for key in ("time", "x", "y"))
+                scale = 1. if task == "UT" else .001
+                axis.plot(x, y*scale, color=".65", lw=.85, label="Raw", zorder=1)
+                axis.plot(x, np.asarray(smooth(smooth(y)))*scale, color="#6f5094", ls="--", lw=1.4, label="Legacy double moving average", zorder=3)
+                nyquist = float((len(time)-1)/(2*(time[-1]-time[0])))
+                if control["cutoff_Hz"] < nyquist:
+                    (fx, fy), info = periodic_causal_filter(time, x, y, control["natural_frequency_Hz"])
+                    axis.plot(fx, fy*scale, color=TOPOLOGY_COLORS[topology], lw=1.25, label="Causal Butterworth, periodic2fn", zorder=4)
+                    status = "applied_causal_Butterworth_2fn"
+                else:
+                    status = "sampling_unresolved_cutoff_at_or_above_saved_Nyquist"
+                    info = None
+                design = row["design"]
+                title = "Periodic" if design == "periodic" else ("Full disorder" if design == "full" else "Mechanism-based disorder")+", ID "+str(row["id"])
+                axis.set_title(title, color={"periodic":".1", "full":"#ff7f0e", "mechanism":"#1f77b4"}[design], fontsize=10)
+                note = r"$2f_n$="+format(control["cutoff_Hz"], ".1f")+"Hz; Nyquist="+format(nyquist, ".1f")+"Hz"
+                if info is None:
+                    note += "\nButterworth unavailable at saved sampling"
+                axis.text(.98, .04, note, transform=axis.transAxes, ha="right", va="bottom", fontsize=8,
+                          bbox=dict(facecolor="white", alpha=.82, edgecolor="none", pad=2))
+                axis.set_xlabel(r"Macroscopic strain, $\varepsilon_L$" if task == "UT" else "Load-line displacement (mm)", fontsize=9)
+                axis.set_ylabel(r"Macroscopic stress, $\Sigma$ (MPa)" if task == "UT" else "Force (kN)", fontsize=9)
+                axis.grid(alpha=.18)
+                result.append(dict(topology=topology, task=task, design=design, id=row["id"],
+                    native_samples=len(time), periodic_cutoff_Hz=control["cutoff_Hz"], saved_Nyquist_Hz=nyquist,
+                    filter_status=status, filter_information=info, native=str(row["native"]), native_sha256=row["native_sha256"]))
+            handles = [Line2D([], [], color=".65", label="Raw response"),
+                       Line2D([], [], color=TOPOLOGY_COLORS[topology], label=r"Causal Butterworth, periodic $2f_n$ (where resolved)"),
+                       Line2D([], [], color="#6f5094", ls="--", label="Legacy double moving average")]
+            title = {"tri":"Triangular", "kagome":"Kagome", "hex":"Hexagonal", "FCC":"FCC"}[topology]
+            fig.suptitle(title+" | "+task+" | paired architecture selection, seed "+str(selection["seed"]), y=.995, fontsize=13)
+            fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(.5, .977), ncol=3, frameon=False, fontsize=9)
+            fig.tight_layout(rect=(0, 0, 1, .945), h_pad=1.8, w_pad=1.3)
+            for extension in ("png", "svg"):
+                target = folder/(topology+"-"+task.lower()+"-paired-curves."+extension)
+                fig.savefig(target, dpi=190)
+                figures.append(str(target))
+            plt.close(fig)
+    report = dict(seed=selection["seed"], selection_rule=selection["selection_rule"], figures=figures,
+        paired_architectures=selection["selected_pairs"], histories=result, periodic_registry_sha256=sha(registry_path),
+        legacy_method="Twice resources.calculations.smooth (default5-point moving average), force/stress only against original paired coordinates",
+        accepted_filter="Paired causal order2/DC Butterworth at twice exact periodic specimen fn; no capped cutoff or invented high-rate data",
+        original_simulations_and_properties_unchanged=True, new_solver_jobs=0)
+    (folder/"gallery.json").write_text(json.dumps(report, indent=2)+"\n")
+    return report
+
+
 def first_crossing(y, fraction):
     peak = int(np.argmax(y))
     values = np.flatnonzero(np.asarray(y)[peak:] <= fraction*y[peak])
@@ -918,8 +1147,21 @@ if __name__ == "__main__":
     parser.add_argument("--extract-periodic-examples",action="store_true",help="Abaqus read-only extraction of24 genuine periodic/full/mechanism histories")
     parser.add_argument("--archive-root",type=Path,default=Path("Z:/p1/HPCarchive/Ti/data"))
     parser.add_argument("--apply-periodic-examples",action="store_true",help="Apply physical periodic cutoff to24 native histories; write two figures and metrics")
+    parser.add_argument("--prepare-paired-examples",action="store_true",help="Freeze response-independent selection of7 paired disordered IDs per topology")
+    parser.add_argument("--extract-paired-examples",action="store_true",help="Abaqus Python read-only extraction of56 selected native disordered histories")
+    parser.add_argument("--paired-examples",action="store_true",help="Plot8paired UT/FT galleries, periodic plus7random architectures per topology")
+    parser.add_argument("--selection-seed",type=int,default=20261110)
     args = parser.parse_args()
-    if args.apply_periodic_examples:
+    if args.prepare_paired_examples:
+        result=prepare_paired_gallery(args.root,args.archive_root,args.data_root,args.selection_seed)
+        print(json.dumps(result["selected_pairs"],indent=2))
+    elif args.extract_paired_examples:
+        result=extract_paired_gallery(args.root)
+        print('Recovered',len(result),'genuine native histories without solver submission')
+    elif args.paired_examples:
+        result=plot_paired_gallery(args.root)
+        print('Wrote',len(result['figures']),'figure files from',len(result['histories']),'native histories')
+    elif args.apply_periodic_examples:
         result=apply_periodic_examples(args.root)
         print('Wrote',len(result['figures']),'figure files and',len(result['measurements']),'method metrics')
     elif args.periodic_cutoffs:

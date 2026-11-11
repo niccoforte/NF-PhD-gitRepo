@@ -127,10 +127,10 @@ def cleanup_review(audit, repo, scratch_roots):
          "paths": [str(audit / name) for name in ("modal/production-periodic", "modal/iso-periodic",
                    "curve-processing/periodic-cutoffs.json", "curve-processing/periodic-cutoff-native",
                    "final/before-periodic-filter", "final/periodic-filter-integration.json")],
-         "reason": "Keep exact periodic source/delivery hashes, native/filter status and the one fingerprinted pre-replacement recovery. No per-disordered modal runs or silent cutoff cap. Retire older moving-average/filtfilt displays after dependency review."},
+         "reason": "Keep periodic source/delivery hashes, native/filter status and the frozen approved-figure recipe. Final figures now depend on the pre-filter CSV: retain its required before-state inputs. No per-disordered modal runs or silent cutoff cap. Review superseded diagnostic displays at final cleanup."},
         {"component": "Unused unsubmitted tensor preparation", "action": "cleanup_candidate_review_required",
          "paths": [str(audit / "fcc-calibration/tensor")],
-         "reason": "Never submitted: UAT section differs from the fracture source. The retained source-CT periodic tensor replaces it. Automatic approval review rejected recursive removal as blocked by policy; directory remains intact and is not used."},
+         "reason": "Never submitted: UAT section differs from the fracture source. The retained source-CT periodic tensor replaces it. Directory remains intact and unused for the final cleanup review."},
         {"component": "Orthotropic SiC validation", "action": "retire_square_display_retain_published_Ortega_reference",
          "paths": [str(audit.parent.parent.parent / "SiC/Validation/audit")],
          "reason": "Square plot CLI and derived display are retired; numerical rejection/source files await final disposition. Keep213 published Fig7 FEM markers and separately identified18-job current-study elastic verification, with consistent f/M axes. Neither establishes plastic eta. Preserve retirement/source receipts until final cleanup; no active square comparison or blanket population tensor programme remains."},
@@ -154,6 +154,7 @@ def cleanup_review(audit, repo, scratch_roots):
               "status": "cleanup_deferred_user_requested_end_of_work",
               "inventory": str(audit / "file-inventory.csv"), "canonical_workbook": workbook,
               "task_checklist": str(repo / "p1-DisorderLatticeProperties/samples/p1-validation/CHECKLIST.md"),
+              "cleanup_checklist": str(repo / "p1-DisorderLatticeProperties/samples/p1-validation/CLEANUP-CHECKLIST.md"),
               "components": components, "automatic_deletion": False,
               "scope": "Validation and shared-calculation evidence, code/notebooks, workbook reconciliation, auxiliary controls and named scratch. Orthotropic/FCC/PSC reprocessing and Results-section figure integration remain pending in the unique checklist."}
     (audit / "cleanup-review.json").write_text(json.dumps(result, indent=2), encoding="utf-8")

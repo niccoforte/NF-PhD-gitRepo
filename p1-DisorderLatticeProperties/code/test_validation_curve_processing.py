@@ -7,10 +7,33 @@ import numpy as np
 
 from validation_curve_processing import (initial_fit, paired_filter, transfer_prefix,
                                          query_support_mask, event_segmented_filter, threshold_details,
-                                         periodic_causal_filter)
+                                         periodic_causal_filter, paired_gallery_selection,
+                                         sampled_odb_fingerprint)
 
 
 class CurveQualification(unittest.TestCase):
+    def test_random_gallery_is_reproducible_balanced_and_original_id_scoped(self):
+        candidates={topology:{design:list(range(1,1006)) for design in ('full','mechanism')}
+                    for topology in ('tri','kagome','hex','FCC')}
+        first=paired_gallery_selection(candidates,42)
+        self.assertEqual(first,paired_gallery_selection(candidates,42))
+        self.assertNotEqual(first,paired_gallery_selection(candidates,43))
+        self.assertEqual(len(first),28)
+        for topology in candidates:
+            rows=[r for r in first if r['topology']==topology]
+            self.assertEqual(sum(r['design']=='full' for r in rows),4)
+            self.assertEqual(sum(r['design']=='mechanism' for r in rows),3)
+        self.assertTrue(all(1<=r['id']<=1000 for r in first))
+
+    def test_sampled_odb_identity_is_not_misrepresented_as_full_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path=Path(directory)/'fixture.odb'
+            path.write_bytes(b'a'*200000)
+            before=sampled_odb_fingerprint(path)
+            self.assertFalse(before['full_file_hash'])
+            path.write_bytes(b'b'*200000)
+            self.assertNotEqual(before,sampled_odb_fingerprint(path))
+
     def test_physical_filter_is_causal_and_does_not_leak_future_fracture(self):
         time=np.arange(100)*.001
         force=np.r_[np.ones(50)*10,np.zeros(50)]
