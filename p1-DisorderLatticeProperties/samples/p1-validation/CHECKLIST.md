@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated10November2026. [Current evidence and figures](README.md).
+Updated12November2026. [Current evidence and figures](README.md).
 This replaces accumulated superseded proposals; it is the single task register.
 
 ## Accepted scope and decisions
@@ -44,9 +44,12 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Find a published in-domain orthotropic lattice benchmark: Omidi/St-Pierre
   2023 snub-square, lambda1,chi7.65/4.74/3.16, actualCTa/W=.25. Current
   Ortega factors differ3.51-6.75% from published TableC2 factors.
-- [ ] Reproduce the3 published snub-square beam-fracture points if retained as
-  the end-to-end literature validation. New topology needed; do not relabel the
-  retired square/45square or continuum verification as these beam results.
+- [ ] Finish3 running/queued actual snub-square CT reproductions and produce
+  the published-data overlays. All3 source-compatible beam-RVE tensors pass:
+  lambda~1,chi8.361/5.597/4.081, within Ortega's range. Published geometry,
+  polymer curve, local strain criterion and source-file hashes are recorded.
+  The source CT has H/W=.9167 rather than nominal1.2; retain this comparison
+  limit, published CT/BL/experiments and measured-vs-closed-form tensors.
 - [x] Retire square/45square from active Ortega validation: out-of-domain chi.
   Remove plot CLI/derived displays and replace notebook caller. Original source
   files and rejection receipts stay only pending final cleanup disposition.
@@ -65,21 +68,30 @@ This replaces accumulated superseded proposals; it is the single task register.
   Order2/DC is an explicit Abaqus-default reconstruction choice; the paper does
   not state the order. Moving averages and.4Nyquist forward/backward examples
   are diagnostics, not the selected primary method. Material events stay native.
-- [x] Apply the protocol to matched native ISO histories with15 verified
-  periodic sources. Previously available14:12filtered,2sampling-unresolved;
-  hex3mm16% becomes positive while hex10mm16/20% become negative. Available
-  native count14to13. All16events and31diagnostic/QS/recovery rows unchanged.
-  No cutoff capping, missing-frequency reconstruction or MLdata rewrite.
-- [ ] Resolve the reported work-partition/finite-sampling qualification before
-  production population replacement; filtering alone did not remove negative Apl.
-- [x] Diagnose and repair the later two-point rejection: all1973 hexagonal
-  UT curves have finite stiffness under the corrected existing estimator;
-  all1456 already-finite values and other properties are unchanged. No FE reruns.
+- [x] Implement archive filtering at physical2fn where resolvable; otherwise
+  explicit fs/6 adaptation, following Abaqus' antialiasing cutoff convention.
+  All64 sampled native UT/FT histories are filtered. Median roughness reduction
+  is76%UT/76%FT, maximum full-curve work change.162%UT/.960%FT. Dense FCC source
+  replay gives-.56% load/-1.64% work versus dense physical2fn, at a fixed native
+  material event. No claim to undo existing aliasing or reproduce missing data.
+- [x] Implement one curve-derived initial-work slope through40% filtered peak,
+  with30/50% windows, cutoff sensitivity and energy-curvature screens. All64
+  sampled histories pass. Against4 UT controls errors-.33/+3.34%; against11
+  FT controls-4.72/+1.94%. This estimates scalar specimen response, not C.
+- [x] Diagnose and repair the two-point guard: all1973 old hex UT estimates
+  finite,1456 already-finite values and other properties unchanged. No reruns.
+- [ ] Complete9 frozen-prediction elastic holdouts for the new curve rule:
+  fullID21; mechanismIDs219,274,643,670,698,699,782,901. The rule gives1973 finite
+  values,1964 pass and9 have5.02-5.87% window spread. Keep curve predictions
+  distinct from controls; do not tune after seeing the holdout results. A hidden
+  task-owned controller launches them only after successful Omidi completion;
+  it refuses changed manifests and runs no simultaneous solver jobs.
+- [ ] Resolve negative-area cases/finite-sampling limits during the production
+  pilot; filtering alone is not a repair for an invalid initial-triangle area.
 - [ ] Recompute saved property columns and audit restored UT/FT pair membership
   during the agreed population pass. No Props/MLdata rewrite has been performed.
-- [ ] Settle C(T) k0 extraction from reusable early histories; use short source
-  controls only where needed. Appendix C symmetry does not itself give cracked-
-  specimen compliance. No blanket all-ID control programme is selected.
+- [x] Qualify reusable-history C(T) k0 using the same initial-work rule and11
+  exact-source1N controls. No blanket disordered-compliance simulation programme.
 - [ ] Settle the scalar isotropic conversion and representative FCC M under
   the same material-state convention as the retained controls. Reuse Appendix C
   evidence; no automatic full FCC tensor scaling from one UAT slope, no second
@@ -87,13 +99,14 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Consolidate one final StiffMatrix workflow, retaining only controls used
   by the accepted calculations. Preserve distinct material tensor versus
   cracked-specimen compliance roles; retire duplicated unused implementations.
-- [ ] Complete orthotropic/FCC plastic calibration. All6 source-mesh nonlinear
-  jobs and4 elastic/tensor controls completed. Final conditional eta1.825/2.482/
-  2.180 depends on elastic subtraction versus ASTM2.261. Material/local unloading
-  and load/crack-stencil sensitivity prevent a qualified original-model factor;
-  do not promote the closest variant. An independently established original-law
-  discrete energy reference remains necessary. No arbitrary extra queue is
-  selected; preserve the full numerical sensitivity and source/delivery hashes.
+- [x] Complete bounded FCC same-interval total-J verification at the resolved
+  initiation opening. Use independent potential-energy differences, prescribed
+  ASTM eta2.261, original-flow transfer and matching elastic baseline. At common
+  observed opening6.45203mm (99.871% of event), original-flow K errors4.02-4.68%.
+  inc_a0 has a reviewed converged prefix; inc_a2 solved fully but packaging failed.
+  Preserve both failure records. No fitted eta is promoted or additional rerun
+  selected. This verifies the adopted approximation, not an exact original-flow
+  contour integral or a published FCC elastoplastic comparison.
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.

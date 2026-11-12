@@ -306,6 +306,98 @@ def prepare_continuation(out):
     return selected
 
 
+def prepare_event(controls, out, endpoint_receipt):
+    """Extend the same six frozen models to a resolved material-event endpoint.
+
+    Only the prescribed final opening changes. Elastic controls and the periodic
+    tensor are referenced by hash; no duplicate elastic jobs are prepared.
+    """
+    controls, out, endpoint_receipt = (Path(value).resolve() for value in (controls, out, endpoint_receipt))
+    event = json.loads(endpoint_receipt.read_text())
+    if (event.get("state") != "completed_and_extracted" or not event.get("read_only")
+            or not event.get("source_equivalence", {}).get("passed")):
+        raise ValueError("A completed, source-equivalent, read-only material-event receipt is required")
+    previous, crossing = event["event"]["previous_field"], event["event"]["crossing_field"]
+    if not (0 <= previous["max_LE11"] < .1105 <= crossing["max_LE11"]
+            and previous["zero_STATUS"] == 0 and previous["time_s"] < crossing["time_s"]):
+        raise ValueError("Endpoint is not the last observed intact material-strain bracket")
+    opening = float(previous["opening_mm"])
+    for path_key, hash_key in (("original_source_inp", "original_source_inp_sha256"),
+                               ("original_source_odb", "original_source_odb_sha256"),
+                               ("event_source_odb", "event_source_odb_sha256"),
+                               ("input", "event_source_inp_sha256")):
+        if sha(event[path_key]) != event[hash_key]:
+            raise ValueError("Resolved-event source changed: " + path_key)
+    records = []
+    pattern = re.compile(r"(?m)^load,2,2,([0-9.Ee+\-]+)\s*$")
+    for index in range(3):
+        for short in ("inc", "pot"):
+            parent = controls/("fcc_{}_a{}".format(short, index))/"source.json"
+            old = json.loads(parent.read_text())
+            if (sha(old["input"]) != old["input_sha256"]
+                    or old["source_sha256"] != event["original_source_inp_sha256"]
+                    or sha(controls/"material-fit.json") != old["material_fit_sha256"]):
+                raise ValueError("Frozen original crack control/source material changed")
+            original_text = Path(old["input"]).read_text(encoding="ascii")
+            matches = list(pattern.finditer(original_text))
+            if (len(matches) != 1 or not np.isclose(float(matches[0].group(1)),
+                    old["loading_displacement_mm"], rtol=1e-10, atol=1e-10)):
+                raise ValueError("Unique original full-opening boundary condition required")
+            text = pattern.sub("load,2,2,{:.17g}".format(opening), original_text)
+            name = "fcc_event_{}_a{}".format(short, index)
+            directory = job_directory(out, name)
+            directory.mkdir(parents=True, exist_ok=True)
+            inp = directory/(name+".inp")
+            if inp.exists() and inp.read_text(encoding="ascii") != text:
+                raise ValueError("Refuse changed prepared event control")
+            inp.write_text(text, encoding="ascii")
+            meta = dict(old, job=name, input=str(inp), input_sha256=sha(inp),
+                        parent_input=old["input"], parent_input_sha256=old["input_sha256"],
+                        parent_source_json=str(parent), parent_source_json_sha256=sha(parent),
+                        loading_displacement_mm=opening, endpoint_receipt=str(endpoint_receipt),
+                        endpoint_receipt_sha256=sha(endpoint_receipt), endpoint_definition=event["criterion"],
+                        original_source_odb_sha256=event["original_source_odb_sha256"],
+                        event_source_odb=event["event_source_odb"],
+                        event_source_odb_sha256=event["event_source_odb_sha256"],
+                        material_fit_file=str(controls/"material-fit.json"),
+                        state="prepared_not_submitted",
+                        endpoint_change="Prescribed final opening only; source mesh, law, sections, constraints and increments unchanged")
+            immutable_json(directory/"source.json", meta)
+            records.append(meta)
+    manifest = {"abaqus": "C:/SIMULIA/Commands/abaqus.bat", "queue_root": str(out/"queue"),
+                "jobs": [{"job": row["job"], "input": row["input"], "input_sha256": row["input_sha256"],
+                          "cpus": 8, "required_outputs": [".odb", ".dat", ".sta"],
+                          "purpose": "Same FCC material-event endpoint, original and potential laws at three crack lengths"}
+                         for row in records]}
+    immutable_json(out/"manifest.json", manifest)
+    reuse = [controls/("fcc_el_a"+str(index))/"result.json" for index in range(3)]
+    reuse.append(controls/"periodic/tensor-results.json")
+    immutable_json(out/"reused-controls.json", {"controls_root": str(controls),
+                   "files_sha256": {str(path): sha(path) for path in reuse},
+                   "new_elastic_or_tensor_jobs": 0})
+    return records
+
+
+def prepare_event_continuation(out):
+    """Only untouched queued event controls; preserve the failed attempt."""
+    out = Path(out).resolve()
+    manifest = json.loads((out/"manifest.json").read_text())
+    state = json.loads((out/"queue/state.json").read_text())
+    if state["phase"] != "stopped_after_failure":
+        raise ValueError("Expected a stopped event queue requiring explicit review")
+    untouched = {row["job"] for row in state["jobs"] if row["status"] == "queued"
+                 and not row.get("started_at")}
+    selected = [row for row in manifest["jobs"] if row["job"] in untouched]
+    if not selected or any(sha(row["input"]) != row["input_sha256"] for row in selected):
+        raise ValueError("No immutable untouched continuation controls")
+    selected.sort(key=lambda row: ("_pot_" not in row["job"], row["job"]))
+    result = dict(manifest, queue_root=str(out/"continuation-queue"), jobs=selected,
+                  parent_manifest=str(out/"manifest.json"), parent_manifest_sha256=sha(out/"manifest.json"),
+                  selection="Only never-started controls; potential references first; no failed-job rerun")
+    immutable_json(out/"continuation-manifest.json", result)
+    return selected
+
+
 def gather_tensor(out, queue):
     """Receipt-bound three-strain periodic tensor with energy/reaction checks."""
     from odbAccess import openOdb
@@ -359,19 +451,39 @@ def gather_tensor(out, queue):
     return results
 
 
-def gather(out, queue):
+def reviewed_failed_delivery_state(launcher, status, final_time, opening_fraction):
+    """Separate a complete solver result from a retained failed launch/wrap-up.
+
+    The caller must explicitly approve the failed delivery and verify these
+    text files against the delivery receipt before classifying its extraction.
+    This never changes the queue's failed execution record.
+    """
+    solver_complete = ("THE ANALYSIS HAS COMPLETED SUCCESSFULLY" in status
+                       and abs(final_time-1.) <= 1e-8
+                       and abs(opening_fraction-1.) <= 1e-6)
+    wrapup_failure = ("End Abaqus/Standard Analysis" in launcher
+                      and "driverExceptions.AbaqusExecutionError: ('SIM Wrap-up'" in launcher)
+    return ("solver_completed_with_failed_wrapup" if solver_complete and wrapup_failure
+            else "failed_with_reviewed_converged_prefix")
+
+
+def gather(out, queue, reviewed_partial=()):
     """Run in Abaqus Python: receipt-verified read-only native histories/sections."""
     from odbAccess import openOdb
     out = Path(out).resolve()
     queues = ([Path(queue).resolve()] if queue else
-              [out/name for name in ("queue", "elastic-queue", "nonlinear-continuation-queue") if (out/name/"state.json").exists()])
-    owners = {}
+              [out/name for name in ("queue", "elastic-queue", "nonlinear-continuation-queue", "continuation-queue") if (out/name/"state.json").exists()])
+    owners, execution_states = {}, {}
+    reviewed_partial = set(reviewed_partial)
     for candidate in queues:
         for row in json.loads((candidate/"state.json").read_text())["jobs"]:
-            if row["status"] == "completed":
+            if row["status"] == "completed" or (row["job"] in reviewed_partial and row["status"] == "failed"):
                 if row["job"] in owners:
                     raise ValueError("Duplicate completed job across FCC queues")
                 owners[row["job"]] = candidate
+                execution_states[row["job"]] = row["status"]
+    if any(execution_states.get(name) != "failed" for name in reviewed_partial):
+        raise ValueError("Each accepted partial must identify one explicitly failed retained control")
     results = []
     for path in sorted(out.glob("fcc_*/source.json")):
         meta = json.loads(path.read_text())
@@ -382,8 +494,16 @@ def gather(out, queue):
         native_endpoint = json.loads(Path(meta["endpoint_receipt"]).read_text())
         if sha(native_endpoint["source"]) != native_endpoint["source_sha256"]:
             raise ValueError("Original native source ODB changed")
+        if native_endpoint.get("event_source_odb"):
+            if sha(native_endpoint["event_source_odb"]) != native_endpoint["event_source_odb_sha256"]:
+                raise ValueError("Resolved material-event ODB changed")
+            if sha(native_endpoint["original_source_inp"]) != native_endpoint["original_source_inp_sha256"]:
+                raise ValueError("Resolved material-event original input changed")
         odb_path, receipt = verified_control_delivery(meta, owners[meta["job"]], set(owners))
         before = sha(odb_path)
+        reviewed_state = "completed_and_extracted"
+        if meta["law"] == "elastic" and execution_states[meta["job"]] == "failed":
+            raise ValueError("Failed elastic controls cannot use nonlinear-prefix qualification")
         odb = openOdb(str(odb_path), readOnly=True)
         try:
             if meta["law"] == "elastic":
@@ -403,7 +523,8 @@ def gather(out, queue):
                 if len(u) != len(rf) or any(abs(a[0]-b[0]) > 1e-10 for a, b in zip(u, rf)):
                     raise ValueError("Native paired load/displacement timestamps differ")
                 displacement, force = np.array([row[1] for row in u]), np.array([row[1] for row in rf])
-                if np.any(np.diff(displacement) < -1e-9) or force[-1] <= 0:
+                if (not np.isfinite(displacement).all() or not np.isfinite(force).all()
+                        or np.any(np.diff(displacement) < -1e-9) or force[-1] <= 0):
                     raise ValueError("Expected monotonic positive pin loading")
                 work = np.r_[0., np.cumsum(.5*(force[1:]+force[:-1])*np.diff(displacement))]
                 energy = [region.historyOutputs for region in step.historyRegions.values() if "ALLWK" in region.historyOutputs]
@@ -411,6 +532,36 @@ def gather(out, queue):
                     raise ValueError("Unique whole-model energy history required")
                 energy_values = {name: [[float(t), float(v)] for t, v in item.data]
                                  for name, item in energy[0].items() if name in ("ALLIE", "ALLSE", "ALLPD", "ALLWK")}
+                fixed_label = odb.rootAssembly.nodeSets["FIXITY"].nodes[0][0].label
+                fixed = [region.historyOutputs for name, region in step.historyRegions.items()
+                         if name.upper() == "NODE ASSEMBLY."+str(fixed_label) and "RF2" in region.historyOutputs]
+                if len(fixed) != 1:
+                    raise ValueError("Unique fixed-pin history required")
+                fixed_force = float(fixed[0]["RF2"].data[-1][1])
+                fixed_opening = float(fixed[0]["U2"].data[-1][1])
+                force_balance = abs(float(force[-1])+fixed_force)/max(abs(float(force[-1])), 1.)
+                work_balance = abs(energy_values["ALLWK"][-1][1]/work[-1]-1)
+                partial = execution_states[meta["job"]] == "failed"
+                fraction = float(displacement[-1]/meta["loading_displacement_mm"])
+                if force_balance > 1e-4 or abs(fixed_opening) > 1e-9 or work_balance > .005:
+                    raise ValueError("FCC control fails fixed-pin force/work balance")
+                if not partial and abs(fraction-1.) > 1e-6:
+                    raise ValueError("Completed FCC control does not reach its prescribed opening")
+                if partial and (fraction < .995 or fraction > 1.+1e-6):
+                    raise ValueError("Reviewed partial control does not reach the bounded event with balanced mechanics")
+                reviewed_state = "completed_and_extracted"
+                execution_evidence = {}
+                if partial:
+                    delivered = {item["file"]: item for item in json.loads(receipt.read_text())["files"]}
+                    texts = {}
+                    for filename in ("launcher.txt", meta["job"]+".sta"):
+                        file_path = odb_path.parent/filename
+                        if filename not in delivered or sha(file_path) != delivered[filename]["sha256"]:
+                            raise ValueError("Reviewed failed control execution evidence differs from receipt")
+                        texts[filename] = file_path.read_text(errors="replace")
+                        execution_evidence[str(file_path)] = delivered[filename]["sha256"]
+                    reviewed_state = reviewed_failed_delivery_state(texts["launcher.txt"],
+                        texts[meta["job"]+".sta"], float(u[-1][0]), fraction)
                 section = {}
                 selected = sorted({min(range(len(step.frames)), key=lambda i: abs(step.frames[i].frameValue-target))
                                    for target in (0., .1, .25, .5, .75, 1.)})
@@ -430,14 +581,24 @@ def gather(out, queue):
                 np.savez_compressed(str(path.parent/"sections.npz"), **section)
                 values = {"time": [float(row[0]) for row in u], "opening_mm": displacement.tolist(),
                           "force_N": force.tolist(), "work_N_mm": work.tolist(), "energy": energy_values,
+                          "actual_final_opening_mm": float(displacement[-1]), "fraction_of_requested_opening": fraction,
+                          "fixed_pin_final_U2_mm": fixed_opening, "force_balance_relative_error": force_balance,
+                          "pin_work_ALLWK_relative_error": work_balance,
+                          "reviewed_execution_evidence_sha256": execution_evidence,
                           "sections": str(path.parent/"sections.npz"), "sections_sha256": sha(path.parent/"sections.npz")}
         finally:
             odb.close()
         if sha(odb_path) != before:
             raise ValueError("Source ODB changed during read-only extraction")
         record = dict(meta, **values, raw_source_odb=meta["source_odb"], raw_source_odb_sha256=native_endpoint["source_sha256"],
+                      event_source_odb=native_endpoint.get("event_source_odb", native_endpoint["source"]),
+                      event_source_odb_sha256=native_endpoint.get("event_source_odb_sha256", native_endpoint["source_sha256"]),
                       source_odb=str(odb_path), source_odb_sha256=before,
-                      state="completed_and_extracted", source_input_hash_verified=True,
+                      state=(reviewed_state if execution_states[meta["job"]] == "failed"
+                             else "completed_and_extracted"),
+                      queue_execution_state=execution_states[meta["job"]],
+                      reviewed_partial_usable=execution_states[meta["job"]] == "failed",
+                      source_input_hash_verified=True,
                       odb=str(odb_path), odb_sha256=before, delivery_sha256=sha(receipt), read_only=True)
         write_json(path.parent/"result.json", record)
         results.append(record)
@@ -575,6 +736,74 @@ def energy_reference(opening, potential_forces, h, B, *, law):
     values = work_derivative(opening, potential_forces, h, B)
     return dict({"J_{}_N_mm".format(name): values[name] for name in ("h", "next_h", "2h", "tip_second_order")},
                 scope="Potential-model energy derivative only; finite lattice crack increments, equivalence not implied")
+
+
+def response_at_opening(opening, force, query):
+    """Force and exact work of the recorded piecewise-linear pin response."""
+    opening, force, query = (np.asarray(value, dtype=float) for value in (opening, force, query))
+    if (opening.ndim != 1 or force.shape != opening.shape or len(opening) < 2
+            or query.ndim != 1 or not all(np.isfinite(value).all() for value in (opening, force, query))
+            or opening[0] != 0 or np.any(np.diff(opening) < 0) or opening[-1] <= opening[0]
+            or len(query) == 0 or np.any(np.diff(query) < 0)
+            or query[0] < opening[0] or query[-1] > opening[-1]):
+        raise ValueError("Finite nondecreasing native opening and supported query points required")
+    cumulative = np.r_[0., np.cumsum(.5*(force[1:]+force[:-1])*np.diff(opening))]
+    index = np.minimum(np.searchsorted(opening, query, side="right")-1, len(opening)-2)
+    dx = query-opening[index]
+    du = np.diff(opening)
+    gradient = np.divide(np.diff(force), du, out=np.zeros_like(du), where=du > 0)
+    interpolated = force[index]+gradient[index]*dx
+    integrated = cumulative[index]+force[index]*dx+.5*gradient[index]*dx*dx
+    # Float-output resolution can produce repeated opening in tiny converged
+    # increments. They contribute exactly zero pin work; retain the last reaction
+    # at that observed coordinate without adding or stretching any sample.
+    at_end = query == opening[-1]
+    interpolated[at_end], integrated[at_end] = force[-1], cumulative[-1]
+    return interpolated, integrated
+
+
+def interval_quantities(cracks, force, pin_work, compliance, elastic_factors, B, W):
+    """Match finite potential-work differences to the same crack-interval average.
+
+    This algebra does not certify that arbitrary work is potential energy. The
+    caller must identify the constitutive law. Signed Apl is retained; invalid
+    area samples are explicitly ineligible for plastic-decomposition claims.
+    """
+    cracks, force, pin_work, compliance, factors = (np.asarray(value, dtype=float) for value in
+        (cracks, force, pin_work, compliance, elastic_factors))
+    if (cracks.shape != (3,) or compliance.shape != (3,) or factors.shape != (3,)
+            or force.ndim != 2 or force.shape[0] != 3 or pin_work.shape != force.shape
+            or not all(np.isfinite(value).all() for value in (cracks, force, pin_work, compliance, factors))
+            or not np.isfinite([B, W]).all() or B <= 0 or W <= 0
+            or np.any(compliance <= 0) or np.any(factors <= 0)
+            or np.any(cracks < 0) or np.any(cracks >= W) or np.any(np.diff(cracks) <= 0)
+            or not np.isclose(cracks[1]-cracks[0], cracks[2]-cracks[1], rtol=1e-10)):
+        raise ValueError("Three equally spaced, finite source-matched crack responses required")
+    ligament = W-cracks
+    area = pin_work-.5*force*force*compliance[:, None]
+    elastic = force*force*factors[:, None]
+    unit_plastic = area/(B*ligament[:, None])
+    eta = 2.+.522*ligament/W
+    prediction = elastic+eta[:, None]*unit_plastic
+    rows = []
+    for name, indices, weights, rule in (
+            ("first_cell", [0, 1], [.5, .5], "endpoint trapezoid"),
+            ("second_cell", [1, 2], [.5, .5], "endpoint trapezoid"),
+            ("two_cells", [0, 1, 2], [1/6, 4/6, 1/6], "three-point Simpson")):
+        first, last = indices[0], indices[-1]
+        average = lambda value: np.dot(weights, value[indices])
+        reference = (pin_work[first]-pin_work[last])/(B*(cracks[last]-cracks[first]))
+        tolerance = max(1e-8, float(np.max(abs(pin_work)))*1e-12)
+        eligible = np.all(area[indices] >= -tolerance, axis=0)
+        rows.append({"interval": name, "a1_mm": float(cracks[first]), "a2_mm": float(cracks[last]),
+                     "quadrature": rule, "finite_work_release_N_mm": reference,
+                     "predicted_total_J_N_mm": average(prediction),
+                     "predicted_elastic_J_N_mm": average(elastic),
+                     "unit_plastic_factor_N_mm": average(unit_plastic),
+                     "ASTM_plastic_J_N_mm": average(eta[:, None]*unit_plastic),
+                     "eligible_nonnegative_Apl": eligible})
+    return {"Apl_N_mm": area, "J_elastic_N_mm": elastic,
+            "predicted_total_J_N_mm": prediction, "eta_per_crack": eta, "intervals": rows}
 
 
 def compare_elastic(out):
@@ -819,17 +1048,245 @@ def conditional_plastic(out):
     return report
 
 
+def interval_validation(out, controls=None):
+    """Finite crack intervals on both sides of the total-J comparison.
+
+    Original-flow method predictions are compared with the potential reference
+    only as a constitutive-approximation check, never as an original-flow J
+    integral. This does not fit eta or change any production calculation.
+    """
+    from resources.calculations import calc_FaW_aniso
+    out = Path(out).resolve()
+    controls = Path(controls).resolve() if controls else out
+    reuse_path = out/"reused-controls.json"
+    if reuse_path.exists():
+        reuse = json.loads(reuse_path.read_text())
+        if Path(reuse["controls_root"]).resolve() != controls:
+            raise ValueError("Retained elastic/tensor controls differ from the event preparation")
+        if any(sha(path) != value for path, value in reuse["files_sha256"].items()):
+            raise ValueError("Retained elastic/tensor control changed after event preparation")
+    records = {"potential": {}, "incremental": {}}
+    files = {}
+    for path in sorted(out.glob("fcc_*/result.json")):
+        row = json.loads(path.read_text())
+        if row["law"] not in records:
+            continue
+        eligible_state = row.get("state") == "completed_and_extracted" or (
+            row.get("state") in ("failed_with_reviewed_converged_prefix", "solver_completed_with_failed_wrapup")
+            and row.get("reviewed_partial_usable"))
+        if (not eligible_state or not row.get("read_only")
+                or not row.get("source_input_hash_verified") or sha(row["input"]) != row["input_sha256"]):
+            raise ValueError("Only completed, source/receipt-verified immutable FCC controls are eligible")
+        index = int(row["crack_index"])
+        if index in records[row["law"]]:
+            raise ValueError("Duplicate crack/law control")
+        records[row["law"]][index] = row
+        files[str(path)] = sha(path)
+    if set(records["potential"]) != {0, 1, 2}:
+        raise ValueError("Three completed potential-material crack controls required")
+    potential = [records["potential"][i] for i in range(3)]
+    fit_path = controls/"material-fit.json"
+    if any(row["material_fit_sha256"] != sha(fit_path) for row in potential):
+        raise ValueError("Potential-material fit differs from the solved controls")
+    fit = json.loads(fit_path.read_text())
+    elastic_paths = [controls/("fcc_el_a"+str(i))/"result.json" for i in range(3)]
+    elastic = [json.loads(path.read_text()) for path in elastic_paths]
+    tensor_path = controls/"periodic/tensor-results.json"
+    tensor = json.loads(tensor_path.read_text())[0]
+    B, W = potential[0]["B_mm"], potential[0]["W_mm"]
+    cracks = np.array([row["a_mm"] for row in potential])
+    if any(row["source_sha256"] != potential[0]["source_sha256"] or row["W_mm"] != W
+           or row["B_mm"] != B for values in records.values() for row in values.values()):
+        raise ValueError("Constituent and specimen controls must share the original source")
+    if any(row["a_mm"] != cracks[i] or row["source_sha256"] != potential[0]["source_sha256"]
+           for i, row in enumerate(elastic)) or tensor["source_sha256"] != potential[0]["source_sha256"]:
+        raise ValueError("Elastic compliance/tensor source differs from the nonlinear controls")
+    C = np.array(tensor["C_MPa"])[np.ix_([1, 0, 2], [1, 0, 2])]
+    M = float(tensor["M_crack_axis_MPa"])
+    factors = np.array([calc_FaW_aniso(a, W, C=C)**2/(B*B*W*M) for a in cracks])
+    compliance = np.array([row["compliance_mm_N"] for row in elastic])
+    cap = min(row["opening_mm"][-1] for row in potential)
+    if set(records["incremental"]) == {0, 1, 2}:
+        cap = min(cap, *(row["opening_mm"][-1] for row in records["incremental"].values()))
+    opening = np.linspace(0., cap, 401)
+    quantities = {}
+    responses = {}
+    for law, values in records.items():
+        if set(values) != {0, 1, 2}:
+            continue
+        pairs = [response_at_opening(values[i]["opening_mm"], values[i]["force_N"], opening) for i in range(3)]
+        force, work = np.array([x[0] for x in pairs]), np.array([x[1] for x in pairs])
+        responses[law] = {"force_N": force, "work_N_mm": work}
+        quantities[law] = interval_quantities(cracks, force, work, compliance, factors, B, W)
+    linear_force = opening[None, :]/compliance[:, None]
+    linear_work = .5*opening[None, :]**2/compliance[:, None]
+    linear = interval_quantities(cracks, linear_force, linear_work, compliance, factors, B, W)
+    intervals = []
+    for index, row in enumerate(quantities["potential"]["intervals"]):
+        reference = row["finite_work_release_N_mm"]
+        predicted = row["predicted_total_J_N_mm"]
+        eligible = row["eligible_nonnegative_Apl"] & (reference > 0) & (predicted > 0)
+        error = np.full(len(opening), np.nan)
+        error[eligible] = np.sqrt(predicted[eligible]/reference[eligible])-1
+        linear_row = linear["intervals"][index]
+        linear_error = float(np.sqrt(linear_row["predicted_total_J_N_mm"][-1]/linear_row["finite_work_release_N_mm"][-1])-1)
+        flow_error = np.full(len(opening), np.nan)
+        flow_total = np.full(len(opening), np.nan)
+        if "incremental" in quantities:
+            flow = quantities["incremental"]["intervals"][index]
+            flow_total = flow["predicted_total_J_N_mm"]
+            mask = flow["eligible_nonnegative_Apl"] & eligible & (flow["predicted_total_J_N_mm"] > 0)
+            flow_error[mask] = np.sqrt(flow["predicted_total_J_N_mm"][mask]/reference[mask])-1
+        late = eligible & (opening >= .5*cap)
+        if not late.any():
+            raise ValueError("No positive-area late-loading interval supports a total-J decomposition check")
+        unit = row["unit_plastic_factor_N_mm"]
+        eta = np.full(len(opening), np.nan)
+        eta_mask = eligible & (unit > max(1e-8, abs(unit[-1])*1e-5))
+        eta[eta_mask] = (reference[eta_mask]-row["predicted_elastic_J_N_mm"][eta_mask])/unit[eta_mask]
+        levels = []
+        for fraction in (.25, .5, .75, 1.):
+            at = round(fraction*(len(opening)-1))
+            levels.append({"fraction_of_checked_opening": fraction, "opening_mm": float(opening[at]),
+                           "eligible_nonnegative_Apl": bool(eligible[at]),
+                           "potential_reference_J_N_mm": float(reference[at]),
+                           "ASTM_method_on_potential_response_J_N_mm": float(predicted[at]),
+                           "original_flow_method_total_J_N_mm": float(flow_total[at]),
+                           "potential_method_equivalent_K_relative_error": float(error[at]),
+                           "original_flow_method_equivalent_K_relative_error": float(flow_error[at]),
+                           "effective_interval_eta_diagnostic": float(eta[at])})
+        intervals.append({**row, "potential_method_equivalent_K_relative_error": error,
+                          "original_flow_method_equivalent_K_relative_error": flow_error,
+                          "original_flow_method_total_J_N_mm": flow_total,
+                          "effective_interval_eta_diagnostic": eta, "elastic_baseline_K_relative_error": linear_error,
+                          "late_loading_window_fraction": [.5, 1.],
+                          "late_potential_max_abs_K_relative_error": float(np.nanmax(abs(error[late]))),
+                          "late_original_flow_method_max_abs_K_relative_error":
+                              float(np.nanmax(abs(flow_error[late]))) if np.isfinite(flow_error[late]).any() else None,
+                          "late_potential_within_own_elastic_error_baseline": bool(np.all(abs(error[late]) <= abs(linear_error)+1e-6)),
+                          "levels": levels})
+    equivalence = []
+    for index in sorted(set(records["potential"]) & set(records["incremental"])):
+        first, second = records["incremental"][index], records["potential"][index]
+        common = np.linspace(0., min(cap, first["opening_mm"][-1], second["opening_mm"][-1]), 401)
+        p1, w1 = response_at_opening(first["opening_mm"], first["force_N"], common)
+        p2, w2 = response_at_opening(second["opening_mm"], second["force_N"], common)
+        equivalence.append({"a_mm": float(cracks[index]), "common_final_opening_mm": float(common[-1]),
+                            "original_final_force_N": float(p1[-1]), "potential_final_force_N": float(p2[-1]),
+                            "original_final_work_N_mm": float(w1[-1]), "potential_final_work_N_mm": float(w2[-1]),
+                            "potential_over_original_final_force_minus_one": float(p2[-1]/p1[-1]-1),
+                            "potential_over_original_final_work_minus_one": float(w2[-1]/w1[-1]-1),
+                            "max_force_error_over_original_peak": float(max(abs(p2-p1))/max(abs(p1)))})
+    report = {"state": "interval_matched_potential_total_J_verification",
+              "source_incremental_J_integral_claimed": False, "eta_fitted_for_prediction": False,
+              "prescribed_ASTM_eta_at_original_crack": float(2.+.522*(W-cracks[0])/W),
+              "adopted_coefficient_change_from_ASTM": 0.,
+              "decision": "Bounded ordered-FCC nonlinear total-J verification completed; retain the prescribed ASTM plastic factor without a toughness fit",
+              "additional_solver_gate_for_this_bounded_check": None,
+              "reference_law": "Fitted deformation/potential approximation; original flow is an approximation-transfer check",
+              "reference_definition": "[U(a1,delta)-U(a2,delta)]/[B(a2-a1)] at fixed opening",
+              "prediction_definition": "Same-interval average of KI(a,delta)^2/M + [2+.522b(a)/W] Apl(a,delta)/[B b(a)]",
+              "integration": "Exact integral of native piecewise-linear pin histories; no extrapolation",
+              "crack_quadrature": "Endpoint trapezoids for each10mm cell; three-point Simpson across20mm",
+              "W_mm": W, "B_mm": B, "cracks_mm": cracks, "M_MPa": M, "opening_mm": opening,
+              "checked_final_opening_mm": cap, "Apl_potential_N_mm": quantities["potential"]["Apl_N_mm"],
+              "requested_material_endpoint_opening_mm": potential[0]["loading_displacement_mm"],
+              "common_support_fraction_of_requested_endpoint": cap/potential[0]["loading_displacement_mm"],
+              "control_mechanics": [{"job": row["job"], "state": row["state"],
+                   "actual_final_opening_mm": row["opening_mm"][-1],
+                   "fraction_of_requested_opening": row.get("fraction_of_requested_opening"),
+                   "force_balance_relative_error": row.get("force_balance_relative_error"),
+                   "pin_work_ALLWK_relative_error": row.get("pin_work_ALLWK_relative_error")}
+                   for values in records.values() for row in values.values()],
+              "partial_controls": [{"job": row["job"], "state": row["state"],
+                   "actual_final_opening_mm": row["opening_mm"][-1],
+                   "fraction_of_requested_opening": row.get("fraction_of_requested_opening"),
+                   "force_balance_relative_error": row.get("force_balance_relative_error"),
+                   "pin_work_ALLWK_relative_error": row.get("pin_work_ALLWK_relative_error")}
+                   for values in records.values() for row in values.values()
+                   if row["state"] != "completed_and_extracted"],
+              "intervals": intervals, "global_material_response_comparison": equivalence,
+              "result_json_sha256": files, "elastic_result_json_sha256": {str(path): sha(path) for path in elastic_paths},
+              "tensor_result_sha256": sha(tensor_path),
+              "potential_approximation_evidence": {
+                  "material_fit_file": str(fit_path), "material_fit_sha256": sha(fit_path),
+                  "constituent_max_stress_error_over_yield": fit["max_stress_error_over_yield"],
+                  "constituent_rms_stress_error_over_yield": fit["rms_stress_error_over_yield"],
+                  "constituent_3pct_screen_passed": fit["constituent_3pct_screen_passed"],
+                  "earlier_local_equivalence_file": str(controls/"pilot-equivalence.json"),
+                  "earlier_local_equivalence_sha256": sha(controls/"pilot-equivalence.json"),
+                  "scope": "Global response-transfer errors are measured above at the common opening; the potential law is an approximation, not identical local unloading behaviour"},
+              "limitations": ["Finite-cell interval verification, not a converged pointwise tip derivative",
+                              "Potential-law total-energy reference is independent of eta but approximates the source flow law",
+                              "No independent published FCC plastic-fracture benchmark is claimed; this is a bounded numerical energy verification",
+                              "The effective interval-eta diagnostic is not a source-point calibration and does not replace prescribed eta",
+                              "Negative initial-triangle areas stay ineligible; the25% loading level is diagnostic",
+                              "Existing constituent/local-unloading differences remain recorded in pilot-equivalence.json",
+                              "No original research simulation, final figure or production eta is changed"]}
+    def finite(value):
+        if isinstance(value, dict):
+            return {key: finite(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, np.ndarray)):
+            return [finite(item) for item in value]
+        if isinstance(value, (float, np.floating)):
+            return float(value) if np.isfinite(value) else None
+        if isinstance(value, np.bool_):
+            return bool(value)
+        return value
+    report = finite(report)
+    write_json(out/"interval-total-J-validation.json", report)
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4.3), constrained_layout=True)
+    last = intervals[-1]
+    axes[0].plot(opening, last["finite_work_release_N_mm"], color="#2166ac", label="Independent potential energy")
+    axes[0].plot(opening, last["predicted_total_J_N_mm"], "--", color="k", label="Ortega + ASTM plastic, potential response")
+    if "incremental" in quantities:
+        axes[0].plot(opening, quantities["incremental"]["intervals"][-1]["predicted_total_J_N_mm"], ":", color=".4", label="Ortega + ASTM plastic, original-flow response")
+    axes[0].set(xlabel="Load-line opening (mm)", ylabel="Interval-average total J (N/mm)", title="Matched 80–100 mm interval")
+    for row, style in zip(intervals, ("-", "--", ":")):
+        name = "{}–{} mm".format(int(row["a1_mm"]), int(row["a2_mm"]))
+        residual = (row["original_flow_method_equivalent_K_relative_error"] if "incremental" in quantities
+                    else row["potential_method_equivalent_K_relative_error"])
+        axes[1].plot(opening, 100*residual, style, color="#2166ac", label=name)
+        axes[1].axhline(100*row["elastic_baseline_K_relative_error"], linestyle=style, color=".65", linewidth=.8)
+    axes[1].set(xlabel="Load-line opening (mm)", ylabel="Equivalent K difference (%)",
+                title=("Original-flow prediction vs energy reference" if "incremental" in quantities
+                       else "Potential prediction vs energy reference"))
+    axes[1].text(.02, .04, "Grey: elastic baselines", ha="left", va="bottom", fontsize=8,
+                 color=".4", transform=axes[1].transAxes)
+    for axis in axes:
+        axis.set_xlim(.5*cap, cap)
+        axis.grid(alpha=.2)
+        axis.legend(fontsize=8)
+    fig.suptitle("FCC total-J verification: Ortega elastic calibration + fixed ASTM plastic factor", fontsize=12)
+    for suffix in ("png", "svg"):
+        fig.savefig(out/("interval-total-J-validation."+suffix), dpi=220)
+    plt.close(fig)
+    return report
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("prepare", "gather", "prepare-tensor", "gather-tensor", "compare-pilot", "prepare-continuation", "compare-elastic", "conditional-plastic"))
+    parser.add_argument("action", choices=("prepare", "gather", "prepare-tensor", "gather-tensor", "compare-pilot", "prepare-continuation", "compare-elastic", "conditional-plastic", "interval-validation", "prepare-event", "prepare-event-continuation"))
     parser.add_argument("--source", type=Path, default=SOURCE)
     parser.add_argument("--out", type=Path, default=OUT)
     parser.add_argument("--queue", type=Path)
     parser.add_argument("--delta", type=float)
     parser.add_argument("--h", type=float, default=10.)
     parser.add_argument("--endpoint-receipt", type=Path)
+    parser.add_argument("--controls", type=Path, help="Existing source-matched elastic/tensor controls; no duplicate solves")
+    parser.add_argument("--accept-converged-prefix", action="append", default=[],
+                        help="Explicit reviewed failed job only; status remains failed and comparison uses actual support")
     args = parser.parse_args()
-    if args.action == "conditional-plastic":
+    if args.action == "prepare-event-continuation":
+        result = prepare_event_continuation(args.out)
+    elif args.action == "prepare-event":
+        result = prepare_event(args.controls or OUT, args.out, args.endpoint_receipt)
+    elif args.action == "interval-validation":
+        result = [interval_validation(args.out, args.controls)]
+    elif args.action == "conditional-plastic":
         result = [conditional_plastic(args.out)]
     elif args.action == "compare-elastic":
         result = [compare_elastic(args.out)]
@@ -844,7 +1301,7 @@ def main():
     elif args.action == "prepare":
         result = prepare(args.source, args.out, args.delta, args.h, args.endpoint_receipt)
     else:
-        result = gather(args.out, args.queue)
+        result = gather(args.out, args.queue, args.accept_converged_prefix)
     print(json.dumps({"prepared" if args.action.startswith("prepare") else "extracted": len(result), "out": str(args.out)}))
 
 

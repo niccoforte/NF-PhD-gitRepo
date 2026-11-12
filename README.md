@@ -472,15 +472,22 @@ Whole-history filtering can alter ductility materially despite stable work.
 checks Ortega inside its fitted domain:18 paired-mesh jobs/9 tensors agree
 within.883%K/1.773%J after consistent source-axis f/M conversion.
 These CPS4R models contain no lattice struts or fracture initiation.
-`validation_fcc.py` now prepares/gathers actual source-mesh FCC B21 controls:
-3elastic crack lengths, one source-compatible mapped periodic tensor, and a
-bounded6-run original/potential-material plastic feasibility pilot. The actual
-FCC elastic energy comparison differs by4.63-5.96% in equivalent K. This is
-numerical lattice verification; plastic qualification is a separate gate.
-`validation_literature.py --output-dir <audit/elastic-calibration/published-lattices>`
-compares Omidi/St-Pierre2023 snub-square TableC2 CT factors with Ortega:
-lambda1,chi3.16-7.65, within the fit domain; deviations3.51-6.75%. Reproducing
-the published discrete-beam fracture points still requires snub-square models.
+`validation_fcc.py interval-validation --out <fcc-calibration/initial-event>
+--controls <fcc-calibration>` compares total J over the same finite crack
+interval at fixed opening: a potential-model energy derivative is independent
+of the ASTM eta prediction. Original incremental-plastic predictions are a
+separate approximation-transfer check, not a loading-work derivative called J.
+At99.871% of resolved initiation opening their equivalent-K residuals are
+4.02-4.68%, with eta2.261 prescribed, not fitted. Preserve the small missing
+support and material-approximation limits. The actual FCC elastic B21 check
+remains separate from published continuum data.
+`validation_omidi.py` reproduces the authors' snub-square geometry and published
+polymer data at20/25/30% density. Use Abaqus Python `gather-tensor` and `gather`
+with `--queue-root <audit/omidi/serial-queue>`, then standard Python `compare`.
+The full bending/shear beam-RVE tensors give lambda~1,chi8.361/5.597/4.081;
+these are measured controls, not forced to the paper's closed-form coefficients.
+Actual CT jobs are serial; published geometry-factor comparison alone is not
+completion of their lattice fracture reproduction.
 Hsieh FT calculations use causal paired Butterworth at2fn; order2/DC is a
 documented reconstruction because the source does not disclose order.
 `validation_modal.py prepare_periodic` prepares8 exact population-periodic
@@ -494,8 +501,18 @@ and `--apply-periodic-examples` plots paired causal filtering.
 For periodic plus7 random paired architectures per lattice, use
 `--prepare-paired-examples`, Abaqus Python `--extract-paired-examples`, then
 `--paired-examples`; the fixed seed and native histories produce8 UT/FT galleries.
-No disordered modal jobs. Never cap2fn to saved Nyquist: above it, filtering is unresolved
-on those stored histories and must not be claimed applied or rewritten into MLdata.
+No disordered modal jobs. The original2fn-only galleries retain unresolved
+sampling status. `validation_stiffness.py` now writes all64 filtered
+examples under `audit/curve-processing/accepted-filter-study`: retain2fn below
+saved Nyquist; otherwise use explicit fs/6 archive adaptation. It is causal,
+order2/DC paired filtering, following the Abaqus automatic antialiasing cutoff
+convention; postprocessing cannot reverse already-aliased output.
+`qualify_stiffness(time,raw_x,raw_y,periodic_fn)` supplies a40%-peak initial
+work-equivalent scalar slope, with30/50%-window, cutoff and curvature screens.
+Do not prefilter its inputs. Existing15 source-exact elastic controls bound
+errors to-4.72/+3.34%;64 native curves pass. Hexagonal read-only replay gives
+1973 finite estimates,1964 pass and9 slightly window-sensitive holdouts.
+Neither the study nor these calls rewrites Props/MLdata or approved figures.
 `validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
 clamps and B21 bending/shear, computing the initial tangent from prescribed
 small travel and reaction, without a curve-fit interval. Four hex/kagome
@@ -503,8 +520,9 @@ periodic/full-ID1 controls are verified; these do not recalculate the population
 Measured short-job timings are10-11s UAT,7-16s CT and10-11s per three-step body
 tensor. Blanket population controls would take3-6days; they are not scheduled.
 Retain Appendix C quasi-isotropy for tri/kagome/hex and orthotropic FCC. No
-per-realisation homogenisation is selected. Use exact FE only where scalar
-stiffness is unresolved; the unique checklist owns costs and final M convention.
+per-realisation homogenisation is selected. Nine short frozen-prediction UAT
+holdouts test the curve rule; they are not a population rerun or a replacement
+of curve estimates by FE values. The checklist owns integration and M state.
 `validation_completion.py --extract-finished --include-interrupted` reads the
 finished new jobs into a separate `new-validation/results` catalogue with native
 histories, initiation/damage evidence and pinned extraction hashes. A reviewed

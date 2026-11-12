@@ -25,14 +25,17 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   Modal actions prepare_periodic/prepare_iso cover population8 and selected
   ISO sources; iso_map joins verified frequencies. Use causal
   order2/DC Butterworth at2fn for matching disorder, no disordered modal jobs.
-  A cutoff at/above saved Nyquist is unresolved, never silently capped; preserve
-  native values with truthful filter provenance. MLdata is not rewritten here.
-  `validation_fcc.py` owns source-mesh3crack elastic controls, one mapped periodic
-  tensor and6nonlinear feasibility jobs. Potential energy derivatives remain
-  conditional on constitutive/local/global agreement; no automatic plastic-J
-  qualification or population reruns. Use full pin opening, no half-model factor.
-  `validation_literature.py` compares Omidi2023 snub-square TableC2 geometry
-  factors with Ortega; this is not completed discrete-beam fracture validation.
+  `validation_stiffness.py` filters archives at resolved2fn, otherwise explicitly
+  fs/6, order2/DC paired SOS. This adaptation cannot undo aliasing. Its40%-peak
+  work-equivalent slope checks30/50% windows, cutoff sensitivity and curvature;
+  return flags, never hide unresolved cases. MLdata migration is separate.
+  `validation_fcc.py` compares total J on identical crack/opening intervals:
+  independent potential-energy derivative versus prescribed ASTM eta prediction,
+  with original-flow transfer and failed-prefix support recorded separately.
+  `validation_controls.py` dense-event replay preserves source loading/model.
+  `validation_omidi.py` owns actual snub-square CT and periodic beam-tensor
+  reproduction; gather verified serial deliveries before comparison. Published
+  CT/BL/experimental data and own FE remain distinct; no fitted normalisation.
 - `validation_failure_audit.py` binds each of the48 native tensile-strain
   initiation brackets to saved section damage and source fingerprints.
   `validation_controls.py` prepares/extracts exact-source B21 conversion and
@@ -109,9 +112,9 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
 - `validation_curve_processing.py` is opt-in, never an MLdata migration.
   --prepare-paired-examples freezes the random seed/IDs; Abaqus Python
   --extract-paired-examples reads native pairs; --paired-examples writes8galleries.
-  Hsieh FT uses paired causal2fn, order2/DC (our stated reconstruction), keeping
-  events native. Above-Nyquist cutoffs remain unapplied. No mask leakage or
-  continuum-only check falsely labelled discrete-lattice validation.
+  Native-only2fn galleries retain sampling limits; accepted-filter-study uses
+  validation_stiffness sampling adaptation, without changing approved figures.
+  Keep material events native; no continuum-only lattice-validation claim.
 
 ## Shared Calculation Checks
 
@@ -161,14 +164,10 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   deletion because section-point failure and whole-element deletion differ.
   An outer-surface strain criterion is a source-comparison choice; do not alter
   shared STATUS failure labels or damage laws to make them coincide.
-  Force-only and matched U/RF causal filters remain labelled controls; matching
-  their phases does not resolve the demonstrated hex80 negative work.
-  Geometric elastic stiffening also makes that initial-compliance subtraction
-  negative without plasticity. ALLSE comparisons remain diagnostic; do not
-  substitute W-ALLSE for ASTM Jpl. Exact-source B21 C gives conversion 1/S11
-  directly, without an additional plane-strain correction. Verified moduli and
-  cutoffs apply only to their indexed source case, never neighbouring specimens.
-  Shared calculation/export defaults and p2 products remain outside this route.
+  Pair filtered U/RF consistently. Geometric stiffening can still make the
+  initial-elastic triangle subtraction negative; W-ALLSE is not ASTM Jpl.
+  Modified-material C needs no second plane-strain mapping. Transfer cutoffs
+  only within the declared matched family; shared exports/p2 migration is separate.
   `ValConvPlots` preserves source values but excludes incomplete saved FT rows and
   KJ<KI (negative-area) points. PSC criteria/sizes stay fixed and deferred.
 - If changing field-output handling, preserve sample ids, frame values, node labels, node coordinates, components, valid masks, and main-body node filtering.

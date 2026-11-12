@@ -6,9 +6,11 @@ Compliance preparation reuses the modal builder with unit_load only; gathering
 uses completed serial-queue deliveries and reads their ODBs without upgrading.
 """
 import argparse
+import csv
 import hashlib
 import math
 import json
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -977,17 +979,181 @@ def gather(root, out):
     print("Available exact-source conversion controls:", len(combined))
 
 
+def prepare_event_resolution(source, out, name="fcc_init_dense", stop_time=.045,
+                             field_interval=.0005, history_interval=.00001):
+    """Retain Explicit physics/amplitude; resolve only a short initiation prefix."""
+    source, out = Path(source).resolve(), Path(out).resolve()
+    original_hash = sha(source)
+    text = source.read_text(encoding="ascii")
+    dynamic = re.compile(r"(?im)^(\*Dynamic,\s*Explicit[^\n]*\n)\s*,\s*([\d.eE+-]+)[^\n]*")
+    matches = list(dynamic.finditer(text))
+    if len(matches) != 1:
+        raise ValueError("One original Explicit step is required")
+    period = float(matches[0].group(2))
+    if not (0 < history_interval <= field_interval <= stop_time <= period):
+        raise ValueError("Positive resolved intervals and an original-step prefix are required")
+    model = text[:re.search(r"(?im)^\*Step\b", text).start()]
+    contents = dynamic.sub(lambda m: m.group(1)+", %.12g" % stop_time, text, count=1)
+    contents, nfield = re.subn(r"(?im)^\*Output,\s*field[^\n]*",
+                              "*Output, field, time interval=%.12g" % field_interval, contents)
+    contents, nhistory = re.subn(r"(?im)^\*Output,\s*history[^\n]*",
+                                "*Output, history, time interval=%.12g" % field_interval, contents)
+    contents, nload = re.subn(r"(?im)^(\*Node Output,\s*nset=load\s*)$",
+                             lambda m: "*Output, history, time interval=%.12g\n" % history_interval+m.group(1), contents)
+    if (nfield, nhistory, nload) != (1, 1, 1):
+        raise ValueError("Expected one field, one history and one load-pin request")
+    if not contents.startswith(model):
+        raise ValueError("Source model/material/amplitude changed")
+    directory = job_directory(out, name)
+    directory.mkdir(parents=True, exist_ok=True)
+    inp = directory/(name+".inp")
+    if inp.exists() and inp.read_text(encoding="ascii") != contents:
+        raise ValueError("Refuse to change an existing resolution control")
+    inp.write_text(contents, encoding="ascii")
+    meta = {"job": name, "input": str(inp), "input_sha256": sha(inp),
+            "source_inp": str(source), "source_sha256": original_hash,
+            "analysis": "source_Explicit_initiation_resolution", "source_period_s": period,
+            "stop_time_s": stop_time, "field_interval_s": field_interval,
+            "load_history_interval_s": history_interval,
+            "model_prefix_sha256": hashlib.sha256(model.encode("ascii")).hexdigest(),
+            "unchanged": "All nodes/elements/sections/material/damage, amplitude, BCs and original loading rate",
+            "changes": "Shorten step only; refine unfiltered field/status/energy times and load-pin histories",
+            "state": "prepared_not_submitted"}
+    if source.with_suffix(".odb").exists():
+        meta.update(source_odb=str(source.with_suffix(".odb")),
+                    source_odb_sha256=sha(source.with_suffix(".odb")))
+    if sha(source) != original_hash:
+        raise ValueError("Original source changed")
+    write_json(directory/"source.json", meta)
+    manifest = {"abaqus": "C:/SIMULIA/Commands/abaqus.bat", "queue_root": str(out/"queue"),
+                "jobs": [{"job": name, "input": str(inp), "input_sha256": sha(inp), "cpus": 8,
+                          "required_outputs": [".odb", ".dat", ".sta"],
+                          "purpose": "Resolve local initiation and pre-decimation filtering; same source physics"}]}
+    path = out/"manifest.json"
+    if path.exists() and json.loads(path.read_text()) != manifest:
+        raise ValueError("Refuse different existing event-resolution manifest")
+    write_json(path, manifest)
+    return {"manifest": str(path), "source_unchanged": True, **meta}
+
+
+def gather_event_resolution(out, queue):
+    """Resolve the material event in a verified output-refined source replay."""
+    from odbAccess import openOdb
+    from validation_failure_audit import maximum
+    out, queue = Path(out), Path(queue)
+    state = json.loads((queue/"state.json").read_text())
+    completed = {row["job"] for row in state["jobs"] if row["status"] == "completed"}
+    records = []
+    for source_json in out.glob("*/source.json"):
+        meta = json.loads(source_json.read_text())
+        if meta.get("analysis") != "source_Explicit_initiation_resolution":
+            continue
+        odb_path, delivery = verified_control_delivery(meta, queue, completed)
+        digest = sha(odb_path)
+        odb = openOdb(str(odb_path), readOnly=True)
+        field_rows, bracket = [], None
+        try:
+            step = odb.steps["Step-1"]
+            candidates = [name for name, region in step.historyRegions.items()
+                          if "U2" in region.historyOutputs and "RF2" in region.historyOutputs]
+            if len(candidates) != 1:
+                raise ValueError("Need one load-pin history")
+            load = step.historyRegions[candidates[0]]
+            u, p = (np.asarray(load.historyOutputs[key].data, dtype=float) for key in ("U2", "RF2"))
+            if not np.array_equal(u[:, 0], p[:, 0]) or not np.isfinite(u).all() or not np.isfinite(p).all():
+                raise ValueError("Dense paired history is not finite/time aligned")
+            for index, frame in enumerate(step.frames):
+                if "LE" not in frame.fieldOutputs:
+                    raise ValueError("Unfiltered strain output missing")
+                field = frame.fieldOutputs["LE"]
+                component = list(field.componentLabels).index("LE11")
+                top = maximum(field, component)
+                if top is None:
+                    raise ValueError("No finite axial strain")
+                zeros = sum(int(np.count_nonzero(np.asarray(block.data) == 0))
+                            for block in frame.fieldOutputs["STATUS"].bulkDataBlocks)
+                row = {"field_index": index, "time_s": float(frame.frameValue),
+                       "max_LE11": top["value"], "zero_STATUS": zeros}
+                field_rows.append(row)
+                if bracket is None and top["value"] >= .1105:
+                    if index == 0:
+                        raise ValueError("Material event already crossed at initial frame")
+                    bracket = {"previous_field": dict(field_rows[-2]), "crossing_field": dict(row),
+                               "critical_point": top}
+            if bracket is None:
+                raise ValueError("Resolution prefix did not reach the material threshold")
+        finally:
+            odb.close()
+        original = Path(meta["source_odb"])
+        if sha(original) != meta["source_odb_sha256"]:
+            raise ValueError("Original native ODB changed")
+        original_odb = openOdb(str(original), readOnly=True)
+        try:
+            region = original_odb.steps["Step-1"].historyRegions[candidates[0]]
+            original_u = np.asarray(region.historyOutputs["U2"].data, dtype=float)
+            original_p = np.asarray(region.historyOutputs["RF2"].data, dtype=float)
+        finally:
+            original_odb.close()
+        for label in ("previous_field", "crossing_field"):
+            point = bracket[label]
+            point.update(opening_mm=float(np.interp(point["time_s"], u[:, 0], u[:, 1])),
+                         force_N=float(np.interp(point["time_s"], p[:, 0], p[:, 1])))
+        keep = original_u[:, 0] <= bracket["previous_field"]["time_s"]
+        times = original_u[keep, 0]
+        du = np.interp(times, u[:, 0], u[:, 1])-original_u[keep, 1]
+        dp = np.interp(times, p[:, 0], p[:, 1])-original_p[keep, 1]
+        scale = max(float(np.max(np.abs(original_p[keep, 1]))), 1.)
+        equivalence = {"samples": len(times), "max_opening_error_mm": float(np.max(np.abs(du))),
+                       "max_force_error_over_peak": float(np.max(np.abs(dp))/scale),
+                       "rms_force_error_over_peak": float(np.sqrt(np.mean(dp**2))/scale)}
+        equivalence["passed"] = (len(times) >= 20 and equivalence["max_opening_error_mm"] < 1e-4
+                                 and equivalence["max_force_error_over_peak"] < .01)
+        if not equivalence["passed"]:
+            raise ValueError("Output-refined replay differs materially from original prefix: "+repr(equivalence))
+        if sha(odb_path) != digest or sha(original) != meta["source_odb_sha256"]:
+            raise ValueError("Read-only ODB changed")
+        curve = source_json.parent/"dense-native-curve.csv"
+        with curve.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.writer(handle); writer.writerow(("time_s", "U2_mm", "RF2_N"))
+            writer.writerows(zip(u[:, 0], u[:, 1], p[:, 1]))
+        with (source_json.parent/"resolved-fields.csv").open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(field_rows[0]));writer.writeheader();writer.writerows(field_rows)
+        result = {**meta, "state": "completed_and_extracted", "read_only": True,
+                  "source": str(original), "source_sha256": meta["source_odb_sha256"],
+                  "original_source_inp": meta["source_inp"], "original_source_inp_sha256": meta["source_sha256"],
+                  "original_source_odb": str(original), "original_source_odb_sha256": meta["source_odb_sha256"],
+                  "event_source_odb": str(odb_path), "event_source_odb_sha256": digest,
+                  "event_source_inp_sha256": meta["input_sha256"], "delivery_sha256": sha(delivery),
+                  "criterion": "Last recorded field before maximum tensile LE11 reaches0.1105; events unfiltered",
+                  "event": bracket, "source_equivalence": equivalence,
+                  "dense_curve_csv": str(curve), "dense_curve_sha256": sha(curve),
+                  "dense_sample_count": len(u), "field_sample_count": len(field_rows)}
+        write_json(source_json.parent/"resolved-event.json", result)
+        records.append(result)
+    write_json(out/"resolved-event-summary.json", records)
+    return records
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("prepare", "gather", "prepare-compliance", "gather-compliance",
                                            "prepare-completion", "gather-completion",
-                                           "prepare-body-tensors", "gather-body-tensors"))
+                                           "prepare-body-tensors", "gather-body-tensors", "prepare-event-resolution", "gather-event-resolution"))
     parser.add_argument("--root", type=Path, default=Path("Z:/p1/sims/Ti/Validation"))
     parser.add_argument("--out", type=Path, default=Path("Z:/p1/sims/Ti/Validation/audit/controls"))
     parser.add_argument("--queue-root", type=Path)
     parser.add_argument("--macrostrain", type=float, default=1e-4)
+    parser.add_argument("--source", type=Path)
+    parser.add_argument("--stop-time", type=float, default=.045)
     args = parser.parse_args()
-    if args.action == "prepare-body-tensors":
+    if args.action == "gather-event-resolution":
+        print(json.dumps([{key: row[key] for key in ("job", "event", "source_equivalence", "dense_sample_count")}
+                          for row in gather_event_resolution(args.out, args.queue_root or args.out/"queue")], indent=2))
+    elif args.action == "prepare-event-resolution":
+        if args.source is None:
+            parser.error("prepare-event-resolution requires --source")
+        print(json.dumps(prepare_event_resolution(args.source, args.out, stop_time=args.stop_time), indent=2))
+    elif args.action == "prepare-body-tensors":
         print(json.dumps(prepare_body_tensors(args.root, args.out, args.macrostrain), indent=2))
     elif args.action == "gather-body-tensors":
         if args.queue_root is None:

@@ -21,6 +21,17 @@ instructions. Refresh them before the final review.
 - [ ] Review all audit outputs, including filtering galleries, stiffness history,
   axis examples, modal controls, FCC feasibility controls and published benchmarks.
   Keep the minimum reproducible evidence; remove superseded renders and bulk.
+- [ ] Review the current snub-square source downloads,3 tensor/3 CT runs and
+  validation overlays under `audit/omidi`; retain author-source identities and
+  accepted evidence, remove unsubmitted separate plans if superseded by the
+  combined serial manifest. Never remove active queue files.
+- [ ] Review `accepted-filter-study`, its64-curve galleries, frozen9-holdout
+  controls and dense FCC replay; retain one accepted filter/stiffness API and
+  minimal qualification evidence. Review older sampling-unresolved galleries
+  and report-history copies for removal only after links are reconciled.
+- [ ] Review FCC initial-event and continuation deliveries, dense-event exports,
+  same-interval verification and old subtraction-sensitivity outputs. Preserve
+  partial support/failure provenance and the chosen final method, not every plot.
 - [ ] Retain original research INP/ODB/transfer data and useful new simulations.
   Review auxiliary ODBs, logs, prepared-but-unused decks and retry lineages separately.
 - [ ] Review `Z:/p1/sims/Ti/Validation/audit/fcc-calibration/tensor`, which was

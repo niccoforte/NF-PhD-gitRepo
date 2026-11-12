@@ -4,44 +4,37 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
 
 ## Current Objective
 
-- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) and the
-  adjacent single report own calculation completion, population replacement,
-  manuscript integration and cleanup. AppendixC quasi-isotropy for tri/kagome/hex
-  and orthotropicFCC remain accepted; no per-ID tensor or blanket stiffness
-  programme is selected. The517 saved stiffness NaNs are a May2026 two-point
-  rejection artifact, not failed simulations:516hex-full and mechanismID737.
-  The guard is fixed; all1973 existing hex UT curves now yield finite estimates,
-  with1456 previously finite values and all other properties unchanged.
-  No nonlinear reruns are needed; saved Props/MLdata are not yet rewritten. Original population
-  scopeIDs1-1000 remains distinct from laterFCC extensions.
-  Published Ortega213FEM markers and18 own CPS4R controls verify the elastic
-  implementation. Three actualFCC B21 compliance controls plus one source-
-  mapped periodic tensor now quantify the lattice conversion: M8945.725MPa,
-  lambda1,chi.590409; interval-equivalentK differences4.63-5.96%. A real published
-  in-domain lattice benchmark is Omidi/St-Pierre2023snub-square: currentOrtega
-  differs3.51-6.75% from its TableC2 calibration. Its discrete fracture points
-  have not yet been reproduced. Retiredsquare/45square stays outside active use.
-  All6 original/potentialFCC nonlinear feasibility jobs are completed. Global
-  baselineforce/work differ.48/.32%, but local unloading and constitutive
-  mismatch prevent automatic original-model plastic qualification. Only the
-  potential model supplies the conditional energy derivative; never label an
-  incremental loading-work derivative J. Conditional eta1.825/2.482/2.180
-  versus ASTM2.261 is not qualified; no factor is promoted to production.
-  Eight population periodic modal families are completed; no disorder modes.
-  Causal paired order2/DCButterworth at2fn is selected; exact ISO modal coverage
-  uses its own source-hash map. AllUAT and tri/FCCFT population cutoffs exceed
-  savedNyquist; native observations stay unchanged with explicit unapplied
-  status, no silent cutoff cap or aliasing reconstruction. At the author's
-  explicit request final validation figures are restored to the pre-filter
-  14native/2recovery/2prediction display. They require explicit approval before
-  any further change. Forward Butterworth outputs remain separate and unchanged.
-  Raw/Butterworth/legacy-MA galleries contain periodic+7paired random specimens
-  per lattice and task. Current Word/LaTeX methods already state Butterworth.
-  ML masks remain deferred:201common loading positions, no stretched prefixes,
-  and per-specimen valid-mean loss. Mesh-before-UAT/FTPSC, Al benchmark, full
-  population replacement, Results figures/manuscript and finalcleanup remain
-  registered. Cleanup has its separate CLEANUP-CHECKLIST.md for final review.
-  Author-closed side investigations are not reopened.
+- [Unique SimCheck task checklist](samples/p1-validation/CHECKLIST.md) and its
+  adjacent single report own the research work; cleanup is separate. Appendix C
+  classifications are closed: quasi-isotropic tri/kagome/hex, orthotropic FCC
+  with near-equal axial moduli. No per-ID homogenisation or blanket rerun queue.
+  The two-point guard repair recovers517 later processing blanks from existing
+  hex curves; it does not imply failed original simulations. Saved Props/MLdata
+  remain unchanged. A new curve-derived40%-peak initial-work rule gives finite
+  estimates for1973 hex specimens;1964 pass frozen sensitivity screens,9 require
+  short frozen-prediction elastic holdout checks, armed after Omidi. All64 sampled UT/FT
+  curves pass;15 existing exact-source elastic controls differ-4.72/+3.34%.
+  Filtering uses causal paired order2/DC2fn where saved sampling resolves it;
+  otherwise the explicit fs/6 archive adaptation denoises the stored response.
+  Dense FCC replay measures-.56% force/-1.64% work versus physical2fn filtering.
+  These are analysis outputs, not a completed shared-code/population migration.
+  The approved18-point validation figure recipe and all15 files remain frozen;
+  changing them needs explicit author approval. Forward numerical work is separate.
+  FCC fixed-opening, same-crack-interval total-J verification is completed within
+  the potential-material approximation, retaining ASTM eta2.261 without fitting.
+  Original-flow equivalent-K residuals are4.02-4.68% at99.871% of the resolved
+  initiation opening. The potential reference is not a published FCC benchmark
+  or an exact original-flow J; material-transfer and support limits remain explicit.
+  Actual Omidi snub-square reproduction is running serially on8CPUs/job. Its3
+  periodic beam tensors pass QA,lambda~1,chi8.361/5.597/4.081;3 CT fracture jobs
+  use the published polymer response and source geometry at20/25/30% density.
+  At12November03:08UTC the first CT run was active, remaining2queued; early
+  pacing suggests3-5h/case, not a completion promise. No simultaneous solver jobs.
+  OriginalIDs1-1000 remain the population scope; no ML migration/training or
+  manuscript edits have occurred. Remaining sequence is shared-method integration,
+  mesh-before-UAT/FTPSC, Al triangular benchmark check, full population replacement,
+  Results/manuscript integration, then user-reviewed cleanup. Author-closed side
+  investigations are not reopened.
 
 
 - The manuscript revision has a common compliance/notation description and an

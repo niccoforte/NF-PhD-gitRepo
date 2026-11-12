@@ -79,9 +79,12 @@ paired coordinates for physical properties. This migration remains deferred.
   use the same reduced tensor; equal-axis outputs and data schemas are unchanged.
   Periodic modal maps bind original INP hashes and verified delivery receipts.
   Matching disordered histories reuse the periodic2fn cutoff; no per-ID modes.
-  Paired causal filtering keeps native material-event indices fixed. Frequencies
-  at/above saved Nyquist remain unresolved, never silently capped or interpolated
-  into a claimed source-equivalent filter. MLdata migration remains deferred.
+  Paired causal filtering keeps native material-event indices fixed. Physical
+  2fn above saved Nyquist is not reconstructable. validation_stiffness explicitly
+  applies fs/6 archive adaptation there; it never claims solver-rate equivalence.
+  Its40%-peak initial-work slope returns window/cutoff/curvature quality evidence.
+  Pass raw paired samples once. Shared calcUT/FT/Props and MLdata migration remain
+  deferred until representative end-to-end replacement is verified.
   Selected validation CSVs/plots remain external audit products, not training
   labels. They distinguish native dynamic histories from damage-off QS controls
   and Hsieh's initial-triangle convention from dissipation/nonlinear-recovery
