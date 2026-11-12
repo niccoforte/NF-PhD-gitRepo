@@ -488,6 +488,12 @@ The full bending/shear beam-RVE tensors give lambda~1,chi8.361/5.597/4.081;
 these are measured controls, not forced to the paper's closed-form coefficients.
 Actual CT jobs are serial; published geometry-factor comparison alone is not
 completion of their lattice fracture reproduction.
+The polymer CT20 attempt failed before initiation; its followers were not run.
+Elastic CT controls are pin-controlled and rejected. Source-derived prescribed-K
+BL and Figure2c-phase comparisons are extracted but disagree with the published
+fit; neither is promoted as external validation. Use `gather-boundary-layer
+--campaign journal-phase` in Abaqus Python for the latest delivered diagnostics.
+Larger/refined prepared jobs are held until the source discrepancy is resolved.
 Hsieh FT calculations use causal paired Butterworth at2fn; order2/DC is a
 documented reconstruction because the source does not disclose order.
 `validation_modal.py prepare_periodic` prepares8 exact population-periodic
@@ -502,17 +508,17 @@ For periodic plus7 random paired architectures per lattice, use
 `--prepare-paired-examples`, Abaqus Python `--extract-paired-examples`, then
 `--paired-examples`; the fixed seed and native histories produce8 UT/FT galleries.
 No disordered modal jobs. The original2fn-only galleries retain unresolved
-sampling status. `validation_stiffness.py` now writes all64 filtered
-examples under `audit/curve-processing/accepted-filter-study`: retain2fn below
-saved Nyquist; otherwise use explicit fs/6 archive adaptation. It is causal,
-order2/DC paired filtering, following the Abaqus automatic antialiasing cutoff
-convention; postprocessing cannot reverse already-aliased output.
-`qualify_stiffness(time,raw_x,raw_y,periodic_fn)` supplies a40%-peak initial
-work-equivalent scalar slope, with30/50%-window, cutoff and curvature screens.
-Do not prefilter its inputs. Existing15 source-exact elastic controls bound
-errors to-4.72/+3.34%;64 native curves pass. Hexagonal read-only replay gives
-1973 finite estimates,1964 pass and9 slightly window-sensitive holdouts.
-Neither the study nor these calls rewrites Props/MLdata or approved figures.
+sampling status. `validation_stiffness.py` defaults to the selected common archive rule
+fc=min(2fn,fs/6), causal order2/DC paired filtering. Outputs are under
+`audit/curve-processing/accepted-filter-study/capped-physical-fs6`; unchanged
+galleries are linked rather than copied. It cannot reverse pre-existing aliasing.
+Use final_archive_filter(raw paired histories), then one40%-peak initial-work
+slope and30/50%-window/cutoff/curvature quality checks. Do not filter twice.
+All64 native curves pass; the15 independent elastic controls remain within5%.
+`--action accepted-hex` verifies the1973-ID catalogue:1964 curve estimates and
+all9 specimens flagged before FE use their own verified elastic controls.
+The fallback policy was selected uniformly after holdout review, not by choosing
+only the3 larger errors. Neither action rewrites Props/MLdata or approved figures.
 `validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
 clamps and B21 bending/shear, computing the initial tangent from prescribed
 small travel and reaction, without a curve-fit interval. Four hex/kagome
@@ -520,9 +526,10 @@ periodic/full-ID1 controls are verified; these do not recalculate the population
 Measured short-job timings are10-11s UAT,7-16s CT and10-11s per three-step body
 tensor. Blanket population controls would take3-6days; they are not scheduled.
 Retain Appendix C quasi-isotropy for tri/kagome/hex and orthotropic FCC. No
-per-realisation homogenisation is selected. Nine short frozen-prediction UAT
-holdouts test the curve rule; they are not a population rerun or a replacement
-of curve estimates by FE values. The checklist owns integration and M state.
+per-realisation homogenisation is selected. Nine short holdouts completed;
+6 met5%,3 differed6.4-7.5%. All9 original flags use source-exact elastic controls
+in the accepted catalogue. No further hex stiffness runs; saved-property migration
+and the consistent conversion-M state remain on the checklist.
 `validation_completion.py --extract-finished --include-interrupted` reads the
 finished new jobs into a separate `new-validation/results` catalogue with native
 histories, initiation/damage evidence and pinned extraction hashes. A reviewed

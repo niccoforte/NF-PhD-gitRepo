@@ -25,17 +25,18 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   Modal actions prepare_periodic/prepare_iso cover population8 and selected
   ISO sources; iso_map joins verified frequencies. Use causal
   order2/DC Butterworth at2fn for matching disorder, no disordered modal jobs.
-  `validation_stiffness.py` filters archives at resolved2fn, otherwise explicitly
-  fs/6, order2/DC paired SOS. This adaptation cannot undo aliasing. Its40%-peak
-  work-equivalent slope checks30/50% windows, cutoff sensitivity and curvature;
-  return flags, never hide unresolved cases. MLdata migration is separate.
+  `validation_stiffness.py` defaults to fc=min(2fn,fs/6), order2/DC paired SOS;
+  it cannot undo aliasing. Use one40%-peak work slope,30/50% quality checks.
+  accepted_hex_stiffness retains1964 curves plus all9 preflagged elastic controls;
+  preserve source/selection evidence. Props/MLdata migration remains separate.
   `validation_fcc.py` compares total J on identical crack/opening intervals:
   independent potential-energy derivative versus prescribed ASTM eta prediction,
   with original-flow transfer and failed-prefix support recorded separately.
   `validation_controls.py` dense-event replay preserves source loading/model.
   `validation_omidi.py` owns actual snub-square CT and periodic beam-tensor
-  reproduction; gather verified serial deliveries before comparison. Published
-  CT/BL/experimental data and own FE remain distinct; no fitted normalisation.
+  diagnostics. CT pin failures and source/paper notch discrepancies remain
+  unqualified; do not choose the better-fit phase or submit held mesh/domain jobs.
+  Published CT/BL/fitted references remain distinct; no fitted normalisation.
 - `validation_failure_audit.py` binds each of the48 native tensile-strain
   initiation brackets to saved section damage and source fingerprints.
   `validation_controls.py` prepares/extracts exact-source B21 conversion and

@@ -44,12 +44,15 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Find a published in-domain orthotropic lattice benchmark: Omidi/St-Pierre
   2023 snub-square, lambda1,chi7.65/4.74/3.16, actualCTa/W=.25. Current
   Ortega factors differ3.51-6.75% from published TableC2 factors.
-- [ ] Finish3 running/queued actual snub-square CT reproductions and produce
-  the published-data overlays. All3 source-compatible beam-RVE tensors pass:
-  lambda~1,chi8.361/5.597/4.081, within Ortega's range. Published geometry,
-  polymer curve, local strain criterion and source-file hashes are recorded.
-  The source CT has H/W=.9167 rather than nominal1.2; retain this comparison
-  limit, published CT/BL/experiments and measured-vs-closed-form tensors.
+- [ ] Reconcile the external Omidi lattice benchmark before calling it validated.
+  All3 periodic beam tensors and all submitted CT/BL diagnostics are extracted.
+  PolymerCT20 failed atLE=.064 before.1 initiation;25/30 unsubmitted. ElasticCT
+  global stress is pin-controlled, rejected. Released-notch-phase109l BL gives
+  -4.1/-11.2/-19.3% against Table3's elastic fit; Fig2c-centred phase has larger
+  residuals despite the expected vertical critical bar. Do not choose the phase
+  that gives closer agreement. Source code/paper differences and corrected
+  angular branches are recorded. Prepared larger/refined checks are unsubmitted;
+  no further solver campaign until this discrepancy is understood.
 - [x] Retire square/45square from active Ortega validation: out-of-domain chi.
   Remove plot CLI/derived displays and replace notebook caller. Original source
   files and rejection receipts stay only pending final cleanup disposition.
@@ -68,24 +71,25 @@ This replaces accumulated superseded proposals; it is the single task register.
   Order2/DC is an explicit Abaqus-default reconstruction choice; the paper does
   not state the order. Moving averages and.4Nyquist forward/backward examples
   are diagnostics, not the selected primary method. Material events stay native.
-- [x] Implement archive filtering at physical2fn where resolvable; otherwise
-  explicit fs/6 adaptation, following Abaqus' antialiasing cutoff convention.
-  All64 sampled native UT/FT histories are filtered. Median roughness reduction
-  is76%UT/76%FT, maximum full-curve work change.162%UT/.960%FT. Dense FCC source
-  replay gives-.56% load/-1.64% work versus dense physical2fn, at a fixed native
-  material event. No claim to undo existing aliasing or reproduce missing data.
+- [x] Select one archive rule fc=min(2fn,fs/6), causal order2/DC paired filtering.
+  All64 sampled curves pass the common40%-peak stiffness-window checks. Versus
+  the previous conditional rule,10 fixed-material controls change at most.119%
+  load/KI and.828%work. Uniformfs/6 was tested but can raise slow-cutoff hex
+  initiation load8.6%; keep the modal upper limit. No aliasing-recovery claim.
+  New figures/metrics live in accepted-filter-study/capped-physical-fs6; reuse
+  seven unchanged galleries, replacing only the changed kagomeFT gallery.
 - [x] Implement one curve-derived initial-work slope through40% filtered peak,
   with30/50% windows, cutoff sensitivity and energy-curvature screens. All64
   sampled histories pass. Against4 UT controls errors-.33/+3.34%; against11
   FT controls-4.72/+1.94%. This estimates scalar specimen response, not C.
 - [x] Diagnose and repair the two-point guard: all1973 old hex UT estimates
   finite,1456 already-finite values and other properties unchanged. No reruns.
-- [ ] Complete9 frozen-prediction elastic holdouts for the new curve rule:
-  fullID21; mechanismIDs219,274,643,670,698,699,782,901. The rule gives1973 finite
-  values,1964 pass and9 have5.02-5.87% window spread. Keep curve predictions
-  distinct from controls; do not tune after seeing the holdout results. A hidden
-  task-owned controller launches them only after successful Omidi completion;
-  it refuses changed manifests and runs no simultaneous solver jobs.
+- [x] Complete9 source-exact elastic holdouts:6 within5%, full21 +7.47%,
+  mechanism698 -6.39%,699 -6.71%. All numerical/hash checks pass. The accepted
+  1973-ID catalogue retains1964 qualified curves and uses all9 preflagged elastic
+  controls uniformly, not just the3 larger errors. Flag membership was frozen
+  before FE; the fallback policy was selected after reviewing the holdouts.
+  Original predictions remain unchanged. No more hex stiffness simulations.
 - [ ] Resolve negative-area cases/finite-sampling limits during the production
   pilot; filtering alone is not a repair for an invalid initial-triangle area.
 - [ ] Recompute saved property columns and audit restored UT/FT pair membership
@@ -107,6 +111,10 @@ This replaces accumulated superseded proposals; it is the single task register.
   Preserve both failure records. No fitted eta is promoted or additional rerun
   selected. This verifies the adopted approximation, not an exact original-flow
   contour integral or a published FCC elastoplastic comparison.
+- [ ] If the manuscript claims independent FCC plastic-factor validation,
+  establish that separately: the completed total-J/potential approximation
+  supports the combined near-initiation calculation, not unique identification
+  of eta or the original-flow plastic term. Retain prescribed2.261 meanwhile.
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.

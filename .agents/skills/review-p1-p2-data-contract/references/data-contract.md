@@ -78,11 +78,11 @@ paired coordinates for physical properties. This migration remains deferred.
   crack-axis convention using sqrt(M_Bao/M_source) before K^2/M. Both moduli
   use the same reduced tensor; equal-axis outputs and data schemas are unchanged.
   Periodic modal maps bind original INP hashes and verified delivery receipts.
-  Matching disordered histories reuse the periodic2fn cutoff; no per-ID modes.
-  Paired causal filtering keeps native material-event indices fixed. Physical
-  2fn above saved Nyquist is not reconstructable. validation_stiffness explicitly
-  applies fs/6 archive adaptation there; it never claims solver-rate equivalence.
-  Its40%-peak initial-work slope returns window/cutoff/curvature quality evidence.
+  Matching disorder reuses periodic modes, with one archive cutoff min(2fn,fs/6).
+  Paired causal order2 filtering keeps native material-event indices fixed;
+  saved-history adaptation cannot undo aliasing or claim solver-rate equivalence.
+  Its40%-peak work slope returns30/50%-window/cutoff/curvature quality evidence.
+  Hex catalogue uses1964 curves and all9 preflagged verified elastic controls.
   Pass raw paired samples once. Shared calcUT/FT/Props and MLdata migration remain
   deferred until representative end-to-end replacement is verified.
   Selected validation CSVs/plots remain external audit products, not training

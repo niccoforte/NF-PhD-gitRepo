@@ -10,26 +10,31 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   with near-equal axial moduli. No per-ID homogenisation or blanket rerun queue.
   The two-point guard repair recovers517 later processing blanks from existing
   hex curves; it does not imply failed original simulations. Saved Props/MLdata
-  remain unchanged. A new curve-derived40%-peak initial-work rule gives finite
-  estimates for1973 hex specimens;1964 pass frozen sensitivity screens,9 require
-  short frozen-prediction elastic holdout checks, armed after Omidi. All64 sampled UT/FT
-  curves pass;15 existing exact-source elastic controls differ-4.72/+3.34%.
-  Filtering uses causal paired order2/DC2fn where saved sampling resolves it;
-  otherwise the explicit fs/6 archive adaptation denoises the stored response.
-  Dense FCC replay measures-.56% force/-1.64% work versus physical2fn filtering.
-  These are analysis outputs, not a completed shared-code/population migration.
-  The approved18-point validation figure recipe and all15 files remain frozen;
-  changing them needs explicit author approval. Forward numerical work is separate.
-  FCC fixed-opening, same-crack-interval total-J verification is completed within
-  the potential-material approximation, retaining ASTM eta2.261 without fitting.
-  Original-flow equivalent-K residuals are4.02-4.68% at99.871% of the resolved
-  initiation opening. The potential reference is not a published FCC benchmark
-  or an exact original-flow J; material-transfer and support limits remain explicit.
-  Actual Omidi snub-square reproduction is running serially on8CPUs/job. Its3
-  periodic beam tensors pass QA,lambda~1,chi8.361/5.597/4.081;3 CT fracture jobs
-  use the published polymer response and source geometry at20/25/30% density.
-  At12November03:08UTC the first CT run was active, remaining2queued; early
-  pacing suggests3-5h/case, not a completion promise. No simultaneous solver jobs.
+  remain unchanged. The accepted scalar-stiffness catalogue has1973 hex specimens:
+  1964 qualified curve-work estimates and all9 preflagged source-exact elastic
+  controls. The9 holdouts completed:6 within5%,3 differ6.4-7.5%. Flag membership
+  was frozen before FE; the uniform fallback policy was chosen after review.
+  No additional hex stiffness runs are needed. Filtering now uses one archive
+  rule fc=min(2fn,fs/6), causal paired order2/DC; one40%-peak work interval and
+  30/50% quality checks. All64 sampled curves pass,15 elastic controls within5%;
+  10 matched initiation controls change at most.119%load/KI,.828%work from the
+  preceding conditional filter. This is not aliasing reversal or Hsieh's exact
+  solver-rate filter. Shared producer/Props/MLdata migration remains outstanding.
+  The approved18-point recipe/all15 final files remain unchanged and frozen.
+  FCC same-interval total-J verification supports the examined ordered geometry
+  with prescribed eta2.261: original-flow equivalent-K residual4.02-4.68% near
+  initiation. It does not identify eta independently or validate arbitrary
+  orthotropic plasticity; potential-law/material/local-unloading limits remain.
+  Omidi reproduction is NOT qualified as external lattice validation. The
+  polymer20% CT failed before initiation;25/30% were not submitted. Three elastic
+  CT checks are pin-controlled. Three109l/10B21-per-bar boundary-layer cases with
+  the released source notch phase differ-4.1/-11.2/-19.3% from Table3's fitted
+  law. The separately rendered Fig2c-centred notch changes the critical bar to
+  vertical but increases residuals substantially. Preserve both configurations,
+  angular-branch correction and full numerical QA; do not select a better-fit
+  phase or label global pin failure as crack toughness. Larger prepared mesh/
+  domain checks remain unsubmitted until the source discrepancy is reconciled.
+  All submitted solvers are settled; no simulations are currently running.
   OriginalIDs1-1000 remain the population scope; no ML migration/training or
   manuscript edits have occurred. Remaining sequence is shared-method integration,
   mesh-before-UAT/FTPSC, Al triangular benchmark check, full population replacement,

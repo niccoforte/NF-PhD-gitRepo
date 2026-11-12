@@ -32,6 +32,13 @@ instructions. Refresh them before the final review.
 - [ ] Review FCC initial-event and continuation deliveries, dense-event exports,
   same-interval verification and old subtraction-sensitivity outputs. Preserve
   partial support/failure provenance and the chosen final method, not every plot.
+- [ ] Retain the accepted hex stiffness catalogue and nine source-exact controls;
+  reconcile it with saved Props in the population pass. Retire superseded filter
+  galleries/conditional CLI routes after the selected capped rule is integrated.
+- [ ] Review abandoned Omidi polymer/pin-controlled CT attempts, ring-rotation
+  diagnostic, original angular-branch inputs (unsubmitted), released-notch-phase
+  controls and unsubmitted refinement/domain plans. Keep only essential rejection
+  evidence plus the accepted Figure2c-phase benchmark and its numerical checks.
 - [ ] Retain original research INP/ODB/transfer data and useful new simulations.
   Review auxiliary ODBs, logs, prepared-but-unused decks and retry lineages separately.
 - [ ] Review `Z:/p1/sims/Ti/Validation/audit/fcc-calibration/tensor`, which was
