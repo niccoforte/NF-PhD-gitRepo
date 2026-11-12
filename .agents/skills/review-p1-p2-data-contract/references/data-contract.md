@@ -81,6 +81,8 @@ paired coordinates for physical properties. This migration remains deferred.
   Matching disorder reuses periodic modes, with one archive cutoff min(2fn,fs/6).
   Paired causal order2 filtering keeps native material-event indices fixed;
   saved-history adaptation cannot undo aliasing or claim solver-rate equivalence.
+  This remains a candidate envelope pending exact-source dense/in-solver replay
+  qualification; before-save antialiasing and post-save smoothing are distinct.
   Its40%-peak work slope returns30/50%-window/cutoff/curvature quality evidence.
   Hex catalogue uses1964 curves and all9 preflagged verified elastic controls.
   Pass raw paired samples once. Shared calcUT/FT/Props and MLdata migration remain

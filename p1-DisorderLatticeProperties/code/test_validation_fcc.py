@@ -14,6 +14,52 @@ from validation_diagnostics import blocks, key, rows, sha
 
 
 class FCCFeasibilityTests(unittest.TestCase):
+    def test_whole_model_work_rejects_malformed_history_rank(self):
+        from validation_fcc import whole_model_work_at_times
+        time = np.array([0., 1.])
+        for malformed in ([0., 1.], [], [[[]]], 0.):
+            with self.subTest(history=malformed):
+                with self.assertRaisesRegex(ValueError, 'Whole-model work'):
+                    whole_model_work_at_times(malformed, time)
+        np.testing.assert_allclose(
+            whole_model_work_at_times([[0., 0.], [2., 10.]], time), [0., 5.])
+
+    def test_eta_calibration_uses_only_declared_training_interval_and_window(self):
+        import copy
+        from validation_fcc import fit_constant_interval_eta
+        opening = np.linspace(0., 1., 21)
+        q = opening**2
+        elastic = 10*q
+        reference = elastic+np.where(opening < .8, 99., 2.)*q
+        def row(name, ref):
+            return dict(interval=name, finite_work_release_N_mm=ref.tolist(),
+                        predicted_elastic_J_N_mm=elastic.tolist(), unit_plastic_factor_N_mm=q.tolist(),
+                        predicted_total_J_N_mm=(elastic+2.261*q).tolist(),
+                        eligible_nonnegative_Apl=[True]*len(q))
+        rows = [row('first_cell', reference), row('second_cell', elastic+3*q),
+                row('two_cells', elastic+2.5*q)]
+        fitted = fit_constant_interval_eta(opening, rows)
+        self.assertAlmostEqual(fitted['eta'], 2.)
+        altered = copy.deepcopy(rows)
+        altered[1]['finite_work_release_N_mm'] = (elastic+80*q).tolist()
+        altered[0]['finite_work_release_N_mm'][:16] = (elastic[:16]+300*q[:16]).tolist()
+        other = fit_constant_interval_eta(opening, altered)
+        self.assertEqual(fitted['eta'], other['eta'])
+        self.assertNotEqual(fitted['intervals'][1]['final_fitted_K_error_percent'],
+                            other['intervals'][1]['final_fitted_K_error_percent'])
+        self.assertEqual(fitted['training_interval'], 'first_cell')
+        self.assertEqual(fitted['intervals'][1]['role'], 'held_out_crack_interval')
+        self.assertEqual(fitted['intervals'][2]['role'], 'overlapping_interval_diagnostic')
+
+    def test_eta_calibration_rejects_unresolved_training_data(self):
+        from validation_fcc import fit_constant_interval_eta
+        opening = np.linspace(0., 1., 11)
+        row = dict(interval='first_cell', finite_work_release_N_mm=[1.]*11,
+                   predicted_elastic_J_N_mm=[.5]*11, unit_plastic_factor_N_mm=[0.]*11,
+                   predicted_total_J_N_mm=[1.]*11, eligible_nonnegative_Apl=[True]*11)
+        with self.assertRaisesRegex(ValueError, 'positive plastic factor'):
+            fit_constant_interval_eta(opening, [row])
+
     def test_complete_strut_and_half_open_tip(self):
         # Two vertical subdivided struts; only x=0 is removed for [0,10).
         nodes = {1: [0., -1.], 2: [0., 0.], 3: [0., 1.],

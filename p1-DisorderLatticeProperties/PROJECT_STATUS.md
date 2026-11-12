@@ -14,17 +14,38 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   1964 qualified curve-work estimates and all9 preflagged source-exact elastic
   controls. The9 holdouts completed:6 within5%,3 differ6.4-7.5%. Flag membership
   was frozen before FE; the uniform fallback policy was chosen after review.
-  No additional hex stiffness runs are needed. Filtering now uses one archive
-  rule fc=min(2fn,fs/6), causal paired order2/DC; one40%-peak work interval and
+  No additional hex stiffness runs are needed. Filtering implements a candidate
+  archive rule fc=min(2fn,fs/6), causal paired order2/DC; one40%-peak work interval and
   30/50% quality checks. All64 sampled curves pass,15 elastic controls within5%;
   10 matched initiation controls change at most.119%load/KI,.828%work from the
   preceding conditional filter. This is not aliasing reversal or Hsieh's exact
-  solver-rate filter. Shared producer/Props/MLdata migration remains outstanding.
+  solver-rate filter. Bhuwal2021/2023 do not state a cutoff, while Omidi used
+  implicit FE. Dense FCC shows aliasing risk and lower cutoffs change event
+  work; the candidate is not yet qualified as a quasistatic envelope. Two exact
+  full-ID336 hex output-only replays were submitted serially, FT thenUT,
+  8CPUs/job under audit/curve-processing/output-filter-replays. They preserve
+  source physics and full loading, with100kHz raw histories/four in-solver
+  filters. Inspect actual state/delivery/channel identities before any result
+  claim. Single-precision FT failed after its recorded prefix; named filters
+  already disagree prefracture and the launcher warns of low cutoff/increment-
+  rate instability. UT was intentionally stopped after >50ms when postfracture
+  increments collapsed. Its dead-worker review retained delivery/failed status
+  and settled the owner; no implicit completion. A byte-identical FT precision
+  control is submitted under double-precision with double=both,8CPUs; inspect
+  live state before reporting results. Coarse all-model LE/energy startup probes
+  are diagnostics, not qualified events. Dense causal100/50Hz changes at a
+  fixed event include endpoint delay, not solely force-opening shape distortion.
+  Shared producer/Props/MLdata migration remains outstanding.
   The approved18-point recipe/all15 final files remain unchanged and frozen.
   FCC same-interval total-J verification supports the examined ordered geometry
   with prescribed eta2.261: original-flow equivalent-K residual4.02-4.68% near
-  initiation. It does not identify eta independently or validate arbitrary
-  orthotropic plasticity; potential-law/material/local-unloading limits remain.
+  initiation. A conditional potential-reference late-window fit eta1.804787
+  (-20.18%ASTM) gives held-out90-100mm errors <=1.972%K potential/2.576%K
+  original-flow transfer. It is not promoted: neither result independently
+  qualifies original-flow eta; potential/material/elastic residuals and the
+  shared90mm control remain. A published original-flow long-strip J=H*W_far
+  route is identified, requiring CT/strip constraint/local-field checks and
+  holdout geometry before coefficient transfer. No new FCC campaign submitted.
   Omidi reproduction is NOT qualified as external lattice validation. The
   polymer20% CT failed before initiation;25/30% were not submitted. Three elastic
   CT checks are pin-controlled. Three109l/10B21-per-bar boundary-layer cases with
@@ -34,7 +55,10 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   angular-branch correction and full numerical QA; do not select a better-fit
   phase or label global pin failure as crack toughness. Larger prepared mesh/
   domain checks remain unsubmitted until the source discrepancy is reconciled.
-  All submitted solvers are settled; no simulations are currently running.
+  All submitted Omidi solvers are settled; no further Omidi job is selected.
+  The shared GUI inspection index maps actual retained INPs/ODBs, with source
+  reference values/navigation in the single report. Nine flagged raw/filtered
+  hex curves show that all flags arose only from >5% window spread.
   OriginalIDs1-1000 remain the population scope; no ML migration/training or
   manuscript edits have occurred. Remaining sequence is shared-method integration,
   mesh-before-UAT/FTPSC, Al triangular benchmark check, full population replacement,

@@ -254,10 +254,46 @@ def run(root=ROOT, repo=REPO, temp=TEMP):
     print(json.dumps(summary, indent=2))
 
 
+def inspection_index(root=ROOT):
+    """Index actual delivered GUI files; never generate model copies or open CAE."""
+    audit=Path(root)/"audit"
+    groups=[("Omidi periodic material",audit/"omidi/tensor", "*/result.json"),
+            ("Omidi polymer CT: failed prefix",audit/"omidi", "omidi_ss_r*/result.json"),
+            ("Omidi elastic CT: pin-controlled",audit/"omidi/elastic", "omidi_el_r*/result.json"),
+            ("Omidi released-notch BL: unqualified",audit/"omidi/boundary-layer/corrected", "omidi_blK_*/result.json"),
+            ("Omidi Figure2c-notch BL: unqualified",audit/"omidi/boundary-layer/journal-phase", "omidi_journal_*/result.json"),
+            ("FCC initial elastic CT",audit/"fcc-calibration", "fcc_el_a*/result.json"),
+            ("FCC nonlinear stationary CT",audit/"fcc-calibration/initial-event", "fcc_event_*/result.json")]
+    rows=[]
+    for group,folder,pattern in groups:
+        for source in sorted(folder.glob(pattern)):
+            data=json.loads(source.read_text())
+            inp=Path(data["input"]);odb=Path(data.get("odb") or data["source_odb"])
+            if not inp.is_file() or not odb.is_file():raise ValueError("GUI file missing: "+str(source))
+            rows.append(dict(group=group,job=data["job"],state=data["state"],
+                             density=data.get("relative_density",data.get("nominal_relative_density","")),
+                             a_mm=data.get("a_mm",""),W_mm=data.get("W_mm",""),B_mm=data.get("B_mm",""),
+                             input_to_import=str(inp),odb_to_open=str(odb),
+                             result_metadata=str(source),result_metadata_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
+                             input_sha256_at_extraction=data["input_sha256"],
+                             odb_sha256_at_extraction=data.get("odb_sha256",data.get("source_odb_sha256","")),
+                             original_source_inp=data.get("source_inp","")))
+    if not rows:raise ValueError("No actual delivered models found")
+    destination=audit/"shared/abaqus-inspection-index.csv"
+    with destination.open("w",newline="",encoding="utf-8")as stream:
+        writer=csv.DictWriter(stream,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
+    (destination.with_suffix(".json")).write_text(json.dumps(dict(
+        generated_UTC=datetime.now(timezone.utc).isoformat(),records=rows,all_files_exist=True,
+        model_copies_created=False,hash_scope="Metadata freshly hashed; model/ODB hashes identify the read-only extraction, not a fresh full-ODB hash pass"),indent=2)+"\n")
+    return destination
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--repo", type=Path, default=REPO)
     parser.add_argument("--temp", type=Path, default=TEMP)
+    parser.add_argument("--inspection-index",action="store_true",help="Index actual delivered Abaqus GUI inputs/results only")
     args = parser.parse_args()
-    run(args.root, args.repo, args.temp)
+    if args.inspection_index:print(inspection_index(args.root))
+    else:run(args.root, args.repo, args.temp)

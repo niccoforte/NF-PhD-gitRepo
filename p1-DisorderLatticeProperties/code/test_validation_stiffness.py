@@ -11,6 +11,23 @@ import validation_stiffness as stiffness
 
 
 class InitialWorkStiffnessTests(unittest.TestCase):
+    def test_flagged_curve_description_preserves_preflag_and_independent_error(self):
+        record={'design':'full','id':21,'path':'fixture.csv','source_sha256':'source',
+                'stiffness':{'flags':['window_sensitive_over5percent'],'quality':'review_required',
+                    'estimate':1500.,'window_relative_spread':.054,'cutoff_relative_spread':.012,
+                    'energy_fit_residual':.02,'samples':8,
+                    'windows':{str(f):{'estimate':v,'end_index':i}for f,v,i in((.3,1581.,5),(.4,1500.,7),(.5,1470.,9))}}}
+        prediction={'design':'full','id':21,'frozen_curve_estimate_MPa':1500.}
+        control={'design':'full','id':21,'elastic_control_E_apparent_MPa':1520.,
+                 'relative_error_percent':100*(1500/1520-1),'within_five_percent':True}
+        result=stiffness.flagged_curve_summary(record,prediction,control,333.3333)
+        self.assertEqual(result['reason'],'30/40/50% window spread exceeds preselected5% screen')
+        self.assertTrue(result['curve_vs_FE_within5percent'])
+        self.assertEqual(result['window_spread_percent'],5.4)
+        self.assertFalse(result['flag_means_missing_value_or_failed_simulation'])
+        prediction['frozen_curve_estimate_MPa']=1499.
+        with self.assertRaises(ValueError):stiffness.flagged_curve_summary(record,prediction,control,333.3333)
+
     def setUp(self):
         self.time = np.linspace(0., .1, 201)
         self.x = np.linspace(0., .01, 201)

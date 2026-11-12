@@ -979,6 +979,395 @@ def gather(root, out):
     print("Available exact-source conversion controls:", len(combined))
 
 
+def output_filter_replay_contents(text, task, physical_cutoff_Hz,
+                                  field_interval=.0005, raw_interval=.00001,
+                                  saved_interval=.0005):
+    """Replace only output requests; retain the full source Explicit loading.
+
+    Named filters run before output decimation. A physical cutoff above saved
+    Nyquist is valid here because the filter samples the solver increments.
+    Material strain/damage/STATUS fields always remain unfiltered.
+    """
+    if task not in ("FT", "UT") or not math.isfinite(physical_cutoff_Hz) or physical_cutoff_Hz <= 0:
+        raise ValueError("FT/UT and a positive periodic physical cutoff are required")
+    if not (0 < raw_interval <= saved_interval and 0 < field_interval):
+        raise ValueError("Positive dense/raw and saved output intervals required")
+    parsed = blocks(text)
+    if (sum(key(b) == "*step" for b in parsed) != 1
+            or sum(key(b) == "*end step" for b in parsed) != 1
+            or any(key(b) in ("*include", "*filter") for b in parsed)
+            or any(key(b) == "*output" and "filter=" in b.splitlines()[0].replace(" ", "").lower()
+                   for b in parsed)):
+        raise ValueError("One self-contained, previously unfiltered source step is required")
+    split = next(i for i, b in enumerate(parsed) if key(b) == "*step")
+    model, step = parsed[:split], parsed[split:]
+    dynamics = [b for b in step if key(b) == "*dynamic"]
+    if len(dynamics) != 1 or "explicit" not in dynamics[0].splitlines()[0].lower():
+        raise ValueError("One original Explicit dynamic step is required")
+    period = float(rows(dynamics[0])[0].split(",")[1])
+    if not 0 < max(field_interval, saved_interval) <= period:
+        raise ValueError("Output intervals must resolve the complete original step")
+    grip = "load" if task == "FT" else "Set-top"
+    if not any(key(b) == "*nset" and re.search(r"nset\s*=\s*"+grip+r"\s*(?:,|$)",
+                   b.splitlines()[0], flags=re.I) for b in model):
+        raise ValueError("Original grip node set is missing")
+    outputs = {"*output", "*node output", "*element output", "*energy output"}
+    kept = [b for b in step if key(b) not in outputs and key(b) != "*end step"]
+    ending = next(b for b in step if key(b) == "*end step")
+    cutoffs = {"PHYSICAL2FN": float(physical_cutoff_Hz),
+               "SELECTED": min(float(physical_cutoff_Hz), 1/(6*saved_interval)),
+               "ENVELOPE100": 100., "ENVELOPE50": 50.}
+    filters = {name: {"cutoff_Hz": cutoff, "order": 2, "startup": "DC"}
+               for name, cutoff in cutoffs.items()}
+    definitions = "".join("*Filter, name=%s, type=BUTTERWORTH, start condition=DC\n%.12g, 2\n"
+                          % (name, cutoff) for name, cutoff in cutoffs.items())
+    requested = ("*Output, field, time interval=%.12g\n*Node Output\nU, RF\n"
+                 "*Element Output, directions=YES\nLE, S, PEEQ, SDEG, STATUS\n"
+                 "*Output, history, time interval=%.12g\n*Energy Output\n"
+                 "ALLIE, ALLKE, ALLSE, ALLWK, ALLAE, ALLVD, ALLPD, ALLFD, ALLDMD, ETOTAL\n"
+                 "*Output, history, time interval=%.12g\n*Node Output, nset=%s\nU2, RF2\n"
+                 % (field_interval, saved_interval, raw_interval, grip))
+    requested += "".join("*Output, history, filter=%s, time interval=%.12g\n"
+                         "*Node Output, nset=%s\nU2, RF2\n" % (name, saved_interval, grip)
+                         for name in filters)
+    contents = "".join(model)+definitions+"".join(kept)+requested+ending
+    physics = "".join(model+kept+[ending])
+    return contents, {"source_period_s": period, "replay_period_s": period,
+                      "grip_nset": grip, "filters": filters,
+                      "field_interval_s": field_interval, "raw_history_interval_s": raw_interval,
+                      "filtered_history_interval_s": saved_interval,
+                      "physics_without_output_sha256": hashlib.sha256(physics.encode("ascii")).hexdigest(),
+                      "model_prefix_sha256": hashlib.sha256("".join(model).encode("ascii")).hexdigest(),
+                      "source_physics_and_full_loading_retained": True,
+                      "events_filtered": False}
+
+
+def prepare_output_filter_replays(root, out):
+    """Prepare the two reviewed hex ID336 output-only replays, FT then UT.
+
+    Preparation never submits or accepts a failed prefix. The queue can retain
+    solver-failure evidence and continue, while failed job status stays failed.
+    """
+    root, out = Path(root).resolve(), Path(out).resolve()
+    index = root/"audit/curve-processing/paired-examples/native-index.json"
+    selected = [r for r in json.loads(index.read_text())
+                if r["topology"] == "hex" and r["design"] == "full" and r["id"] == 336]
+    registry_path = root/"audit/curve-processing/periodic-cutoffs.json"
+    frequencies = ({r["task"]: r for r in json.loads(registry_path.read_text())["families"]
+                    if r["topology"] == "hex"} if registry_path.exists() else {})
+    targets, records, jobs = {}, [], []
+    for task, cutoff in (("FT", 318.16), ("UT", 1836.34)):
+        matches = [r for r in selected if r["task"] == task]
+        if len(matches) != 1:
+            raise ValueError("Exactly one reviewed full-disorder hex ID336 source per task is required")
+        row = matches[0]
+        source, odb = Path(row["source_inp"]).resolve(), Path(row["source_odb"]).resolve()
+        if sha(source) != row["source_inp_sha256"]:
+            raise ValueError("Reviewed source input changed")
+        if task in frequencies:
+            control = frequencies[task]
+            if control["status"] != "accepted_physical_mode" or not math.isclose(
+                    2*control["natural_frequency_Hz"], cutoff, rel_tol=1e-10):
+                raise ValueError("Hex periodic physical frequency differs from the reviewed replay")
+        contents, info = output_filter_replay_contents(source.read_text(encoding="ascii"), task, cutoff)
+        name = "of_hex336_"+task.lower()
+        directory = job_directory(out, name)
+        inp = directory/(name+".inp")
+        digest = hashlib.sha256(contents.encode("ascii")).hexdigest()
+        meta = {"job": name, "input": str(inp), "input_sha256": digest,
+                "task": task, "topology": "hex", "design": "full", "id": 336,
+                "source_job": source.stem, "source_inp": str(source),
+                "source_sha256": row["source_inp_sha256"], "source_odb": str(odb),
+                "source_odb_sha256": sha(odb), "selection_index": str(index),
+                "selection_index_sha256": sha(index),
+                "periodic_registry_sha256": sha(registry_path) if frequencies else None,
+                "analysis": "source_Explicit_output_filter_replay", "state": "prepared_not_submitted",
+                "unchanged": "Original mesh, material, damage, clamps/pins, amplitude, loading rate and full step duration",
+                "changes": "Output requests only: unfiltered dense U/RF, native fields/whole energies and named in-solver filters",
+                "failure_handling": "Failed status remains failed; no automatic usable-prefix acceptance",
+                "history_identity_check_required": "Verify raw U2/RF2 and all four named filtered U2/RF2 channels per original grip node",
+                **info}
+        targets[inp] = contents.encode("ascii")
+        targets[directory/"source.json"] = (json.dumps(meta, indent=2, allow_nan=False)+"\n").encode("utf-8")
+        records.append(meta)
+        jobs.append({"job": name, "input": str(inp), "input_sha256": digest, "cpus": 8,
+                     "allow_solver_failure": True, "required_outputs": [".odb", ".dat", ".sta"],
+                     "purpose": "Output-filter qualification on unchanged full-duration source; failed prefixes need separate review"})
+    manifest = {"abaqus": "C:/SIMULIA/Commands/abaqus.bat", "queue_root": str(out/"queue"), "jobs": jobs}
+    manifest_path = out/"manifest.json"
+    targets[manifest_path] = (json.dumps(manifest, indent=2)+"\n").encode("utf-8")
+    for path, data in targets.items():
+        if path.exists() and path.read_bytes() != data:
+            raise ValueError("Prepared output-filter replay is immutable: "+str(path))
+    for path, data in targets.items():
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+    return {"manifest": str(manifest_path), "prepared_jobs": [r["job"] for r in records],
+            "source_unchanged": True, "submission_performed": False}
+
+
+def prepare_output_filter_precision_replay(parent, out, name="of_hex336_ft_dp"):
+    """Copy the exact FT replay input; change execution precision only."""
+    parent, out = Path(parent).resolve(), Path(out).resolve()
+    parent_path = parent/"source.json"
+    original = json.loads(parent_path.read_text())
+    if original["task"] != "FT":
+        raise ValueError("The reviewed precision follow-up is FT only")
+    for path, digest in ((original["input"], original["input_sha256"]),
+                         (original["source_inp"], original["source_sha256"]),
+                         (original["source_odb"], original["source_odb_sha256"])):
+        if sha(path) != digest:
+            raise ValueError("Precision replay parent/source bytes changed")
+    contents = Path(original["input"]).read_bytes()
+    directory = job_directory(out, name)
+    inp = directory/(name+".inp")
+    options = ["double=both", "output_precision=full"]
+    meta = {**original, "job": name, "input": str(inp), "state": "prepared_not_submitted",
+            "parent_job": original["job"], "parent_input": original["input"],
+            "parent_input_sha256": original["input_sha256"], "parent_source_json": str(parent_path),
+            "parent_source_json_sha256": sha(parent_path), "execution_options": options,
+            "precision_comparison": "Identical input bytes and original full loading; execution precision only"}
+    if (parent/"extraction.json").exists():
+        meta.update(parent_extraction=str(parent/"extraction.json"),
+                    parent_extraction_sha256=sha(parent/"extraction.json"))
+    manifest = {"abaqus": "C:/SIMULIA/Commands/abaqus.bat", "queue_root": str(out/"queue"),
+                "jobs": [{"job": name, "input": str(inp), "input_sha256": original["input_sha256"],
+                          "cpus": 8, "execution_options": options, "allow_solver_failure": True,
+                          "required_outputs": [".odb", ".dat", ".sta"],
+                          "purpose": "Isolate execution precision for named-filter discrepancy; same full-duration FT source"}]}
+    targets = {inp: contents, directory/"source.json": (json.dumps(meta, indent=2)+"\n").encode(),
+               out/"manifest.json": (json.dumps(manifest, indent=2)+"\n").encode()}
+    for path, data in targets.items():
+        if path.exists() and path.read_bytes() != data:
+            raise ValueError("Prepared precision replay is immutable: "+str(path))
+    for path, data in targets.items():
+        if not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+    return {"manifest": str(out/"manifest.json"), "job": name,
+            "input_bytes_identical_to_parent": True, "submission_performed": False}
+
+
+def output_filter_history_data(odb, meta, include_filters=True):
+    """Verify each original grip node/channel and aggregate paired native units."""
+    step = odb.steps["Step-1"]
+    groups = {"RAW": ""}
+    if include_filters:
+        groups.update({name: "_"+name for name in meta["filters"]})
+    node_set = odb.rootAssembly.nodeSets[meta["grip_nset"].upper()]
+    labels = sorted(node.label for group in node_set.nodes for node in group)
+    if not labels or len(labels) != len(set(labels)) or (meta["task"] == "FT" and len(labels) != 1):
+        raise ValueError("Original grip node identities are invalid")
+    instance = "ASSEMBLY" if meta["task"] == "FT" else "PART-1-1"
+    collected, ledger = {name: [] for name in groups}, []
+    for label in labels:
+        region_name = "Node %s.%d" % (instance, label)
+        if region_name not in step.historyRegions:
+            raise ValueError("Original grip node history missing: "+region_name)
+        history = step.historyRegions[region_name].historyOutputs
+        node_proof = {"region": region_name, "node": label, "channels": {}}
+        for name, suffix in groups.items():
+            channels = [variable+suffix for variable in ("U2", "RF2")]
+            if any(channel not in history for channel in channels):
+                raise ValueError("Required raw/filtered channel missing at "+region_name+": "+repr(channels))
+            pairs = [np.asarray(history[channel].data, dtype=float) for channel in channels]
+            for values in pairs:
+                if (values.ndim != 2 or values.shape[1] != 2 or len(values) < 2
+                        or not np.isfinite(values).all() or np.any(np.diff(values[:, 0]) <= 0)):
+                    raise ValueError("Need finite strictly increasing paired history observations")
+            if not np.array_equal(pairs[0][:, 0], pairs[1][:, 0]):
+                raise ValueError("U2/RF2 output times are not aligned")
+            interval = meta["raw_history_interval_s"] if name == "RAW" else meta["filtered_history_interval_s"]
+            if not include_filters:
+                interval = float(np.median(np.diff(pairs[0][:, 0])))
+            if pairs[0][0, 0] != 0 or np.max(np.diff(pairs[0][:, 0])) > 1.5*interval:
+                raise ValueError("Native history starts late or contains an output gap")
+            collected[name].append(np.column_stack((pairs[0][:, 0], pairs[0][:, 1], pairs[1][:, 1])))
+            node_proof["channels"][name] = channels
+        ledger.append(node_proof)
+    data = {}
+    for name, arrays in collected.items():
+        if any(not np.array_equal(a[:, 0], arrays[0][:, 0]) for a in arrays[1:]):
+            raise ValueError("Grip-node output times are not aligned")
+        data[name] = np.column_stack((arrays[0][:, 0], np.mean([a[:, 1] for a in arrays], axis=0),
+                                     np.sum([a[:, 2] for a in arrays], axis=0)))
+    filtered = [a[:, 0] for name, a in data.items() if name != "RAW"]
+    if filtered and any(not np.array_equal(t, filtered[0]) for t in filtered[1:]):
+        raise ValueError("Named filtered output times are not aligned")
+    return data, ledger
+
+
+def output_filter_replay_delivery(meta, state, queue):
+    """Verify retained bytes without converting a failed solver into completion."""
+    if state["status"] not in ("completed", "failed"):
+        raise ValueError("Only settled retained deliveries may be extracted")
+    for path, expected in ((meta["source_inp"], meta["source_sha256"]),
+                           (meta["source_odb"], meta["source_odb_sha256"]),
+                           (meta["input"], meta["input_sha256"])):
+        if sha(path) != expected:
+            raise ValueError("Replay source/prepared input changed")
+    run = job_directory(Path(queue)/"runs", meta["job"])
+    receipt_path = run/"delivery.json"
+    receipt = json.loads(receipt_path.read_text())
+    if receipt["job"] != meta["job"] or receipt.get("required_outputs_missing"):
+        raise ValueError("Incomplete output-filter delivery")
+    entries = {r["file"]: r for r in receipt["files"]}
+    if any(meta["job"]+suffix not in entries for suffix in (".inp", ".odb", ".dat", ".sta")):
+        raise ValueError("Required output-filter delivery file missing")
+    for filename, record in entries.items():
+        target = (run/filename).resolve()
+        if target.parent != run or sha(target) != record["sha256"]:
+            raise ValueError("Retained delivery differs from its receipt")
+    if entries[meta["job"]+".inp"]["sha256"] != meta["input_sha256"]:
+        raise ValueError("Retained delivery input differs from prepared model")
+    if state["status"] == "completed":
+        launcher = (run/"launcher.txt").read_text(errors="replace")
+        if state.get("solver_returncode") != 0 or not re.search(
+                r"Abaqus\s+JOB\s+"+re.escape(meta["job"])+r"\s+COMPLETED", launcher, re.I):
+            raise ValueError("Completed queue status lacks solver completion evidence")
+    return {"solver_status": state["status"], "solver_returncode": state.get("solver_returncode"),
+            "prefix_qualified": False, "delivery": str(receipt_path),
+            "delivery_sha256": sha(receipt_path), "odb": str(run/(meta["job"]+".odb")),
+            "odb_sha256": entries[meta["job"]+".odb"]["sha256"]}
+
+
+def gather_output_filter_replays(out, queue):
+    """Extract complete channel evidence from settled jobs; never qualify a prefix."""
+    from odbAccess import openOdb
+    from validation_failure_audit import maximum
+    out, queue = Path(out).resolve(), Path(queue).resolve()
+    manifest_path = out/"manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    state = json.loads((queue/"state.json").read_text())
+    if state.get("manifest_sha256") != sha(manifest_path):
+        raise ValueError("Output-filter queue differs from the immutable manifest")
+    statuses = {r["job"]: r for r in state["jobs"]}
+    results, pending = [], []
+
+    def curve_metrics(values):
+        return {"samples": len(values), "last_time_s": float(values[-1, 0]),
+                "force_N": float(values[-1, 2]), "opening_mm": float(values[-1, 1]),
+                "work_Nmm": float(np.trapz(values[:, 2], values[:, 1])),
+                "peak_force_N": float(np.max(values[:, 2])),
+                "min_opening_mm": float(np.min(values[:, 1])), "max_opening_mm": float(np.max(values[:, 1]))}
+
+    def csv_array(path, headings, values):
+        with path.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.writer(stream); writer.writerow(headings); writer.writerows(values)
+        return {"path": str(path), "sha256": sha(path)}
+
+    for job in manifest["jobs"]:
+        if statuses[job["job"]]["status"] not in ("completed", "failed"):
+            pending.append({"job": job["job"], "solver_status": statuses[job["job"]]["status"]})
+            continue
+        directory = job_directory(out, job["job"])
+        meta = json.loads((directory/"source.json").read_text())
+        if meta["input_sha256"] != job["input_sha256"]:
+            raise ValueError("Prepared replay identity differs from immutable manifest")
+        proof = output_filter_replay_delivery(meta, statuses[job["job"]], queue)
+        odb = openOdb(proof["odb"], readOnly=True)
+        fields, energy, event = [], {}, None
+        try:
+            data, node_ledger = output_filter_history_data(odb, meta)
+            step = odb.steps["Step-1"]
+            wanted = ("ALLIE", "ALLKE", "ALLSE", "ALLWK", "ALLAE", "ALLVD", "ALLPD", "ALLFD", "ALLDMD", "ETOTAL")
+            regions = [r for r in step.historyRegions.values() if all(k in r.historyOutputs for k in wanted)]
+            if len(regions) != 1:
+                raise ValueError("One whole-model energy history is required")
+            for name in wanted:
+                values = np.asarray(regions[0].historyOutputs[name].data, dtype=float)
+                if (values.ndim != 2 or len(values) < 2 or not np.isfinite(values).all()
+                        or np.any(np.diff(values[:, 0]) <= 0)):
+                    raise ValueError("Invalid native energy observations")
+                energy[name] = values
+            et = energy[wanted[0]][:, 0]
+            if any(not np.array_equal(v[:, 0], et) for v in energy.values()):
+                raise ValueError("Native energy channels are not time aligned")
+            if not np.array_equal(et, data["SELECTED"][:, 0]):
+                raise ValueError("Energy and saved filtered histories are not time aligned")
+            for index, frame in enumerate(step.frames):
+                required = {"LE", "S", "PEEQ", "SDEG", "STATUS", "U", "RF"}
+                if not required.issubset(frame.fieldOutputs.keys()):
+                    raise ValueError("Native strain/damage/nodal field output missing")
+                le = frame.fieldOutputs["LE"]
+                top = maximum(le, list(le.componentLabels).index("LE11"))
+                row = {"field_index": index, "time_s": float(frame.frameValue),
+                       "max_LE11": top["value"] if top else None, "critical_point": top}
+                for variable in ("SDEG", "STATUS", "PEEQ"):
+                    arrays = [np.asarray(b.data, dtype=float).ravel() for b in frame.fieldOutputs[variable].bulkDataBlocks]
+                    values = np.concatenate(arrays)
+                    finite = values[np.isfinite(values)]
+                    row[variable+"_nonfinite_values"] = int(len(values)-len(finite))
+                    row[variable+"_min"] = float(np.min(finite)) if len(finite) else None
+                    row[variable+"_max"] = float(np.max(finite)) if len(finite) else None
+                fields.append(row)
+                if event is None and top and top["value"] >= .1105:
+                    event = {"previous_field": fields[-2] if len(fields) > 1 else None,
+                             "crossing_field": row,
+                             "scope": "Global recorded surface LE11 diagnostic, critical location retained; body/section eligibility not qualified"}
+        finally:
+            odb.close()
+        original = openOdb(meta["source_odb"], readOnly=True)
+        try:
+            source_data, source_nodes = output_filter_history_data(original, meta, include_filters=False)
+        finally:
+            original.close()
+        if [r["region"] for r in node_ledger] != [r["region"] for r in source_nodes]:
+            raise ValueError("Source/replay original grip node identities differ")
+        raw = data["RAW"]
+        source = source_data["RAW"]
+        common = source[(source[:, 0] >= raw[0, 0]) & (source[:, 0] <= raw[-1, 0])]
+        rx, rp = [np.interp(common[:, 0], raw[:, 0], raw[:, c]) for c in (1, 2)]
+        comparison = np.column_stack((common, rx, rp, rx-common[:, 1], rp-common[:, 2]))
+        def difference(mask):
+            a = comparison[mask]
+            if not len(a):
+                return {"samples": 0}
+            peak = max(float(np.max(np.abs(a[:, 2]))), 1e-30)
+            return {"samples": len(a), "last_time_s": float(a[-1, 0]),
+                    "max_opening_difference_mm": float(np.max(np.abs(a[:, 5]))),
+                    "max_force_difference_percent_source_peak": 100*float(np.max(np.abs(a[:, 6])))/peak,
+                    "RMS_force_difference_percent_source_peak": 100*float(np.sqrt(np.mean(a[:, 6]**2)))/peak}
+        source_comparison = {"all_shared_observations": difference(np.ones(len(comparison), dtype=bool)),
+                             "interpolation": "Dense continuous response evaluated only at observed original-source times; no material-event interpolation",
+                             "qualification": "Diagnostic only; no automatic source-equivalence or failed-prefix acceptance"}
+        if event and event["previous_field"]:
+            stop = event["previous_field"]["time_s"]
+            source_comparison["before_global_recorded_strain_bracket"] = difference(comparison[:, 0] <= stop)
+        exports = {name: csv_array(directory/("raw-curve.csv" if name == "RAW" else "filter-"+name+".csv"),
+                                   ("time_s", "U2_mm", "RF2_N"), values) for name, values in data.items()}
+        exports["energies"] = csv_array(directory/"native-energies.csv", ("time_s", *wanted),
+                                        np.column_stack((et, *[energy[k][:, 1] for k in wanted])))
+        exports["source_comparison"] = csv_array(directory/"source-prefix-comparison.csv",
+            ("time_s", "source_U2_mm", "source_RF2_N", "replay_U2_mm", "replay_RF2_N", "difference_U2_mm", "difference_RF2_N"), comparison)
+        native_path = directory/"native-fields.json"
+        write_json(native_path, fields)
+        exports["native_fields"] = {"path": str(native_path), "sha256": sha(native_path)}
+        windows = {"all_retained_observations": {name: curve_metrics(v) for name, v in data.items()}}
+        if event and event["previous_field"]:
+            stop = event["previous_field"]["time_s"]
+            windows["before_global_recorded_strain_bracket"] = {
+                name: curve_metrics(v[v[:, 0] <= stop]) for name, v in data.items()}
+        # Bracket the entire read-only extraction, including original-source reads.
+        if sha(proof["odb"]) != proof["odb_sha256"] or sha(meta["source_odb"]) != meta["source_odb_sha256"]:
+            raise ValueError("Read-only output-filter extraction changed ODB bytes")
+        result = {**meta, **proof, "state": proof["solver_status"], "read_only": True,
+                  "extraction_state": "retained_channels_extracted", "source_unchanged": True,
+                  "full_requested_time_observed": bool(raw[-1, 0] >= meta["source_period_s"]-1e-7),
+                  "failure_interpretation": "Solver status retained; a finite retained prefix is not automatically invalid or qualified",
+                  "node_channel_ledger": node_ledger, "source_prefix_comparison": source_comparison,
+                  "global_recorded_strain_bracket": event, "native_field_frames": len(fields),
+                  "native_energy_samples": len(et), "window_metrics": windows, "exports": exports,
+                  "code_sha256": sha(__file__)}
+        write_json(directory/"extraction.json", result)
+        results.append(result)
+    summary = {"results": results, "pending_jobs": pending, "read_only": True,
+               "manifest_sha256": sha(manifest_path), "automatic_prefix_qualification": False}
+    write_json(out/"extraction-summary.json", summary)
+    return summary
+
+
 def prepare_event_resolution(source, out, name="fcc_init_dense", stop_time=.045,
                              field_interval=.0005, history_interval=.00001):
     """Retain Explicit physics/amplitude; resolve only a short initiation prefix."""
@@ -1138,7 +1527,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=("prepare", "gather", "prepare-compliance", "gather-compliance",
                                            "prepare-completion", "gather-completion",
-                                           "prepare-body-tensors", "gather-body-tensors", "prepare-event-resolution", "gather-event-resolution"))
+                                           "prepare-body-tensors", "gather-body-tensors", "prepare-event-resolution", "gather-event-resolution",
+                                           "prepare-output-filter-replays", "gather-output-filter-replays",
+                                           "prepare-output-filter-double"))
     parser.add_argument("--root", type=Path, default=Path("Z:/p1/sims/Ti/Validation"))
     parser.add_argument("--out", type=Path, default=Path("Z:/p1/sims/Ti/Validation/audit/controls"))
     parser.add_argument("--queue-root", type=Path)
@@ -1146,7 +1537,17 @@ if __name__ == "__main__":
     parser.add_argument("--source", type=Path)
     parser.add_argument("--stop-time", type=float, default=.045)
     args = parser.parse_args()
-    if args.action == "gather-event-resolution":
+    if args.action == "prepare-output-filter-double":
+        if args.source is None:
+            parser.error("prepare-output-filter-double requires --source parent replay directory")
+        print(json.dumps(prepare_output_filter_precision_replay(args.source, args.out), indent=2))
+    elif args.action == "gather-output-filter-replays":
+        result = gather_output_filter_replays(args.out, args.queue_root or args.out/"queue")
+        print(json.dumps({"jobs": [{k: r[k] for k in ("job", "solver_status", "native_field_frames", "native_energy_samples")}
+                                     for r in result["results"]], "pending_jobs": result["pending_jobs"]}, indent=2))
+    elif args.action == "prepare-output-filter-replays":
+        print(json.dumps(prepare_output_filter_replays(args.root, args.out), indent=2))
+    elif args.action == "gather-event-resolution":
         print(json.dumps([{key: row[key] for key in ("job", "event", "source_equivalence", "dense_sample_count")}
                           for row in gather_event_resolution(args.out, args.queue_root or args.out/"queue")], indent=2))
     elif args.action == "prepare-event-resolution":

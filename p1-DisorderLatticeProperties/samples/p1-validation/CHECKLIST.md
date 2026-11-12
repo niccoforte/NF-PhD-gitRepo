@@ -71,13 +71,31 @@ This replaces accumulated superseded proposals; it is the single task register.
   Order2/DC is an explicit Abaqus-default reconstruction choice; the paper does
   not state the order. Moving averages and.4Nyquist forward/backward examples
   are diagnostics, not the selected primary method. Material events stay native.
-- [x] Select one archive rule fc=min(2fn,fs/6), causal order2/DC paired filtering.
+- [x] Implement one candidate archive rule fc=min(2fn,fs/6), causal order2/DC paired filtering.
   All64 sampled curves pass the common40%-peak stiffness-window checks. Versus
   the previous conditional rule,10 fixed-material controls change at most.119%
   load/KI and.828%work. Uniformfs/6 was tested but can raise slow-cutoff hex
   initiation load8.6%; keep the modal upper limit. No aliasing-recovery claim.
   New figures/metrics live in accepted-filter-study/capped-physical-fs6; reuse
   seven unchanged galleries, replacing only the changed kagomeFT gallery.
+- [ ] Finish specimen-specific filter qualification before production adoption.
+  Bhuwal2021/2023 do not report a cutoff prescription; Omidi uses implicit FE.
+  A dense FCC record demonstrates pre-save aliasing risk, while lower cutoffs
+  change fixed-event work substantially. Two output-only hex full-ID336 replays
+  retain original physics/full0.1s loading, dense100kHz histories and four
+  in-solver filter channels. FT then UT,8CPUs serial; manifest/state under
+  audit/curve-processing/output-filter-replays. Check actual delivery, raw/source
+  equivalence, native events/energies, causal lag and pre-decimation filtering.
+  fs/6 is antialias-inspired, not independently validated quasistatic smoothing.
+  Single-precision named-filter outputs disagree before fracture; Abaqus warns
+  of too-small cutoff/increment-rate ratio. A byte-identical FT double=both
+  control is submitted separately. UT was intentionally stopped after >50ms
+  of data/postfracture step collapse; preserve its failed/termination records
+  and reviewed dead-worker delivery. Assess causal delay at fixed-event times
+  separately from shape/work at common physically observed opening.
+  FT common12mm work changes only-.182/-.296/-.409% at318/100/50Hz; fixed-time
+  changes-6.24/-18.23/-34.35% are mainly endpoint delay. Do not interpret them
+  as equal envelope distortion or silently compensate a native fracture event.
 - [x] Implement one curve-derived initial-work slope through40% filtered peak,
   with30/50% windows, cutoff sensitivity and energy-curvature screens. All64
   sampled histories pass. Against4 UT controls errors-.33/+3.34%; against11
@@ -90,6 +108,9 @@ This replaces accumulated superseded proposals; it is the single task register.
   controls uniformly, not just the3 larger errors. Flag membership was frozen
   before FE; the fallback policy was selected after reviewing the holdouts.
   Original predictions remain unchanged. No more hex stiffness simulations.
+  All9 raw/filtered curves,40% work lines,30/50% intervals and per-ID CSVs are in
+  accepted-filter-study/flagged-hex-curves. Every original flag is solely >5%
+  window spread, not missing data, a failed simulation or a cutoff failure.
 - [ ] Resolve negative-area cases/finite-sampling limits during the production
   pilot; filtering alone is not a repair for an invalid initial-triangle area.
 - [ ] Recompute saved property columns and audit restored UT/FT pair membership
@@ -115,6 +136,14 @@ This replaces accumulated superseded proposals; it is the single task register.
   establish that separately: the completed total-J/potential approximation
   supports the combined near-initiation calculation, not unique identification
   of eta or the original-flow plastic term. Retain prescribed2.261 meanwhile.
+  A conditional near-initiation potential-reference fit gives eta1.804787
+  (-20.18% from2.261);90-100mm held-out interval K residual at most1.972% for
+  the potential law,2.576% for original-flow transfer. It is not a production
+  coefficient or independent original-flow validation; its elastic residual,
+  material approximation and shared90mm control remain explicit.
+  Assess the published original-flow long-strip route J=H*W_far before a new
+  calibration campaign; CT/strip constraint and local-field agreement plus
+  held-out geometry are required. Do not infer eta from total-J agreement alone.
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.

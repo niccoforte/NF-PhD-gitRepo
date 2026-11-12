@@ -1,15 +1,18 @@
 # p1 Notebook Agent Context
 
-This directory contains the notebook layer for p1: FEA-derived mechanics, data processing, validation, and exploratory analysis for quasi-disordered 2D lattices. Most notebooks depend on shared helpers in `resources/`; read the helper code before changing notebook behavior.
+P1 notebook/validation layer: mechanics, data processing, effective properties,
+convergence and displacement plots. Read called `resources/` helpers before edits.
 
 ## Workflow Role
 
 - `p1-DisorderLatticeProperties/SIMscripts/` generates Abaqus models and writes raw `transfer/` files.
-- `DataProcessing.ipynb` is the current batch processing notebook. It builds `DATA(path=1, ...)` objects, loops over lattice/disorder settings, and calls `create_inputCSV`, `create_outputCSV`, and `create_fieldNPZ`.
-- `InputsOutputs.ipynb` inspects and saves ML-ready curve and field datasets using `load_data`, `UTprops`, `FTprops`, `MULTIprops`, `save_MLdata`, `save_MULTIdata`, `save_field_MLdata`, and `save_MULTIfieldData`.
-- `SIMresults.ipynb` is for quick local/transfer result inspection and mechanical-property calculation from output CSVs.
-- `StiffnessMatrix.ipynb` handles analytical/simulation stiffness matrices, isotropy checks, and effective-property calculations.
-- `ContinuumPlots.ipynb` and `ValConvPlots.ipynb` support displacement-field visualization, material/validation plots, mesh/refinement checks, and convergence/validation figures.
+- `DataProcessing.ipynb`: batch `DATA(path=1, ...)`, `create_inputCSV`,
+  `create_outputCSV`, `create_fieldNPZ` across topology/disorder settings.
+- `InputsOutputs.ipynb`: load_data, UT/FT/MULTIprops and matching save_MLdata,
+  save_MULTIdata, save_field_MLdata, save_MULTIfieldData calls.
+- `SIMresults.ipynb`: local/transfer CSV mechanics inspection.
+- `StiffnessMatrix.ipynb`: analytical/FE tensors, symmetry/effective properties.
+- `ContinuumPlots.ipynb`/`ValConvPlots.ipynb`: fields, validation and mesh/PSC plots.
 - Continuum principal plots show both eigenvalues of reconstructed Green-Lagrange
   strain with x/y coordinates and a shared signed scale. Confirm saved sample/frame
   provenance before exporting an initiation figure; the colour cap is not a
@@ -25,13 +28,18 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   Modal actions prepare_periodic/prepare_iso cover population8 and selected
   ISO sources; iso_map joins verified frequencies. Use causal
   order2/DC Butterworth at2fn for matching disorder, no disordered modal jobs.
-  `validation_stiffness.py` defaults to fc=min(2fn,fs/6), order2/DC paired SOS;
-  it cannot undo aliasing. Use one40%-peak work slope,30/50% quality checks.
+  `validation_stiffness.py` defaults to candidate fc=min(2fn,fs/6), order2/DC
+  paired SOS; it cannot undo aliasing or qualify a quasistatic envelope by itself.
+  Output-only hex replays compare dense/native/in-solver filters without changing
+  source physics; preserve failed status and verify source/delivery/channel identity.
+  Use one40%-peak work slope,30/50% quality checks; flagged-hex-curves plots all9.
   accepted_hex_stiffness retains1964 curves plus all9 preflagged elastic controls;
   preserve source/selection evidence. Props/MLdata migration remains separate.
   `validation_fcc.py` compares total J on identical crack/opening intervals:
   independent potential-energy derivative versus prescribed ASTM eta prediction,
   with original-flow transfer and failed-prefix support recorded separately.
+  calibration-review exports actual U/P histories and a conditional eta fit with
+  held-out crack interval. It does not qualify the original-flow plastic factor.
   `validation_controls.py` dense-event replay preserves source loading/model.
   `validation_omidi.py` owns actual snub-square CT and periodic beam-tensor
   diagnostics. CT pin failures and source/paper notch discrepancies remain
@@ -52,6 +60,7 @@ This directory contains the notebook layer for p1: FEA-derived mechanics, data p
   area remains unavailable. Nonlinear recovery and dissipation eta-J estimates
   remain distinct methods, never replacements falsely attributed to Hsieh.
   `validation_inventory.py` inventories retained evidence and named task scratch;
+  --inspection-index maps retained INPs/ODBs for GUI inspection without copies;
   its `cleanup-review.json` also covers workbook additions/legacy values, code,
   early reviews, pending reference capture and temporary evidence dependencies.
   It never deletes. Continuation `-status.json` receipts are not submission plans.

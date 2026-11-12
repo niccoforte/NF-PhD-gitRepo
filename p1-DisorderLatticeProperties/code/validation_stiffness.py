@@ -977,13 +977,153 @@ def plot(out,rows,arrays,gold):
     plt.close(fig)
 
 
+def flagged_curve_summary(record,prediction,control,cutoff_Hz):
+    """Describe the frozen curve flag independently of the later FE error."""
+    key=record["design"],record["id"]
+    if key!=(prediction["design"],prediction["id"]) or key!=(control["design"],control["id"]):
+        raise ValueError("Flagged curve and holdout identities differ")
+    fit=record["stiffness"]
+    if fit["estimate"]!=prediction["frozen_curve_estimate_MPa"]:
+        raise ValueError("Frozen curve prediction differs")
+    if fit["quality"]!="review_required" or fit["flags"]!=["window_sensitive_over5percent"]:
+        raise ValueError("Expected the original window-only preflag")
+    return dict(design=key[0],id=key[1],reason="30/40/50% window spread exceeds preselected5% screen",
+                window_spread_percent=100*fit["window_relative_spread"],
+                cutoff_spread_percent=100*fit["cutoff_relative_spread"],
+                energy_curvature_percent=100*fit["energy_fit_residual"],
+                selected_cutoff_Hz=float(cutoff_Hz),E30_MPa=fit["windows"]["0.3"]["estimate"],
+                E40_MPa=fit["estimate"],E50_MPa=fit["windows"]["0.5"]["estimate"],
+                samples40=fit["samples"],elastic_control_MPa=control["elastic_control_E_apparent_MPa"],
+                curve_vs_FE_error_percent=control["relative_error_percent"],
+                curve_vs_FE_within5percent=control["within_five_percent"],
+                flag_means_missing_value_or_failed_simulation=False,
+                raw_transfer=record["path"],raw_transfer_sha256=record["source_sha256"])
+
+
+def flagged_hex_curves(root=ROOT):
+    """Read and visualise all9 frozen flags; never alter their accepted catalogue."""
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from validation_curve_processing import transfer_prefix
+    root=Path(root);study=root/"audit/curve-processing/accepted-filter-study"
+    out=study/"flagged-hex-curves";out.mkdir(parents=True,exist_ok=True)
+    frozen_path=study/"holdout-controls/frozen-predictions.json"
+    population_path=study/"hex-population-readonly-qualification.json"
+    comparison_path=study/"holdout-controls/holdout-comparison.json"
+    catalogue=study/"accepted-hex-stiffness.json"
+    catalogue_csv=study/"accepted-hex-stiffness.csv"
+    protected=[frozen_path,population_path,comparison_path,catalogue,catalogue_csv]
+    before={str(path):sha(path) for path in protected}
+    freeze=json.loads(frozen_path.read_text());population=json.loads(population_path.read_text())
+    if sha(population_path)!=freeze["source_replay_sha256"]:
+        raise ValueError("Frozen population replay changed")
+    records={(r["design"],r["id"]):r for r in population["records"]}
+    comparison={(r["design"],r["id"]):r for r in json.loads(comparison_path.read_text())["records"]}
+    accepted={(r["design"],r["id"]):r for r in json.loads(catalogue.read_text())["records"]}
+    registry_path=root/"audit/curve-processing/periodic-cutoffs.json"
+    registry=json.loads(registry_path.read_text())
+    fn=next(r["natural_frequency_Hz"] for r in registry["families"] if r["topology"]=="hex" and r["task"]=="UT")
+    rows,curves=[],[]
+    if len(freeze["predictions"])!=9:
+        raise ValueError("Exactly nine frozen flagged specimens required")
+    for prediction in freeze["predictions"]:
+        key=prediction["design"],prediction["id"];record=records[key]
+        if sha(record["path"])!=record["source_sha256"] or sha(prediction["source_inp"])!=prediction["source_inp_sha256"]:
+            raise ValueError("Frozen flagged raw transfer/source INP changed")
+        if accepted[key]["estimator"]!="source_exact_linear_UAT_preflagged_fallback":
+            raise ValueError("Accepted preflagged fallback membership changed")
+        raw,support=transfer_prefix(record["path"])
+        time=np.arange(len(raw))*.0005
+        (x,y),info=final_archive_filter(time,raw[:,0],raw[:,1],fn)
+        fits={str(f):initial_work_stiffness(x,y,f) for f in(.3,.4,.5)}
+        for fraction,fit in fits.items():
+            if not np.isclose(fit["estimate"],record["stiffness"]["windows"][fraction]["estimate"],rtol=1e-12,atol=1e-10):
+                raise ValueError("Selected filter/window no longer reproduces frozen estimate")
+        row=flagged_curve_summary(record,prediction,comparison[key],info["cutoff_Hz"])
+        stem="hex-UT-"+key[0]+"-"+str(key[1])
+        csv_path=out/(stem+"-inspection.csv")
+        with csv_path.open("w",newline="") as stream:
+            writer=csv.writer(stream);writer.writerow(["original_sample_index","declared_time_s","raw_macro_strain","raw_macro_stress_MPa","filtered_macro_strain","filtered_macro_stress_MPa","selected40percent_work_line_MPa","within30percent_window","within40percent_window","within50percent_window"])
+            E=fits["0.4"]["estimate"]
+            writer.writerows((i,float(t),float(a),float(b),float(c),float(d),float(E*(c-x[0])),
+                              i<=fits["0.3"]["end_index"],i<=fits["0.4"]["end_index"],i<=fits["0.5"]["end_index"])
+                             for i,(t,a,b,c,d) in enumerate(zip(time,raw[:,0],raw[:,1],x,y)))
+        row.update(source_inp=prediction["source_inp"],source_inp_sha256=prediction["source_inp_sha256"],
+                   accepted_E_MPa=accepted[key]["E_apparent_MPa"],inspection_csv=str(csv_path),
+                   samples=len(raw),support=support,filter=info,
+                   window_end_indices={k:v["end_index"] for k,v in fits.items()})
+        rows.append(row);curves.append((raw,x,y,fits))
+    figures=[]
+    for zoom in(False,True):
+        fig,axes=plt.subplots(3,3,figsize=(15,11.7))
+        for ax,row,(raw,x,y,fits) in zip(axes.flat,rows,curves):
+            color="#ff7f0e" if row["design"]=="full" else "#1f77b4"
+            end50=fits["0.5"]["end_index"]
+            ax.plot(raw[:,0],raw[:,1],color=".65",lw=.9,zorder=1)
+            ax.plot(x,y,color=color,lw=1.4,zorder=3)
+            end=fits["0.4"]["end_index"];line_x=np.array([x[0],x[end]])
+            ax.plot(line_x,fits["0.4"]["estimate"]*(line_x-x[0]),color=".1",ls="--",lw=1.5,zorder=4)
+            for fraction,marker in(("0.3","^"),("0.4","o"),("0.5","s")):
+                index=fits[fraction]["end_index"]
+                ax.scatter(x[index],y[index],s=32,marker=marker,facecolor="white",edgecolor=".1",zorder=5)
+            if zoom:
+                xmax=max(float(x[end50]),float(raw[min(end50,len(raw)-1),0]))*1.2
+                local=(raw[:,0]<=xmax)
+                ymax=max(float(np.max(raw[local,1])),float(np.max(y[:end50+1])))
+                ax.set_xlim(-.02*xmax,xmax);ax.set_ylim(-.04*ymax,1.18*ymax)
+                for fraction in("0.3","0.4","0.5"):
+                    index=fits[fraction]["end_index"]
+                    ax.annotate(str(int(float(fraction)*100))+"%",(x[index],y[index]),xytext=(3,5),textcoords="offset points",fontsize=8)
+            title=("Full disorder" if row["design"]=="full" else "Mechanism-based")+" | ID"+str(row["id"])
+            ax.set_title(title,color=color,fontsize=10)
+            note="Window {:.2f}% (>5%); cutoff {:.2f}%; curvature {:.2f}%\nCurve−elastic control: {:+.2f}% {}".format(
+                row["window_spread_percent"],row["cutoff_spread_percent"],row["energy_curvature_percent"],
+                row["curve_vs_FE_error_percent"],"(within5%)" if row["curve_vs_FE_within5percent"] else "(outside5%)")
+            ax.text(.02,.98,note,ha="left",va="top",transform=ax.transAxes,fontsize=8,
+                    bbox=dict(facecolor="white",alpha=.85,edgecolor="none",pad=2))
+            ax.grid(alpha=.17);ax.set_xlabel(r"Macroscopic strain, $\varepsilon_L$",fontsize=9)
+            ax.set_ylabel(r"Macroscopic stress, $\Sigma$ (MPa)",fontsize=9)
+        handles=[Line2D([],[],color=".65",lw=1,label="Raw recorded transfer"),
+                 Line2D([],[],color="#1f77b4",lw=1.5,label=r"Selected causal Butterworth, $f_c=\min(2f_n,f_s/6)$"),
+                 Line2D([],[],color=".1",ls="--",label="40%-peak work-equivalent line"),
+                 Line2D([],[],color=".1",marker="^",mfc="white",ls="none",label="30% check"),
+                 Line2D([],[],color=".1",marker="s",mfc="white",ls="none",label="50% check")]
+        fig.suptitle("Nine preflagged hexagonal UAT specimens | "+("initial loading" if zoom else "full recorded curves"),y=.997,fontsize=14)
+        fig.legend(handles=handles,loc="upper center",bbox_to_anchor=(.5,.975),ncol=3,frameon=False,fontsize=9)
+        fig.tight_layout(rect=(0,0,1,.925),h_pad=1.9,w_pad=1.5)
+        stem="flagged-hex-initial-loading" if zoom else "flagged-hex-full-curves"
+        for extension in("png","svg"):
+            path=out/(stem+"."+extension);fig.savefig(path,dpi=210);figures.append(str(path))
+        plt.close(fig)
+    for path in protected:
+        if sha(path)!=before[str(path)]:raise ValueError("Protected source/catalogue changed")
+    fields=[k for k in rows[0] if k not in("support","filter","window_end_indices")]
+    with(out/"flagged-specimens.csv").open("w",newline="") as stream:
+        writer=csv.DictWriter(stream,fieldnames=fields);writer.writeheader()
+        writer.writerows({k:r[k] for k in fields}for r in rows)
+    report=dict(records=rows,figures=figures,flag_count=9,reason="All9 window sensitivities exceed5%; none is a missing stiffness or solver-failure flag",
+                within5percent_FE=sum(r["curve_vs_FE_within5percent"] for r in rows),
+                outside5percent_FE=sum(not r["curve_vs_FE_within5percent"] for r in rows),
+                selected_filter="min(2fn,fs/6), causal paired second-order/DC; all9 cutoffs333.333Hz",
+                timestamp_basis="Declared0.0005s transfer schedule; transfer files do not store native solver timestamps",
+                numerical_core_sha256=numerical_core_sha256(),protected_hashes_before=before,
+                protected_hashes_after={str(path):sha(path)for path in protected},
+                no_source_catalogue_Props_or_MLdata_writes=True,new_solver_jobs=0)
+    (out/"flagged-curves.json").write_text(json.dumps(report,indent=2)+"\n")
+    return report
+
+
 def main(argv=None):
     """Default to the selected single policy; old qualification is reference-only."""
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root",type=Path,default=ROOT)
-    parser.add_argument("--action",choices=("selected","accepted-hex","uniform-study"),default="selected")
+    parser.add_argument("--action",choices=("selected","accepted-hex","uniform-study","flagged-hex-curves"),default="selected")
     args=parser.parse_args(argv)
-    if args.action=="accepted-hex":
+    if args.action=="flagged-hex-curves":
+        report=flagged_hex_curves(args.root);summary={k:report[k]for k in("flag_count","within5percent_FE","outside5percent_FE")}
+    elif args.action=="accepted-hex":
         report=accepted_hex_stiffness(args.root);summary=report["counts"]
     elif args.action=="uniform-study":
         report=compare_uniform_fs6(args.root);summary={k:report[k] for k in("native_histories","changed_histories")}

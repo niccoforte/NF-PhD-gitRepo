@@ -481,6 +481,12 @@ At99.871% of resolved initiation opening their equivalent-K residuals are
 4.02-4.68%, with eta2.261 prescribed, not fitted. Preserve the small missing
 support and material-approximation limits. The actual FCC elastic B21 check
 remains separate from published continuum data.
+`validation_fcc.py calibration-review` with the same --out/--controls exports
+six actual pin-work/ALLWK histories, energy-release and coefficient-fit plots.
+The late-window80-90mm potential-reference fit gives eta1.804787;90-100mm is
+held out from fitting. Its shared90mm control, potential-law approximation and
+elastic calibration residual prevent treating this as independent original-flow
+plastic-factor validation. No fitted coefficient is promoted to production.
 `validation_omidi.py` reproduces the authors' snub-square geometry and published
 polymer data at20/25/30% density. Use Abaqus Python `gather-tensor` and `gather`
 with `--queue-root <audit/omidi/serial-queue>`, then standard Python `compare`.
@@ -508,10 +514,27 @@ For periodic plus7 random paired architectures per lattice, use
 `--prepare-paired-examples`, Abaqus Python `--extract-paired-examples`, then
 `--paired-examples`; the fixed seed and native histories produce8 UT/FT galleries.
 No disordered modal jobs. The original2fn-only galleries retain unresolved
-sampling status. `validation_stiffness.py` defaults to the selected common archive rule
+sampling status. `validation_stiffness.py` defaults to the candidate common archive rule
 fc=min(2fn,fs/6), causal order2/DC paired filtering. Outputs are under
 `audit/curve-processing/accepted-filter-study/capped-physical-fs6`; unchanged
 galleries are linked rather than copied. It cannot reverse pre-existing aliasing.
+This cutoff is not yet a qualified quasistatic envelope. Exact-source hexID336
+UT/FT output-only replays compare100kHz native histories with four in-solver
+filters before saving: physical2fn, candidate archive,100Hz and50Hz. Prepare via
+`validation_controls.py prepare-output-filter-replays --out <audit/curve-processing/output-filter-replays>`;
+submit only its immutable manifest through validation_queue,8CPUs serial.
+Original full loading/physics and unfiltered material events/energies remain.
+Use Abaqus Python `validation_controls.py gather-output-filter-replays --out
+<campaign>` for hash-bound raw/four-channel/field/energy exports. Failed status
+is preserved; extraction never qualifies a prefix automatically. The first
+single-precision run warns of low cutoff/increment-rate instability and its
+named filters are unqualified. `prepare-output-filter-double --source
+<parent-replay-directory> --out <double-precision>` prepares a byte-identical
+input with double=both execution, a distinct immutable identity, not a rerun
+that overwrites its parent. The collector supports that precision follow-up.
+Bhuwal2021/2023 report no filter prescription; Omidi uses implicit FE, so those
+smooth curves do not independently establish an Explicit cutoff. fs/6 follows
+an antialiasing convention, not a universal physical smoothing frequency.
 Use final_archive_filter(raw paired histories), then one40%-peak initial-work
 slope and30/50%-window/cutoff/curvature quality checks. Do not filter twice.
 All64 native curves pass; the15 independent elastic controls remain within5%.
@@ -519,6 +542,11 @@ All64 native curves pass; the15 independent elastic controls remain within5%.
 all9 specimens flagged before FE use their own verified elastic controls.
 The fallback policy was selected uniformly after holdout review, not by choosing
 only the3 larger errors. Neither action rewrites Props/MLdata or approved figures.
+`--action flagged-hex-curves` verifies and plots all9 raw/filtered curves with
+40%-peak work lines and30/50% checks. Each flag came solely from >5% window
+spread. `validation_inventory.py --inspection-index` writes one GUI navigation
+index of retained INPs/ODBs under audit/shared; detailed inspection steps and
+reference values are in the existing samples/p1-validation report.
 `validation_controls.prepare_uat_linear`/`gather_uat_linear` retain exact source
 clamps and B21 bending/shear, computing the initial tangent from prescribed
 small travel and reaction, without a curve-fit interval. Four hex/kagome

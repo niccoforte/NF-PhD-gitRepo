@@ -1267,9 +1267,280 @@ def interval_validation(out, controls=None):
     return report
 
 
+def fit_constant_interval_eta(opening, intervals, training_interval="first_cell", lower_fraction=.8):
+    """Fit one coefficient on one declared interval; other intervals never train it.
+
+    This identifies a conditional potential-model coefficient, not an original
+    incremental-plastic J integral. Low-area and early loading remain diagnostics.
+    """
+    opening = np.asarray(opening, dtype=float)
+    if (opening.ndim != 1 or len(opening) < 2 or not np.isfinite(opening).all()
+            or opening[0] != 0 or np.any(np.diff(opening) <= 0)
+            or not 0 < lower_fraction < 1):
+        raise ValueError("Increasing observed opening and a bounded training fraction required")
+    names = [row["interval"] for row in intervals]
+    if len(set(names)) != len(names) or names.count(training_interval) != 1:
+        raise ValueError("Exactly one declared training interval required")
+    train = intervals[names.index(training_interval)]
+    def arrays(row):
+        values = [np.asarray(row[key], dtype=float) for key in
+                  ("finite_work_release_N_mm", "predicted_elastic_J_N_mm", "unit_plastic_factor_N_mm")]
+        eligible = np.asarray(row["eligible_nonnegative_Apl"], dtype=bool)
+        if any(value.shape != opening.shape for value in values) or eligible.shape != opening.shape:
+            raise ValueError("Every crack interval must share the same observed opening grid")
+        good = eligible & np.all(np.isfinite(values), axis=0) & (values[0] > 0) & (values[2] > 0)
+        return *values, good
+    reference, elastic, factor, valid = arrays(train)
+    window = opening/opening[-1] >= lower_fraction
+    mask = valid & window
+    if np.count_nonzero(mask) < 2 or np.dot(factor[mask], factor[mask]) <= 0:
+        raise ValueError("Training requires resolved positive plastic factor on at least two opening levels")
+    eta = float(np.dot(factor[mask], (reference-elastic)[mask])/np.dot(factor[mask], factor[mask]))
+    if not np.isfinite(eta) or eta <= 0:
+        raise ValueError("Declared training data do not support a finite positive coefficient")
+    output = []
+    for row in intervals:
+        ref, jel, q, good = arrays(row)
+        prediction = jel+eta*q
+        good &= prediction > 0
+        residual = np.full(len(opening), np.nan)
+        residual[good] = 100*(np.sqrt(prediction[good]/ref[good])-1)
+        effective = np.full(len(opening), np.nan)
+        effective[good] = (ref[good]-jel[good])/q[good]
+        late = good & window
+        levels = [{"fraction": fraction, "index": int(np.argmin(abs(opening/opening[-1]-fraction)))}
+                  for fraction in (.5, .75, .8, 1.)]
+        for level in levels:
+            i = level["index"]
+            level.update(opening_mm=float(opening[i]), effective_eta=float(effective[i]),
+                         fitted_K_error_percent=float(residual[i]))
+        output.append({"interval": row["interval"],
+                       "role": "training_interval" if row["interval"] == training_interval else
+                               "held_out_crack_interval" if row["interval"] == "second_cell" else
+                               "overlapping_interval_diagnostic",
+                       "potential_reference_J_N_mm": ref.tolist(), "unchanged_Ortega_elastic_J_N_mm": jel.tolist(),
+                       "unit_plastic_factor_N_mm": q.tolist(), "fitted_total_J_N_mm": prediction.tolist(),
+                       "fitted_K_error_percent": residual.tolist(), "effective_eta": effective.tolist(),
+                       "eligible": good.tolist(), "levels": levels,
+                       "late_max_abs_fitted_K_error_percent": float(max(abs(residual[late]))) if late.any() else None,
+                       "final_fitted_K_error_percent": float(residual[-1])})
+    return {"eta": eta, "training_interval": training_interval, "training_lower_fraction": lower_fraction,
+            "training_indices": np.flatnonzero(mask).tolist(), "training_points": int(mask.sum()),
+            "actual_training_fraction_range": [float(opening[mask][0]/opening[-1]), 1.],
+            "training_objective": "Unweighted least squares of Jref-Jel=eta*q; no intercept; only declared first interval and late opening levels",
+            "opening_mm": opening.tolist(), "intervals": output}
+
+
+def whole_model_work_at_times(history, time):
+    """Interpolate a recorded work channel only after validating its table shape."""
+    allwk = np.asarray(history, dtype=float)
+    if (allwk.ndim != 2 or allwk.shape[1] != 2 or len(allwk) == 0
+            or not np.isfinite(allwk).all()
+            or time[0] < allwk[0, 0] or time[-1] > allwk[-1, 0]
+            or np.any(np.diff(allwk[:, 0]) < 0)):
+        raise ValueError("Whole-model work does not cover the native pin history")
+    return np.interp(time, allwk[:, 0], allwk[:, 1])
+
+
+def calibration_review(out, controls=None):
+    """Reproduce a separated fit/holdout review and expose all six native pin works.
+
+    Writes only calibration-review outputs. Neither the retained interval report,
+    production eta nor final figures are changed.
+    """
+    import csv
+    from resources.calculations import calc_FaW_aniso
+    out = Path(out).resolve()
+    controls = Path(controls).resolve() if controls else out
+    source = out/"interval-total-J-validation.json"
+    original_bytes = source.read_bytes()
+    report = json.loads(original_bytes)
+    verified = {str(source): sha(source)}
+    def verify(path, digest):
+        path = Path(path)
+        if not path.is_file() or sha(path) != digest:
+            raise ValueError("Calibration source changed or is absent: "+str(path))
+        verified[str(path)] = digest
+    for mapping in (report["result_json_sha256"], report["elastic_result_json_sha256"]):
+        for path, digest in mapping.items():
+            verify(path, digest)
+    tensor_path = controls/"periodic/tensor-results.json"
+    verify(tensor_path, report["tensor_result_sha256"])
+    approximation = report["potential_approximation_evidence"]
+    for prefix in ("material_fit", "earlier_local_equivalence"):
+        verify(approximation[prefix+"_file"], approximation[prefix+"_sha256"])
+    records = {"potential": {}, "incremental": {}}
+    for path in report["result_json_sha256"]:
+        row = json.loads(Path(path).read_text())
+        if (not row.get("read_only") or not row.get("source_input_hash_verified")
+                or row["law"] not in records or row["crack_index"] in records[row["law"]]):
+            raise ValueError("Duplicate or unverified nonlinear FCC control")
+        for path_key, hash_key in (("input", "input_sha256"), ("source_inp", "source_sha256"),
+                                   ("odb", "odb_sha256"), ("sections", "sections_sha256")):
+            verify(row[path_key], row[hash_key])
+        verify(Path(row["odb"]).parent/"delivery.json", row["delivery_sha256"])
+        records[row["law"]][int(row["crack_index"])] = row
+    if any(set(rows) != {0, 1, 2} for rows in records.values()):
+        raise ValueError("Six source-bound stationary-crack responses are required")
+    elastic = [json.loads((controls/("fcc_el_a"+str(i))/"result.json").read_text()) for i in range(3)]
+    tensor = json.loads(tensor_path.read_text())[0]
+    for row in [*elastic, tensor]:
+        if (row.get("state") != "completed_and_extracted" or not row.get("read_only")
+                or not row.get("source_input_hash_verified")):
+            raise ValueError("Unverified elastic/tensor control cannot support coefficient calibration")
+        for path_key, hash_key in (("input", "input_sha256"), ("source_inp", "source_sha256"),
+                                   ("odb", "odb_sha256")):
+            verify(row[path_key], row[hash_key])
+        verify(Path(row["odb"]).parent/"delivery.json", row["delivery_sha256"])
+    compliance = np.array([row["compliance_mm_N"] for row in elastic])
+    cracks = np.array(report["cracks_mm"], dtype=float)
+    B, W, M = (float(report[key]) for key in ("B_mm", "W_mm", "M_MPa"))
+    if not np.isclose(M, tensor["M_crack_axis_MPa"], rtol=1e-12):
+        raise ValueError("Retained conversion modulus differs from the interval reference")
+    C = np.array(tensor["C_MPa"])[np.ix_([1, 0, 2], [1, 0, 2])]
+    factors = np.array([calc_FaW_aniso(a, W, C=C)**2/(B*B*W*M) for a in cracks])
+    opening = np.array(report["opening_mm"], dtype=float)
+    recomputed, responses, energy_rows, energy_checks = {}, {}, [], []
+    for law, entries in records.items():
+        pairs = [response_at_opening(entries[i]["opening_mm"], entries[i]["force_N"], opening) for i in range(3)]
+        forces, work = np.array([row[0] for row in pairs]), np.array([row[1] for row in pairs])
+        responses[law] = {"force_N": forces, "work_N_mm": work}
+        recomputed[law] = interval_quantities(cracks, forces, work, compliance, factors, B, W)
+        for i, row in entries.items():
+            time, displacement, force, saved_work = (np.array(row[key], dtype=float) for key in
+                                                   ("time", "opening_mm", "force_N", "work_N_mm"))
+            integrated = np.r_[0., np.cumsum(.5*(force[1:]+force[:-1])*np.diff(displacement))]
+            solver_work = whole_model_work_at_times(row["energy"]["ALLWK"], time)
+            other_energy = {}
+            for name in ("ALLIE", "ALLSE", "ALLPD"):
+                channel = np.asarray(row["energy"][name], dtype=float)
+                if (channel.ndim != 2 or channel.shape[1] != 2 or not np.isfinite(channel).all()
+                        or time[0] < channel[0, 0] or time[-1] > channel[-1, 0]):
+                    raise ValueError("Named whole-model energy channel does not cover native pin history")
+                other_energy[name] = np.interp(time, channel[:, 0], channel[:, 1])
+            tolerance = 1e-10*max(abs(integrated[-1]), 1.)
+            if max(abs(saved_work-integrated)) > tolerance:
+                raise ValueError("Saved pin work does not reproduce native force/opening integration")
+            difference = integrated-solver_work
+            energy_checks.append({"job": row["job"], "law": law, "a_mm": float(cracks[i]),
+                "native_samples": len(time), "final_pin_work_N_mm": float(integrated[-1]),
+                "final_ALLWK_N_mm": float(solver_work[-1]),
+                "max_abs_pin_work_minus_ALLWK_N_mm": float(max(abs(difference))),
+                "max_work_difference_over_final_pin_work": float(max(abs(difference))/max(abs(integrated[-1]), 1.)),
+                "saved_pin_work_reproduced": True})
+            for j in range(len(time)):
+                energy_rows.append({"job": row["job"], "law": law, "a_mm": float(cracks[i]),
+                    "time": float(time[j]), "opening_mm": float(displacement[j]), "force_N": float(force[j]),
+                    "work_N_mm": float(integrated[j]), "ALLWK_N_mm": float(solver_work[j]),
+                    "work_minus_ALLWK_N_mm": float(difference[j]),
+                    **{name+"_N_mm": float(values[j]) for name, values in other_energy.items()},
+                    "interpretation": "potential-model pin energy" if law == "potential" else "incremental loading work; not potential energy or J"})
+    for old, fresh in zip(report["intervals"], recomputed["potential"]["intervals"]):
+        if old["interval"] != fresh["interval"]:
+            raise ValueError("Interval identity changed")
+        for key in ("finite_work_release_N_mm", "predicted_elastic_J_N_mm", "unit_plastic_factor_N_mm", "predicted_total_J_N_mm"):
+            if not np.allclose(old[key], fresh[key], rtol=1e-10, atol=1e-9):
+                raise ValueError("Interval report no longer reproduces its pinned histories: "+key)
+    fit = fit_constant_interval_eta(opening, report["intervals"])
+    table, curves = [], []
+    fraction = opening/opening[-1]
+    for index, fitted in enumerate(fit["intervals"]):
+        potential = report["intervals"][index]
+        reference = np.array(potential["finite_work_release_N_mm"])
+        flow = recomputed["incremental"]["intervals"][index]
+        for law, row in (("potential", potential), ("incremental", flow)):
+            jel, q = (np.array(row[key]) for key in ("predicted_elastic_J_N_mm", "unit_plastic_factor_N_mm"))
+            eligible = np.array(row["eligible_nonnegative_Apl"], dtype=bool) & (reference > 0)
+            for method in ("prescribed_ASTM", "fitted_constant"):
+                prediction = np.array(row["predicted_total_J_N_mm"]) if method == "prescribed_ASTM" else jel+fit["eta"]*q
+                good = eligible & (prediction > 0)
+                errors = np.full(len(opening), np.nan)
+                errors[good] = 100*(np.sqrt(prediction[good]/reference[good])-1)
+                late = good & (fraction >= .8)
+                table.append({"interval": fitted["interval"], "role": fitted["role"], "response_law": law,
+                    "method": method, "late_max_abs_K_error_percent": float(max(abs(errors[late]))) if late.any() else None,
+                    "final_K_error_percent": float(errors[-1]),
+                    "reference_law": "potential only; incremental prediction is a material-transfer comparison"})
+                for i in range(len(opening)):
+                    curves.append({"interval": fitted["interval"], "role": fitted["role"], "response_law": law,
+                        "method": method, "opening_mm": float(opening[i]), "Jref_potential_N_mm": float(reference[i]),
+                        "Jel_Ortega_N_mm": float(jel[i]), "unit_plastic_factor_N_mm": float(q[i]),
+                        "predicted_total_J_N_mm": float(prediction[i]), "equivalent_K_error_percent": float(errors[i]),
+                        "eligible": bool(good[i])})
+    destination = out/"calibration-review"
+    destination.mkdir(exist_ok=True)
+    for name, rows_ in (("six-native-energy-histories.csv", energy_rows), ("calibration-comparison.csv", curves),
+                        ("calibration-error-summary.csv", table)):
+        with (destination/name).open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(rows_[0]))
+            writer.writeheader(); writer.writerows(rows_)
+    result = {"state": "conditional_potential_calibration_and_held_out_crack_review", **fit,
+        "source_incremental_J_integral_claimed": False, "production_eta_changed": False,
+        "ASTM_eta_at_original_crack": 2.261, "fitted_eta_difference_from_ASTMeta_percent": 100*(fit["eta"]/2.261-1),
+        "source_files_sha256": verified, "error_summary": table, "energy_work_checks": energy_checks,
+        "common_supported_endpoint_mm": float(opening[-1]),
+        "holdout_shared_crack_mm": float(cracks[1]),
+        "definition": "Fit only80-90mm interval,last20%observed opening; freeze eta before90-100mm holdout.80-100mm overlaps training and is diagnostic only.",
+        "limitations": ["Potential reference approximates original incremental material; held-out comparison is not independent original-flow J validation",
+            "A fitted eta can absorb elastic calibration and finite-cell errors; unchanged Ortega elastic J is retained",
+            "Only the declared near-initiation window is fitted; low-area loading exposes coefficient non-universality",
+            "Original-flow predictions share the potential reference and remain a constitutive-transfer check",
+            "The held-out90-100mm interval shares the90mm control with training; it is not an independent specimen or a withheld loading mode",
+            "Whole-model ALLWK corroborates pin work; it is not a separately calculated crack-tip J",
+            "No original simulation, production coefficient, retained interval report or final paper figure is changed"]}
+    def finite(value):
+        if isinstance(value, dict): return {key: finite(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, np.ndarray)): return [finite(item) for item in value]
+        if isinstance(value, (float, np.floating)): return float(value) if np.isfinite(value) else None
+        if isinstance(value, np.bool_): return bool(value)
+        return value
+    write_json(destination/"calibration-review.json", finite(result))
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    names = {"first_cell": "80-90 mm: training", "second_cell": "90-100 mm: holdout", "two_cells": "80-100 mm: overlapping diagnostic"}
+    fig, axes = plt.subplots(1, 2, figsize=(12, 4.7), constrained_layout=True)
+    for row, color in zip(fit["intervals"], ("#2166ac", "#c43b3b", "#555555")):
+        axes[0].plot(opening, row["effective_eta"], color=color, label=names[row["interval"]])
+        axes[1].plot(opening, row["fitted_K_error_percent"], color=color, label=names[row["interval"]])
+    axes[0].axhline(2.261, color="black", ls="--", label="ASTM at a/W=0.5:2.261")
+    axes[0].axhline(fit["eta"], color="#2166ac", ls=":", label="Fitted constant:{:.4f}".format(fit["eta"]))
+    axes[0].set(ylabel="Effective plastic coefficient", ylim=(-.5, 2.6), title="Loading dependence")
+    axes[1].axhline(0, color=".6", lw=.8)
+    axes[1].set(ylabel="Fitted total-K error (%)", title="Frozen coefficient: potential reference")
+    for axis in axes:
+        axis.axvspan(.8*opening[-1], opening[-1], color=".8", alpha=.25)
+        axis.set(xlabel="Full load-line opening (mm)", xlim=(.5*opening[-1], opening[-1]))
+        axis.grid(alpha=.2); axis.legend(fontsize=8)
+    fig.suptitle("FCC conditional calibration: shaded window trains only the 80-90 mm interval", fontsize=11)
+    for suffix in ("png", "svg"): fig.savefig(destination/("coefficient-fit-and-holdout."+suffix), dpi=220)
+    plt.close(fig)
+    fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.4), constrained_layout=True)
+    for i, color in enumerate(("#2166ac", "#c43b3b", "#555555")):
+        axes[0].plot(opening, responses["potential"]["work_N_mm"][i]/1000, color=color,
+                     label="a={:g}mm".format(cracks[i]))
+    for row in report["intervals"]:
+        axes[1].plot(opening, row["finite_work_release_N_mm"], label=names[row["interval"]].split(":")[0])
+    for row in records["potential"].values():
+        time, energy = np.array(row["time"]), np.array(row["energy"]["ALLWK"])
+        difference = np.array(row["work_N_mm"])-np.interp(time, energy[:, 0], energy[:, 1])
+        axes[2].plot(row["opening_mm"], difference, label="a={:g}mm".format(row["a_mm"]))
+    axes[0].set(ylabel="Integrated pin energy U (kN mm)", title="Three simulated potential histories")
+    axes[1].set(ylabel="Finite-interval Jref (N/mm)", title="Energy differences / crack area")
+    axes[2].set(ylabel="Pin work minus ALLWK (N mm)", title="Whole-model work cross-check")
+    for axis in axes:
+        axis.set_xlabel("Full load-line opening (mm)"); axis.grid(alpha=.2); axis.legend(fontsize=8)
+    fig.suptitle("Actual simulated energies: original-flow work remains separately labelled in CSV", fontsize=11)
+    for suffix in ("png", "svg"): fig.savefig(destination/("native-energy-and-release."+suffix), dpi=220)
+    plt.close(fig)
+    if source.read_bytes() != original_bytes:
+        raise ValueError("Retained interval verification changed during calibration review")
+    return finite(result)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=("prepare", "gather", "prepare-tensor", "gather-tensor", "compare-pilot", "prepare-continuation", "compare-elastic", "conditional-plastic", "interval-validation", "prepare-event", "prepare-event-continuation"))
+    parser.add_argument("action", choices=("prepare", "gather", "prepare-tensor", "gather-tensor", "compare-pilot", "prepare-continuation", "compare-elastic", "conditional-plastic", "interval-validation", "prepare-event", "prepare-event-continuation", "calibration-review"))
     parser.add_argument("--source", type=Path, default=SOURCE)
     parser.add_argument("--out", type=Path, default=OUT)
     parser.add_argument("--queue", type=Path)
@@ -1280,7 +1551,9 @@ def main():
     parser.add_argument("--accept-converged-prefix", action="append", default=[],
                         help="Explicit reviewed failed job only; status remains failed and comparison uses actual support")
     args = parser.parse_args()
-    if args.action == "prepare-event-continuation":
+    if args.action == "calibration-review":
+        result = [calibration_review(args.out, args.controls)]
+    elif args.action == "prepare-event-continuation":
         result = prepare_event_continuation(args.out)
     elif args.action == "prepare-event":
         result = prepare_event(args.controls or OUT, args.out, args.endpoint_receipt)
