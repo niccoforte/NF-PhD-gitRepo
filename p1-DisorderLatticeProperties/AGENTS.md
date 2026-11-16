@@ -61,9 +61,10 @@ In practical terms:
   establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
   records audit products and named temporary files without cleanup authority.
 - Final figures require explicit user approval before any change. The approved
-  pre-filter validation figures are restored (14native,2recovery,2predictions),
-  bound by audit/paper/approved-figure-recipe.json. Butterworth calculations
-  remain separate; ordinary notebook/CLI comparison refreshes cannot overwrite figures. Their supplement is source-hash-bound and
+  Fig8 values remain pre-filter; selected Fig10 uses12 filtered native values,
+  2 raw hex10mm fallbacks and4 caption-disclosed supplements. Its separate source
+  and all figure hashes are bound by audit/paper/approved-figure-recipe.json.
+  Ordinary notebook/CLI refreshes cannot overwrite figures. Their supplement is source-hash-bound and
   displayed with common Current study circles and case-specific captions; it never overwrites native KJ or
   negative areas. Other diagnostic alternatives stay in `audit/benchmark`.
   Relative-density axes match the common nominal density without input changes.

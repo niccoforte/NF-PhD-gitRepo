@@ -1,7 +1,6 @@
 # p1 Notebook Agent Context
 
-P1 notebook/validation layer: mechanics, data processing, effective properties,
-convergence and displacement plots. Read called `resources/` helpers before edits.
+P1 mechanics/validation notebooks. Read called `resources/` helpers before edits.
 
 ## Workflow Role
 
@@ -67,9 +66,10 @@ convergence and displacement plots. Read called `resources/` helpers before edit
   Refresh it before final cleanup.
 - Final figures require explicit user approval before any change. Default
   comparison refreshes never write them; --write-paper is approval-only.
-  The approved pre-filter display is restored:14native,2recovery,2predictions.
-  Its hash-bound recipe is audit/paper/approved-figure-recipe.json; forward
-  Butterworth calculations remain separate. Preserve every point's provenance.
+  Fig8 stays pre-filter. Selected Fig10 has12 filtered native values,2 raw
+  hex10mm fallbacks and4 disclosed supplements; caption/data retain exceptions.
+  audit/paper/approved-figure-recipe.json binds each figure; its Fig10 source is
+  separate. The obsolete density-chart renderer is retired; preserve source data.
   `audit/paper` holds PNG/PDF/SVG, point/exclusion tables and captions. Fig10
   uses nominal density, direct3mm references and declared10mm length scaling.
   Fig8b sqrt3 views alter display ordinates only, with factors/captions; base K
@@ -101,7 +101,7 @@ convergence and displacement plots. Read called `resources/` helpers before edit
   mesh/BC/periodic-patch proof; never use it for nonlinear fracture or loading
   rate equivalence. New13% hexagonal controls remain separate supplemental solves.
 - `AK-DataProcessing.ipynb` and `AK-InputsOutputs.ipynb` are legacy Akash-data workflows using `DATA(path=0, ...)`; do not mix them into the current Ti data pipeline unless the user asks.
-- `FunctionApproximation.ipynb`, `Sampling.ipynb`, and `QuickPlots..ipynb` are exploratory research notebooks. Treat them as prototypes unless the user makes one active.
+- `FunctionApproximation.ipynb`, `Sampling.ipynb`, `QuickPlots..ipynb`: prototypes unless made active.
 
 ## Data Conventions
 

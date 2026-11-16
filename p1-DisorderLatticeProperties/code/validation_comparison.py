@@ -552,112 +552,6 @@ def plot_fig8(records, fig8, material, out, panel, principal=False):
     plt.close(fig)
 
 
-def plot_figure10_density(records, reference_rows, out):
-    """Reconstruct source K-density axes without altering literal digitisation.
-
-    The manuscript's nominal density assignment is used for physical density;
-    printed source x coordinates remain separate, unchanged CSV fields. A 10mm
-    p1 result projected to 3mm is a scaling prediction, never direct 3mm data.
-    """
-    import matplotlib
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from matplotlib.lines import Line2D
-    from matplotlib.ticker import NullFormatter
-
-    colors = {"tri": "#c43b3b", "kagome": "#303030", "hex": "#4c8c50"}
-    names = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal"}
-    fig, ax = plt.subplots(figsize=(11.2, 7.4), constrained_layout=True)
-    output = []
-    for topology in TOPOLOGIES:
-        for stage in ("initial", "final"):
-            points = sorted((r for r in reference_rows if r["topology"] == topology
-                             and r["stage"] == stage), key=lambda r: float(r["nominal_relative_density"]))
-            x = np.array([float(r["nominal_relative_density"])*4500 for r in points])
-            y = np.array([float(r["K_MPa_sqrt_m"]) for r in points])
-            low = np.array([float(r["K_graphical_lower"]) for r in points])
-            high = np.array([float(r["K_graphical_upper"]) for r in points])
-            ax.errorbar(x, y, yerr=[y-low, high-y], color=colors[topology],
-                        marker="^" if stage == "initial" else "v", ls="-" if stage == "initial" else "--",
-                        mfc=colors[topology] if stage == "initial" else "white", capsize=3, lw=1.2, ms=6)
-            for point in points:
-                output.append({**point, "source": "Hsieh_Fig10", "plot_density_kg_m3": float(point["nominal_relative_density"])*4500,
-                               "plot_density_basis": "MANUSCRIPT_INTERPRETATION_nominal_rho_times_4500_not_literal_printed_x",
-                               "plot_K_MPa_sqrt_m": float(point["K_MPa_sqrt_m"]),
-                               "length_basis": "published_3mm", "source_ordinate_altered": False})
-    method_handles = {}
-    for row in records:
-        if row["l_mm"] not in LENGTHS or row["relative_density"] not in DENSITIES:
-            continue
-        length = row["l_mm"]
-        factor = math.sqrt(length/3.)
-        value = row.get("KJ_MPa_sqrt_m")
-        signed = row.get("signed_area_KJ_diagnostic_MPa_sqrt_m")
-        item = {**row, "stage": "initial_estimate", "quantity": "initial_KJ_estimate",
-                "plot_density_kg_m3": row["relative_density"]*4430,
-                "plot_density_basis": "p1_nominal_rho_times_source_parent_density_4430",
-                "plot_K_MPa_sqrt_m": value/factor if value is not None else None,
-                "plot_signed_area_diagnostic_MPa_sqrt_m": signed/factor if signed is not None else None,
-                "length_basis": "direct_3mm_simulation" if length == 3 else "PREDICTION_10mm_K_divided_by_sqrt_10_over_3",
-                "length_scale_factor_applied": 1/factor}
-        output.append(item)
-        family, _, marker = selected_method_style(row["method"])
-        if row["value_status"] != "available_provisional" or value is None:
-            if signed is not None and signed > 0:
-                ax.plot(item["plot_density_kg_m3"], signed/factor, marker="x", color="#a12a2a", ls="none", ms=7)
-                label = family + ": invalid area diagnostic"
-                method_handles.setdefault(label, Line2D([], [], color="#a12a2a", marker="x", ls="none"))
-            continue
-        if row["method"] == "native_energy_eta" and length == 10:
-            marker = "D"
-        face = colors[row["topology"]] if length == 3 else "none"
-        ax.plot(item["plot_density_kg_m3"], item["plot_K_MPa_sqrt_m"], color=colors[row["topology"]],
-                marker=marker, mfc=face, mec=colors[row["topology"]], ls="none", ms=8, mew=1.4)
-        label = family + (
-            "\ndirect 3mm" if length == 3 else "\n10mm -> 3mm scaling prediction")
-        method_handles.setdefault(label, Line2D([], [], color="#333333", marker=marker, mfc="#333333" if length == 3 else "none", ls="none"))
-    # Retain exact coordinates when two direct observations visually coincide.
-    direct = sorted((r for r in records if r["l_mm"] == 3 and r["method"] == "native_energy_eta"
-                     and r["value_status"] == "available_provisional"
-                     and r.get("KJ_MPa_sqrt_m") is not None), key=lambda r: (r["relative_density"], r["KJ_MPa_sqrt_m"]))
-    for first, second in zip(direct, direct[1:]):
-        if (first["relative_density"] == second["relative_density"] and first["topology"] != second["topology"]
-                and abs(first["KJ_MPa_sqrt_m"]/second["KJ_MPa_sqrt_m"]-1) < .005):
-            ax.annotate("3mm {}/{}: {:.2f}/{:.2f}".format(first["topology"], second["topology"],
-                        first["KJ_MPa_sqrt_m"], second["KJ_MPa_sqrt_m"]),
-                        xy=(first["relative_density"]*4430, first["KJ_MPa_sqrt_m"]), xytext=(-30, 27),
-                        textcoords="offset points", ha="right", fontsize=8,
-                        bbox={"facecolor":"white", "alpha":.9, "edgecolor":"none", "pad":1},
-                        arrowprops={"arrowstyle":"-", "color":"#666666", "lw":.7})
-    topology_handles = [Line2D([], [], color=colors[t], lw=2, label=names[t]) for t in TOPOLOGIES]
-    source_handles = [Line2D([], [], color="#333333", marker="^", ls="-", label="Hsieh initial KJIC (3mm)"),
-                      Line2D([], [], color="#333333", marker="v", mfc="white", ls="--", label="Hsieh final KJFC (3mm)")]
-    fig.legend(topology_handles+source_handles+list(method_handles.values()),
-               [h.get_label() for h in topology_handles+source_handles]+list(method_handles),
-               loc="outside lower center", ncol=3, fontsize=8)
-    ax.set(xscale="log", yscale="log", xlabel=r"Physical density (kg m$^{-3}$)",
-           ylabel=r"$K_J$ (MPa$\sqrt{\mathrm{m}}$)", xlim=(530, 1000), ylim=(1.5, 65))
-    ax.set_xticks([585, 720, 900], ["585", "720", "900"])
-    ax.xaxis.set_minor_formatter(NullFormatter())
-    ax.grid(alpha=.22, which="both")
-    unavailable = [row for row in records if row["value_status"] != "available_provisional"]
-    status_note = ("\n{} selected calculations have unavailable KJ{}.".format(len(unavailable),
-                   " because their initial-triangle areas are negative" if all(negative_area(row) for row in unavailable) else "")
-                   if unavailable else "")
-    if any(row.get("signed_area_KJ_diagnostic_MPa_sqrt_m") is not None for row in unavailable):
-        status_note += " Crosses show finite signed-area diagnostics only."
-    ax.text(.02, .98, "Source graphical bounds apply to K only.\nP1 initiation is compared with source initial KJIC; p1 final toughness is not computed." + status_note,
-            transform=ax.transAxes, va="top", fontsize=8,
-            bbox={"facecolor":"white", "alpha":.9, "edgecolor":"none", "pad":3})
-    fig.suptitle("Figure 10 reconstruction - manuscript density interpretation\n"
-                 "Hsieh: nominal rho x 4500 kg/m3; p1: nominal rho x 4430 kg/m3\n"
-                 "Printed source density x coordinates differ by about 10x and remain unchanged in the CSV.\n"
-                 + selected_method_note(records), fontsize=10)
-    fig.savefig(out / "figure10-validation.png", dpi=210)
-    plt.close(fig)
-    write_rows(out / "figure10-density-comparison.csv", output)
-
-
 def plot_normalisation_sensitivity(records, fig8, material, out):
     import matplotlib
     matplotlib.use("Agg")
@@ -1135,7 +1029,6 @@ def run(root="Z:/p1/sims/Ti/Validation", output=None, final_results=None,
     plot_comparison(principal, reference, out, differences=True, principal=True)
     plot_comparison(controls, reference, out)
     plot_comparison(controls, reference, out, differences=True)
-    plot_figure10_density(principal, reference_rows, out)
     summary_fields = ("case_id", "topology", "l_mm", "relative_density", "nnx", "endpoint", "endpoint_time_s",
                       "method", "work_partition", "loading_state", "source_work_convention", "initial_stiffness_N_per_mm",
                       "compliance_source", "KI_MPa_sqrt_m", "KJ_MPa_sqrt_m", "Apl_Nmm", "Apl_N_mm",

@@ -446,10 +446,15 @@ without deleting anything. `audit/cleanup-review.json` extends that inventory
 to code/notebook cleanup, legacy workbook values and audit additions, competing
 early reviews, backup states and pending reference capture. Refresh both before
 final cleanup; source values and unique temporary evidence must be preserved.
-Final validation figures in `audit/paper` are frozen at the author's approved
-pre-filter values:14 native points,2 recovery indices and2 declared predictions.
-Their inputs and hashes are in `approved-figure-recipe.json`. The forward
-Butterworth calculation CSV remains separate and unchanged. **Never change final
+Final validation figures in `audit/paper` are author-selected frozen outputs.
+Figure10 uses12 capped causal Butterworth native values,2 original raw hex10mm
+fallbacks (16%,20%) and the same4 disclosed recovery/prediction supplements.
+Its caption/data record every exception; this is not an all-filtered result.
+Figure8 versions are unchanged. Inputs/hashes are in approved-figure-recipe.json;
+figure10-finalization.json records the verified selection and4 retired renders.
+The obsolete mass-density Figure10 renderer/caller is removed, so routine
+diagnostic refreshes do not recreate it. Original research sources are retained.
+The forward calculation CSV remains separate and unchanged. **Never change final
 figures without explicit user approval.** `validation_comparison.py` defaults to
 diagnostics only; `--write-paper` is reserved for an explicitly approved figure
 operation and accepts `--final-results`/`--paper-supplement` source paths.

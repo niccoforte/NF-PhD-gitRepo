@@ -18,6 +18,10 @@ instructions. Refresh them before the final review.
 - [ ] Retain the user-approved validation figures and their frozen input recipe
   in `Z:/p1/sims/Ti/Validation/audit/paper/approved-figure-recipe.json`. Final figures
   may change only after explicit user approval; diagnostic recalculation is separate.
+- [x] Retire4 superseded Figure10 renders after verified author selection16November;
+  figure10-finalization.json records exact paths/hashes. Keep original scientific
+  sources, calculation provenance and all other current figures. The obsolete
+  density-chart renderer is removed so default refreshes cannot recreate it.
 - [ ] Review all audit outputs, including filtering galleries, stiffness history,
   axis examples, modal controls, FCC feasibility controls and published benchmarks.
   Keep the minimum reproducible evidence; remove superseded renders and bulk.

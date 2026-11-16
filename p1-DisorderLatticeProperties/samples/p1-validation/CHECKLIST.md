@@ -8,9 +8,11 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 - [x] Consolidate useful Ti validation sources, recover native histories and
   reconcile the20 Review lattices.py findings with verified foundation fixes.
-- [x] Restore the author-approved pre-filter validation figures:14native,
-  2recovery and2declared predictions. Keep forward Butterworth calculation
-  outputs separate. Final figures require explicit permission before any change.
+- [x] Select final Figure10 on16November:12 Butterworth native points plus
+  2 original raw hex10mm16/20% fallbacks and4 unchanged recovery/prediction
+  supplements, disclosed in caption/data. Keep plot labels/axes/titles/legend.
+  Fig8 remains unchanged; retire older Figure10 renders after verification.
+  Final figures require explicit permission before any further change.
   Direct3mm Fig10 is primary;10mm references are declared length-scaled values.
   No further full-fracture completion campaign is selected. No clipping negative Apl.
 - [x] Retain Appendix C quasi-isotropy approximation for tri/kagome/hex and

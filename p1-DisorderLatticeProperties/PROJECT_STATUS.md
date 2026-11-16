@@ -36,7 +36,13 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   are diagnostics, not qualified events. Dense causal100/50Hz changes at a
   fixed event include endpoint delay, not solely force-opening shape distortion.
   Shared producer/Props/MLdata migration remains outstanding.
-  The approved18-point recipe/all15 final files remain unchanged and frozen.
+  Figure10 is now author-selected:12 Butterworth native points,2 original raw
+  hex10mm16/20% fallbacks and4 unchanged recovery/prediction supplements. Caption
+  and data disclose exceptions; this is not uniform filtering. Labels/axes/titles/
+  legend are unchanged; the other12 final figure files retain their hashes.
+  Four obsolete Figure10 renders were removed with source/calculation evidence
+  retained. figure10-finalization.json and approved-figure-recipe.json own this
+  selection; no shared population calculation or manuscript was changed.
   FCC same-interval total-J verification supports the examined ordered geometry
   with prescribed eta2.261: original-flow equivalent-K residual4.02-4.68% near
   initiation. A conditional potential-reference late-window fit eta1.804787

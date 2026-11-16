@@ -93,8 +93,10 @@ paired coordinates for physical properties. This migration remains deferred.
   eta-J estimates. Source hashes, event brackets and invalid negative areas
   survive this comparison boundary. An alternate work estimate is not ASTM J.
   Final figures are author-approved frozen outputs, requiring explicit approval
-  before changes. Their pre-filter input recipe remains separate from forward
-  Butterworth calculation CSVs; default comparison refreshes do not overwrite them.
+  before changes. Fig8 keeps its pre-filter recipe; selected Fig10 has12 filtered
+  native values,2 raw hex10mm exceptions and4 disclosed supplements with a separate
+  source. Default diagnostics do not overwrite final figures or regenerate the
+  retired mass-density Figure10 renderer. Shared population labels are unchanged.
   Adopted recovery/prediction supplements retain separate point provenance.
   Equal nominal densities share an x coordinate. Never silently substitute a
   control history or force-fit literature ordinates; negative areas stay invalid.
