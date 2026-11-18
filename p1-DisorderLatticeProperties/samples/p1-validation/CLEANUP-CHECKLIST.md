@@ -45,6 +45,9 @@ instructions. Refresh them before the final review.
   Include calibration-review native energy histories, train/holdout metadata and
   provisional coefficient plots. A conditional fitted coefficient is not accepted
   production output; retain only the final chosen calibration evidence.
+  Include original-flow-strip and Z:/codex-p1-fcc-strip-20261118. Keep the
+  deterministic mesh generator, source manifests and verified observations until
+  the domain and C(T) transfer checks are resolved.
 - [ ] Retain the accepted hex stiffness catalogue and nine source-exact controls;
   reconcile it with saved Props in the population pass. Retire superseded filter
   galleries/conditional CLI routes after the selected capped rule is integrated.

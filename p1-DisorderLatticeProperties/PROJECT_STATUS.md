@@ -30,9 +30,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   already disagree prefracture and the launcher warns of low cutoff/increment-
   rate instability. UT was intentionally stopped after >50ms when postfracture
   increments collapsed. Its dead-worker review retained delivery/failed status
-  and settled the owner; no implicit completion. A byte-identical FT precision
-  control is submitted under double-precision with double=both,8CPUs; inspect
-  live state before reporting results. Coarse all-model LE/energy startup probes
+  and settled the owner; no implicit completion. The byte-identical FT precision
+  control completed 12 November at 19:08 UTC with double=both, eight CPUs, and
+  verified source/delivery hashes. Its built-in 318.16 Hz filtered work agrees
+  with dense causal SOS within 0.004% at the recorded 23.5 ms diagnostic
+  endpoint. Double precision resolves the observed single-precision filter
+  discrepancy; it does not remove causal lag. Coarse all-model LE/energy startup probes
   are diagnostics, not qualified events. Dense causal100/50Hz changes at a
   fixed event include endpoint delay, not solely force-opening shape distortion.
   Shared producer/Props/MLdata migration remains outstanding.
@@ -51,9 +54,20 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   qualifies original-flow eta; potential/material/elastic residuals and the
   shared90mm control remain. A published original-flow long-strip J=H*W_far
   route is identified, requiring CT/strip constraint/local-field checks and
-  holdout geometry before coefficient transfer. No new FCC campaign submitted.
+  holdout geometry before coefficient transfer. In the original-law H=90 mm
+  strip pilot the uncracked calibration matched initial C22 within 0.013% and
+  pin work agreed with ALLWK. The cracked job was stopped after repeat cutbacks
+  concentrated at the free end around x=536–540 mm (tip at x=90 mm); its incomplete
+  delivery is preserved. Last retained crack-tip LE11=.0500, below .1105, at
+  an applied strip-energy diagnostic of49.45 N/mm. An H=190 mm original-law pair with controlled far end
+  and separate energy bands is submitted serially. Read live queue state under
+  audit/fcc-calibration/original-flow-strip/queue-h190far. The single original
+  C(T) initiation prediction is J=142.638 N/mm with eta=2.261, distinct from
+  interval-averaged values. No fitted coefficient is promoted.
   Omidi reproduction is NOT qualified as external lattice validation. The
-  polymer20% CT failed before initiation;25/30% were not submitted. Three elastic
+  polymer20% CT failed Standard increment convergence before recorded initiation;
+  its current ODB hash differs from the archived delivery/extraction hash.
+  25/30% were not submitted. Three elastic
   CT checks are pin-controlled. Three109l/10B21-per-bar boundary-layer cases with
   the released source notch phase differ-4.1/-11.2/-19.3% from Table3's fitted
   law. The separately rendered Fig2c-centred notch changes the critical bar to

@@ -143,9 +143,12 @@ This replaces accumulated superseded proposals; it is the single task register.
   the potential law,2.576% for original-flow transfer. It is not a production
   coefficient or independent original-flow validation; its elastic residual,
   material approximation and shared90mm control remain explicit.
-  Assess the published original-flow long-strip route J=H*W_far before a new
-  calibration campaign; CT/strip constraint and local-field agreement plus
-  held-out geometry are required. Do not infer eta from total-J agreement alone.
+  Original-law long-strip pilot is under audit/fcc-calibration/original-flow-strip.
+  H=90 mm calibration completed; the cracked run was stopped at repeated
+  remote-edge cutbacks. H=190 mm controlled-far-end pair submitted for
+  observability with two far-ahead energy bands and one wake band.
+  Qualify far-ahead work, initiation, size/mesh convergence and C(T) local-field
+  transfer before interpreting held-out crack geometries and fitting eta.
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.
