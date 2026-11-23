@@ -60,7 +60,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Kagome jobs reached the original-notch initiation bracket. At the last
   intact opening the load/work estimates are 2.339/2.162 versus ASTM 2.259,
   with equivalent-K sensitivity under 0.81% to these substitutions. Hexagonal
-  has no qualifying common monotone plastic branch. [Isotropic record](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/README.md)
+  has no qualifying common monotone plastic branch. The longest-notch ODB
+  confirms positive material dissipation despite negative initial-triangle
+  work. A triangular initiation-bracket extension and the direct-LE11 FCC
+  repeat are registered serially. Their collectors reuse the exact 1 N
+  controls and report the physical range reached. [Isotropic record](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/README.md) ·
+  [FCC handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-le-bracket/handoff-state.json)
   Omidi reproduction is NOT qualified as external lattice validation. The
   polymer20% CT failed Standard increment convergence before recorded initiation;
   its current ODB hash differs from the archived delivery/extraction hash.

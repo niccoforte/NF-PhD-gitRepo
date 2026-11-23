@@ -133,6 +133,18 @@ This replaces accumulated superseded proposals; it is the single task register.
   At the last intact opening, load/work eta are 2.339/2.162 against ASTM
   2.259, changing equivalent K by +0.65%/-0.80%. Compliance and fit-window
   sensitivity limit independent factor identification. [Kagome results](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/kagome-bracket/eta-results.json)
+- [ ] Process the triangular three-notch extension at the directly observed
+  initiation bracket. The original-law models and R2 1 N controls are retained.
+  [Serial jobs](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/tri-bracket/queue/state.json)
+- [x] Diagnose the hexagonal signed plastic work from the exact R2 ODBs. At the
+  longest notch, Abaqus reports +16,713 Nmm plastic dissipation despite a
+  -588 Nmm initial-triangle area. The archived elastic and unloading controls
+  explain why repeating the same work partition cannot identify ASTM eta.
+  [Energy receipt](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/hex-energy-check.json)
+- [ ] Apply the same load-separation check to FCC with direct LE11 output and
+  source-matched 80, 90 and 100 mm notches. The registered successor waits for
+  triangular to settle. Qualify the observed bracket and common range before
+  interpreting any coefficient. [Handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-le-bracket/handoff-state.json)
 - [x] Replay the ordered FCC size series at the approved 225 Hz C(T) cutoff.
   Ortega plus prescribed ASTM eta gives equivalent K differences of +3.76%,
   +1.83%, +0.57% against the scaled beam reference for nx20, 30, 40. The
