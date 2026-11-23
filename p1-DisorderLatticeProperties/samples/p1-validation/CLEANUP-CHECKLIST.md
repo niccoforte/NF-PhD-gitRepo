@@ -1,8 +1,10 @@
 # SimCheck cleanup checklist
 
-This is the separate cleanup checklist for this research task. Cleanup is deferred
-until the user reviews it at the end. Do not delete evidence or change approved
-final figures while the calculation and manuscript work continues.
+This is the separate cleanup checklist for this research task. Keep it current
+while the work progresses. Cleanup begins only after the user reviews the
+completed research checklist and explicitly approves the cleanup scope. Do not
+delete evidence or change approved final figures while the calculation and
+manuscript work continues.
 
 The [research checklist](CHECKLIST.md) tracks scientific work. The
 [machine-readable register](Z:/p1/sims/Ti/Validation/audit/cleanup-review.json) and
@@ -27,6 +29,10 @@ instructions. Refresh them before the final review.
   the temporary render copies were removed. The folder holds the staged review,
   rollback metadata and data, and the Matplotlib cache. Keep only evidence still
   needed to reproduce or check the `audit/paper` release.
+- [ ] Review `Z:/codex-p1-figure10-20261116` alongside the release references.
+  The machine-readable register identifies it as the earlier staging root.
+  Check the retained release and rollback records for dependencies on its
+  scripts and receipts before proposing any disposition.
 - [ ] Review all audit outputs, including filtering galleries, stiffness history,
   axis examples, modal controls, FCC feasibility controls and published benchmarks.
   Keep the minimum reproducible evidence; remove superseded renders and bulk.
@@ -86,10 +92,16 @@ instructions. Refresh them before the final review.
   and remove registered Git worktrees through Git before deleting their directories.
 - [ ] Check `C:/temp` and all task-owned scratch locations. Do not sweep unrelated
   temporary files, other projects or original source data.
+- [ ] Resolve ownership of the three adjacent recovery files reported at the
+  drive root: `Z:/codex-handbook-recovery.tmp`,
+  `Z:/codex-memory-summary-recovery.tmp` and
+  `Z:/codex-raw-memories-recovery.tmp`. They appear to contain older Codex
+  memory material. Their creator, relationship to SimCheck, and recovery
+  value are unverified. Keep them pending a separate owner decision.
 - [ ] Resolve pending reference intake and report links before deleting supporting
   extracts or captures. Do not modify the personal memory store as part of cleanup.
 - [ ] Perform the final cross-drive inventory and verify that only accepted code,
   research data, figures and necessary provenance remain. Report retained paths,
   removed paths and any residual dependencies to the user.
 
-No automatic deletion is enabled. Final disposition is reviewed with the user.
+No automatic deletion is enabled.

@@ -29,7 +29,9 @@ In practical terms:
 
 - Validation evidence/report and the unique SimCheck task checklist live in
   `samples/p1-validation/README.md` and `CHECKLIST.md`. Keep the task checklist
-  tracked; generated report/figure outputs remain ignored. Keep accepted active
+  tracked; generated report/figure outputs remain ignored. Use the separate
+  [SimCheck cleanup checklist](samples/p1-validation/CLEANUP-CHECKLIST.md) for
+  temporary work, ownership questions and the final cleanup review. Keep accepted active
   methods/results singular: final integration replaces superseded production,
   workbook and notebook paths after verification, with minimal recovery evidence.
 - Use the approved [response-filtering schedule](FILTERING.md) and its
