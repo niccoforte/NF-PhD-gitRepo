@@ -32,6 +32,11 @@ In practical terms:
   tracked; generated report/figure outputs remain ignored. Keep accepted active
   methods/results singular: final integration replaces superseded production,
   workbook and notebook paths after verification, with minimal recovery evidence.
+- Use the approved [response-filtering schedule](FILTERING.md) and its
+  [exact cutoff registry](code/response_filter_cutoffs.json) for new
+  calculations. Historical modal cutoffs are comparison baselines. SimCheck
+  owns validation and later population recalculation. Corrections edits the
+  manuscript after those checks and calculations are final.
 
 - The consolidated Ti validation collection is `Z:/p1/sims/Ti/Validation`.
   Its `README.md`, `case-index.csv` and `file-manifest.json` define retained cases,

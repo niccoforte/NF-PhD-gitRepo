@@ -14,32 +14,16 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   1964 qualified curve-work estimates and all9 preflagged source-exact elastic
   controls. The9 holdouts completed:6 within5%,3 differ6.4-7.5%. Flag membership
   was frozen before FE; the uniform fallback policy was chosen after review.
-  No additional hex stiffness runs are needed. Filtering implements a candidate
-  archive rule fc=min(2fn,fs/6), causal paired order2/DC; one40%-peak work interval and
-  30/50% quality checks. All64 sampled curves pass,15 elastic controls within5%;
-  10 matched initiation controls change at most.119%load/KI,.828%work from the
-  preceding conditional filter. This is not aliasing reversal or Hsieh's exact
-  solver-rate filter. Bhuwal2021/2023 do not state a cutoff, while Omidi used
-  implicit FE. Dense FCC shows aliasing risk and lower cutoffs change event
-  work; the candidate is not yet qualified as a quasistatic envelope. Two exact
-  full-ID336 hex output-only replays were submitted serially, FT thenUT,
-  8CPUs/job under audit/curve-processing/output-filter-replays. They preserve
-  source physics and full loading, with100kHz raw histories/four in-solver
-  filters. Inspect actual state/delivery/channel identities before any result
-  claim. Single-precision FT failed after its recorded prefix; named filters
-  already disagree prefracture and the launcher warns of low cutoff/increment-
-  rate instability. UT was intentionally stopped after >50ms when postfracture
-  increments collapsed. Its dead-worker review retained delivery/failed status
-  and settled the owner; no implicit completion. The byte-identical FT precision
-  control completed 12 November at 19:08 UTC with double=both, eight CPUs, and
-  verified source/delivery hashes. Its built-in 318.16 Hz filtered work agrees
-  with dense causal SOS within 0.004% at the recorded 23.5 ms diagnostic
-  endpoint. Double precision resolves the observed single-precision filter
-  discrepancy; it does not remove causal lag. Coarse all-model LE/energy startup probes
-  are diagnostics, not qualified events. Dense causal100/50Hz changes at a
-  fixed event include endpoint delay, not solely force-opening shape distortion.
-  Shared producer/Props/MLdata migration remains outstanding.
-  Figure10 is now author-selected:12 Butterworth native points,2 original raw
+  No additional hex stiffness runs are needed. The author approved the
+  [fixed topology-by-test Butterworth schedule](FILTERING.md). Its machine-readable
+  values live in [the cutoff registry](code/response_filter_cutoffs.json).
+  Qualification covers the screened 10 mm / 20% populations and records the
+  sensitivity limits and the independent half-rate comparisons, including the
+  larger hexagonal C(T) difference. SimCheck will recalculate Figure 10 first,
+  then apply the registry to the later checklist calculations and population
+  replacement. Corrections owns the manuscript appendix and final production
+  update after the checks and recalculation are complete.
+  The 16 November Figure 10 baseline contains:12 Butterworth native points,2 original raw
   hex10mm16/20% fallbacks and4 unchanged recovery/prediction supplements. Caption
   and data disclose exceptions; this is not uniform filtering. Labels/axes/titles/
   legend are unchanged; the other12 final figure files retain their hashes.
@@ -57,7 +41,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   holdout geometry before coefficient transfer. In the original-law H=90 mm
   strip pilot the uncracked calibration matched initial C22 within 0.013% and
   pin work agreed with ALLWK. The cracked job was stopped after repeat cutbacks
-  concentrated at the free end around x=536–540 mm (tip at x=90 mm); its incomplete
+  concentrated at the free end around x=536â€“540 mm (tip at x=90 mm); its incomplete
   delivery is preserved. Last retained crack-tip LE11=.0500, below .1105, at
   an applied strip-energy diagnostic of49.45 N/mm. An H=190 mm original-law pair with controlled far end
   and separate energy bands is submitted serially. Read live queue state under

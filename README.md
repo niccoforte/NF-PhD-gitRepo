@@ -380,6 +380,9 @@ Historical whole-mirror inventories predate this local curation. Do not rerun
 the full mirror just to restore discarded validation scratch or CPU repeats.
 PSC is unchanged and deferred from the current validation review.
 
+The [Paper 1 filtering decision](p1-DisorderLatticeProperties/FILTERING.md) records
+the approved UAT and C(T) cutoff registry, qualification limits, and recalculation order.
+
 The maintained validation audit is in `p1-DisorderLatticeProperties/code/`:
 
 ```powershell

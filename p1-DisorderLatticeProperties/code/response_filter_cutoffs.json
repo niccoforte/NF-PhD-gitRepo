@@ -1,0 +1,27 @@
+{
+  "decision_date": "2026-11-23",
+  "authority": "Author-approved topology-by-test Butterworth cutoff schedule",
+  "test_modes": {"UT": "uniaxial tension", "FT": "compact tension"},
+  "cutoffs_hz": {
+    "tri": {"UT": 241.66666666666666, "FT": 266.6666666666667},
+    "kagome": {"UT": 275.0, "FT": 291.6666666666667},
+    "hex": {"UT": 300.0, "FT": 302.252},
+    "FCC": {"UT": 333.3333333333333, "FT": 225.0}
+  },
+  "filter": {
+    "family": "Butterworth",
+    "kind": "lowpass",
+    "order": 2,
+    "implementation": "causal second-order sections, first-sample DC initialization",
+    "channels": "paired response and conjugate displacement or strain at the same native timestamps",
+    "event_source": "unfiltered material and damage records"
+  },
+  "qualification": {
+    "reference_strut_length_mm": 10,
+    "reference_relative_density": 0.2,
+    "nominal_saved_interval_s": 0.0005,
+    "nominal_saved_sampling_hz": 2000,
+    "screened_history_count": 64,
+    "transfer": "Use the schedule for matching populations and check native sampling and fixed-event effects for other geometries or output cadences before accepting transferred results."
+  }
+}

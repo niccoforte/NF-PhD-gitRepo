@@ -1,18 +1,19 @@
 # SimCheck task checklist
 
 Unique checklist for chat01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated12November2026. [Current evidence and figures](README.md).
+Updated 23 November 2026. [Current evidence and figures](README.md).
 This replaces accumulated superseded proposals; it is the single task register.
 
 ## Accepted scope and decisions
 
 - [x] Consolidate useful Ti validation sources, recover native histories and
   reconcile the20 Review lattices.py findings with verified foundation fixes.
-- [x] Select final Figure10 on16November:12 Butterworth native points plus
+- [x] Retain the verified 16 November Figure 10 as the pre-recalculation baseline:12 Butterworth native points plus
   2 original raw hex10mm16/20% fallbacks and4 unchanged recovery/prediction
   supplements, disclosed in caption/data. Keep plot labels/axes/titles/legend.
   Fig8 remains unchanged; retire older Figure10 renders after verification.
-  Final figures require explicit permission before any further change.
+  The author approved this Figure 10 recalculation on 23 November. Other
+  final figure changes still require explicit approval.
   Direct3mm Fig10 is primary;10mm references are declared length-scaled values.
   No further full-fracture completion campaign is selected. No clipping negative Apl.
 - [x] Retain Appendix C quasi-isotropy approximation for tri/kagome/hex and
@@ -67,37 +68,26 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 ## Shared calculations before population replacement
 
-- [x] Adopt Hsieh's filtered mechanical response for FT performance calculations:
-  causal Butterworth,fc=2fn from the matched specimen's lowest physical mode.
-  Filtered endpoint load and filtered P-v work feed KI,Apl,J,KJ consistently.
-  Order2/DC is an explicit Abaqus-default reconstruction choice; the paper does
-  not state the order. Moving averages and.4Nyquist forward/backward examples
-  are diagnostics, not the selected primary method. Material events stay native.
-- [x] Implement one candidate archive rule fc=min(2fn,fs/6), causal order2/DC paired filtering.
-  All64 sampled curves pass the common40%-peak stiffness-window checks. Versus
-  the previous conditional rule,10 fixed-material controls change at most.119%
-  load/KI and.828%work. Uniformfs/6 was tested but can raise slow-cutoff hex
-  initiation load8.6%; keep the modal upper limit. No aliasing-recovery claim.
-  New figures/metrics live in accepted-filter-study/capped-physical-fs6; reuse
-  seven unchanged galleries, replacing only the changed kagomeFT gallery.
-- [ ] Finish specimen-specific filter qualification before production adoption.
-  Bhuwal2021/2023 do not report a cutoff prescription; Omidi uses implicit FE.
-  A dense FCC record demonstrates pre-save aliasing risk, while lower cutoffs
-  change fixed-event work substantially. Two output-only hex full-ID336 replays
-  retain original physics/full0.1s loading, dense100kHz histories and four
-  in-solver filter channels. FT then UT,8CPUs serial; manifest/state under
-  audit/curve-processing/output-filter-replays. Check actual delivery, raw/source
-  equivalence, native events/energies, causal lag and pre-decimation filtering.
-  fs/6 is antialias-inspired, not independently validated quasistatic smoothing.
-  Single-precision named-filter outputs disagree before fracture; Abaqus warns
-  of too-small cutoff/increment-rate ratio. A byte-identical FT double=both
-  control is submitted separately. UT was intentionally stopped after >50ms
-  of data/postfracture step collapse; preserve its failed/termination records
-  and reviewed dead-worker delivery. Assess causal delay at fixed-event times
-  separately from shape/work at common physically observed opening.
-  FT common12mm work changes only-.182/-.296/-.409% at318/100/50Hz; fixed-time
-  changes-6.24/-18.23/-34.35% are mainly endpoint delay. Do not interpret them
-  as equal envelope distortion or silently compensate a native fracture event.
+- [x] Approve the fixed topology-by-test Butterworth cutoffs, the paired causal
+  order-two implementation, and native material events. Use the exact
+  [registry](../../code/response_filter_cutoffs.json). See [the filtering
+  rationale](../../FILTERING.md) for the rounded table, scope, sweep thresholds,
+  examples, and independent checks. The earlier modal archive cutoff and
+  solver-output trials remain baseline comparisons in the evidence report.
+- [ ] Recalculate and update the final Hsieh Figure 10 comparison first. Use
+  the approved C(T) cutoff for each current-study topology. Run the transfer
+  checks on 3 mm and other off-screen geometries. Verify sampling, initiation
+  status, and signed plastic area. Preserve the reference, plot conventions,
+  and traceable status of any fallback or supplementary point.
+- [ ] Apply the registry to subsequent checklist calculations and their pilot,
+  then reprocess the full population. Preserve the 40%-work stiffness method
+  and exact elastic fallbacks. Track the independent half-rate differences and
+  any failed or censored cases as part of the pilot.
+- [ ] Once all checks and population values are final, SimCheck passes the
+  manuscript work to Corrections. Update the methods reference and relevant
+  appendix with the approved cutoff table, qualification and its limitations,
+  and raw/filtered examples for periodic and disordered UAT and C(T). Apply
+  final population and figure changes in that manuscript pass.
 - [x] Implement one curve-derived initial-work slope through40% filtered peak,
   with30/50% windows, cutoff sensitivity and energy-curvature screens. All64
   sampled histories pass. Against4 UT controls errors-.33/+3.34%; against11

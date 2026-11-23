@@ -24,13 +24,9 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
   `validation_queue.py` alone submits reviewed immutable manifests,8CPUs serial,
   verifies delivery and cleans only owned scratch; each continuation has a
   distinct queue root. Failed packaging remains failed pending pinned review.
-  Modal actions prepare_periodic/prepare_iso cover population8 and selected
-  ISO sources; iso_map joins verified frequencies. Use causal
-  order2/DC Butterworth at2fn for matching disorder, no disordered modal jobs.
-  `validation_stiffness.py` defaults to candidate fc=min(2fn,fs/6), order2/DC
-  paired SOS; it cannot undo aliasing or qualify a quasistatic envelope by itself.
-  Output-only hex replays compare dense/native/in-solver filters without changing
-  source physics; preserve failed status and verify source/delivery/channel identity.
+  Modal controls cover periodic and selected isotropic models. Their cutoffs
+  are comparison baselines. Transfer the approved schedule within matching
+  families and preserve native histories and verified output-only replay receipts.
   Use one40%-peak work slope,30/50% quality checks; flagged-hex-curves plots all9.
   accepted_hex_stiffness retains1964 curves plus all9 preflagged elastic controls;
   preserve source/selection evidence. Props/MLdata migration remains separate.
@@ -122,8 +118,7 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
 - `validation_curve_processing.py` is opt-in, never an MLdata migration.
   --prepare-paired-examples freezes the random seed/IDs; Abaqus Python
   --extract-paired-examples reads native pairs; --paired-examples writes8galleries.
-  Native-only2fn galleries retain sampling limits; accepted-filter-study uses
-  validation_stiffness sampling adaptation, without changing approved figures.
+  Follow [FILTERING.md](../FILTERING.md) for approved cutoffs and transfer checks.
   Keep material events native; no continuum-only lattice-validation claim.
 
 ## Shared Calculation Checks
