@@ -65,10 +65,11 @@ In practical terms:
   are separate calculations; a positive alternative work estimate does not
   establish agreement with Hsieh's procedure or qualify ASTM J. The inventory
   records audit products and named temporary files without cleanup authority.
-- Final figures require explicit user approval before any change. The approved
-  Fig8 values remain pre-filter; selected Fig10 uses12 filtered native values,
-  2 raw hex10mm fallbacks and4 caption-disclosed supplements. Its separate source
-  and all figure hashes are bound by audit/paper/approved-figure-recipe.json.
+- Final figures require explicit user approval before any change. Figure 8
+  retains its approved values. The fixed-cutoff Figure 10 uses 14 filtered
+  native values, one raw fallback, one recovery index and two predictions.
+  The caption discloses the exceptions. The results and transfer checks, plus
+  all figure hashes, are bound by audit/paper/approved-figure-recipe.json.
   Ordinary notebook/CLI refreshes cannot overwrite figures. Their supplement is source-hash-bound and
   displayed with common Current study circles and case-specific captions; it never overwrites native KJ or
   negative areas. Other diagnostic alternatives stay in `audit/benchmark`.

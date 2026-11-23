@@ -8,12 +8,9 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 - [x] Consolidate useful Ti validation sources, recover native histories and
   reconcile the20 Review lattices.py findings with verified foundation fixes.
-- [x] Retain the verified 16 November Figure 10 as the pre-recalculation baseline:12 Butterworth native points plus
-  2 original raw hex10mm16/20% fallbacks and4 unchanged recovery/prediction
-  supplements, disclosed in caption/data. Keep plot labels/axes/titles/legend.
-  Fig8 remains unchanged; retire older Figure10 renders after verification.
-  The author approved this Figure 10 recalculation on 23 November. Other
-  final figure changes still require explicit approval.
+- [x] Preserve the approved Figure 10 axes, labels, titles and legend in the
+  23 November fixed-cutoff update. Figure 8 remains frozen. Changes to other
+  final figures require explicit approval.
   Direct3mm Fig10 is primary;10mm references are declared length-scaled values.
   No further full-fracture completion campaign is selected. No clipping negative Apl.
 - [x] Retain Appendix C quasi-isotropy approximation for tri/kagome/hex and
@@ -74,15 +71,25 @@ This replaces accumulated superseded proposals; it is the single task register.
   rationale](../../FILTERING.md) for the rounded table, scope, sweep thresholds,
   examples, and independent checks. The earlier modal archive cutoff and
   solver-output trials remain baseline comparisons in the evidence report.
-- [ ] Recalculate and update the final Hsieh Figure 10 comparison first. Use
-  the approved C(T) cutoff for each current-study topology. Run the transfer
-  checks on 3 mm and other off-screen geometries. Verify sampling, initiation
-  status, and signed plastic area. Preserve the reference, plot conventions,
-  and traceable status of any fallback or supplementary point.
-- [ ] Apply the registry to subsequent checklist calculations and their pilot,
-  then reprocess the full population. Preserve the 40%-work stiffness method
-  and exact elastic fallbacks. Track the independent half-rate differences and
-  any failed or censored cases as part of the pilot.
+- [x] Recalculate and update the final Hsieh Figure 10 comparison with the
+  approved C(T) registry. The 16 native histories pass sampling and event
+  transfer checks. The display contains 14 filtered native points and the
+  disclosed hexagonal 10 mm/20% raw fallback, 3 mm/20% recovery estimate,
+  and two 13% predictions. Five cases exceed at least one archive-baseline
+  response tolerance. The underlying table preserves signed areas, native
+  event brackets, and the sensitive 3 mm/20% filtered candidate.
+  [Transfer checks](Z:/p1/sims/Ti/Validation/audit/paper/figure10-transfer-checks.csv)
+- [x] Apply the registry to the frozen 64-history population pilot. All response
+  curves and 40%-work fits resolve. Sixteen short histories keep their original
+  position masks. Native section fields support 31 of 32 C(T) endpoints.
+  Triangular full ID 661 records damage before the strain criterion. Hexagonal
+  mechanism FT ID 336 has negative plastic work in the curve-stiffness check.
+  The 1% UAT work endpoint is censored for hex full ID 826 and FCC mechanism
+  ID 717. [Pilot report](Z:/p1/sims/Ti/Validation/audit/curve-processing/accepted-filter-study/fixed-cutoff-pilot/pilot.json)
+- [ ] Reprocess the full population after the remaining shared-calculation and
+  convergence checks. Requalify hexagonal UAT curve stiffness at 300 Hz, keep
+  the nine source-exact elastic fallbacks and transfer the native-event and
+  censoring rules before replacing saved results.
 - [ ] Once all checks and population values are final, SimCheck passes the
   manuscript work to Corrections. Update the methods reference and relevant
   appendix with the approved cutoff table, qualification and its limitations,

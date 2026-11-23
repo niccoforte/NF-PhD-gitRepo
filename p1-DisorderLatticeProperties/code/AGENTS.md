@@ -24,12 +24,10 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
   `validation_queue.py` alone submits reviewed immutable manifests,8CPUs serial,
   verifies delivery and cleans only owned scratch; each continuation has a
   distinct queue root. Failed packaging remains failed pending pinned review.
-  Modal controls cover periodic and selected isotropic models. Their cutoffs
-  are comparison baselines. Transfer the approved schedule within matching
-  families and preserve native histories and verified output-only replay receipts.
-  Use one40%-peak work slope,30/50% quality checks; flagged-hex-curves plots all9.
-  accepted_hex_stiffness retains1964 curves plus all9 preflagged elastic controls;
-  preserve source/selection evidence. Props/MLdata migration remains separate.
+  Modal cutoffs are comparison baselines. Use the approved schedule on native
+  histories and the 40%-peak work slope with 30/50% checks. The old hexagonal
+  catalogue uses 1964 curves and nine frozen elastic fallbacks. Requalify its
+  curve values before reuse. Shared Props/MLdata migration is separate.
   `validation_fcc.py` compares total J on identical crack/opening intervals:
   independent potential-energy derivative versus prescribed ASTM eta prediction,
   with original-flow transfer and failed-prefix support recorded separately.
@@ -40,8 +38,9 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
   diagnostics. CT pin failures and source/paper notch discrepancies remain
   unqualified; do not choose the better-fit phase or submit held mesh/domain jobs.
   Published CT/BL/fitted references remain distinct; no fitted normalisation.
-- `validation_failure_audit.py` binds each of the48 native tensile-strain
-  initiation brackets to saved section damage and source fingerprints.
+- `validation_failure_audit.py` binds initiation to native section observations.
+  `--pilot-events` reads frozen C(T) ODBs without solving. `validation_fixed_filter_pilot.py`
+  uses these receipts for the 64-history pilot with masks and signed-work checks.
   `validation_controls.py` prepares/extracts exact-source B21 conversion and
   initial-compliance controls.
   `prepare_uat_linear` retains exact UAT clamps/sections and computes the initial
@@ -54,25 +53,20 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
   comparison CSV. Hsieh Appendix D uses an initial-slope triangle: negative
   area remains unavailable. Nonlinear recovery and dissipation eta-J estimates
   remain distinct methods, never replacements falsely attributed to Hsieh.
-  `validation_inventory.py` inventories retained evidence and named task scratch;
-  --inspection-index maps retained INPs/ODBs for GUI inspection without copies;
-  its `cleanup-review.json` also covers workbook additions/legacy values, code,
-  early reviews, pending reference capture and temporary evidence dependencies.
-  It never deletes. Continuation `-status.json` receipts are not submission plans.
-  Refresh it before final cleanup.
+  Refresh `validation_inventory.py` before cleanup. `--inspection-index` maps
+  retained INPs/ODBs for GUI inspection without copies. Continuation receipts
+  record evidence and cannot be used as submission plans.
 - Final figures require explicit user approval before any change. Default
   comparison refreshes never write them; --write-paper is approval-only.
-  Fig8 stays pre-filter. Selected Fig10 has12 filtered native values,2 raw
-  hex10mm fallbacks and4 disclosed supplements; caption/data retain exceptions.
-  audit/paper/approved-figure-recipe.json binds each figure; its Fig10 source is
-  separate. The obsolete density-chart renderer is retired; preserve source data.
-  `audit/paper` holds PNG/PDF/SVG, point/exclusion tables and captions. Fig10
-  uses nominal density, direct3mm references and declared10mm length scaling.
-  Fig8b sqrt3 views alter display ordinates only, with factors/captions; base K
-  remains unchanged and neither hypothesis is a verified correction.
-  Use Hsieh et al./Current study source legends, hollow references, layered
-  Current study circles and direct topology labels without coordinate jitter.
-  Internal Simulation IDs and point provenance remain intact.
+  `validation_figure10.py prepare` stages the authorised fixed-cutoff update
+  and its case-level sampling, event and signed-work checks. `promote` requires
+  matching PNG/PDF review hashes and a matching approved baseline. Figure 10
+  has 14 filtered native values, one raw fallback, one recovery index and two
+  predictions, disclosed in the caption and point data. Figure 8 stays frozen.
+  `audit/paper/approved-figure-recipe.json` binds figures and separate inputs.
+  Figure 10 uses nominal density, direct 3 mm data and declared 10 mm scaling.
+  Figure 8b sqrt(3) hypothesis views change only display ordinates. Use hollow
+  Hsieh et al. references, layered Current study circles and no coordinate jitter.
 - `validation_completion.py` prepares the seven absent length/density cases
   under `audit/new-validation`, using archived A1 INPs and verified dimensional
   scaling rather than today's A1 defaults. It never submits; the serial queue

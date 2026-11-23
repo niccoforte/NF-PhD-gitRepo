@@ -19,9 +19,14 @@ instructions. Refresh them before the final review.
   in `Z:/p1/sims/Ti/Validation/audit/paper/approved-figure-recipe.json`. Final figures
   may change only after explicit user approval; diagnostic recalculation is separate.
 - [x] Retire4 superseded Figure10 renders after verified author selection16November;
-  figure10-finalization.json records exact paths/hashes. Keep original scientific
+  the 16 November release recorded the exact paths and hashes. Keep original scientific
   sources, calculation provenance and all other current figures. The obsolete
   density-chart renderer is removed so default refreshes cannot recreate it.
+- [ ] Review `audit/figure10-fixed-cutoffs-20261123` after the manuscript handoff.
+  The canonical PNG, PDF and SVG replaced the previous renders in place and
+  the temporary render copies were removed. The folder holds the staged review,
+  rollback metadata and data, and the Matplotlib cache. Keep only evidence still
+  needed to reproduce or check the `audit/paper` release.
 - [ ] Review all audit outputs, including filtering galleries, stiffness history,
   axis examples, modal controls, FCC feasibility controls and published benchmarks.
   Keep the minimum reproducible evidence; remove superseded renders and bulk.
@@ -39,6 +44,8 @@ instructions. Refresh them before the final review.
   Include the separately identified double-precision control and original
   single-precision warning/termination/dead-worker receipts. Reconcile future
   collector dependencies before retiring either attempt; no silent overwrite.
+  Include `fixed-cutoff-pilot`, whose case-level results depend on its `events`
+  index and source-bound Abaqus extraction receipts.
 - [ ] Review FCC initial-event and continuation deliveries, dense-event exports,
   same-interval verification and old subtraction-sensitivity outputs. Preserve
   partial support/failure provenance and the chosen final method, not every plot.

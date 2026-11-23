@@ -307,6 +307,110 @@ def damage_prefix_audit(out):
         save_initiations(out, records)
 
 
+def extract_pilot_event(source, curve):
+    """Qualify a frozen pilot CT history against its original section fields."""
+    from odbAccess import openOdb
+
+    threshold = .1105
+    odb = openOdb(str(source), readOnly=True)
+    previous = None
+    issues = []
+    try:
+        step, = list(odb.steps.values())
+        pin = step.historyRegions["Node ASSEMBLY.1"].historyOutputs
+        t, u = np.asarray(pin["U2"].data, dtype=float).T
+        tf, force = np.asarray(pin["RF2"].data, dtype=float).T
+        if not np.array_equal(t, tf) or not np.array_equal(t, curve["time"]):
+            raise ValueError("Original pin timestamps differ from the frozen native curve")
+        for frame_number, frame in enumerate(step.frames):
+            tm = float(frame.frameValue)
+            if "LE" not in frame.fieldOutputs:
+                issues.append({"frame": frame_number, "reason": "LE missing"})
+                continue
+            strain = frame.fieldOutputs["LE"]
+            component = list(strain.componentLabels).index("LE11")
+            point = maximum(strain, component)
+            if point is None or any(not np.isfinite(np.asarray(block.data)[:, component]).all()
+                                    for block in strain.bulkDataBlocks):
+                issues.append({"frame": frame_number, "reason": "LE11 missing or nonfinite"})
+                continue
+            if point["value"] >= threshold:
+                if previous is None:
+                    return {"threshold_found": True, "undamaged_prefix_through_primary_lower_bound_verified": False,
+                            "nonfinite_before_threshold": issues, "status": "no_previous_intact_frame"}
+                prev_time, prev_value = previous
+                ends = []
+                for field_time in (prev_time, tm):
+                    i = int(np.argmin(np.abs(t-field_time)))
+                    ends.append(dict(index=i, time_s=float(t[i]), U2_mm=float(u[i]), RF2_N=float(force[i]),
+                                     time_error_to_field_s=float(t[i]-field_time)))
+                matches = ends[0]["index"] < ends[1]["index"] and all(
+                    abs(row["time_error_to_field_s"]) <= 2e-7 for row in ends)
+                return {"threshold_found": True, "criterion": "maximum recorded surface tensile LE11 >=0.1105",
+                        "prev_time": prev_time, "cross_time": tm, "prev_max_LE11": prev_value,
+                        "cross_max_LE11": point["value"], "first_point": point,
+                        "prev_native_history": ends[0], "cross_native_history": ends[1],
+                        "nonfinite_before_threshold": issues,
+                        "undamaged_prefix_through_primary_lower_bound_verified": matches and not issues,
+                        "status": "qualified_observed_event" if matches and not issues else "unqualified_observed_event"}
+            for name in ("SDEG", "STATUS", "DUCTCRT", "PEEQ"):
+                field = frame.fieldOutputs[name] if name in frame.fieldOutputs else None
+                data = [np.asarray(block.data, dtype=float) for block in field.bulkDataBlocks] if field else []
+                if not data or any(not values.size or not np.isfinite(values).all() for values in data):
+                    issues.append({"frame": frame_number, "reason": name + " missing or nonfinite"})
+                elif ((name == "SDEG" and max(float(values.max()) for values in data) > 1e-8)
+                      or (name == "STATUS" and min(float(values.min()) for values in data) < .5)):
+                    issues.append({"frame": frame_number, "reason": name + " shows pre-crossing damage"})
+            previous = tm, float(point["value"])
+        return {"threshold_found": False, "nonfinite_before_threshold": issues,
+                "last_observed_field": previous, "status": "crossing_censored"}
+    finally:
+        odb.close()
+
+
+def pilot_events(root, out):
+    """Write source-bound receipts for the 32 paired pilot CT cases, read-only."""
+    from validation_curve_processing import sampled_odb_fingerprint
+
+    base = root / "audit/curve-processing"
+    selection = json.loads((base / "paired-examples/selection.json").read_text(encoding="utf-8-sig"))
+    native = json.loads((base / "paired-examples/native-index.json").read_text(encoding="utf-8-sig"))
+    periodic = json.loads((base / "periodic-cutoff-native/index.json").read_text(encoding="utf-8-sig"))
+    if any(row not in periodic for row in selection["periodic"]):
+        raise ValueError("Frozen periodic selection differs from the extraction index")
+    cases = [row for row in native + selection["periodic"] if row["task"] == "FT"]
+    if len({(r["topology"], r["design"], r["id"]) for r in cases}) != 32:
+        raise ValueError("Expected 32 unique frozen pilot CT cases")
+    out.mkdir(parents=True, exist_ok=True)
+    index = []
+    for row in cases:
+        source, deck, native = (Path(row[key]) for key in ("source_odb", "source_inp", "native"))
+        before = fingerprint(source)
+        if ((row.get("source_odb_sha256") and row["source_odb_sha256"] != before["sha256"])
+                or (row.get("source_odb_fingerprint") and sampled_odb_fingerprint(source) != row["source_odb_fingerprint"])
+                or fingerprint(deck)["sha256"] != row["source_inp_sha256"]
+                or fingerprint(native)["sha256"] != row["native_sha256"]):
+            raise ValueError("A frozen native pilot source changed: " + str(source))
+        try:
+            with np.load(str(native), allow_pickle=False) as curve:
+                event = extract_pilot_event(source, curve)
+        except (KeyError, ValueError, OSError, RuntimeError) as error:
+            event = {"threshold_found": False, "status": "unavailable_source_field_review", "error": str(error)}
+        after = fingerprint(source)
+        if before != after:
+            raise ValueError("Original ODB changed during read-only pilot extraction: " + str(source))
+        event.update(source=str(source), before=before, after=after, source_unchanged=True, read_only=True,
+                     source_inp_sha256=row["source_inp_sha256"], native_sha256=row["native_sha256"])
+        folder = out / f"{row['topology']}-{row['design']}-{row['id']}"
+        folder.mkdir(exist_ok=True)
+        path = folder / "initiation.json"
+        dump(path, event)
+        index.append({key: row[key] for key in ("topology", "task", "design", "id", "native_sha256", "source_inp_sha256")} |
+                     {"path": str(path), "sha256": fingerprint(path)["sha256"], "status": event["status"]})
+        print(row["topology"], row["design"], row["id"], event["status"], flush=True)
+    dump(out / "index.json", index)
+
+
 def critical_strut_mesh(out, manifest_path):
     """Trace original B21 connectivity only; never opens or submits an ODB/job."""
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -528,15 +632,21 @@ def audit(path, out, detailed):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT)
-    parser.add_argument("--out", type=Path, default=ROOT / "audit/failure")
+    parser.add_argument("--out", type=Path)
     parser.add_argument("--case", action="append")
     parser.add_argument("--density-campaign", action="store_true")
     parser.add_argument("--initiation-only", action="store_true", help="sequential LE11 scan stops at first0.1105 tensile crossing; no full damage scan")
     parser.add_argument("--damage-prefix-only", action="store_true", help="add earliestSDEG/DUCTCRT/PEEQ and signedpoint snapshots up to saved tensile crossings")
     parser.add_argument("--summarize-existing", action="store_true", help="refresh saved summaries and citations without opening ODBs")
     parser.add_argument("--critical-strut-mesh", action="store_true", help="trace11 selected critical struts in original INPs only")
+    parser.add_argument("--pilot-events", action="store_true", help="read native C(T) event brackets for the frozen filter pilot")
     parser.add_argument("--loading-controls-manifest", type=Path, default=ROOT / "audit/work-partition/loading-controls-manifest.json")
     args = parser.parse_args()
+    if args.pilot_events:
+        output = args.out or args.root / "audit/curve-processing/accepted-filter-study/fixed-cutoff-pilot/events"
+        pilot_events(args.root, output.resolve())
+        return
+    args.out = args.out or ROOT / "audit/failure"
     if args.critical_strut_mesh:
         critical_strut_mesh(args.out, args.loading_controls_manifest)
         return

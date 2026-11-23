@@ -19,17 +19,19 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   values live in [the cutoff registry](code/response_filter_cutoffs.json).
   Qualification covers the screened 10 mm / 20% populations and records the
   sensitivity limits and the independent half-rate comparisons, including the
-  larger hexagonal C(T) difference. SimCheck will recalculate Figure 10 first,
-  then apply the registry to the later checklist calculations and population
-  replacement. Corrections owns the manuscript appendix and final production
+  larger hexagonal C(T) difference. SimCheck completed Figure 10 and the
+  frozen 64-history fixed-cutoff pilot. The pilot verified 31 C(T) event brackets,
+  retained one early-damage exclusion, one negative-work diagnostic and two
+  censored UAT work endpoints. Population replacement awaits the shared mechanics
+  and convergence checks. Corrections owns the manuscript appendix and final production
   update after the checks and recalculation are complete.
-  The 16 November Figure 10 baseline contains:12 Butterworth native points,2 original raw
-  hex10mm16/20% fallbacks and4 unchanged recovery/prediction supplements. Caption
-  and data disclose exceptions; this is not uniform filtering. Labels/axes/titles/
-  legend are unchanged; the other12 final figure files retain their hashes.
-  Four obsolete Figure10 renders were removed with source/calculation evidence
-  retained. figure10-finalization.json and approved-figure-recipe.json own this
-  selection; no shared population calculation or manuscript was changed.
+  The approved Figure 10 contains 14 fixed-cutoff filtered native values plus
+  the disclosed hexagonal 10 mm/20% raw fallback, 3 mm/20% recovery index, and
+  two 13% predictions. Its transfer table records five response tolerance
+  exceedances relative to the archive baseline, with signed plastic work and
+  native initiation brackets. The reference, labels, axes, titles and legend
+  retain the approved conventions. The Figure 8 hashes are unchanged.
+  `figure10-finalization.json` and `approved-figure-recipe.json` bind this selection.
   FCC same-interval total-J verification supports the examined ordered geometry
   with prescribed eta2.261: original-flow equivalent-K residual4.02-4.68% near
   initiation. A conditional potential-reference late-window fit eta1.804787
