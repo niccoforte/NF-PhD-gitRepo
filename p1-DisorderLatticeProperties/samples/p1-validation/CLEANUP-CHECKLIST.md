@@ -55,6 +55,10 @@ instructions. Refresh them before the final review.
   Include original-flow-strip and Z:/codex-p1-fcc-strip-20261118. Keep the
   deterministic mesh generator, source manifests and verified observations until
   the domain and C(T) transfer checks are resolved.
+- [ ] Review the isotropic stationary-notch and kagome extension deliveries in
+  `audit/fcc-calibration/eta-verification`. Retain the exact 1 N controls, case
+  index, solver and extraction receipts, and the ordered FCC cutoff and existing
+  history comparisons. Keep the H190 failed-prefix receipt with its source.
 - [ ] Retain the accepted hex stiffness catalogue and nine source-exact controls;
   reconcile it with saved Props in the population pass. Retire superseded filter
   galleries/conditional CLI routes after the selected capped rule is integrated.

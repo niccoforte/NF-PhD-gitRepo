@@ -45,11 +45,22 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   pin work agreed with ALLWK. The cracked job was stopped after repeat cutbacks
   concentrated at the free end around x=536â€“540 mm (tip at x=90 mm); its incomplete
   delivery is preserved. Last retained crack-tip LE11=.0500, below .1105, at
-  an applied strip-energy diagnostic of49.45 N/mm. An H=190 mm original-law pair with controlled far end
-  and separate energy bands is submitted serially. Read live queue state under
-  audit/fcc-calibration/original-flow-strip/queue-h190far. The single original
-  C(T) initiation prediction is J=142.638 N/mm with eta=2.261, distinct from
-  interval-averaged values. No fitted coefficient is promoted.
+  an applied strip-energy diagnostic of49.45 N/mm. The H=190 mm controlled strip
+  recorded an applied J onset bracket of 128.265–134.476 N/mm before its later
+  convergence failure. Its 0.3044% force imbalance exceeds the 0.1% limit and
+  C(T) local-field transfer remains unqualified. In the ordered C(T) size series,
+  the 225 Hz filter, Ortega elastic term and prescribed eta=2.261 give equivalent
+  K differences of +3.76%, +1.83% and +0.57% against the beam references. This is
+  a total-J check with the stated reference. The longer stationary FCC series
+  gives pre-initiation load/work eta diagnostics of 1.874/1.728. Retain the
+  prescribed factor for the tested ordered configurations. No fitted coefficient
+  is promoted. [Numerical checks](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/README.md)
+  All 15 isotropic stationary jobs completed. Triangular's load-based eta is
+  near ASTM (2.266) and its work-based estimate is 2.122. Three additional
+  Kagome jobs reached the original-notch initiation bracket. At the last
+  intact opening the load/work estimates are 2.339/2.162 versus ASTM 2.259,
+  with equivalent-K sensitivity under 0.81% to these substitutions. Hexagonal
+  has no qualifying common monotone plastic branch. [Isotropic record](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/README.md)
   Omidi reproduction is NOT qualified as external lattice validation. The
   polymer20% CT failed Standard increment convergence before recorded initiation;
   its current ODB hash differs from the archived delivery/extraction hash.

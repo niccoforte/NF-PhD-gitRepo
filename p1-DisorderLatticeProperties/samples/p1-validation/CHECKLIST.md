@@ -123,6 +123,23 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Consolidate one final StiffMatrix workflow, retaining only controls used
   by the accepted calculations. Preserve distinct material tensor versus
   cracked-specimen compliance roles; retire duplicated unused implementations.
+- [x] Process 15 phase-matched original-law isotropic C(T) jobs. Triangular
+  median load eta is 2.2663 and work eta is 2.1220 against ASTM 2.2610. Kagome
+  gives 2.1428 and 2.0116 against ASTM 2.2593 at 66% common plastic-opening
+  coverage. Hexagonal leaves no resolved monotonic plastic branch. These are
+  pre-initiation checks. [Isotropic results](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/eta-results-r2.json)
+- [x] Complete the three-notch Kagome extension with the exact R2 1 N
+  controls. The common range reaches the observed LE11 initiation bracket.
+  At the last intact opening, load/work eta are 2.339/2.162 against ASTM
+  2.259, changing equivalent K by +0.65%/-0.80%. Compliance and fit-window
+  sensitivity limit independent factor identification. [Kagome results](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/kagome-bracket/eta-results.json)
+- [x] Replay the ordered FCC size series at the approved 225 Hz C(T) cutoff.
+  Ortega plus prescribed ASTM eta gives equivalent K differences of +3.76%,
+  +1.83%, +0.57% against the scaled beam reference for nx20, 30, 40. The
+  retained original-law FCC load-separation estimates at the longer cap are
+  1.874 and 1.728. Their saved E11 field gives no independent LE11 initiation
+  bracket. Retain eta=2.261 as a working total-J approximation for the tested
+  series. [FCC checks](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/README.md)
 - [x] Complete bounded FCC same-interval total-J verification at the resolved
   initiation opening. Use independent potential-energy differences, prescribed
   ASTM eta2.261, original-flow transfer and matching elastic baseline. At common
@@ -141,11 +158,11 @@ This replaces accumulated superseded proposals; it is the single task register.
   coefficient or independent original-flow validation; its elastic residual,
   material approximation and shared90mm control remain explicit.
   Original-law long-strip pilot is under audit/fcc-calibration/original-flow-strip.
-  H=90 mm calibration completed; the cracked run was stopped at repeated
-  remote-edge cutbacks. H=190 mm controlled-far-end pair submitted for
-  observability with two far-ahead energy bands and one wake band.
-  Qualify far-ahead work, initiation, size/mesh convergence and C(T) local-field
-  transfer before interpreting held-out crack geometries and fitting eta.
+  H=90 mm failed at remote-edge cutbacks. The H=190 mm cracked strip converged
+  through a genuine onset bracket before later cutbacks. Its applied J bracket
+  is 128.265–134.476 N/mm. The 0.3044% force imbalance exceeds the 0.1% gate,
+  and the matched C(T) local fields and domain/mesh evidence do not qualify
+  transfer. [Failed-prefix review](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/original-flow-strip/collection-h190far/failed-prefix-review.json)
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.
