@@ -65,7 +65,12 @@ instructions. Refresh them before the final review.
   `audit/fcc-calibration/eta-verification`. Retain the exact 1 N controls, case
   index, solver and extraction receipts, and the ordered FCC cutoff and existing
   history comparisons. Keep the hexagonal energy receipt, the serial handoff
-  and the H190 failed-prefix receipt with their sources.
+  and the H190 failed-prefix receipt with their sources. Include the ordered
+  80 mm FCC rerun, the supervision report and its earlier figure, and
+  the larger PSC preparation, failed first launch, verified onset records,
+  and settled [serial queue](Z:/p1/sims/Ti/Validation/audit/psc-eta-q/state.json).
+  The failed triangular reference delivery supports its qualified onset prefix.
+  Refresh the machine-readable register before any final disposition.
 - [ ] Retain the accepted hex stiffness catalogue and nine source-exact controls;
   reconcile it with saved Props in the population pass. Retire superseded filter
   galleries/conditional CLI routes after the selected capped rule is integrated.

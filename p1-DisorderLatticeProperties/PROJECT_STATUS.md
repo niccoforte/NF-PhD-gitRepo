@@ -32,52 +32,21 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   native initiation brackets. The reference, labels, axes, titles and legend
   retain the approved conventions. The Figure 8 hashes are unchanged.
   `figure10-finalization.json` and `approved-figure-recipe.json` bind this selection.
-  FCC same-interval total-J verification supports the examined ordered geometry
-  with prescribed eta2.261: original-flow equivalent-K residual4.02-4.68% near
-  initiation. A conditional potential-reference late-window fit eta1.804787
-  (-20.18%ASTM) gives held-out90-100mm errors <=1.972%K potential/2.576%K
-  original-flow transfer. It is not promoted: neither result independently
-  qualifies original-flow eta; potential/material/elastic residuals and the
-  shared90mm control remain. A published original-flow long-strip J=H*W_far
-  route is identified, requiring CT/strip constraint/local-field checks and
-  holdout geometry before coefficient transfer. In the original-law H=90 mm
-  strip pilot the uncracked calibration matched initial C22 within 0.013% and
-  pin work agreed with ALLWK. The cracked job was stopped after repeat cutbacks
-  concentrated at the free end around x=536â€“540 mm (tip at x=90 mm); its incomplete
-  delivery is preserved. Last retained crack-tip LE11=.0500, below .1105, at
-  an applied strip-energy diagnostic of49.45 N/mm. The H=190 mm controlled strip
-  recorded an applied J onset bracket of 128.265–134.476 N/mm before its later
-  convergence failure. Its 0.3044% force imbalance exceeds the 0.1% limit and
-  C(T) local-field transfer remains unqualified. In the ordered C(T) size series,
-  the 225 Hz filter, Ortega elastic term and prescribed eta=2.261 give equivalent
-  K differences of +3.76%, +1.83% and +0.57% against the beam references. This is
-  a total-J check with the stated reference. The longer stationary FCC series
-  gives pre-initiation load/work eta diagnostics of 1.874/1.728. Retain the
-  prescribed factor for the tested ordered configurations. No fitted coefficient
-  is promoted. [Numerical checks](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/README.md)
-  All 15 isotropic stationary jobs completed. Triangular's load-based eta is
-  near ASTM (2.266) and its work-based estimate is 2.122. Three additional
-  Kagome jobs reached the original-notch initiation bracket. At the last
-  intact opening the load/work estimates are 2.339/2.162 versus ASTM 2.259,
-  with equivalent-K sensitivity under 0.81% to these substitutions. Hexagonal
-  has no qualifying common monotone plastic branch. The longest-notch ODB
-  confirms positive material dissipation despite negative initial-triangle
-  work. A triangular initiation-bracket extension and the direct-LE11 FCC
-  repeat are registered serially. Their collectors reuse the exact 1 N
-  controls and report the physical range reached. [Isotropic record](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/README.md) ·
-  [FCC handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-le-bracket/handoff-state.json)
-  Omidi reproduction is NOT qualified as external lattice validation. The
-  polymer20% CT failed Standard increment convergence before recorded initiation;
-  its current ODB hash differs from the archived delivery/extraction hash.
-  25/30% were not submitted. Three elastic
-  CT checks are pin-controlled. Three109l/10B21-per-bar boundary-layer cases with
-  the released source notch phase differ-4.1/-11.2/-19.3% from Table3's fitted
-  law. The separately rendered Fig2c-centred notch changes the critical bar to
-  vertical but increases residuals substantially. Preserve both configurations,
-  angular-branch correction and full numerical QA; do not select a better-fit
-  phase or label global pin failure as crack toughness. Larger prepared mesh/
-  domain checks remain unsubmitted until the source discrepancy is reconciled.
-  All submitted Omidi solvers are settled; no further Omidi job is selected.
+  Ordered FCC numerical validation is complete at the original 80 mm notch
+  of the 20×19 specimen. The observed initiation bracket and full matched
+  opening range give a load fit of eta 1.871 and a work fit of 1.786. Ortega
+  plus the load fit gives 128.88 N/mm and 33.95 MPa√m, +0.46% and +0.23%
+  against the screened beam fields of the same model. Broader size and
+  disordered transfer remain open. The potential-energy and long-strip checks
+  remain diagnostic because of their separate material and local-field limits.
+  Omidi reproduction is deferred. Its published elastic calibration stays
+  supporting evidence, with the source notch-phase discrepancy recorded.
+  The larger stationary series has settled. Kagome 30/36 load fits are
+  2.190/2.180 and triangular 40 gives 2.287. The triangular original notch
+  recorded initiation before a later solver failure. All three fits use
+  full observed overlap. Hexagonal has no qualifying common monotonic plastic
+  branch, and its work partition remains open.
+  [Current numerical evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/supervisor-20261123/report.md)
   The shared GUI inspection index maps actual retained INPs/ODBs, with source
   reference values/navigation in the single report. Nine flagged raw/filtered
   hex curves show that all flags arose only from >5% window spread.

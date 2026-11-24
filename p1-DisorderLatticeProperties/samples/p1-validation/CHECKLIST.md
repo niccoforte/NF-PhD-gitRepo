@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated 23 November 2026. [Current evidence and figures](README.md).
+Updated 24 November 2026. [Current evidence and figures](README.md).
 This replaces accumulated superseded proposals; it is the single task register.
 
 ## Accepted scope and decisions
@@ -44,15 +44,11 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Find a published in-domain orthotropic lattice benchmark: Omidi/St-Pierre
   2023 snub-square, lambda1,chi7.65/4.74/3.16, actualCTa/W=.25. Current
   Ortega factors differ3.51-6.75% from published TableC2 factors.
-- [ ] Reconcile the external Omidi lattice benchmark before calling it validated.
-  All3 periodic beam tensors and all submitted CT/BL diagnostics are extracted.
-  PolymerCT20 failed atLE=.064 before.1 initiation;25/30 unsubmitted. ElasticCT
-  global stress is pin-controlled, rejected. Released-notch-phase109l BL gives
-  -4.1/-11.2/-19.3% against Table3's elastic fit; Fig2c-centred phase has larger
-  residuals despite the expected vertical critical bar. Do not choose the phase
-  that gives closer agreement. Source code/paper differences and corrected
-  angular branches are recorded. Prepared larger/refined checks are unsubmitted;
-  no further solver campaign until this discrepancy is understood.
+- [x] Defer Omidi reproduction for the ordered FCC closeout. Retain the published
+  Table C.2 elastic comparison as supporting evidence. The unresolved source
+  versus paper notch phase and pin-controlled or incomplete C(T) diagnostics are
+  recorded in the audit. A future external reproduction claim requires its own
+  phase, boundary, mesh and initiation checks.
 - [x] Retire square/45square from active Ortega validation: out-of-domain chi.
   Remove plot CLI/derived displays and replace notebook caller. Original source
   files and rejection receipts stay only pending final cleanup disposition.
@@ -133,48 +129,47 @@ This replaces accumulated superseded proposals; it is the single task register.
   At the last intact opening, load/work eta are 2.339/2.162 against ASTM
   2.259, changing equivalent K by +0.65%/-0.80%. Compliance and fit-window
   sensitivity limit independent factor identification. [Kagome results](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/kagome-bracket/eta-results.json)
-- [ ] Process the triangular three-notch extension at the directly observed
-  initiation bracket. The original-law models and R2 1 N controls are retained.
-  [Serial jobs](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/tri-bracket/queue/state.json)
+- [x] Process the original triangular three-notch initiation bracket. Load/work
+  eta are 2.294/2.172 against ASTM 2.261, with full observed overlap.
+  [Original triangular fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/tri-bracket/eta-results.json)
+- [x] Process the larger ordered isotropic cases at their original A1 notches.
+  Load/work eta are 2.190/2.059 for kagome 30, 2.180/2.019 for kagome 36,
+  and 2.287/2.147 for triangular 40. All three reach full observed overlap.
+  The triangular reference reached the strain bracket before a later solver
+  failure. The verified initiation prefix and failure record are retained.
+  [Larger-size results](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/supervisor-20261123/report.md)
 - [x] Diagnose the hexagonal signed plastic work from the exact R2 ODBs. At the
   longest notch, Abaqus reports +16,713 Nmm plastic dissipation despite a
   -588 Nmm initial-triangle area. The archived elastic and unloading controls
   explain why repeating the same work partition cannot identify ASTM eta.
   [Energy receipt](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/hex-energy-check.json)
-- [ ] Apply the same load-separation check to FCC with direct LE11 output and
-  source-matched 80, 90 and 100 mm notches. The registered successor waits for
-  triangular to settle. Qualify the observed bracket and common range before
-  interpreting any coefficient. [Handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-le-bracket/handoff-state.json)
+- [x] Close the ordered FCC initiation validation at the original 80 mm notch
+  of the 20×19 specimen. The stabilised reference reaches the observed strain
+  bracket and the retained 90/100 mm companions give full overlap. Load/work
+  eta are 1.871/1.786. Use the load fit with Ortega for this specimen. The
+  resulting J is 128.88 versus 128.29 N/mm from the screened beam fields
+  (+0.46% J, +0.23% equivalent K).
+  [Initiation fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-le-bracket/a0-rerun/stabilization-1e-5/eta-results.json)
 - [x] Replay the ordered FCC size series at the approved 225 Hz C(T) cutoff.
-  Ortega plus prescribed ASTM eta gives equivalent K differences of +3.76%,
-  +1.83%, +0.57% against the scaled beam reference for nx20, 30, 40. The
-  retained original-law FCC load-separation estimates at the longer cap are
-  1.874 and 1.728. Their saved E11 field gives no independent LE11 initiation
-  bracket. Retain eta=2.261 as a working total-J approximation for the tested
-  series. [FCC checks](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/README.md)
+  With Ortega and fixed eta 1.871, matched-ring equivalent K differences are
+  +0.23%, −0.72%, and −1.34% at nx20/30/40. The wider ring sensitivity makes
+  the larger sizes diagnostic. Direct load-fit convergence remains unmeasured.
+  [FCC size evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/approved-cutoff-check.json)
 - [x] Complete bounded FCC same-interval total-J verification at the resolved
   initiation opening. Use independent potential-energy differences, prescribed
   ASTM eta2.261, original-flow transfer and matching elastic baseline. At common
   observed opening6.45203mm (99.871% of event), original-flow K errors4.02-4.68%.
   inc_a0 has a reviewed converged prefix; inc_a2 solved fully but packaging failed.
-  Preserve both failure records. No fitted eta is promoted or additional rerun
-  selected. This verifies the adopted approximation, not an exact original-flow
-  contour integral or a published FCC elastoplastic comparison.
-- [ ] If the manuscript claims independent FCC plastic-factor validation,
-  establish that separately: the completed total-J/potential approximation
-  supports the combined near-initiation calculation, not unique identification
-  of eta or the original-flow plastic term. Retain prescribed2.261 meanwhile.
-  A conditional near-initiation potential-reference fit gives eta1.804787
-  (-20.18% from2.261);90-100mm held-out interval K residual at most1.972% for
-  the potential law,2.576% for original-flow transfer. It is not a production
-  coefficient or independent original-flow validation; its elastic residual,
-  material approximation and shared90mm control remain explicit.
-  Original-law long-strip pilot is under audit/fcc-calibration/original-flow-strip.
-  H=90 mm failed at remote-edge cutbacks. The H=190 mm cracked strip converged
-  through a genuine onset bracket before later cutbacks. Its applied J bracket
-  is 128.265–134.476 N/mm. The 0.3044% force imbalance exceeds the 0.1% gate,
-  and the matched C(T) local fields and domain/mesh evidence do not qualify
-  transfer. [Failed-prefix review](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/original-flow-strip/collection-h190far/failed-prefix-review.json)
+  Preserve both failure records. This earlier comparison tests the prescribed
+  factor against the potential-energy approximation near initiation. The
+  potential-material fitted coefficient stays a diagnostic.
+- [ ] Qualify transfer before using the ordered FCC factor across the population
+  or making a broader independent plastic-factor claim. A larger matched-notch
+  set and representative disordered checks would test transfer directly.
+  The potential-material fit and H190 strip bracket remain supporting checks.
+  The strip's force imbalance and local-field mismatch leave C(T) transfer
+  unresolved. The separate hexagonal work-partition qualification stays open.
+  [Scope and limitations](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/supervisor-20261123/report.md)
 - [ ] Replace exporter/event/filter/work/stiffness/modulus paths in place with
   the settled implementation; no parallel legacy calculation options. Run a
   representative end-to-end pilot before any population recalculation.
