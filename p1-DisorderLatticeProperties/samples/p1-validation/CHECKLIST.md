@@ -143,17 +143,18 @@ This replaces accumulated superseded proposals; it is the single task register.
   -588 Nmm initial-triangle area. The archived elastic and unloading controls
   explain why repeating the same work partition cannot identify ASTM eta.
   [Energy receipt](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/isotropic/load-separation/hex-energy-check.json)
-- [x] Close the ordered FCC initiation validation at the original 80 mm notch
+- [x] Complete the ordered FCC initiation fit at the original 80 mm notch
   of the 20×19 specimen. The stabilised reference reaches the observed strain
   bracket and the retained 90/100 mm companions give full overlap. Load/work
-  eta are 1.871/1.786. Use the load fit with Ortega for this specimen. The
+  eta are 1.871/1.786. Treat 1.871 as a calibration candidate. With Ortega, the
   resulting J is 128.88 versus 128.29 N/mm from the screened beam fields
   (+0.46% J, +0.23% equivalent K).
   [Initiation fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-le-bracket/a0-rerun/stabilization-1e-5/eta-results.json)
 - [x] Replay the ordered FCC size series at the approved 225 Hz C(T) cutoff.
   With Ortega and fixed eta 1.871, matched-ring equivalent K differences are
   +0.23%, −0.72%, and −1.34% at nx20/30/40. The wider ring sensitivity makes
-  the larger sizes diagnostic. Direct load-fit convergence remains unmeasured.
+  the larger sizes diagnostic. Raw histories and alternate elastic subtraction
+  give different trends. Direct load-fit convergence remains unmeasured.
   [FCC size evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/approved-cutoff-check.json)
 - [x] Complete bounded FCC same-interval total-J verification at the resolved
   initiation opening. Use independent potential-energy differences, prescribed
@@ -163,9 +164,10 @@ This replaces accumulated superseded proposals; it is the single task register.
   Preserve both failure records. This earlier comparison tests the prescribed
   factor against the potential-energy approximation near initiation. The
   potential-material fitted coefficient stays a diagnostic.
-- [ ] Qualify transfer before using the ordered FCC factor across the population
-  or making a broader independent plastic-factor claim. A larger matched-notch
-  set and representative disordered checks would test transfer directly.
+- [ ] Settle the FCC production factor. A larger matched-notch check should
+  compare the direct load fit with the reference fit at the same plastic-opening
+  criterion, preserving crack-tip phase and checking notch-window sensitivity.
+  Representative disordered checks are needed for a population-wide claim.
   The potential-material fit and H190 strip bracket remain supporting checks.
   The strip's force imbalance and local-field mismatch leave C(T) transfer
   unresolved. The separate hexagonal work-partition qualification stays open.

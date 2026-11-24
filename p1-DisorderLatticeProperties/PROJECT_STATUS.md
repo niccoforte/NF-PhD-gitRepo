@@ -32,13 +32,15 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   native initiation brackets. The reference, labels, axes, titles and legend
   retain the approved conventions. The Figure 8 hashes are unchanged.
   `figure10-finalization.json` and `approved-figure-recipe.json` bind this selection.
-  Ordered FCC numerical validation is complete at the original 80 mm notch
+  The ordered FCC initiation fit is complete at the original 80 mm notch
   of the 20×19 specimen. The observed initiation bracket and full matched
   opening range give a load fit of eta 1.871 and a work fit of 1.786. Ortega
   plus the load fit gives 128.88 N/mm and 33.95 MPa√m, +0.46% and +0.23%
-  against the screened beam fields of the same model. Broader size and
-  disordered transfer remain open. The potential-energy and long-strip checks
-  remain diagnostic because of their separate material and local-field limits.
+  against the screened beam fields of the same model. Eta 1.871 remains a
+  calibration candidate. Raw histories and alternate elastic subtraction give
+  different residual size trends. The production factor and transfer are open.
+  The potential-energy and long-strip checks remain diagnostic because of
+  their separate material and local-field limits.
   Omidi reproduction is deferred. Its published elastic calibration stays
   supporting evidence, with the source notch-phase discrepancy recorded.
   The larger stationary series has settled. Kagome 30/36 load fits are
