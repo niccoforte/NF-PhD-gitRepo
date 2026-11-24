@@ -167,13 +167,13 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Settle the FCC production factor. A larger matched-notch check should
   compare the direct load fit with the reference fit at the same plastic-opening
   criterion, preserving crack-tip phase and checking notch-window sensitivity.
-  The approved 40-cell set at 160/170/180 mm has been submitted serially. The
-  original 160 mm compliance and dense Explicit history are reused. Evaluate
-  the 160–180 mm secant against the 20-cell 80–90 mm secant, and document the
-  narrower normalized window of the three-notch derivative. The 30-cell set
-  remains unsubmitted.
-  [40-cell case index](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/case-index.json)
-  · [Live queue](Z:/p1/sims/Ti/Validation/audit/fcc40-eta-q/state.json)
+  The 40-cell set yields load/work fits of 2.176/2.085 at the original notch.
+  The 180 mm companion resolved initiation before the late failed tail, and the
+  fit has full reference coverage. The matched-interval load secant rises by
+  8.8% at the same normalized plastic opening. The 30-cell 120/130/140 mm set
+  has been submitted serially, reusing the exact original-notch compliance.
+  [40-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
+  · [30-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc30-eta-q/state.json)
   Representative disordered checks are needed for a population-wide claim.
   The potential-material fit and H190 strip bracket remain supporting checks.
   The strip's force imbalance and local-field mismatch leave C(T) transfer

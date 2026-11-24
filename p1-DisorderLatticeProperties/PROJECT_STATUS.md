@@ -39,9 +39,12 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   against the screened beam fields of the same model. Eta 1.871 remains a
   calibration candidate. Raw histories and alternate elastic subtraction give
   different residual size trends. The production factor and transfer are open.
-  The 40-cell direct-fit queue uses same-phase 160/170/180 mm notches, retains
-  the existing original-notch 1 N control, and tests the same normalized 0.50
-  to 0.5625 interval as the 20-cell series. [Queue](Z:/p1/sims/Ti/Validation/audit/fcc40-eta-q/state.json)
+  The 40-cell direct fit gives 2.176 by load and 2.085 by work with full
+  initiation coverage, using the qualified 180 mm prefix before late cutbacks.
+  The matched 0.50–0.5625 load secant rises from 2.002 to 2.178 at the same
+  normalized plastic opening. The 30-cell 120/130/140 mm set is submitted.
+  [40-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
+  · [30-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc30-eta-q/state.json)
   The potential-energy and long-strip checks remain diagnostic because of
   their separate material and local-field limits.
   Omidi reproduction is deferred. Its published elastic calibration stays
