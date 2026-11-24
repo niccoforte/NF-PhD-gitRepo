@@ -70,6 +70,9 @@ instructions. Refresh them before the final review.
   the larger PSC preparation, failed first launch, verified onset records,
   and settled [serial queue](Z:/p1/sims/Ti/Validation/audit/psc-eta-q/state.json).
   The failed triangular reference delivery supports its qualified onset prefix.
+  Include the 40-cell FCC stationary control [study directory](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40)
+  and [owned queue](Z:/p1/sims/Ti/Validation/audit/fcc40-eta-q). The existing
+  160 mm linear control and dense reference remain linked in place.
   Refresh the machine-readable register before any final disposition.
 - [ ] Retain the accepted hex stiffness catalogue and nine source-exact controls;
   reconcile it with saved Props in the population pass. Retire superseded filter
