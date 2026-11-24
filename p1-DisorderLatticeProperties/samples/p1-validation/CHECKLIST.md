@@ -174,17 +174,19 @@ This replaces accumulated superseded proposals; it is the single task register.
   2.363/2.298, so the direct size series is nonmonotonic. The 26/36-cell
   sets use original notches of 108/148 mm and share the serial archive queue.
   The 26-cell original-notch load/work fit is 2.177/2.144 at full initiation
-  coverage. The 36-cell original-notch bracket is qualified. Its companions
-  are in progress. The reviewed 50-cell source and its three notch models
-  have passed, and the serial handoff waits for the preceding queue to settle.
+  coverage. The 36-cell fit is 2.650/2.385 with full coverage, flagged for
+  0.119% stabilisation energy at the 158 mm companion's fitted opening.
+  Its outer-notch load secant is 2.185. The 50-cell serial handoff succeeded,
+  all 1 N cases passed and the original notch brackets initiation. Wait for
+  the two 50-cell companions and the queued postprocessing.
   Reassess a plateau using native initiation coverage, common plastic opening,
   notch ratios and compliance sensitivity before deciding on 46/56 cells.
   Both larger source models are geometry-qualified and remain unsubmitted.
   [40-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
   · [30-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
   · [26-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n26/eta-results.json)
-  · [26- and 36-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc-eta-archive-q/state.json)
-  · [50-cell handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/queue-handoff.log)
+  · [36-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n36/eta-results.json)
+  · [50-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc50-eta-q/state.json)
   Representative disordered checks are needed for a population-wide claim.
   The potential-material fit and H190 strip bracket remain supporting checks.
   The strip's force imbalance and local-field mismatch leave C(T) transfer
