@@ -173,12 +173,16 @@ This replaces accumulated superseded proposals; it is the single task register.
   8.8% at the same normalized plastic opening. The 30-cell set gives
   2.363/2.298, so the direct size series is nonmonotonic. The 26/36-cell
   sets use original notches of 108/148 mm and share the serial archive queue.
-  The 50-cell PSC geometry build and serial handoff require a checked source
-  and wait for the 26/36-cell queue to settle before running the 50-cell set.
+  The 26-cell original-notch load/work fit is 2.177/2.144 at full initiation
+  coverage. The 36-cell original-notch bracket is qualified. Its companions
+  are in progress. The reviewed 50-cell source and its three notch models
+  have passed, and the serial handoff waits for the preceding queue to settle.
   Reassess a plateau using native initiation coverage, common plastic opening,
   notch ratios and compliance sensitivity before deciding on 46/56 cells.
+  Both larger source models are geometry-qualified and remain unsubmitted.
   [40-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
   · [30-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
+  · [26-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n26/eta-results.json)
   · [26- and 36-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc-eta-archive-q/state.json)
   · [50-cell handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/queue-handoff.log)
   Representative disordered checks are needed for a population-wide claim.
