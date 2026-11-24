@@ -170,10 +170,17 @@ This replaces accumulated superseded proposals; it is the single task register.
   The 40-cell set yields load/work fits of 2.176/2.085 at the original notch.
   The 180 mm companion resolved initiation before the late failed tail, and the
   fit has full reference coverage. The matched-interval load secant rises by
-  8.8% at the same normalized plastic opening. The 30-cell 120/130/140 mm set
-  has been submitted serially, reusing the exact original-notch compliance.
+  8.8% at the same normalized plastic opening. The 30-cell set gives
+  2.363/2.298, so the direct size series is nonmonotonic. The 26/36-cell
+  sets use original notches of 108/148 mm and share the serial archive queue.
+  The 50-cell PSC geometry build and serial handoff require a checked source
+  and wait for the 26/36-cell queue to settle before running the 50-cell set.
+  Reassess a plateau using native initiation coverage, common plastic opening,
+  notch ratios and compliance sensitivity before deciding on 46/56 cells.
   [40-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
-  · [30-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc30-eta-q/state.json)
+  · [30-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
+  · [26- and 36-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc-eta-archive-q/state.json)
+  · [50-cell handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/queue-handoff.log)
   Representative disordered checks are needed for a population-wide claim.
   The potential-material fit and H190 strip bracket remain supporting checks.
   The strip's force imbalance and local-field mismatch leave C(T) transfer

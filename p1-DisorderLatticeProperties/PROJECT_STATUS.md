@@ -42,9 +42,17 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   The 40-cell direct fit gives 2.176 by load and 2.085 by work with full
   initiation coverage, using the qualified 180 mm prefix before late cutbacks.
   The matched 0.50–0.5625 load secant rises from 2.002 to 2.178 at the same
-  normalized plastic opening. The 30-cell 120/130/140 mm set is submitted.
+  normalized plastic opening. The 30-cell 120/130/140 mm set gives
+  2.363/2.298 with full initiation coverage. At the same normalized plastic
+  opening the 20/30/40-cell load fits are 1.841/2.348/2.176. The direct
+  values have no monotonic trend, and the normalized notch spans differ.
+  The 26- and 36-cell phase-matched sets are in one serial queue. The archived
+  density-series 50-cell geometry differs in pin spacing and tip refinement.
+  A PSC-matched source build and validation-gated serial handoff are active.
   [40-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
-  · [30-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc30-eta-q/state.json)
+  · [30-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
+  · [26- and 36-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc-eta-archive-q/state.json)
+  · [50-cell handoff](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/queue-handoff.log)
   The potential-energy and long-strip checks remain diagnostic because of
   their separate material and local-field limits.
   Omidi reproduction is deferred. Its published elastic calibration stays

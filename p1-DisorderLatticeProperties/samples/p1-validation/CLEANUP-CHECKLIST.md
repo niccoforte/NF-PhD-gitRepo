@@ -76,6 +76,9 @@ instructions. Refresh them before the final review.
   and [owned queue](Z:/p1/sims/Ti/Validation/audit/fcc30-eta-q). Both original
   linear controls and dense references remain linked in place. Retain the
   180 mm late cutback and timestamp-provenance receipts with the qualified fit.
+  Include the 26- and 36-cell stationary case directories, the single
+  [archive queue](Z:/p1/sims/Ti/Validation/audit/fcc-eta-archive-q), and the
+  PSC-matched [50-cell source-build directory](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/source-build).
   Refresh the machine-readable register before any final disposition.
 - [ ] Retain the accepted hex stiffness catalogue and nine source-exact controls;
   reconcile it with saved Props in the population pass. Retire superseded filter
