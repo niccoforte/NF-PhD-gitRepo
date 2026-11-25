@@ -37,8 +37,9 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   opening range give a load fit of eta 1.871 and a work fit of 1.786. Ortega
   plus the load fit gives 128.88 N/mm and 33.95 MPa√m, +0.46% and +0.23%
   against the screened beam fields of the same model. Eta 1.871 remains a
-  calibration candidate. Raw histories and alternate elastic subtraction give
-  different residual size trends. The production factor and transfer are open.
+  calibration comparison. The author selected ASTM eta 2.261 for the FCC
+  calculations. Replay with the final production inputs remains open. Raw
+  histories and alternate elastic subtraction give different residual trends.
   The 40-cell direct fit gives 2.176 by load and 2.085 by work with full
   initiation coverage, using the qualified 180 mm prefix before late cutbacks.
   The matched 0.50–0.5625 load secant rises from 2.002 to 2.178 at the same
@@ -57,7 +58,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   0.003574, the 40/50-cell local load fits are 2.140/2.209 while the outer-pair
   secants are 2.138/2.093 over different notch intervals. The 40–50 change is
   smaller than the notch and compliance sensitivity. The 46/56-cell decks
-  are prepared, with solver submission on hold. A common coefficient is open.
+  are prepared, with solver submission on hold. The asymptotic value remains
+  unresolved. The four-size display fixes its inverse-square limit to ASTM.
   [40-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
   · [30-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
   · [26-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n26/eta-results.json)

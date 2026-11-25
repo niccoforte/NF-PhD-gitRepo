@@ -164,9 +164,10 @@ This replaces accumulated superseded proposals; it is the single task register.
   Preserve both failure records. This earlier comparison tests the prescribed
   factor against the potential-energy approximation near initiation. The
   potential-material fitted coefficient stays a diagnostic.
-- [ ] Settle the FCC production factor. A larger matched-notch check should
-  compare the direct load fit with the reference fit at the same plastic-opening
-  criterion, preserving crack-tip phase and checking notch-window sensitivity.
+- [ ] Replay FCC with the adopted ASTM eta 2.261 and the final production
+  inputs. Hand off the size-sensitivity evidence and the independent toughness
+  comparison. The inverse-square guide fixes its asymptote to ASTM, and the
+  limiting value remains unresolved.
   The 40-cell set yields load/work fits of 2.176/2.085 at the original notch.
   The 180 mm companion resolved initiation before the late failed tail, and the
   fit has full reference coverage. The matched-interval load secant rises by
