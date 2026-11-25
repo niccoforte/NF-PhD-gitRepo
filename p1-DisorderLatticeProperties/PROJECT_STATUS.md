@@ -47,8 +47,10 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   2.177/2.144. The 36-cell estimate is 2.650/2.385 with full coverage, flagged
   because the 158 mm companion has 0.119% stabilisation energy at the fitted
   opening. Its outer-notch load secant is 2.185. The isolated 158 mm companion
-  repeat uses finer increments and lighter stabilisation with automatic review.
-  [Retry queue](Z:/p1/sims/Ti/Validation/audit/fcc36-refined-q/state.json)
+  repeat reached full coverage and returned 2.703/2.452. Its 0.166%
+  stabilisation energy at the fitted opening exceeds the 0.100% check, so
+  the three-notch 36-cell point stays flagged.
+  [Retry evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n36/middle-notch-refined/fit-comparison.json)
   The matched 50-cell fit is
   2.209/2.075 with full coverage. Both companions stopped after initiation,
   leaving qualified converged histories. At common normalized plastic opening
