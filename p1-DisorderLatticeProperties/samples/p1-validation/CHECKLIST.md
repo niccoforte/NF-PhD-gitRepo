@@ -176,6 +176,9 @@ This replaces accumulated superseded proposals; it is the single task register.
   The 26-cell original-notch load/work fit is 2.177/2.144 at full initiation
   coverage. The 36-cell fit is 2.650/2.385 with full coverage, flagged for
   0.119% stabilisation energy at the 158 mm companion's fitted opening.
+  An isolated 158 mm retry has started with finer increments and lighter
+  stabilisation. Review the attained bracket, full overlap and damping through
+  the fitted opening before using that result. [Retry queue](Z:/p1/sims/Ti/Validation/audit/fcc36-refined-q/state.json)
   Its outer-notch load secant is 2.185. The 50-cell fit is 2.209/2.075 at full
   coverage, including both verified companion histories before late cutbacks.
   At common normalized plastic opening 0.003574, local load fits for 40/50

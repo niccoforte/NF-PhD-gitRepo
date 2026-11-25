@@ -79,6 +79,8 @@ instructions. Refresh them before the final review.
   Include the 26- and 36-cell stationary case directories, the single
   [archive queue](Z:/p1/sims/Ti/Validation/audit/fcc-eta-archive-q), and the
   PSC-matched [50-cell source-build directory](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/source-build).
+  Include the 158 mm [refinement study](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n36/middle-notch-refined)
+  and its [serial queue](Z:/p1/sims/Ti/Validation/audit/fcc36-refined-q).
   Include the 50-cell postprocessing receipts and the qualified geometry-only
   [46-cell source](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n46/source-build)
   and [56-cell source](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n56/source-build).

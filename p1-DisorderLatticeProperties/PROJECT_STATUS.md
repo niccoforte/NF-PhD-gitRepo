@@ -46,7 +46,10 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   2.363/2.298 with full initiation coverage. The completed 26-cell fit gives
   2.177/2.144. The 36-cell estimate is 2.650/2.385 with full coverage, flagged
   because the 158 mm companion has 0.119% stabilisation energy at the fitted
-  opening. Its outer-notch load secant is 2.185. The matched 50-cell fit is
+  opening. Its outer-notch load secant is 2.185. The isolated 158 mm companion
+  repeat uses finer increments and lighter stabilisation with automatic review.
+  [Retry queue](Z:/p1/sims/Ti/Validation/audit/fcc36-refined-q/state.json)
+  The matched 50-cell fit is
   2.209/2.075 with full coverage. Both companions stopped after initiation,
   leaving qualified converged histories. At common normalized plastic opening
   0.003574, the 40/50-cell local load fits are 2.140/2.209 while the outer-pair
