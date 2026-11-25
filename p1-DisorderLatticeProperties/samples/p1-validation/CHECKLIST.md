@@ -1,7 +1,7 @@
 # SimCheck task checklist
 
 Unique checklist for chat01a1782e-8158-7792-90e7-6fd570dd3155.
-Updated 24 November 2026. [Current evidence and figures](README.md).
+Updated 25 November 2026. [Current evidence and figures](README.md).
 This replaces accumulated superseded proposals; it is the single task register.
 
 ## Accepted scope and decisions
@@ -82,10 +82,14 @@ This replaces accumulated superseded proposals; it is the single task register.
   mechanism FT ID 336 has negative plastic work in the curve-stiffness check.
   The 1% UAT work endpoint is censored for hex full ID 826 and FCC mechanism
   ID 717. [Pilot report](Z:/p1/sims/Ti/Validation/audit/curve-processing/accepted-filter-study/fixed-cutoff-pilot/pilot.json)
-- [ ] Reprocess the full population after the remaining shared-calculation and
-  convergence checks. Requalify hexagonal UAT curve stiffness at 300 Hz, keep
-  the nine source-exact elastic fallbacks and transfer the native-event and
-  censoring rules before replacing saved results.
+- [x] Requalify the 1,973 saved hexagonal UAT transfer histories at 300 Hz.
+  Keep all nine frozen source-exact elastic fallbacks. Of the remaining curve
+  estimates, 1,942 pass and 22 are newly window-sensitive (5.02–5.83%).
+  All estimates are finite. The transfer replay uses the declared time schedule.
+  [Evidence](Z:/p1/sims/Ti/Validation/audit/production/hex-uat-cutoff-requalification.json)
+- [ ] Transfer native-event and censoring rules before population replacement.
+  All 8,000 disorder IDs have paired INP/ODB files in the archive by filename.
+  Check geometry identity, observed support and metric eligibility at replay.
 - [ ] Once all checks and population values are final, SimCheck passes the
   manuscript work to Corrections. Update the methods reference and relevant
   appendix with the approved cutoff table, qualification and its limitations,
@@ -106,13 +110,23 @@ This replaces accumulated superseded proposals; it is the single task register.
   All9 raw/filtered curves,40% work lines,30/50% intervals and per-ID CSVs are in
   accepted-filter-study/flagged-hex-curves. Every original flag is solely >5%
   window spread, not missing data, a failed simulation or a cutoff failure.
-- [ ] Resolve negative-area cases/finite-sampling limits during the production
-  pilot; filtering alone is not a repair for an invalid initial-triangle area.
+- [x] Verify the negative-area case in the frozen pilot. Hexagonal C(T)
+  mechanism 336 gives -32,799 Nmm with curve stiffness and -27,308 Nmm
+  with a source-exact 1 N control. Withhold total J/KJ and retain elastic K.
+  [Compliance diagnostic](Z:/p1/sims/Ti/Validation/audit/production/hex-ct336/diagnostic-result.json)
+- [ ] Carry the negative-work and unresolved-event exclusions through
+  convergence and population processing. Keep valid properties from a
+  partly supported run. A recovered-work estimate uses a different partition.
 - [ ] Recompute saved property columns and audit restored UT/FT pair membership
   during the agreed population pass. No Props/MLdata rewrite has been performed.
 - [x] Qualify reusable-history C(T) k0 using the same initial-work rule and11
   exact-source1N controls. No blanket disordered-compliance simulation programme.
-- [ ] Settle the scalar isotropic conversion and representative FCC M under
+- [x] Measure the four ordered 10 mm/20% conversion references in the
+  [material catalogue](Z:/p1/sims/Ti/Validation/audit/controls/population-materials/material-catalogue.json).
+  Triangular, kagome and hexagonal mapped B21 values are 9.250, 9.079 and
+  1.404 GPa. The hexagonal isotropy residual is retained. FCC uses a physical
+  periodic tensor and one prismatic reduction, giving 8.340 GPa.
+- [ ] Settle the disorder conversion approximation under
   the same material-state convention as the retained controls. Reuse Appendix C
   evidence; no automatic full FCC tensor scaling from one UAT slope, no second
   plane-strain correction, and no full tensor solve for every disordered ID.
@@ -164,9 +178,13 @@ This replaces accumulated superseded proposals; it is the single task register.
   Preserve both failure records. This earlier comparison tests the prescribed
   factor against the potential-energy approximation near initiation. The
   potential-material fitted coefficient stays a diagnostic.
-- [ ] Replay FCC with the adopted ASTM eta 2.261 and the final production
-  inputs. Hand off the size-sensitivity evidence and the independent toughness
-  comparison. The inverse-square guide fixes its asymptote to ASTM, and the
+- [x] Replay `eta=2.261` using the production FCC material state and source
+  notch. At matched force, work and event, equivalent K differences against
+  ordered beam fields are +6.06%, +4.40%, +3.32% for 20, 30 and 40 cells.
+  [Shared mechanics pilot](Z:/p1/sims/Ti/Validation/audit/production/shared-mechanics-pilot.json)
+  also records the canonical archive's distinct 20-cell initiation result.
+  Hand off the size-sensitivity evidence and independent toughness comparison
+  only after the author's explicit approval. The inverse-square guide fixes its asymptote to ASTM, and the
   limiting value remains unresolved.
   The 40-cell set yields load/work fits of 2.176/2.085 at the original notch.
   The 180 mm companion resolved initiation before the late failed tail, and the
@@ -204,12 +222,28 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 ## Convergence and remaining validation
 
-- [ ] Check UAT and FT mesh convergence first, reusing168 retained model sets
-  and MeshConv source data. Check the recalculated quantities and charts.
-- [ ] Recalculate both28UAT and28FT PSC cases with final methods; keep the
-  supervisor-approved specimen sizes and convergence criteria.
-- [ ] Light Al/triangular UAT/UTval processing and plot check. Existing7ODBs,
-  6transfers; re-export18-1.1 if needed. No new nonlinear campaign selected.
+- [x] Reprocess all 168 UAT/C(T) mesh histories with source gauges and the
+  native-event rules. UAT modulus is stable against the finer meshes.
+  Kagome, hexagonal and FCC failure measures retain mesh sensitivity.
+  For C(T), 75 of 84 mesh cases yield valid total toughness.
+  [Mesh checks and figures](Z:/p1/sims/Ti/Validation/audit/production/convergence/README.md)
+- [ ] Reconcile Appendix B with the active FCC C(T) coarse/fine mesh and
+  qualify metric-specific convergence claims. The archived PSC decks have
+  mixed refinements, not a uniform ten elements per strut.
+- [x] Reprocess all 28 UAT and 28 C(T) PSC archives with the source geometry,
+  approved filters and working ordered conversion. All 28 UAT ductility
+  crossings and 21 C(T) initiation toughness values resolve. Preserve the
+  approved sizes and the limits of the hexagonal negative-area comparisons.
+  [PSC results and figures](Z:/p1/sims/Ti/Validation/audit/production/convergence/README.md)
+- [x] Check the three negative hexagonal PSC areas using exact 1 N controls.
+  The native-event areas remain negative at 26, 36 and 40 cells.
+  [Compliance sensitivity](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-compliance/diagnostic.json)
+- [x] Read all seven Al/triangular UAT histories, including the missing
+  18-1.1 curve. Use the real BodySet dimensions. The historical selected
+  18-1.1 model peaks at 19.53 MPa, 18.6% above Gu's digitised experiment.
+  [Al validation check](Z:/p1/sims/Ti/Validation/audit/production/convergence/al-validation.json)
+- [ ] Reconcile the corrected Al curve with the benchmark before Results
+  integration. Preserve the present model and reference provenance.
 - [ ] Revisit lattice-foundation branches only where active later work uses them.
 
 ## Deferred ML migration and population processing
@@ -243,6 +277,10 @@ This replaces accumulated superseded proposals; it is the single task register.
   ranges using final values. Select final layout after numerical recalculation.
 - [ ] Replace manuscript numerical claims/figures only after final population
   outputs are accepted. Corrections owns direct manuscript editing.
+For reproduction, use `validation_convergence.py extract --study mesh|psc|al`
+in Abaqus Python, then `replay --study mesh|psc|al` in standard Python. The Al
+overlay is generated by `validation_al.py` from the replay and original workbook.
+
 Cleanup is deferred and tracked separately in [CLEANUP-CHECKLIST.md](CLEANUP-CHECKLIST.md).
 Do not remove audit evidence, worktrees or temporary files before that review.
 

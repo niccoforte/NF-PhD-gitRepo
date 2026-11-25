@@ -1080,6 +1080,47 @@ def nodes_in_set(ra, name, prefix='Node '):
                 pairs.add((prefix + ".".join([iname, str(n.label)])))
     return pairs
 
+def native_reaction_history(odb, task):
+    """Read exact paired times, mean clamp travel and summed reaction.
+
+    FT uses the loading pin. UT requires every top-clamp history. Missing
+    channels, mismatched grids and interior nonfinite values cannot stand
+    for zero response. The caller opens and closes the solver database.
+    """
+    if len(odb.steps) != 1 or task not in ("UT", "FT"):
+        raise ValueError("Expected a single nonlinear UT or FT loading step")
+    step, = odb.steps.values()
+    histories = step.historyRegions
+    if task == "FT":
+        names = ["Node ASSEMBLY.1"]
+    else:
+        nodes = odb.rootAssembly.nodeSets["SET-TOP"].nodes
+        names = ["Node {}.{}".format(node.instanceName, node.label)
+                 for group in nodes for node in group]
+        if not names or len(set(names)) != len(names):
+            raise ValueError("Missing or duplicate top-clamp nodes")
+    time = None
+    displacement, reaction = [], []
+    for name in names:
+        if name not in histories:
+            raise ValueError("Missing native history " + name)
+        outputs = histories[name].historyOutputs
+        for variable, target in (("U2", displacement), ("RF2", reaction)):
+            if variable not in outputs:
+                raise ValueError("Missing native {} for {}".format(variable, name))
+            values = np.asarray(outputs[variable].data, dtype=float)
+            if values.ndim != 2 or values.shape[1] != 2 or not np.isfinite(values).all():
+                raise ValueError("Native histories must contain finite time/value pairs")
+            if time is None:
+                time = values[:, 0]
+                if np.any(np.diff(time) <= 0):
+                    raise ValueError("Native history times must increase strictly")
+            elif not np.array_equal(time, values[:, 0]):
+                raise ValueError("Native force/displacement timestamps differ")
+            target.append(values[:, 1])
+    return time, np.mean(displacement, axis=0), np.sum(reaction, axis=0)
+
+
 def _normalize_history_series(values, expected_steps, extrapolate=False):
     values = list(np.nan_to_num(values))
 

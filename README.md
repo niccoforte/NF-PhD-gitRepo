@@ -282,6 +282,11 @@ The same terms appear across Abaqus scripts, data-processing notebooks, and ML c
 
 `p1-DisorderLatticeProperties/` is the finite-element and data-generation layer. It creates quasi-disordered 2D lattice simulations, extracts input/output data from Abaqus files, and prepares the mechanical data used later by p2.
 
+The [SimCheck task checklist](p1-DisorderLatticeProperties/samples/p1-validation/CHECKLIST.md)
+links the staged native property and convergence replays. The replays use observed
+histories and preserve missing endpoints and signed work diagnostics for review
+before coordinated publication and data replacement.
+
 ### `p1-DisorderLatticeProperties/SIMscripts/`
 
 This folder contains the active local and HPC Abaqus workflow.

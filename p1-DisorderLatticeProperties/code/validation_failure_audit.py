@@ -307,63 +307,67 @@ def damage_prefix_audit(out):
         save_initiations(out, records)
 
 
-def extract_pilot_event(source, curve):
-    """Qualify a frozen pilot CT history against its original section fields."""
-    from odbAccess import openOdb
-
+def tensile_strain_event(step, t, u, force):
+    """First recorded Ti surface LE11 crossing and screened intact history bound."""
     threshold = .1105
-    odb = openOdb(str(source), readOnly=True)
     previous = None
     issues = []
+    for frame_number, frame in enumerate(step.frames):
+        tm = float(frame.frameValue)
+        if "LE" not in frame.fieldOutputs:
+            issues.append({"frame": frame_number, "reason": "LE missing"})
+            continue
+        strain = frame.fieldOutputs["LE"]
+        component = list(strain.componentLabels).index("LE11")
+        point = maximum(strain, component)
+        if point is None or any(not np.isfinite(np.asarray(block.data)[:, component]).all()
+                                for block in strain.bulkDataBlocks):
+            issues.append({"frame": frame_number, "reason": "LE11 missing or nonfinite"})
+            continue
+        if point["value"] >= threshold:
+            if previous is None:
+                return {"threshold_found": True, "undamaged_prefix_through_primary_lower_bound_verified": False,
+                        "nonfinite_before_threshold": issues, "status": "no_previous_intact_frame"}
+            prev_time, prev_value = previous
+            ends = []
+            for field_time in (prev_time, tm):
+                i = int(np.argmin(np.abs(t-field_time)))
+                ends.append(dict(index=i, time_s=float(t[i]), U2_mm=float(u[i]), RF2_N=float(force[i]),
+                                 time_error_to_field_s=float(t[i]-field_time)))
+            matches = ends[0]["index"] < ends[1]["index"] and all(
+                abs(row["time_error_to_field_s"]) <= 2e-7 for row in ends)
+            return {"threshold_found": True, "criterion": "maximum recorded surface tensile LE11 >=0.1105",
+                    "prev_time": prev_time, "cross_time": tm, "prev_max_LE11": prev_value,
+                    "cross_max_LE11": point["value"], "first_point": point,
+                    "prev_native_history": ends[0], "cross_native_history": ends[1],
+                    "nonfinite_before_threshold": issues,
+                    "undamaged_prefix_through_primary_lower_bound_verified": matches and not issues,
+                    "status": "qualified_observed_event" if matches and not issues else "unqualified_observed_event"}
+        for name in ("SDEG", "STATUS", "DUCTCRT", "PEEQ"):
+            field = frame.fieldOutputs[name] if name in frame.fieldOutputs else None
+            data = [np.asarray(block.data, dtype=float) for block in field.bulkDataBlocks] if field else []
+            if not data or any(not values.size or not np.isfinite(values).all() for values in data):
+                issues.append({"frame": frame_number, "reason": name + " missing or nonfinite"})
+            elif ((name == "SDEG" and max(float(values.max()) for values in data) > 1e-8)
+                  or (name == "STATUS" and min(float(values.min()) for values in data) < .5)):
+                issues.append({"frame": frame_number, "reason": name + " shows pre-crossing damage"})
+        previous = tm, float(point["value"])
+    return {"threshold_found": False, "nonfinite_before_threshold": issues,
+            "last_observed_field": previous, "status": "crossing_censored"}
+
+
+def extract_pilot_event(source, curve):
+    """Qualify a frozen pilot C(T) history against its original section fields."""
+    from odbAccess import openOdb
+    from resources.abaqus import native_reaction_history
+
+    odb = openOdb(str(source), readOnly=True)
     try:
-        step, = list(odb.steps.values())
-        pin = step.historyRegions["Node ASSEMBLY.1"].historyOutputs
-        t, u = np.asarray(pin["U2"].data, dtype=float).T
-        tf, force = np.asarray(pin["RF2"].data, dtype=float).T
-        if not np.array_equal(t, tf) or not np.array_equal(t, curve["time"]):
+        step, = odb.steps.values()
+        t, u, force = native_reaction_history(odb, "FT")
+        if not np.array_equal(t, curve["time"]):
             raise ValueError("Original pin timestamps differ from the frozen native curve")
-        for frame_number, frame in enumerate(step.frames):
-            tm = float(frame.frameValue)
-            if "LE" not in frame.fieldOutputs:
-                issues.append({"frame": frame_number, "reason": "LE missing"})
-                continue
-            strain = frame.fieldOutputs["LE"]
-            component = list(strain.componentLabels).index("LE11")
-            point = maximum(strain, component)
-            if point is None or any(not np.isfinite(np.asarray(block.data)[:, component]).all()
-                                    for block in strain.bulkDataBlocks):
-                issues.append({"frame": frame_number, "reason": "LE11 missing or nonfinite"})
-                continue
-            if point["value"] >= threshold:
-                if previous is None:
-                    return {"threshold_found": True, "undamaged_prefix_through_primary_lower_bound_verified": False,
-                            "nonfinite_before_threshold": issues, "status": "no_previous_intact_frame"}
-                prev_time, prev_value = previous
-                ends = []
-                for field_time in (prev_time, tm):
-                    i = int(np.argmin(np.abs(t-field_time)))
-                    ends.append(dict(index=i, time_s=float(t[i]), U2_mm=float(u[i]), RF2_N=float(force[i]),
-                                     time_error_to_field_s=float(t[i]-field_time)))
-                matches = ends[0]["index"] < ends[1]["index"] and all(
-                    abs(row["time_error_to_field_s"]) <= 2e-7 for row in ends)
-                return {"threshold_found": True, "criterion": "maximum recorded surface tensile LE11 >=0.1105",
-                        "prev_time": prev_time, "cross_time": tm, "prev_max_LE11": prev_value,
-                        "cross_max_LE11": point["value"], "first_point": point,
-                        "prev_native_history": ends[0], "cross_native_history": ends[1],
-                        "nonfinite_before_threshold": issues,
-                        "undamaged_prefix_through_primary_lower_bound_verified": matches and not issues,
-                        "status": "qualified_observed_event" if matches and not issues else "unqualified_observed_event"}
-            for name in ("SDEG", "STATUS", "DUCTCRT", "PEEQ"):
-                field = frame.fieldOutputs[name] if name in frame.fieldOutputs else None
-                data = [np.asarray(block.data, dtype=float) for block in field.bulkDataBlocks] if field else []
-                if not data or any(not values.size or not np.isfinite(values).all() for values in data):
-                    issues.append({"frame": frame_number, "reason": name + " missing or nonfinite"})
-                elif ((name == "SDEG" and max(float(values.max()) for values in data) > 1e-8)
-                      or (name == "STATUS" and min(float(values.min()) for values in data) < .5)):
-                    issues.append({"frame": frame_number, "reason": name + " shows pre-crossing damage"})
-            previous = tm, float(point["value"])
-        return {"threshold_found": False, "nonfinite_before_threshold": issues,
-                "last_observed_field": previous, "status": "crossing_censored"}
+        return tensile_strain_event(step, t, u, force)
     finally:
         odb.close()
 

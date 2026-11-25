@@ -33,6 +33,16 @@ instructions. Refresh them before the final review.
   The machine-readable register identifies it as the earlier staging root.
   Check the retained release and rollback records for dependencies on its
   scripts and receipts before proposing any disposition.
+- [ ] Review `audit/controls/population-materials` and its two serial
+  exact-source RVE controls. Keep the binding to the reused triangular control
+  and the distinct source-mapped and physical FCC evidence. Review the
+  `audit/production` shared mechanics, hexagonal UAT requalification, and
+  convergence receipts and figures once the final sources are accepted.
+  Review the [hexagonal CT336 source-exact 1 N diagnostic](Z:/p1/sims/Ti/Validation/audit/production/hex-ct336)
+  and temporary extractor `C:/temp/p1-ct336-diagnostic/extract.py`.
+  Include three hexagonal PSC exact-compliance controls and
+  `C:/temp/p1-psc-hex-compliance/extract.py`. Review the inspection-only
+  `C:/Users/exy053/AppData/Local/Temp/codex-p1-nextsteps-20261125` folder.
 - [ ] Review all audit outputs, including filtering galleries, stiffness history,
   axis examples, modal controls, FCC feasibility controls and published benchmarks.
   Keep the minimum reproducible evidence; remove superseded renders and bulk.

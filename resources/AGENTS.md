@@ -69,6 +69,11 @@ below expose imported functions/classes. Do not add job entry points here.
 
 ## Data-Processing Rules
 
+- `native_reaction_history` reads paired native U2/RF2 without zero-padding.
+  `compact_tension_initiation` accepts a verified sample, N/mm/MPa inputs and
+  consistently paired factor/modulus. Keep signed negative work and withhold
+  total J/KJ. Native replay precedes fixed-length consumer migration.
+
 - `data_processing.py` reads raw files from `Path(dat.PATH) / "transfer"` and periodic references from `dat.PATH_PER` when available.
 - Processed curve CSVs are written to `dat.PATH` and aligned by integer simulation id.
 - Manifest CSVs record missing inputs, missing outputs, frequency handling, NaNs, failure-index drops, and final inclusion. Preserve this audit trail when changing filtering.

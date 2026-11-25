@@ -159,6 +159,7 @@ def extract_periodic_cutoff_examples(root, archive_root, data_root):
     genuine ODB response. Final native samples are recovered rather than padded.
     """
     from odbAccess import openOdb
+    from resources.abaqus import native_reaction_history
     from validation_history_audit import field_summary
     archive_root, data_root = Path(archive_root), Path(data_root)
     out = Path(root)/"audit/curve-processing/periodic-cutoff-native"
@@ -180,30 +181,8 @@ def extract_periodic_cutoff_examples(root, archive_root, data_root):
                 source, before = inp.with_suffix(".odb"), sha(inp.with_suffix(".odb"))
                 odb = openOdb(str(source), readOnly=True)
                 try:
-                    if len(odb.steps) != 1:
-                        raise ValueError("Expected one original nonlinear step")
-                    step = list(odb.steps.values())[0]
-                    if task == "FT":
-                        regions = [step.historyRegions["Node ASSEMBLY.1"]]
-                    else:
-                        nodes = [node for group_nodes in odb.rootAssembly.nodeSets["SET-TOP"].nodes for node in group_nodes]
-                        regions = []
-                        for node in nodes:
-                            matching = [r for name,r in step.historyRegions.items()
-                                        if name.startswith("Node PART-1-1.") and name.endswith("."+str(node.label))
-                                        and "U2" in r.historyOutputs and "RF2" in r.historyOutputs]
-                            if len(matching) != 1:
-                                raise ValueError("Ambiguous exact-source clamp node history")
-                            regions.append(matching[0])
-                    time = np.asarray([t for t,v in regions[0].historyOutputs["U2"].data])
-                    displacement, force = [], []
-                    for region in regions:
-                        for key, target in (("U2", displacement), ("RF2", force)):
-                            pairs = np.asarray(region.historyOutputs[key].data)
-                            if not np.array_equal(pairs[:,0], time):
-                                raise ValueError("Native force/displacement grids differ")
-                            target.append(pairs[:,1])
-                    x_native, y_native = np.mean(displacement, axis=0), np.sum(force, axis=0)
+                    time, x_native, y_native = native_reaction_history(odb, task)
+                    step, = odb.steps.values()
                     status_event = None
                     for frame in step.frames:
                         if "STATUS" in frame.fieldOutputs and field_summary(frame.fieldOutputs["STATUS"])["min"] == 0:
@@ -432,6 +411,7 @@ def sampled_odb_fingerprint(path):
 def extract_paired_gallery(root):
     """Abaqus native read-only histories for the frozen56 disordered task cases."""
     from odbAccess import openOdb
+    from resources.abaqus import native_reaction_history
     folder = Path(root)/"audit/curve-processing/paired-examples"
     selection = json.loads((folder/"selection.json").read_text())
     index_path = folder/"native-index.json"
@@ -446,30 +426,7 @@ def extract_paired_gallery(root):
             continue
         odb = openOdb(str(source), readOnly=True)
         try:
-            if len(odb.steps) != 1:
-                raise ValueError("Expected one original nonlinear step")
-            step = list(odb.steps.values())[0]
-            if row["task"] == "FT":
-                regions = [step.historyRegions["Node ASSEMBLY.1"]]
-            else:
-                nodes = [node for group in odb.rootAssembly.nodeSets["SET-TOP"].nodes for node in group]
-                regions = []
-                for node in nodes:
-                    found = [region for name, region in step.historyRegions.items()
-                             if name.startswith("Node PART-1-1.") and name.endswith("."+str(node.label))
-                             and "U2" in region.historyOutputs and "RF2" in region.historyOutputs]
-                    if len(found) != 1:
-                        raise ValueError("Ambiguous native clamp history")
-                    regions.append(found[0])
-            time = np.asarray([t for t, value in regions[0].historyOutputs["U2"].data])
-            displacement, reaction = [], []
-            for region in regions:
-                for variable, target in (("U2", displacement), ("RF2", reaction)):
-                    values = np.asarray(region.historyOutputs[variable].data)
-                    if not np.array_equal(values[:, 0], time):
-                        raise ValueError("Native paired histories have different timestamps")
-                    target.append(values[:, 1])
-            raw_x, raw_y = np.mean(displacement, axis=0), np.sum(reaction, axis=0)
+            time, raw_x, raw_y = native_reaction_history(odb, row["task"])
         finally:
             odb.close()
         if sampled_odb_fingerprint(source) != before:

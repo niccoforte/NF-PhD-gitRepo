@@ -19,6 +19,85 @@ def smooth(y_old):
     return y_new
 
 
+def filter_force(time, force, cutoff, order=2, zero_phase=False):
+    """Uniform-grid Butterworth; restore genuine times, never interpolate STATUS.
+
+    DC startup and causal second-order filtering follow Abaqus defaults. Small
+    output-time jitter is interpolated explicitly; gaps >1.5 nominal intervals
+    are rejected. A noncausal sensitivity is separately labelled.
+    """
+    from scipy.signal import butter, sosfilt, sosfilt_zi, sosfiltfilt
+
+    time, force = np.asarray(time, float), np.asarray(force, float)
+    if len(time) < 4 or len(time) != len(force):
+        raise ValueError("Need at least four paired samples")
+    if not np.all(np.isfinite(time)) or not np.all(np.isfinite(force)):
+        raise ValueError("Missing/nonfinite continuous histories cannot be filtered")
+    dt = np.diff(time)
+    if np.any(dt <= 0) or np.max(dt) > 1.5 * np.median(dt):
+        raise ValueError("Time grid is nonmonotone or contains a missing interval")
+    grid = np.linspace(time[0], time[-1], len(time))
+    fs = (len(time) - 1) / (time[-1] - time[0])
+    if not 0 < cutoff < fs / 2:
+        raise ValueError("Cutoff must be below native-history Nyquist frequency")
+    uniform_force = np.interp(grid, time, force)
+    sos = butter(order, cutoff, fs=fs, output="sos")
+    if zero_phase:
+        filtered = sosfiltfilt(sos, uniform_force)
+    else:
+        filtered, _ = sosfilt(sos, uniform_force,
+                              zi=sosfilt_zi(sos) * uniform_force[0])
+    return np.interp(time, grid, filtered), {
+        "fs_Hz": fs, "nyquist_Hz": fs / 2, "cutoff_Hz": cutoff,
+        "order": order, "zero_phase": zero_phase,
+        "max_time_remap_s": float(np.max(np.abs(grid - time))),
+    }
+
+
+def initial_work_stiffness(x, y, end_fraction=.4, min_samples=6, baseline_response=0.):
+    """Initial work-equivalent slope over one declared low-load interval.
+
+    Match initial work W=E*x_end^2/2 through the first end_fraction crossing.
+    Under linear elasticity this equals the ordinary modulus/load stiffness.
+    The physical unloaded origin is used, not one noisy initial reaction.
+    A known preload can be supplied explicitly as baseline_response.
+    The estimate is not asserted to be a homogenised material tensor.
+    """
+    x, y = np.asarray(x, float), np.asarray(y, float)
+    if len(x) != len(y) or len(x) < 2 or not np.isfinite(x).all() or not np.isfinite(y).all():
+        raise ValueError("Aligned finite observations required")
+    if not 0 < end_fraction < 1:
+        raise ValueError("Initial loading fraction must lie inside zero and one")
+    if not np.isfinite(baseline_response):
+        raise ValueError("Known finite baseline required")
+    u, p = x-x[0], y-float(baseline_response)
+    p=p.copy();p[0]=0.
+    peak = int(np.argmax(p))
+    if peak == 0 or p[peak] <= 0:
+        return {"status": "unresolved_positive_initial_loading", "estimate": None}
+    crossed = np.flatnonzero(p[:peak+1] >= end_fraction*p[peak])
+    if not len(crossed):
+        return {"status": "unobserved_initial_fraction", "estimate": None}
+    end = int(crossed[0])
+    a, b = u[:end+1], p[:end+1]
+    if len(a) < 2 or np.any(np.diff(a) <= 0) or a[-1] <= 0:
+        return {"status": "unresolved_monotone_initial_coordinate", "estimate": None, "end_index": end}
+    work = np.r_[0., np.cumsum(.5*(b[1:]+b[:-1])*np.diff(a))]
+    q = a*a
+    estimate = float(2*work[-1]/q[-1])
+    span = float(np.ptp(b))
+    residual = float(np.sqrt(np.mean((b-estimate*a)**2))/max(span, 1e-30))
+    energy_residual = float(np.sqrt(np.mean((2*work-estimate*q)**2))/max(abs(2*work[-1]), 1e-30))
+    return dict(status="resolved_estimate" if len(a) >= min_samples and estimate > 0 else "low_resolution_estimate",
+                estimate=estimate, end_index=end, samples=len(a), peak_index=peak,
+                end_fraction=end_fraction, end_coordinate=float(a[-1]), initial_work=float(work[-1]),
+                secant_energy_estimate=float(2*work[-1]/a[-1]**2),
+                linearity_residual_over_stress_span=residual,
+                energy_fit_residual=energy_residual, baseline_x=float(x[0]), baseline_y=float(baseline_response),
+                observed_initial_response=float(y[0]),
+                definition="E=2*integral(response dcoordinate)/coordinate_end^2 through declared filtered-peak fraction; physical unloaded origin")
+
+
 def stress_to_mpa(stress):
     stress = float(stress)
     return stress / 1e6 if abs(stress) > 1e6 else stress
@@ -226,6 +305,71 @@ def calc_FaW_aniso(a, W, C=None, S=None):
     f_a_W = calc_p_poly(lambda_bar, chi_bar, a/W)*(lambda_aniso**D)*((1+0.006689*chi)**0.47151)*((2*(2+(a/W)))/((1-(a/W))**(3/2)))*(((2*(lambda_aniso**(3/2)))/(1+chi))**(1/4))
     return f_a_W
 
+def ortega_crack_axis_factor(a, W, elastic, source_axis1=1):
+    """Convert the loading-axis Ortega factor to the supplied crack-axis M."""
+    from resources.lattices import calc_anisoParams
+
+    if source_axis1 not in (0, 1):
+        raise ValueError("Ortega source axis must be 0 (x) or 1 (y)")
+    order = [source_axis1, 1-source_axis1, 2]
+    S_source = elastic["S_xy_pe"][np.ix_(order, order)]
+    lam, chi = calc_anisoParams(S=S_source)
+    source_modulus = np.sqrt(2 * lam**1.5 / (1 + chi)) / S_source[0, 0]
+    return calc_FaW_aniso(a, W, S=S_source) * np.sqrt(elastic["M_I_pe"] / source_modulus)
+
+
+def compact_tension_initiation(displacement, force, index, a, B, W, modulus,
+                               stiffness, geometry_factor):
+    """C(T) J at a verified native endpoint, with N, mm and MPa inputs.
+
+    The supplied modulus and geometry factor must use the same crack-axis
+    convention. Stiffness is the initial cracked-specimen load slope in N/mm.
+    Signed area and an elastic-only result remain available to diagnose a
+    failed work partition. Reported K values are in MPa sqrt(m).
+    """
+    from scipy.integrate import trapezoid
+
+    d, f = np.asarray(displacement, float), np.asarray(force, float)
+    if (d.ndim != 1 or d.shape != f.shape or not isinstance(index, (int, np.integer))
+            or not 0 < index < len(d)):
+        raise ValueError("An observed noninitial sample on paired histories is required")
+    d, f = d[:index + 1], f[:index + 1]
+    if not (np.isfinite(d).all() and np.isfinite(f).all()) or np.any(np.diff(d) < 0):
+        raise ValueError("Endpoint must bound a finite monotone loading history")
+    if (not np.all(np.isfinite([a, B, W, modulus, stiffness, geometry_factor]))
+            or not 0 < a < W or min(B, modulus, stiffness, geometry_factor, f[-1]) <= 0):
+        raise ValueError("Positive geometry, modulus, stiffness and endpoint load required")
+
+    load = float(f[-1])
+    work = float(trapezoid(f, d))
+    elastic_work = load**2 / (2 * stiffness)
+    area = work - elastic_work
+    # Round-off at an exactly elastic endpoint must not masquerade as
+    # resolved negative plastic work. Keep the signed area for diagnostics.
+    numerical_zero = 32 * np.finfo(float).eps * max(abs(work), elastic_work)
+    valid = bool(area >= -numerical_zero)
+    eta = 2 + .522 * (W - a) / W
+    ki = load * geometry_factor / (B * np.sqrt(W))
+    jel = ki**2 / modulus
+    jpl_signed = eta * area / (B * (W - a))
+    signed_total = jel + jpl_signed
+    jpl = eta * max(area, 0.) / (B * (W - a)) if valid else None
+    total = jel + jpl if valid else None
+    return {
+        "sample_index": int(index), "displacement_mm": float(d[-1]), "force_N": load,
+        "work_N_mm": work, "elastic_work_N_mm": elastic_work, "Apl_N_mm": area,
+        "stiffness_N_mm": float(stiffness), "modulus_MPa": float(modulus), "eta": float(eta),
+        "Jel_N_per_mm": float(jel), "Jpl_N_per_mm": float(jpl) if valid else None,
+        "Jpl_signed_diagnostic_N_per_mm": float(jpl_signed),
+        "J_N_per_mm": float(total) if valid else None,
+        "KI_MPa_sqrt_m": float(ki / np.sqrt(1000)),
+        "KJ_signed_area_diagnostic_MPa_sqrt_m": float(np.sqrt(modulus * signed_total / 1000))
+        if signed_total >= 0 else None,
+        "KJ_MPa_sqrt_m": float(np.sqrt(modulus * total / 1000)) if valid else None,
+        "valid_plastic_area": valid,
+    }
+
+
 def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
            C_state="plane_stress", v_s=0.3, ortega_axis1=None):
     """Calculate legacy initiation measures with a consistent FCC elastic chain.
@@ -254,7 +398,7 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
 
     fcc_elastic = None
     if geom.LAT.lower() == "fcc":
-        from resources.lattices import calcC_mohr, calc_anisoParams, prismatic_plane_strain
+        from resources.lattices import calcC_mohr, prismatic_plane_strain
         if C is None:
             if C_state != "plane_stress":
                 raise ValueError("Supply C explicitly when it is already plane-strain reduced.")
@@ -283,18 +427,8 @@ def calcFT(df, geom, E_eff_pe, n_Ks=1, validation=False, E=123e9, C=None,
             f_a_W = calc_FaW(ai[n], W)
         elif geom.iso == False:
             if fcc_elastic is not None:
-                # Ortega uses axis1 along loading, unlike Bao's crack-axis1
-                # convention used for M. Keep the two input axes explicit.
                 source_axis1 = 1 if ortega_axis1 is None else ortega_axis1
-                order = [source_axis1, 1-source_axis1, 2]
-                S_ortega = fcc_elastic["S_xy_pe"][np.ix_(order, order)]
-                f_a_W = calc_FaW_aniso(ai[n], W, S=S_ortega)
-                lambda_source, chi_source = calc_anisoParams(S=S_ortega)
-                M_source = np.sqrt(2 * lambda_source**1.5 / (1 + chi_source)) / S_ortega[0, 0]
-                # Ortega Eq12 and its fitted K use the loading-axis1 order.
-                # Convert K before pairing it with Bao's crack-axis1 M.
-                # Both moduli remain in C's native stress units here.
-                f_a_W *= np.sqrt(fcc_elastic["M_I_pe"] / M_source)
+                f_a_W = ortega_crack_axis_factor(ai[n], W, fcc_elastic, source_axis1)
             elif C is None:
                 from resources.lattices import calcC_mohr
                 C = calcC_mohr(copy.deepcopy(geom), "unit", E_s=E)[0]

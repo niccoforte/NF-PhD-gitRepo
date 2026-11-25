@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 
 from resources.calculations import smooth
+from resources.calculations import initial_work_stiffness
 from validation_calculations import filter_force
 
 
@@ -54,50 +55,6 @@ def archive_filter(time, x, y, natural_frequency_Hz, nyquist_fraction=1/3,
                 limitation="Postprocessing cannot undo existing aliasing or recreate original solver-rate filtering",
                 source_basis=SOURCE)
     return (fx, fy), info
-
-
-def initial_work_stiffness(x, y, end_fraction=.4, min_samples=6, baseline_response=0.):
-    """Initial work-equivalent slope over one declared low-load interval.
-
-    Match initial work W=E*x_end^2/2 through the first end_fraction crossing.
-    Under linear elasticity this equals the ordinary modulus/load stiffness.
-    The physical unloaded origin is used, not one noisy initial reaction.
-    A known preload can be supplied explicitly as baseline_response.
-    The estimate is not asserted to be a homogenised material tensor.
-    """
-    x, y = np.asarray(x, float), np.asarray(y, float)
-    if len(x) != len(y) or len(x) < 2 or not np.isfinite(x).all() or not np.isfinite(y).all():
-        raise ValueError("Aligned finite observations required")
-    if not 0 < end_fraction < 1:
-        raise ValueError("Initial loading fraction must lie inside zero and one")
-    if not np.isfinite(baseline_response):
-        raise ValueError("Known finite baseline required")
-    u, p = x-x[0], y-float(baseline_response)
-    p=p.copy();p[0]=0.
-    peak = int(np.argmax(p))
-    if peak == 0 or p[peak] <= 0:
-        return {"status": "unresolved_positive_initial_loading", "estimate": None}
-    crossed = np.flatnonzero(p[:peak+1] >= end_fraction*p[peak])
-    if not len(crossed):
-        return {"status": "unobserved_initial_fraction", "estimate": None}
-    end = int(crossed[0])
-    a, b = u[:end+1], p[:end+1]
-    if len(a) < 2 or np.any(np.diff(a) <= 0) or a[-1] <= 0:
-        return {"status": "unresolved_monotone_initial_coordinate", "estimate": None, "end_index": end}
-    work = np.r_[0., np.cumsum(.5*(b[1:]+b[:-1])*np.diff(a))]
-    q = a*a
-    estimate = float(2*work[-1]/q[-1])
-    span = float(np.ptp(b))
-    residual = float(np.sqrt(np.mean((b-estimate*a)**2))/max(span, 1e-30))
-    energy_residual = float(np.sqrt(np.mean((2*work-estimate*q)**2))/max(abs(2*work[-1]), 1e-30))
-    return dict(status="resolved_estimate" if len(a) >= min_samples and estimate > 0 else "low_resolution_estimate",
-                estimate=estimate, end_index=end, samples=len(a), peak_index=peak,
-                end_fraction=end_fraction, end_coordinate=float(a[-1]), initial_work=float(work[-1]),
-                secant_energy_estimate=float(2*work[-1]/a[-1]**2),
-                linearity_residual_over_stress_span=residual,
-                energy_fit_residual=energy_residual, baseline_x=float(x[0]), baseline_y=float(baseline_response),
-                observed_initial_response=float(y[0]),
-                definition="E=2*integral(response dcoordinate)/coordinate_end^2 through declared filtered-peak fraction; physical unloaded origin")
 
 
 def qualify_stiffness(time, x, y, natural_frequency_Hz):
@@ -578,6 +535,110 @@ def accepted_hex_stiffness(root=ROOT):
     _write_immutable_targets({study/"accepted-hex-stiffness.json":json.dumps(report,indent=2)+"\n",
                               study/"accepted-hex-stiffness.csv":csv_buffer.getvalue()})
     return report
+
+
+def requalify_accepted_hex_stiffness(root=ROOT):
+    """Return a read-only fixed-cutoff replay; preserve all nine frozen controls.
+
+    This does not rewrite the historical catalogue or silently widen its
+    screens. Newly sensitive curve estimates remain identified separately.
+    Transfer times use the previously declared 0.0005 s schedule, not a claim
+    that native timestamps have been recovered for the whole population.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from validation_curve_processing import transfer_prefix
+    root=Path(root);study=root/"audit/curve-processing/accepted-filter-study"
+    paths={"replay":study/"hex-population-readonly-qualification.json",
+           "accepted":study/"accepted-hex-stiffness.json",
+           "freeze":study/"holdout-controls/frozen-predictions.json",
+           "controls":study/"holdout-controls/uat-linear-summary.json",
+           "registry":Path(__file__).with_name("response_filter_cutoffs.json")}
+    fingerprints={key:sha(path) for key,path in paths.items()}
+    data={key:json.loads(path.read_text()) for key,path in paths.items()}
+    population=data["replay"]["records"];freeze=data["freeze"]
+    if fingerprints["replay"]!=freeze["source_replay_sha256"]:
+        raise ValueError("Frozen population replay changed")
+    keys={(r["design"],r["id"]) for r in population}
+    predictions={(r["design"],r["id"]):r for r in freeze["predictions"]}
+    if len(population)!=1973 or len(keys)!=1973 or len(predictions)!=9:
+        raise ValueError("Original1973 identities and nine frozen fallbacks required")
+    expected={(r["design"],r["id"]) for r in population
+              if r["stiffness"]["quality"]=="review_required"}
+    if set(predictions)!=expected:
+        raise ValueError("Frozen fallback membership differs from original quality flags")
+    if data["accepted"]["frozen_predictions_sha256"]!=fingerprints["freeze"]:
+        raise ValueError("Accepted catalogue uses a different fallback freeze")
+    controls={r["job"]:r for r in data["controls"]}
+    if set(controls)!={r["job"] for r in predictions.values()}:
+        raise ValueError("Complete nine-control extraction required")
+    for prediction in predictions.values():
+        control=controls[prediction["job"]]
+        if (control["source_sha256"]!=prediction["source_inp_sha256"] or
+                sha(control["source_inp"])!=control["source_sha256"] or
+                sha(control["input"])!=control["input_sha256"] or
+                control.get("state")!="completed_and_extracted" or control.get("read_only") is not True):
+            raise ValueError("Frozen elastic control source/extraction changed")
+        if not all(np.isfinite(control[k]) and 0<=control[k]<=1e-5 for k in
+                   ("force_balance_relative","work_energy_relative","clamp_work_energy_relative")):
+            raise ValueError("Frozen elastic control numerical gate failed")
+    cutoff=float(data["registry"]["cutoffs_hz"]["hex"]["UT"])
+    def process(record):
+        if sha(record["path"])!=record["source_sha256"]:
+            raise ValueError("Raw transfer changed: "+record["path"])
+        points,support=transfer_prefix(record["path"])
+        if support["used_prefix_rows"]!=record["support"]["used_prefix_rows"]:
+            raise ValueError("Transfer prefix support changed")
+        time=np.arange(len(points))*.0005
+        x,_=filter_force(time,points[:,0],cutoff,order=2,zero_phase=False)
+        y,_=filter_force(time,points[:,1],cutoff,order=2,zero_phase=False)
+        primary=initial_work_stiffness(x,y);value=primary.get("estimate")
+        if value is None or not np.isfinite(value) or value<=0:
+            raise ValueError("Fixed-cutoff positive stiffness unresolved")
+        windows=[initial_work_stiffness(x,y,f).get("estimate") for f in (.3,.4,.5)]
+        alternatives=[];nyquist=(len(time)-1)/(2*(time[-1]-time[0]))
+        for fraction in (.2,1/3,.4,.6):
+            a,_=filter_force(time,points[:,0],fraction*nyquist,order=2,zero_phase=False)
+            b,_=filter_force(time,points[:,1],fraction*nyquist,order=2,zero_phase=False)
+            alternatives.append(initial_work_stiffness(a,b).get("estimate"))
+        def spread(values):
+            return None if any(v is None or not np.isfinite(v) or v<=0 for v in values) else float(max(abs(np.asarray(values)/value-1)))
+        window_spread,cutoff_spread=spread(windows),spread(alternatives);flags=[]
+        if primary["status"]!="resolved_estimate":flags.append(primary["status"])
+        if window_spread is None or window_spread>.05:flags.append("window_sensitive_over5percent")
+        if cutoff_spread is None or cutoff_spread>.03:flags.append("cutoff_sensitive_over3percent")
+        if primary["energy_fit_residual"]>.03:flags.append("systematic_energy_curvature_over3percent")
+        key=record["design"],record["id"];fallback=key in predictions
+        row=dict(design=key[0],id=key[1],curve_estimate_MPa=value,
+                 curve_change_percent=100*(value/record["stiffness"]["estimate"]-1),
+                 window_relative_spread=window_spread,cutoff_relative_spread=cutoff_spread,
+                 energy_fit_residual=primary["energy_fit_residual"],flags=flags,
+                 frozen_fallback=fallback)
+        if fallback:
+            control=controls[predictions[key]["job"]]
+            row.update(selected_value_MPa=control["E_apparent_MPa"],
+                       fallback_job=control["job"],curve_vs_FE_percent=100*(value/control["E_apparent_MPa"]-1))
+        return row
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        rows=list(pool.map(process,population))
+    if any(sha(path)!=fingerprints[key] for key,path in paths.items()):
+        raise ValueError("Requalification inputs changed during replay")
+    curves=[r for r in rows if not r["frozen_fallback"]]
+    new_flags=[r for r in curves if r["flags"]]
+    return dict(scope="Read-only fixed-cutoff requalification; no production property or MLdata replacement",
+                cutoff_Hz=cutoff,filter="Paired causal second-order Butterworth SOS with first-sample DC initialization",
+                time_basis="Declared0.0005s transfer schedule; native timestamps not attested for full population",
+                cutoff_sensitivity="Historical0.2,1/3,0.4,0.6 Nyquist alternatives relative to fixed primary; sensitivity only",
+                counts=dict(total=len(rows),retained_curve_estimates=len(curves),frozen_elastic_fallbacks=9,
+                            current_curve_screen_pass=sum(not r["flags"] for r in curves),
+                            newly_sensitive_curve_estimates=len(new_flags),current_flags_all=sum(bool(r["flags"]) for r in rows)),
+                curve_change_percentiles={str(p):float(np.percentile([r["curve_change_percent"] for r in curves],p))
+                                          for p in (0,5,50,95,100)},
+                newly_sensitive_curve_estimates=new_flags,
+                frozen_fallbacks=[r for r in rows if r["frozen_fallback"]],
+                no_fallback_membership_changed=True,no_files_written=True,
+                provenance=dict(input_sha256=fingerprints,raw_transfers_verified=len(rows),
+                                control_source_and_input_hashes_verified=9,
+                                control_ODB_hashes_reverified=False))
 
 
 def uniform_fs6_curve(time,x,y):

@@ -15,44 +15,9 @@ import sys
 
 import numpy as np
 import pandas as pd
-from scipy.integrate import trapezoid
-from scipy.signal import butter, sosfilt, sosfilt_zi, sosfiltfilt
 
-from resources.calculations import calc_FaW, smooth
+from resources.calculations import calc_FaW, compact_tension_initiation, filter_force, smooth
 from resources.lattices import Geometry, effProperties
-
-
-def filter_force(time, force, cutoff, order=2, zero_phase=False):
-    """Uniform-grid Butterworth; restore genuine times, never interpolate STATUS.
-
-    DC startup and causal second-order filtering follow Abaqus defaults. Small
-    output-time jitter is interpolated explicitly; gaps >1.5 nominal intervals
-    are rejected. A noncausal sensitivity is separately labelled.
-    """
-    time, force = np.asarray(time, float), np.asarray(force, float)
-    if len(time) < 4 or len(time) != len(force):
-        raise ValueError("Need at least four paired samples")
-    if not np.all(np.isfinite(time)) or not np.all(np.isfinite(force)):
-        raise ValueError("Missing/nonfinite continuous histories cannot be filtered")
-    dt = np.diff(time)
-    if np.any(dt <= 0) or np.max(dt) > 1.5 * np.median(dt):
-        raise ValueError("Time grid is nonmonotone or contains a missing interval")
-    grid = np.linspace(time[0], time[-1], len(time))
-    fs = (len(time) - 1) / (time[-1] - time[0])
-    if not 0 < cutoff < fs / 2:
-        raise ValueError("Cutoff must be below native-history Nyquist frequency")
-    uniform_force = np.interp(grid, time, force)
-    sos = butter(order, cutoff, fs=fs, output="sos")
-    if zero_phase:
-        filtered = sosfiltfilt(sos, uniform_force)
-    else:
-        filtered, _ = sosfilt(sos, uniform_force,
-                              zi=sosfilt_zi(sos) * uniform_force[0])
-    return np.interp(time, grid, filtered), {
-        "fs_Hz": fs, "nyquist_Hz": fs / 2, "cutoff_Hz": cutoff,
-        "order": order, "zero_phase": zero_phase,
-        "max_time_remap_s": float(np.max(np.abs(grid - time))),
-    }
 
 
 def fit_stiffness(displacement, force, end):
@@ -68,39 +33,12 @@ def fit_stiffness(displacement, force, end):
 
 
 def fracture_metrics(displacement, force, index, geom, modulus, stiffness):
-    """C(T) initial-linear-compliance work control at an explicit sample.
-
-    index is never inferred from an arbitrary global force maximum. A negative
-    Apl remains diagnostic and yields an unavailable KJ, rather than KJ<KI.
-    Geometric stiffening can invalidate the triangle even in an elastic model;
-    positive area alone does not certify this as the recoverable-work partition.
-    """
-    d, f = np.asarray(displacement, float), np.asarray(force, float)
-    if not np.all(np.isfinite(d[:index + 1])) or not np.all(np.isfinite(f[:index + 1])):
-        raise ValueError("Nonfinite history in the integration interval")
-    if not 0 < index < len(d) or np.any(np.diff(d[:index + 1]) < 0):
-        raise ValueError("Endpoint must bound a monotone loading history")
-    if not np.isfinite(stiffness) or stiffness <= 0 or modulus <= 0:
-        raise ValueError("Positive stiffness and conversion modulus required")
-    p = float(f[index])
-    work = float(trapezoid(f[:index + 1], d[:index + 1]))
-    elastic_work = p * p / (2 * stiffness)
-    apl = work - elastic_work
+    """Evaluate the isotropic calibration at a recorded initiation sample."""
     a, b, w = float(geom.ai[0]), float(geom.B), float(geom.W)
-    ki = p * calc_FaW(a, w) / (b * np.sqrt(w))
-    jel = ki * ki / modulus
-    jpl = (2 + .522 * (w - a) / w) * apl / (b * (w - a))
-    total = jel + jpl
-    return {"sample_index": int(index), "displacement_mm": float(d[index]),
-            "force_N": p, "work_N_mm": work, "elastic_work_N_mm": elastic_work,
-            "Apl_N_mm": apl, "stiffness_N_mm": float(stiffness),
-            "modulus_MPa": float(modulus), "Jel_N_per_mm": float(jel),
-            "Jpl_N_per_mm": float(jpl), "KI_MPa_sqrt_m": float(ki / np.sqrt(1000)),
-            "KJ_signed_area_diagnostic_MPa_sqrt_m": float(np.sqrt(modulus * total) / np.sqrt(1000))
-            if total >= 0 else None,
-            "KJ_MPa_sqrt_m": float(np.sqrt(modulus * total) / np.sqrt(1000))
-            if apl >= 0 and total >= 0 else None,
-            "valid_plastic_area": bool(apl >= 0)}
+    result = compact_tension_initiation(displacement, force, index, a, b, w,
+                                        modulus, stiffness, calc_FaW(a, w))
+    result["Jpl_N_per_mm"] = result["Jpl_signed_diagnostic_N_per_mm"]
+    return result
 
 
 def read_table(path):

@@ -117,6 +117,12 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
 
 ## Shared Calculation Checks
 
+- Native mechanics and convergence replays are documented in the
+  [SimCheck checklist](../samples/p1-validation/CHECKLIST.md).
+  `validation_materials.py` owns ordered C/M. Keep cracked compliance separate.
+  `validation_convergence.py` extracts with Abaqus Python and replays with
+  standard Python. Keep results in the external audit until reviewed.
+
 - `test_validation_shared.py` verifies corrected Ortega's approximate isotropic
   geometry limit (about-.8% at a/W=.5), exact isotropic M and tensor-scale
   homogeneity. These mathematical checks do not validate a disorder constitutive
