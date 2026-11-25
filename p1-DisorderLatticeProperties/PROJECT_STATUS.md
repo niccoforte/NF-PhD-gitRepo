@@ -46,17 +46,18 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   2.363/2.298 with full initiation coverage. The completed 26-cell fit gives
   2.177/2.144. The 36-cell estimate is 2.650/2.385 with full coverage, flagged
   because the 158 mm companion has 0.119% stabilisation energy at the fitted
-  opening. Its outer-notch load secant is 2.185. At the same normalized plastic
-  opening the 20/26/30/36/40-cell local load fits are 1.841/2.193/2.348/2.552/2.176.
-  The direct values are nonmonotonic even excluding 36 cells. The matched
-  50-cell queue started after the 26/36-cell set. Its three compliance runs
-  passed and its 200 mm reference recorded initiation. The 210/220 mm companions
-  determine whether a 50-cell fit can be used to assess larger sizes.
+  opening. Its outer-notch load secant is 2.185. The matched 50-cell fit is
+  2.209/2.075 with full coverage. Both companions stopped after initiation,
+  leaving qualified converged histories. At common normalized plastic opening
+  0.003574, the 40/50-cell local load fits are 2.140/2.209 while the outer-pair
+  secants are 2.138/2.093 over different notch intervals. The 40–50 change is
+  smaller than the notch and compliance sensitivity. The 46/56-cell decks
+  are prepared, with solver submission on hold. A common coefficient is open.
   [40-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
   · [30-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
   · [26-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n26/eta-results.json)
   · [36-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n36/eta-results.json)
-  · [50-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc50-eta-q/state.json)
+  · [50-cell evidence](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/eta-results.json)
   The potential-energy and long-strip checks remain diagnostic because of
   their separate material and local-field limits.
   Omidi reproduction is deferred. Its published elastic calibration stays

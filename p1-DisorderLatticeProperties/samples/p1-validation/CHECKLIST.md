@@ -176,17 +176,18 @@ This replaces accumulated superseded proposals; it is the single task register.
   The 26-cell original-notch load/work fit is 2.177/2.144 at full initiation
   coverage. The 36-cell fit is 2.650/2.385 with full coverage, flagged for
   0.119% stabilisation energy at the 158 mm companion's fitted opening.
-  Its outer-notch load secant is 2.185. The 50-cell serial handoff succeeded,
-  all 1 N cases passed and the original notch brackets initiation. Wait for
-  the two 50-cell companions and the queued postprocessing.
-  Reassess a plateau using native initiation coverage, common plastic opening,
-  notch ratios and compliance sensitivity before deciding on 46/56 cells.
-  Both larger source models are geometry-qualified and remain unsubmitted.
+  Its outer-notch load secant is 2.185. The 50-cell fit is 2.209/2.075 at full
+  coverage, including both verified companion histories before late cutbacks.
+  At common normalized plastic opening 0.003574, local load fits for 40/50
+  cells are 2.140/2.209. The outer-pair load estimates move in the opposite
+  direction across different notch intervals. Hold the 46/56-cell submissions
+  because more sizes at the current notch intervals would leave the observed
+  estimator and compliance sensitivity unresolved.
   [40-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n40/eta-results.json)
   · [30-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n30/eta-results.json)
   · [26-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n26/eta-results.json)
   · [36-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n36/eta-results.json)
-  · [50-cell queue](Z:/p1/sims/Ti/Validation/audit/fcc50-eta-q/state.json)
+  · [50-cell fit](Z:/p1/sims/Ti/Validation/audit/fcc-calibration/eta-verification/fcc-size/load-separation-n50/eta-results.json)
   Representative disordered checks are needed for a population-wide claim.
   The potential-material fit and H190 strip bracket remain supporting checks.
   The strip's force imbalance and local-field mismatch leave C(T) transfer
