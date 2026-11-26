@@ -89,7 +89,7 @@ Per study, deliver one ignored `samples/<suite>/README.md` following [visual stu
 
 Treat the user's cleanup preference as a high-priority engineering constraint, not a cosmetic preference.
 
-- **High priority: no surprises.** Do not expand scope, relocate files or create alternate notebook copies without explicit authorization. Keep p2 notebooks in `p2-DisorderML/code/`. External data stores hold datasets, results and requested figures—not executable notebooks, scripts or deployment bundles. Use outside-repository temporary directories for validation intermediates.
+- Keep scope, locations and notebook copies within authorisation. p2 notebooks live in `p2-DisorderML/code/`. Data stores hold datasets, results and requested figures. Stage transient scripts, trials and outputs in one dedicated directory outside Git checkouts. Transfer only verified final work to its owning repository.
 - Keep active scripts, notebooks, and helpers compact, current, and intentional. Remove abandoned approaches, stale notebook cells and outputs, duplicated or superseded code, obsolete workaround helpers, and unnecessary compatibility or fallback scaffolding as part of the change.
 - Prefer direct code and compact helpers: inline one-off helpers that do not clarify the flow, and move genuinely reused logic into the appropriate `resources/` module.
 - Important exception: archived or explicitly historical folders, such as `p1-DisorderLatticeProperties/SIMscripts/OldScriptVersions/`, can preserve old versions. Active/current scripts and notebooks should not accumulate old experiments.

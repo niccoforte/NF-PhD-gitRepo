@@ -21,10 +21,15 @@ instructions. Refresh them before the final review.
   notebook cells, and their run products after dependency and hash checks.
 - [ ] Retire the individual C(T) mesh displacement review render
   `audit/production/convergence/mesh-FT-initiation-displacement.png` after
-  the final panel decision if the main figure supersedes it.
+  cleanup approval. The updated C(T) mesh figure includes the accepted panel.
 - [ ] Review the two matched 40-cell hexagonal C(T) rate/sampling diagnostics
   under `audit/production/convergence/hex-psc40-rate` after extraction. Keep the
   comparison and the source/result receipts required for reproduction.
+  Review its temporary scripts in `C:/temp/p1-hex-psc40-rate`.
+- [ ] Review the rear-edge rotation and half-rate fine hexagonal C(T)
+  diagnostics in `audit/production/convergence/fcc-rear-rotation` and
+  `hex-mesh-c5f15-rate`, and their extraction work and render staging in
+  `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant
   audit sheets and backups only after verified recovery and manuscript integration.

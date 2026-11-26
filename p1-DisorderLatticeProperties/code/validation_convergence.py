@@ -10,7 +10,7 @@ import tempfile
 
 import numpy as np
 
-from resources.calculations import filter_force
+from resources.calculations import compact_tension_initiation, filter_force
 from resources.lattices import prismatic_plane_strain
 from validation_controls import body_tensor_source
 from validation_curve_processing import sampled_odb_fingerprint
@@ -30,7 +30,6 @@ MESH_SELECTED = {
 SELECTED = {"tri": 30, "kagome": 20, "hex": 20, "FCC": 20}
 COLOR = {"tri": "red", "kagome": "black", "hex": "green", "FCC": "tab:blue"}
 LABEL = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal", "FCC": "FCC"}
-UAT_WORK_STRAIN = .03
 
 
 def sources(root, study):
@@ -143,18 +142,6 @@ def collect(root, study, out, scratch=None):
     _write_immutable_targets({out:json.dumps(doc, indent=2, allow_nan=False)+"\n"})
 
 
-def work_at_strain(strain, stress, endpoint):
-    """Integrate a supported observed prefix to a common physical strain."""
-    crossing = np.flatnonzero(strain >= endpoint)
-    if not len(crossing):
-        raise ValueError("Common strain is beyond the observed prefix")
-    end = int(crossing[0])
-    if end < 1 or np.any(np.diff(strain[:end+1]) <= 0):
-        raise ValueError("Common strain must be in the observed increasing prefix")
-    final_stress = np.interp(endpoint, strain[end-1:end+1], stress[end-1:end+1])
-    return float(np.trapz(np.r_[stress[:end], final_stress], np.r_[strain[:end], endpoint]))
-
-
 def convergence_event(event, time):
     """Admit tiny timestamp round-off when the intact field bracket is observed."""
     endpoint = {"status": event["status"]}
@@ -174,7 +161,30 @@ def convergence_event(event, time):
     return endpoint
 
 
-def calculate(raw, materials):
+def archive_raw_fallback(filtered, fits, x, y):
+    """Recompute at the same native event and screen the three k0 windows."""
+    i = filtered["sample_index"]
+    a, B, W = (filtered["geometry"][k] for k in ("a_mm", "B_mm", "W_mm"))
+    candidates = {}
+    for fraction in ("0.3", "0.4", "0.5"):
+        fit = fits[fraction]
+        if fit["status"] != "resolved_estimate" or fit["end_index"] > i:
+            raise ValueError("Raw fallback lacks a qualified initial-stiffness window")
+        result = compact_tension_initiation(x, y, i, a, B, W, filtered["modulus_MPa"],
+                                            fit["estimate"], filtered["geometry_factor"])
+        if not result["valid_plastic_area"]:
+            raise ValueError("Raw fallback fails plastic-work sensitivity at " + fraction)
+        candidates[fraction] = result
+    primary = candidates["0.4"]
+    return dict(filtered, **primary, status="calculated_raw_fallback",
+                response_method="paired_archive_raw_fallback",
+                minimum_k0_for_nonnegative_area_N_per_mm=primary["force_N"]**2/(2*primary["work_N_mm"]),
+                raw_Apl_by_filtered_stiffness_window_N_mm={
+                    fraction: values["Apl_N_mm"] for fraction, values in candidates.items()},
+                filtered_diagnostic=filtered)
+
+
+def calculate(raw, materials, raw_fallbacks=()):
     registry = read_json(REGISTRY)["cutoffs_hz"]
     fcc = prismatic_plane_strain(materials["FCC"]["C_MPa"], .2, 123000., .3)
     result = []
@@ -210,11 +220,6 @@ def calculate(raw, materials):
         except ValueError as error:
             stripped.update(calculation_status="unavailable_sampling_or_response", calculation_reason=str(error))
             continue
-        if task == "UT" and raw["study"] in ("mesh", "psc"):
-            try:
-                filtered["work_at_003"] = work_at_strain(fx, fy, UAT_WORK_STRAIN)
-            except ValueError as error:
-                filtered.update(work_at_003=None, work_at_003_reason=str(error))
         stripped.update(calculation_status="calculated", filter=filt, recorded_samples=len(t),
                         last_time_s=float(t[-1]), peak_response=filtered["peak_response"],
                         evaluation=filtered)
@@ -226,6 +231,12 @@ def calculate(raw, materials):
                 fcc if lat == "FCC" else None)
             if "time_match" in endpoint:
                 stripped["compact_tension"]["event_time_match"] = endpoint
+            if row["input_sha256"] in raw_fallbacks:
+                baseline = stripped["compact_tension"]
+                if baseline["status"] != "unavailable_negative_plastic_work":
+                    raise ValueError("Archived fallback no longer matches the reviewed negative work")
+                stripped["compact_tension"] = archive_raw_fallback(
+                    baseline, filtered["initial_work_fits"], x, y)
         elif raw["study"] == "al":
             stripped["curve"] = {"strain": x.tolist(), "stress_MPa": y.tolist()}
     return dict(study=raw["study"], materials=materials, records=result,
@@ -283,7 +294,7 @@ def convergence_comparisons(records, study):
     return output
 
 
-def plot_convergence(report, task, output, displacement_only=False):
+def plot_convergence(report, task, output):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -292,23 +303,26 @@ def plot_convergence(report, task, output, displacement_only=False):
 
     psc = report["study"] == "psc"
     rows = report["records"]
-    if displacement_only:
-        panels = {"Initiation load-line displacement (mm)":
-                  lambda r: r.get("compact_tension", {}).get("displacement_mm")}
-    elif task == "UT":
+    if task == "UT":
         panels = {
             "Peak stress (MPa)": UT_METRICS["Peak stress (MPa)"],
             "Initial modulus (MPa)": stiffness,
-            r"Ductility, $\varepsilon_L$": lambda r: r.get("evaluation", {}).get("ductility25_coordinate"),
-            r"Work to $\varepsilon_L=0.03$ (MJ/m³)": lambda r: r.get("evaluation", {}).get("work_at_003"),
+            r"Ductility, $\mathcal{D}$": lambda r: r.get("evaluation", {}).get("ductility25_coordinate"),
         }
+        nrows, ncols, figsize = 1, 3, (13.4, 4.4)
+    elif psc:
+        panels = dict(list(FT_METRICS.items())[:2])
+        nrows, ncols, figsize = 1, 2, (11.6, 4.1)
     else:
-        panels = dict(list(FT_METRICS.items())[:2]) if psc else FT_METRICS
+        panels = {
+            **dict(list(FT_METRICS.items())[:2]),
+            "Initiation load-line displacement (mm)":
+                lambda r: r.get("compact_tension", {}).get("displacement_mm"),
+            "Initiation load (N)": FT_METRICS["Initiation load (N)"],
+        }
+        nrows, ncols, figsize = 2, 2, (11.6, 7.0)
 
-    count = len(panels)
-    fig, axes = plt.subplots(2 if count == 4 else 1, 2 if count > 1 else 1,
-                             figsize=(11.6, 7.0 if count == 4 else 4.1) if count > 1 else (8.2, 5.2),
-                             constrained_layout=True, squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=True, squeeze=False)
     styles = {None: "-", 1: "-", 2: "--", 5: ":"}
     for ax, (label, getter) in zip(axes.ravel(), panels.items()):
         for lat in SELECTED:
@@ -317,10 +331,16 @@ def plot_convergence(report, task, output, displacement_only=False):
                 coords = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r))
                           for r in subset if psc or int(r["configuration"].split("-")[1]) == coarse]
                 x, y = np.asarray(sorted((a, np.nan if b is None else b) for a,b in coords)).T
-                observed = np.flatnonzero(np.isfinite(y))
+                raw_cases = {r["nx"] if psc else int(r["configuration"].split("-")[2])
+                             for r in subset if (psc or int(r["configuration"].split("-")[1]) == coarse)
+                             and r.get("compact_tension", {}).get("status") == "calculated_raw_fallback"}
+                raw = np.isin(x, list(raw_cases)) & np.isfinite(y)
+                observed = np.flatnonzero(np.isfinite(y) & ~raw)
                 ax.plot(x[observed], y[observed], color=COLOR[lat], linestyle="none", marker="o", ms=3.8)
-                # Follow the modified-Akima convention in ValConvPlots. An
-                # unavailable simulation breaks the guide; it is never drawn.
+                if raw.any():
+                    ax.plot(x[raw], y[raw], color=COLOR[lat], linestyle="none", marker="s",
+                            ms=6.2, mfc="white", mew=1.25, zorder=5)
+                # Break the guide at unavailable and alternate-method results.
                 for group in np.split(observed, np.flatnonzero(np.diff(observed) > 1) + 1):
                     if len(group) >= 3:
                         xs = np.linspace(x[group[0]], x[group[-1]], 100)
@@ -343,7 +363,12 @@ def plot_convergence(report, task, output, displacement_only=False):
                 for lat in SELECTED]
     selected_handle = Line2D([], [], linestyle="none", marker="D", markersize=6, color="0.25",
                              markerfacecolor="white", label="Selected model")
-    fig.legend(handles=[*topology, selected_handle], loc="outside upper center", frameon=False, ncol=5)
+    handles = [*topology, selected_handle]
+    if task == "FT" and any(r.get("compact_tension", {}).get("status") == "calculated_raw_fallback"
+                            for r in rows):
+        handles.append(Line2D([], [], linestyle="none", marker="s", markersize=6, color="0.25",
+                              markerfacecolor="white", label="Raw fallback"))
+    fig.legend(handles=handles, loc="outside upper center", frameon=False, ncol=len(handles))
     if not psc:
         coarse_handles = [Line2D([], [], color="0.3", linestyle=styles[c], label=f"{c}/strut")
                           for c in (1, 2, 5)]
@@ -359,6 +384,8 @@ def main():
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--scratch", type=Path, help="Local directory for one removable ODB copy")
     parser.add_argument("--replace-result-sha256", help="Replace this exact existing convergence receipt")
+    parser.add_argument("--raw-fallback-evidence", type=Path,
+                        help="Reviewed set of archive input SHA-256 values eligible for raw fallback")
     args = parser.parse_args()
     base = args.root/"audit/production/convergence"
     base.mkdir(parents=True, exist_ok=True)
@@ -370,8 +397,19 @@ def main():
             collect(args.root, args.study, raw, args.scratch)
     else:
         material = args.root/MATERIALS
-        report = calculate(read_json(raw), read_json(material)["materials"])
+        fallbacks = ()
+        if args.raw_fallback_evidence and args.study != "al":
+            evidence = read_json(args.raw_fallback_evidence)
+            if (evidence["registry_sha256"] != sha(REGISTRY)
+                    or evidence["source_result_receipts"][args.study]["native_sha256"] != sha(raw)):
+                raise ValueError("Reviewed raw-fallback evidence requires the same filter and native histories")
+            fallbacks = {case["archived_input_sha256"] for case in evidence["archived_cases"]
+                         if case["study"] == args.study and case["proposed_raw_fallback"]}
+        report = calculate(read_json(raw), read_json(material)["materials"], fallbacks)
         report.update(native_sha256=sha(raw), materials_sha256=sha(material), registry_sha256=sha(REGISTRY))
+        if fallbacks:
+            report["raw_fallback_evidence"] = dict(path=str(args.raw_fallback_evidence.resolve()),
+                                                   sha256=sha(args.raw_fallback_evidence))
         path = base/(args.study+"-results.json")
         payload = json.dumps(report, indent=2, allow_nan=False)+"\n"
         if args.replace_result_sha256 is None:

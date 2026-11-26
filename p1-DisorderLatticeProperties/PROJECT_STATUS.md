@@ -28,12 +28,18 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   gives M=9.250/9.079/1.404/8.340 GPa for tri/kagome/hex/FCC. With ASTM eta 2.261
   and the ROM FCC material state, equivalent K differs by +6.06/+4.40/+3.32%
   from matched ordered beam fields. All 168 mesh and 56 PSC histories were
-  replayed. The mesh check returned 76 C(T) toughness values after
-  sub-microsecond timestamp alignment for kagome C5/F2, and PSC returned 21.
-  Fifteen C(T) gaps remain (eight recorded pre-tensile damage and seven negative
-  areas). UAT convergence plots show complete work to common strain .03 and
-  dimensionless ductility. The original work-to-1% outcomes remain in evidence.
-  Two source-matched 40-cell hexagonal PSC C(T) replays test rate and sampling.
+  replayed. The mesh check returned 77 C(T) toughness values and PSC returned
+  23, including three limited raw-history fallbacks that passed stiffness
+  sensitivity. Twelve C(T) gaps remain: eight earlier remote damage and four
+  negative or stiffness-sensitive areas. UAT figures show all 112 peak
+  stresses, initial moduli and ductilities using the manuscript notation.
+  The C(T) mesh figure shows initiation load-line displacement. Both 40-cell
+  hexagonal rate replays retained negative filtered work at initiation.
+  A fine-mesh hexagonal half-rate diagnostic was submitted separately.
+  Both FCC rear-joint UR3 controls completed. The restraint moves C5/F5
+  first damage to the back edge and raises C2/F5 notch-initiation KJ by 3.11%.
+  Retain the production pin-only boundary conditions. The eight archived
+  remote first-damage loads and equivalent indices are reported separately.
   UAT failure properties and hexagonal C(T) retain material mesh
   or size sensitivity. The actual FCC C(T) PSC mesh is C2/F5 rather than
   the historic circled C5/F5. Population replacement awaits production
@@ -41,9 +47,13 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   handoff before Corrections updates the manuscript.
   The CT336 exact 1 N check still gives negative signed work (-27,308 Nmm).
   The 300 Hz hexagonal UAT check kept nine elastic fallbacks and flagged 22
-  additional window-sensitive curves. All 8,000 paired archive IDs have
-  matching filenames for both tests. The Al UAT overlay uses the author-agreed
-  nominal benchmark gauge (176 mm, 414 mm²). The filtered 18-1.1 trace peaks
+  additional window-sensitive curves. The broader inventory confirms 16,000
+  paired archive IDs before separate frequency runs, including 9,000 full and
+  1,000 mechanism-based FCC specimens. The earlier 8,000 covered the first
+  1,000 IDs per topology and design. The FCC notch cut retains the same
+  physical joints and struts under the verified perturbation bound. Both
+  the legacy method and the production pilot use nominal a₀ = 80 mm. The Al
+  UAT overlay uses the author-agreed nominal gauge (176 mm, 414 mm²). The filtered 18-1.1 trace peaks
   at 16.344 MPa and ends at the first minimum after force collapse.
   The approved Figure 10 contains 14 fixed-cutoff filtered native values plus
   the disclosed hexagonal 10 mm/20% raw fallback, 3 mm/20% recovery index, and
