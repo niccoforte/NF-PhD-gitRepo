@@ -29,8 +29,9 @@ instructions. Refresh them before the final review.
 - [ ] Review the rear-edge rotation and half-rate fine hexagonal C(T)
   diagnostics in `audit/production/convergence/fcc-rear-rotation` and
   `hex-mesh-c5f15-rate`, the `fcc-c5-rear-band-rotation` campaign and the
-  `fcc-c5-full-rear-rotation` follow-on. Review their extraction, launch
-  work and render staging in
+  `fcc-c5-full-rear-rotation` suite and the `hex-psc36-rate` diagnostic.
+  Review their extraction and launch work and the two temporary UAT
+  ductility treatments in
   `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant

@@ -256,8 +256,13 @@ This replaces accumulated superseded proposals; it is the single task register.
   across all tested stiffness windows at both sampling rates.
   [Half-rate receipt](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c5f15-rate/comparison.json)
 - [ ] Resolve or qualify the remaining work-partition gaps for hexagonal mesh
-  C1/F1 and C5/F20 and PSC 36. Review the C5-only FCC reruns before changing
-  the remote-damage results.
+  C1/F1 and C5/F20 and PSC 36. The PSC 36 half-rate dense replay follows the
+  C5 full-edge queue, retaining the exact mesh and material.
+  [PSC 36 serial order](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-psc36-rate/serial-order.json)
+- [x] Verify the four PSC C(T) archives with earlier remote compression:
+  FCC 16 and triangular 10, 16 and 20. Preserve the notch-initiation
+  exclusions and report the observed elements, times and coordinates.
+  [Remote-damage evidence](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-rear-rotation/first-damage-comparison.json)
 - [x] Test rear-edge rotations on the FCC C5/F5 and C2/F5 meshes. Reject the
   tested restraint because C5/F5 still damages remotely and earlier, and C2/F5
   toughness changes by 3.11%. Record the first-damage load, opening and

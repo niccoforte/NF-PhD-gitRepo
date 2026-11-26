@@ -346,7 +346,7 @@ def plot_convergence(report, task, output):
     if task == "UT":
         panels = {
             "Peak stress (MPa)": UT_METRICS["Peak stress (MPa)"],
-            "Initial modulus (MPa)": stiffness,
+            "Stiffness (GPa)": stiffness,
             r"Ductility, $\mathcal{D}$": lambda r: r.get("evaluation", {}).get("ductility25_coordinate"),
         }
         nrows, ncols, figsize = 1, 3, (13.4, 4.4)
@@ -358,13 +358,14 @@ def plot_convergence(report, task, output):
             **dict(list(FT_METRICS.items())[:2]),
             "Initiation load-line displacement (mm)":
                 lambda r: r.get("compact_tension", {}).get("displacement_mm"),
-            "Initiation load (N)": FT_METRICS["Initiation load (N)"],
+            "Initiation load (kN)": FT_METRICS["Initiation load (N)"],
         }
         nrows, ncols, figsize = 2, 2, (11.6, 7.0)
 
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=True, squeeze=False)
     styles = {None: "-", 1: "-", 2: "--", 5: ":"}
     for ax, (label, getter) in zip(axes.ravel(), panels.items()):
+        scale = .001 if label in ("Stiffness (GPa)", "Initiation load (kN)") else 1.
         ductility_psc = psc and task == "UT" and label.startswith("Ductility")
         for lat in SELECTED:
             subset = [r for r in rows if r["task"] == task and r["topology"] == lat]
@@ -372,6 +373,7 @@ def plot_convergence(report, task, output):
                 coords = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r))
                           for r in subset if psc or int(r["configuration"].split("-")[1]) == coarse]
                 x, y = np.asarray(sorted((a, np.nan if b is None else b) for a,b in coords)).T
+                y *= scale
                 observed = np.flatnonzero(np.isfinite(y))
                 ax.plot(x[observed], y[observed], color=COLOR[lat], linestyle="none", marker="o", ms=3.8)
                 # Break the guide where the underlying observation is unavailable.
@@ -395,7 +397,7 @@ def plot_convergence(report, task, output):
         ax.set_ylabel(label)
         ax.set_xlabel("Unit cells in the $X$-direction" if psc else "Fine mesh divisions per strut (nominal)")
         ax.set_xticks(sorted(set(r["nx"] if psc else int(r["configuration"].split("-")[2]) for r in rows)))
-        ax.grid(alpha=.22)
+        ax.grid(False)
     topology = [Line2D([], [], color=COLOR[lat], marker="o", markersize=4, label=LABEL[lat])
                 for lat in SELECTED]
     selected_handle = Line2D([], [], linestyle="none", marker="D", markersize=6, color="0.25",

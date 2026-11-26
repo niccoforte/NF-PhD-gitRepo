@@ -35,7 +35,10 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   stresses, initial moduli and ductilities using the manuscript notation.
   The older UAT PSC ductility trend used size-dependent transfer gauge
   heights. The replay uses the main-body height from the archived deck.
-  The C(T) mesh figure shows initiation load-line displacement. Both 40-cell
+  Raw and double-smoothed ductility comparisons with that same gauge retain
+  size effects. The convergence plots omit grids and display stiffness in
+  GPa and C(T) initiation load in kN. The C(T) mesh includes initiation
+  load-line displacement. Both 40-cell
   hexagonal rate replays retained negative filtered work at initiation.
   The half-rate C5/F15 mesh run recovered positive Butterworth plastic
   work and gives KJ = 9.498 MPa√m. Its raw work stays negative.
@@ -57,8 +60,9 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   The 300 Hz hexagonal UAT check kept nine elastic fallbacks and flagged 22
   additional window-sensitive curves. The broader inventory confirms 16,000
   paired archive IDs before separate frequency runs, including 9,000 full and
-  1,000 mechanism-based FCC specimens. The Paper 1 FCC cohort is the first
-  1,000 IDs of each design (2,000 FCC pairs). The FCC notch cut retains the same
+  1,000 mechanism-based FCC specimens. Paper 1 selects FCC simulation IDs
+  through 1000, with at most 1,000 UAT/C(T) pairs (2,000 analyses). FCC IDs
+  above 1000 are for the Paper 2 ML training data. The FCC notch cut retains the same
   physical joints and struts under the verified perturbation bound. Both
   the legacy method and the production pilot use nominal a₀ = 80 mm. The Al
   UAT overlay uses the author-agreed nominal gauge (176 mm, 414 mm²). The filtered 18-1.1 trace peaks
