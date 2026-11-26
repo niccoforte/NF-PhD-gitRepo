@@ -30,6 +30,8 @@ instructions. Refresh them before the final review.
   diagnostics in `audit/production/convergence/fcc-rear-rotation` and
   `hex-mesh-c5f15-rate`, the `fcc-c5-rear-band-rotation` campaign and the
   `fcc-c5-full-rear-rotation` suite and the `hex-psc36-rate` diagnostic.
+  Include `hex-mesh-c1f1-compliance`, `hex-mesh-c5f20-rate` and
+  `hex-mesh-c5f20-compliance`.
   Review their extraction and launch work and the two temporary UAT
   ductility treatments in
   `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.

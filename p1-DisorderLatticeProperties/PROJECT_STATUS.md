@@ -28,11 +28,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   gives M=9.250/9.079/1.404/8.340 GPa for tri/kagome/hex/FCC. With ASTM eta 2.261
   and the ROM FCC material state, equivalent K differs by +6.06/+4.40/+3.32%
   from matched ordered beam fields. All 168 mesh and 56 PSC histories were
-  replayed. The mesh check returned 78 C(T) toughness values and PSC returned
-  23, including three limited raw-history fallbacks that passed stiffness
-  sensitivity. Eleven C(T) gaps remain: eight earlier remote damage and three
-  negative or stiffness-sensitive areas. UAT figures show all 112 peak
-  stresses, initial moduli and ductilities using the manuscript notation.
+  replayed. The current convergence figures retain three qualified
+  archive fallbacks. The mesh figure shows 80 notch-initiation points
+  and three marked off-notch first-damage indices. The PSC figure shows
+  20 notch-initiation and four off-notch first-damage points through 36
+  cells. The recovered Hex 36 point uses the dense half-rate receipt at
+  9.087 MPa√m. Only hexagonal mesh C1/F1 lacks a plotted value.
+  UAT PSC uses raw histories for its three properties, and both PSC figures
+  use the 10–36 cell range.
   The older UAT PSC ductility trend used size-dependent transfer gauge
   heights. The replay uses the main-body height from the archived deck.
   Raw and double-smoothed ductility comparisons with that same gauge retain
@@ -48,9 +51,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   remote first-damage loads and equivalent indices are reported separately.
   Four C5 band controls completed and still damaged away from the notch.
   The user stopped the active band F15 job and superseded the remaining
-  band runs. All seven C5 cases now run serially with the same global
-  rotation restraint on all 96 mesh nodes at x = 200 mm. The archived
-  C2 decks and results are the production basis.
+  band runs. All seven full-edge C5 cases completed and were processed.
+  F1/F15/F20/F25 give valid notch initiation, with F25 at 32.862 MPa√m.
+  F2/F5/F10 give marked off-notch indices. The archived C2 decks and results
+  remain the production basis. Hex 36 and the C1/F1 exact compliance
+  check completed. The C1/F1 work remains negative with exact compliance.
+  The dense half-rate C5/F20 mesh run and exact 1 N check completed.
+  Its accepted raw endpoint gives KJ = 9.261 MPa√m. The observed dense
+  and resampled histories both give positive raw work with exact stiffness.
   UAT failure properties and hexagonal C(T) retain material mesh
   or size sensitivity. The actual FCC C(T) PSC mesh is C2/F5 rather than
   the historic circled C5/F5. Population replacement awaits production

@@ -213,19 +213,26 @@ def calculate(raw, materials, raw_fallbacks=()):
             if "normalisation" in row:
                 stripped["source_to_retained_scale_ratio"] = (factors/row["normalisation"]).tolist()
         cutoff = registry[lat][task]
+        raw_psc_uat = task == "UT" and raw["study"] == "psc"
         try:
-            fx, filt = filter_force(t, x, cutoff)
-            fy, _ = filter_force(t, y, cutoff)
-            filtered = metrics(fx, fy, task)
+            if raw_psc_uat:
+                evaluation = metrics(x, y, task)
+                filt = None
+            else:
+                fx, filt = filter_force(t, x, cutoff)
+                fy, _ = filter_force(t, y, cutoff)
+                evaluation = metrics(fx, fy, task)
         except ValueError as error:
             stripped.update(calculation_status="unavailable_sampling_or_response", calculation_reason=str(error))
             continue
         stripped.update(calculation_status="calculated", filter=filt, recorded_samples=len(t),
-                        last_time_s=float(t[-1]), peak_response=filtered["peak_response"],
-                        evaluation=filtered)
+                        last_time_s=float(t[-1]), peak_response=evaluation["peak_response"],
+                        evaluation=evaluation)
+        if raw_psc_uat:
+            stripped["response_method"] = "native_raw"
         if task == "FT":
             endpoint = convergence_event(row["native_event"], t)
-            processed = {"material_endpoint": endpoint, "methods": {"fixed": filtered}}
+            processed = {"material_endpoint": endpoint, "methods": {"fixed": evaluation}}
             stripped["compact_tension"] = compact_tension_properties(
                 processed, t, x, y, cutoff, row["geometry"], materials[lat]["M_MPa"],
                 fcc if lat == "FCC" else None)
@@ -236,7 +243,7 @@ def calculate(raw, materials, raw_fallbacks=()):
                 if baseline["status"] != "unavailable_negative_plastic_work":
                     raise ValueError("Archived fallback no longer matches the reviewed negative work")
                 stripped["compact_tension"] = archive_raw_fallback(
-                    baseline, filtered["initial_work_fits"], x, y)
+                    baseline, evaluation["initial_work_fits"], x, y)
         elif raw["study"] == "al":
             stripped["curve"] = {"strain": x.tolist(), "stress_MPa": y.tolist()}
     return dict(study=raw["study"], materials=materials, records=result,
@@ -295,31 +302,42 @@ def convergence_comparisons(records, study):
 
 
 
-def apply_mesh_rate_replay(report, evidence_path, native_path):
+def apply_rate_replay(report, evidence_path, native_path):
     """Replace one archived negative-work result with its qualified rerun."""
     evidence = read_json(evidence_path)
-    if (report["study"] != "mesh" or evidence["prior_native"]["sha256"] != sha(native_path)
+    if (evidence["prior_native"]["sha256"] != sha(native_path)
             or evidence["registry_sha256"] != sha(REGISTRY)):
-        raise ValueError("Mesh rate replay is bound to different inputs")
+        raise ValueError("Rate replay is bound to different inputs")
     row, = [row for row in report["records"]
             if row["input_sha256"] == evidence["source"]["source_sha256"]]
     old = row["compact_tension"]
     event = evidence["event"]
     selected = evidence["selected_method"]
-    result = evidence["qualification"][selected]
-    point = result["native_refit_40pct"]
+    native_only = selected is None and report["study"] == "psc"
+    if native_only:
+        # Use the measured dense history if only its decimation is sensitive.
+        selected = "approved_butterworth"
+        sensitivity = evidence["response_comparisons"]["40kHz_native+approved_butterworth"][
+            "last_intact_native_field_time"]
+        required = {"rerun_peak_fit": {"0.3", "0.4", "0.5"},
+                    "archive_fixed": {"0.3", "0.4", "0.5"}, "exact_1N": {"exact_1N"}}
+        if ({scheme: set(fits) for scheme, fits in sensitivity.items()} != required
+                or not all(value["Apl_N_mm"] > 0 and value["valid_plastic_area"]
+                           for fits in sensitivity.values() for value in fits.values())):
+            raise ValueError("Native dense PSC evidence remains work-partition sensitive")
+    result = evidence["qualification"].get(selected, {})
+    point = result.get("native_refit_40pct")
     if (old["status"] != "unavailable_negative_plastic_work"
             or event["status"] != "qualified_observed_event"
-            or not result["positive_work_robust_across_stiffness_windows_and_sampling"]
-            or not point["valid_plastic_area"]
+            or (not native_only and not result.get("positive_work_robust_across_stiffness_windows_and_sampling"))
+            or not point or not point["valid_plastic_area"]
             or point["modulus_MPa"] != old["modulus_MPa"]
             or sha(evidence["delivered_input"]) != evidence["delivered_input_sha256"]):
-        raise ValueError("Mesh rate replay lacks compatible initiation evidence")
+        raise ValueError("Rate replay lacks compatible initiation evidence")
     row["compact_tension"] = {
         **old, **point, "status": "calculated",
         "response_method": selected, "event_time_s": event["prev_native_history"]["time_s"],
         "minimum_k0_for_nonnegative_area_N_per_mm": point["force_N"]**2/(2*point["work_N_mm"]),
-
     }
     row["compact_tension"].pop("stiffness_fit_end_index")
     row["compact_tension_replay"] = {
@@ -327,11 +345,73 @@ def apply_mesh_rate_replay(report, evidence_path, native_path):
         "input": evidence["delivered_input"], "input_sha256": evidence["delivered_input_sha256"],
         "odb": evidence["delivered_odb"], "odb_sha256": evidence["delivered_odb_sha256"],
         "archive_diagnostic": old,
+        "qualification": "native_dense_history" if native_only else "native_and_resampled",
     }
-    counts = report["FT_endpoint_counts"]
-    counts["unavailable_negative_plastic_work"] -= 1
-    counts["calculated"] += 1
-    report["comparisons"] = convergence_comparisons(report["records"], report["study"])
+
+
+def apply_first_damage_evidence(report, evidence_path, materials_path):
+    """Add the observed first-damage indices for the four PSC exceptions."""
+    evidence = read_json(evidence_path)
+    if (report["study"] != "psc" or evidence["registry_sha256"] != sha(REGISTRY)
+            or evidence["material_sha256"] != sha(materials_path)):
+        raise ValueError("PSC first-damage evidence uses different processing inputs")
+    for row in report["records"]:
+        if row["task"] != "FT":
+            continue
+        key = f'psc-{row["topology"]}-{row["nx"]}'
+        if key not in evidence["cases"]:
+            continue
+        control = evidence["cases"][key]
+        archived = row["compact_tension"]
+        point = control["first_damage_mechanics"]
+        section_strain = control["first_damage"]["LE11_at_matching_section"]
+        if (control["input_sha256"] != row["input_sha256"]
+                or control["odb_fingerprint"] != row["sampled_odb_fingerprint"]
+                or archived["status"] != "unqualified_observed_event"
+                or not point["valid_plastic_area"]
+                or not section_strain or not all(value < 0 for value in section_strain)):
+            raise ValueError("PSC first-damage evidence does not match " + key)
+        row["compact_tension"] = dict(point, status="calculated_first_damage_away_from_notch")
+        row["compact_tension_replay"] = {
+            "comparison": str(evidence_path.resolve()), "comparison_sha256": sha(evidence_path),
+            "archive_diagnostic": archived, "first_damage": control["first_damage"],
+        }
+
+
+def apply_fcc_full_edge_evidence(report, evidence_path, materials_path):
+    """Use one consistent C5 boundary condition and preserve the archive comparison."""
+    evidence = read_json(evidence_path)
+    sources = evidence_path.with_name("paired-source.json")
+    if (report["study"] != "mesh" or evidence["paired_source_sha256"] != sha(sources)
+            or evidence["registry_sha256"] != sha(REGISTRY)
+            or evidence["material_catalogue_sha256"] != sha(materials_path)):
+        raise ValueError("FCC full-edge evidence uses different processing inputs")
+    expected = {case["configuration"]: case for case in read_json(sources)["cases"]}
+    if set(expected) != set(evidence["cases"]):
+        raise ValueError("The seven FCC C5 cases must be processed together")
+    for row in report["records"]:
+        key = row.get("configuration")
+        if row["task"] != "FT" or row["topology"] != "FCC" or key not in expected:
+            continue
+        control = evidence["cases"][key]
+        source = expected[key]
+        if (row["input_sha256"] != source["source_sha256"]
+                or control["input_sha256"] != source["input_sha256"]
+                or control["verified_rotation_frames"] < 2
+                or control["maximum_rear_rotation_rad"] != 0.
+                or row["compact_tension"] != control["original"]):
+            raise ValueError("FCC full-edge evidence does not match " + key)
+        point = control["boundary_full_result"]
+        if point["status"] == "unqualified_observed_event":
+            first_damage = control["first_observed_damage_mechanics"]
+            if first_damage and first_damage["valid_plastic_area"]:
+                point = dict(first_damage, status="calculated_first_damage_away_from_notch")
+        row["compact_tension"] = point
+        row["compact_tension_replay"] = {
+            "comparison": str(evidence_path.resolve()), "comparison_sha256": sha(evidence_path),
+            "archive_diagnostic": control["original"], "boundary_condition": "full_right_edge_UR3_zero",
+            "first_damage": control["first_damage"], "odb": control["odb"],
+        }
 
 
 def plot_convergence(report, task, output):
@@ -342,7 +422,8 @@ def plot_convergence(report, task, output):
     from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 
     psc = report["study"] == "psc"
-    rows = report["records"]
+    rows = [row for row in report["records"] if not psc or row["nx"] <= 36]
+    first_damage_status = "calculated_first_damage_away_from_notch"
     if task == "UT":
         panels = {
             "Peak stress (MPa)": UT_METRICS["Peak stress (MPa)"],
@@ -366,21 +447,30 @@ def plot_convergence(report, task, output):
     styles = {None: "-", 1: "-", 2: "--", 5: ":"}
     for ax, (label, getter) in zip(axes.ravel(), panels.items()):
         scale = .001 if label in ("Stiffness (GPa)", "Initiation load (kN)") else 1.
-        ductility_psc = psc and task == "UT" and label.startswith("Ductility")
+        shape_preserving = psc and (task == "FT" or label.startswith("Ductility"))
         for lat in SELECTED:
             subset = [r for r in rows if r["task"] == task and r["topology"] == lat]
             for coarse in ([None] if psc else [1, 2, 5]):
-                coords = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r))
+                series = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r),
+                           r.get("compact_tension", {}).get("status") == first_damage_status)
                           for r in subset if psc or int(r["configuration"].split("-")[1]) == coarse]
-                x, y = np.asarray(sorted((a, np.nan if b is None else b) for a,b in coords)).T
+                x, y, remote = np.asarray(sorted((a, np.nan if b is None else b, off_notch)
+                                                for a, b, off_notch in series)).T
                 y *= scale
-                observed = np.flatnonzero(np.isfinite(y))
-                ax.plot(x[observed], y[observed], color=COLOR[lat], linestyle="none", marker="o", ms=3.8)
+                available = np.isfinite(y)
+                normal_points = available & ~remote.astype(bool)
+                off_notch_points = available & remote.astype(bool)
+                observed = np.flatnonzero(available)
+                ax.plot(x[normal_points], y[normal_points], color=COLOR[lat],
+                        linestyle="none", marker="o", ms=3.8)
+                if off_notch_points.any():
+                    ax.plot(x[off_notch_points], y[off_notch_points], color=COLOR[lat],
+                            linestyle="none", marker="x", ms=5.5, mew=1.3, zorder=5)
                 # Break the guide where the underlying observation is unavailable.
                 for group in np.split(observed, np.flatnonzero(np.diff(observed) > 1) + 1):
                     if len(group) >= 3:
                         xs = np.linspace(x[group[0]], x[group[-1]], 100)
-                        if ductility_psc:
+                        if shape_preserving:
                             guide = PchipInterpolator(x[group], y[group])
                         else:
                             guide = Akima1DInterpolator(x[group], y[group], method="makima")
@@ -402,9 +492,18 @@ def plot_convergence(report, task, output):
                 for lat in SELECTED]
     selected_handle = Line2D([], [], linestyle="none", marker="D", markersize=6, color="0.25",
                              markerfacecolor="white", label="Selected model")
-    fig.legend(handles=[*topology, selected_handle], loc="outside upper center", frameon=False, ncol=5)
+    handles = [*topology, selected_handle]
+    if task == "FT" and any(r.get("compact_tension", {}).get("status") == first_damage_status for r in rows):
+        handles.append(Line2D([], [], linestyle="none", marker="x", color="0.25",
+                              label="First damage away from notch"))
+    fig.legend(handles=handles, loc="outside upper center", frameon=False, ncol=len(handles))
     if not psc:
-        coarse_handles = [Line2D([], [], color="0.3", linestyle=styles[c], label=f"{c}/strut")
+        coarse_labels = {1: "1/strut", 2: "2/strut", 5: "5/strut"}
+        full_edge = task == "FT" and any(r.get("compact_tension_replay", {}).get("boundary_condition")
+                                        == "full_right_edge_UR3_zero" for r in rows)
+        if full_edge:
+            coarse_labels[5] = "5/strut (FCC: full edge)"
+        coarse_handles = [Line2D([], [], color="0.3", linestyle=styles[c], label=coarse_labels[c])
                           for c in (1, 2, 5)]
         axes[0, -1].legend(handles=coarse_handles, title="Coarse mesh", frameon=False)
     fig.savefig(output, dpi=200)
@@ -420,7 +519,10 @@ def main():
     parser.add_argument("--replace-result-sha256", help="Replace this exact existing convergence receipt")
     parser.add_argument("--raw-fallback-evidence", type=Path,
                         help="Reviewed set of archive input SHA-256 values eligible for raw fallback")
-    parser.add_argument("--mesh-rate-comparison", type=Path, help="Qualified mesh rerun receipt")
+    parser.add_argument("--rate-comparison", "--mesh-rate-comparison", type=Path,
+                        action="append", default=[], help="Qualified rate-rerun receipt; repeat for multiple cases")
+    parser.add_argument("--psc-first-damage-evidence", type=Path)
+    parser.add_argument("--mesh-fcc-full-edge-evidence", type=Path)
     args = parser.parse_args()
     base = args.root/"audit/production/convergence"
     base.mkdir(parents=True, exist_ok=True)
@@ -441,8 +543,16 @@ def main():
             fallbacks = {case["archived_input_sha256"] for case in evidence["archived_cases"]
                          if case["study"] == args.study and case["proposed_raw_fallback"]}
         report = calculate(read_json(raw), read_json(material)["materials"], fallbacks)
-        if args.mesh_rate_comparison:
-            apply_mesh_rate_replay(report, args.mesh_rate_comparison, raw)
+        for evidence in args.rate_comparison:
+            apply_rate_replay(report, evidence, raw)
+        if args.psc_first_damage_evidence:
+            apply_first_damage_evidence(report, args.psc_first_damage_evidence, material)
+        if args.mesh_fcc_full_edge_evidence:
+            apply_fcc_full_edge_evidence(report, args.mesh_fcc_full_edge_evidence, material)
+        report["comparisons"] = convergence_comparisons(report["records"], report["study"])
+        report["FT_endpoint_counts"] = dict(Counter(
+            row.get("compact_tension", {}).get("status", "unavailable_curve")
+            for row in report["records"] if row["task"] == "FT"))
         report.update(native_sha256=sha(raw), materials_sha256=sha(material), registry_sha256=sha(REGISTRY))
         if fallbacks:
             report["raw_fallback_evidence"] = dict(path=str(args.raw_fallback_evidence.resolve()),
