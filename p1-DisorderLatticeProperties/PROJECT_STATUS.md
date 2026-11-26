@@ -43,9 +43,11 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   first damage to the back edge and raises C2/F5 notch-initiation KJ by 3.11%.
   Retain the production pin-only boundary conditions. The eight archived
   remote first-damage loads and equivalent indices are reported separately.
-  Seven C5-only controls test zero UR3 at the right edge within
-  80 < y < 120 mm. The completed F5 run still damages away from the notch.
-  The archived C2 decks and results are the production basis.
+  Four C5 band controls completed and still damaged away from the notch.
+  The user stopped the active band F15 job and superseded the remaining
+  band runs. All seven C5 cases now run serially with the same global
+  rotation restraint on all 96 mesh nodes at x = 200 mm. The archived
+  C2 decks and results are the production basis.
   UAT failure properties and hexagonal C(T) retain material mesh
   or size sensitivity. The actual FCC C(T) PSC mesh is C2/F5 rather than
   the historic circled C5/F5. Population replacement awaits production

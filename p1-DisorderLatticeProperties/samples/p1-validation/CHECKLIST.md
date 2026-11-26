@@ -263,10 +263,15 @@ This replaces accumulated superseded proposals; it is the single task register.
   toughness changes by 3.11%. Record the first-damage load, opening and
   equivalent toughness for all eight archived remote initiation cases.
   [Boundary-condition comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-rear-rotation/first-damage-comparison.json)
-- [ ] Process the seven C5-only reruns with zero rotation at the right-edge
-  B21 mesh nodes in the open 80–120 mm band. Check the first-damage location
-  and the normal work qualification before updating any C5 result.
-  [Local queue](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-c5-rear-band-rotation/queue/state.json)
+- [x] Compare the four completed C5 rear-band controls. All still had first
+  damage away from the notch. The uncompleted band jobs were stopped or
+  superseded by the full-edge suite.
+  [Band comparisons](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-c5-rear-band-rotation/partial-comparison.json)
+- [ ] Process all seven C5 full-edge reruns. They apply the exact band UR3 = 0
+  condition to all 96 physical right-edge mesh nodes and leave translational
+  degrees of freedom and C2 inputs unchanged. Verify rotations and first
+  damage before updating convergence.
+  [Serial queue](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-c5-full-rear-rotation/queue/state.json)
 - [x] Read all seven Al/triangular UAT histories, including the missing
   18-1.1 curve. Use the agreed 176 mm and 414 mm² nominal dimensions for
   the comparison figure, with the filtered trace through the first collapse.
