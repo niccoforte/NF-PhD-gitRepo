@@ -225,7 +225,9 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Reprocess all 168 UAT/C(T) mesh histories with source gauges and the
   native-event rules. UAT modulus is stable against the finer meshes.
   Kagome, hexagonal and FCC failure measures retain mesh sensitivity.
-  For C(T), 75 of 84 mesh cases yield valid total toughness.
+  For C(T), 76 of 84 mesh cases yield total toughness, including kagome
+  C5/F2 recovered by source time alignment. The UAT work plots use a common
+  strain of .03 and display ductility as dimensionless strain.
   [Mesh checks and figures](Z:/p1/sims/Ti/Validation/audit/production/convergence/README.md)
 - [ ] Reconcile Appendix B with the active FCC C(T) coarse/fine mesh and
   qualify metric-specific convergence claims. The archived PSC decks have
@@ -238,12 +240,18 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Check the three negative hexagonal PSC areas using exact 1 N controls.
   The native-event areas remain negative at 26, 36 and 40 cells.
   [Compliance sensitivity](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-compliance/diagnostic.json)
+- [ ] Process two matched 40-cell hexagonal PSC C(T) replays, one with the
+  original ramp and one at half rate, with dense pin histories. Compare native
+  and 2 kHz resampled histories with the same 302.252 Hz filter and exact 1 N
+  compliance. Keep remote first-damage cases distinct from notch initiation.
+  [Serial queue](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-psc40-rate/queue/state.json)
 - [x] Read all seven Al/triangular UAT histories, including the missing
-  18-1.1 curve. Use the real BodySet dimensions. The historical selected
-  18-1.1 model peaks at 19.53 MPa, 18.6% above Gu's digitised experiment.
+  18-1.1 curve. Use the agreed 176 mm and 414 mm² nominal dimensions for
+  the comparison figure, with the filtered trace through the first collapse.
+  The peak is 16.344 MPa, 0.74% below Gu's digitised experiment.
   [Al validation check](Z:/p1/sims/Ti/Validation/audit/production/convergence/al-validation.json)
-- [ ] Reconcile the corrected Al curve with the benchmark before Results
-  integration. Preserve the present model and reference provenance.
+- [ ] Integrate the agreed Al figure into Results after handoff approval.
+  Retain its nominal benchmark convention and reference provenance.
 - [ ] Revisit lattice-foundation branches only where active later work uses them.
 
 ## Deferred ML migration and population processing

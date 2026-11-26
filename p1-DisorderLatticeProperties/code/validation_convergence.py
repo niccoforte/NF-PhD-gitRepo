@@ -30,6 +30,7 @@ MESH_SELECTED = {
 SELECTED = {"tri": 30, "kagome": 20, "hex": 20, "FCC": 20}
 COLOR = {"tri": "red", "kagome": "black", "hex": "green", "FCC": "tab:blue"}
 LABEL = {"tri": "Triangular", "kagome": "Kagome", "hex": "Hexagonal", "FCC": "FCC"}
+UAT_WORK_STRAIN = .03
 
 
 def sources(root, study):
@@ -142,6 +143,37 @@ def collect(root, study, out, scratch=None):
     _write_immutable_targets({out:json.dumps(doc, indent=2, allow_nan=False)+"\n"})
 
 
+def work_at_strain(strain, stress, endpoint):
+    """Integrate a supported observed prefix to a common physical strain."""
+    crossing = np.flatnonzero(strain >= endpoint)
+    if not len(crossing):
+        raise ValueError("Common strain is beyond the observed prefix")
+    end = int(crossing[0])
+    if end < 1 or np.any(np.diff(strain[:end+1]) <= 0):
+        raise ValueError("Common strain must be in the observed increasing prefix")
+    final_stress = np.interp(endpoint, strain[end-1:end+1], stress[end-1:end+1])
+    return float(np.trapz(np.r_[stress[:end], final_stress], np.r_[strain[:end], endpoint]))
+
+
+def convergence_event(event, time):
+    """Admit tiny timestamp round-off when the intact field bracket is observed."""
+    endpoint = {"status": event["status"]}
+    if endpoint["status"] == "unqualified_observed_event" and not event["nonfinite_before_threshold"]:
+        low, high = event["prev_native_history"], event["cross_native_history"]
+        # The original absolute gate is 0.2 us. Limit the convergence replay
+        # correction to 0.1% of the measured history interval, at most 1 us.
+        allowed = min(1e-6, .001 * float(np.median(np.diff(time))))
+        error = max(abs(v["time_error_to_field_s"]) for v in (low, high))
+        if (0 < low["index"] < high["index"] < len(time) and error <= allowed
+                and event["prev_max_LE11"] < .1105 <= event["cross_max_LE11"]):
+            endpoint.update(status="qualified_observed_event", time_match="native_timestamp_roundoff",
+                            maximum_time_error_s=error, permitted_time_error_s=allowed)
+    if endpoint["status"] == "qualified_observed_event":
+        point = event["prev_native_history"]
+        endpoint.update(native_index=point["index"], time_s=point["time_s"])
+    return endpoint
+
+
 def calculate(raw, materials):
     registry = read_json(REGISTRY)["cutoffs_hz"]
     fcc = prismatic_plane_strain(materials["FCC"]["C_MPa"], .2, 123000., .3)
@@ -178,19 +210,22 @@ def calculate(raw, materials):
         except ValueError as error:
             stripped.update(calculation_status="unavailable_sampling_or_response", calculation_reason=str(error))
             continue
+        if task == "UT" and raw["study"] in ("mesh", "psc"):
+            try:
+                filtered["work_at_003"] = work_at_strain(fx, fy, UAT_WORK_STRAIN)
+            except ValueError as error:
+                filtered.update(work_at_003=None, work_at_003_reason=str(error))
         stripped.update(calculation_status="calculated", filter=filt, recorded_samples=len(t),
                         last_time_s=float(t[-1]), peak_response=filtered["peak_response"],
                         evaluation=filtered)
         if task == "FT":
-            event = row["native_event"]
-            endpoint = dict(status=event["status"])
-            if event["status"] == "qualified_observed_event":
-                point = event["prev_native_history"]
-                endpoint.update(native_index=point["index"], time_s=point["time_s"])
+            endpoint = convergence_event(row["native_event"], t)
             processed = {"material_endpoint": endpoint, "methods": {"fixed": filtered}}
             stripped["compact_tension"] = compact_tension_properties(
                 processed, t, x, y, cutoff, row["geometry"], materials[lat]["M_MPa"],
                 fcc if lat == "FCC" else None)
+            if "time_match" in endpoint:
+                stripped["compact_tension"]["event_time_match"] = endpoint
         elif raw["study"] == "al":
             stripped["curve"] = {"strain": x.tolist(), "stress_MPa": y.tolist()}
     return dict(study=raw["study"], materials=materials, records=result,
@@ -248,46 +283,71 @@ def convergence_comparisons(records, study):
     return output
 
 
-def plot_convergence(report, task, output):
+def plot_convergence(report, task, output, displacement_only=False):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    from scipy.interpolate import Akima1DInterpolator
 
     psc = report["study"] == "psc"
     rows = report["records"]
-    fig, axes = plt.subplots(2, 2, figsize=(11.6, 7.0), constrained_layout=True)
-    for ax, (label, getter) in zip(axes.ravel(), (UT_METRICS if task=="UT" else FT_METRICS).items()):
+    if displacement_only:
+        panels = {"Initiation load-line displacement (mm)":
+                  lambda r: r.get("compact_tension", {}).get("displacement_mm")}
+    elif task == "UT":
+        panels = {
+            "Peak stress (MPa)": UT_METRICS["Peak stress (MPa)"],
+            "Initial modulus (MPa)": stiffness,
+            r"Ductility, $\varepsilon_L$": lambda r: r.get("evaluation", {}).get("ductility25_coordinate"),
+            r"Work to $\varepsilon_L=0.03$ (MJ/m³)": lambda r: r.get("evaluation", {}).get("work_at_003"),
+        }
+    else:
+        panels = dict(list(FT_METRICS.items())[:2]) if psc else FT_METRICS
+
+    count = len(panels)
+    fig, axes = plt.subplots(2 if count == 4 else 1, 2 if count > 1 else 1,
+                             figsize=(11.6, 7.0 if count == 4 else 4.1) if count > 1 else (8.2, 5.2),
+                             constrained_layout=True, squeeze=False)
+    styles = {None: "-", 1: "-", 2: "--", 5: ":"}
+    for ax, (label, getter) in zip(axes.ravel(), panels.items()):
         for lat in SELECTED:
             subset = [r for r in rows if r["task"] == task and r["topology"] == lat]
             for coarse in ([None] if psc else [1, 2, 5]):
                 coords = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r))
                           for r in subset if psc or int(r["configuration"].split("-")[1]) == coarse]
-                valid = sorted((a, np.nan if b is None else b) for a,b in coords)
-                if valid:
-                    x, y = np.asarray(valid).T
-                    ax.plot(x, y, color=COLOR[lat],
-                            label=LABEL[lat] if psc or coarse == 1 else None,
-                            linestyle={None:"-",1:"-",2:"--",5:":"}[coarse], marker="o", ms=3.8)
-                    selected = SELECTED[lat] if psc else int(MESH_SELECTED[lat][task].rsplit("-",1)[1])
-                    selected_coarse = int(MESH_SELECTED[lat][task].split("-")[1])
-                    if (psc or coarse == selected_coarse) and selected in x:
-                        v = y[list(x).index(selected)]
-                        if np.isfinite(v):
-                            ax.scatter(selected, v, edgecolor=COLOR[lat], facecolor="white",
-                                       marker="D", zorder=4, s=52, linewidth=1.4)
+                x, y = np.asarray(sorted((a, np.nan if b is None else b) for a,b in coords)).T
+                observed = np.flatnonzero(np.isfinite(y))
+                ax.plot(x[observed], y[observed], color=COLOR[lat], linestyle="none", marker="o", ms=3.8)
+                # Follow the modified-Akima convention in ValConvPlots. An
+                # unavailable simulation breaks the guide; it is never drawn.
+                for group in np.split(observed, np.flatnonzero(np.diff(observed) > 1) + 1):
+                    if len(group) >= 3:
+                        xs = np.linspace(x[group[0]], x[group[-1]], 100)
+                        ys = Akima1DInterpolator(x[group], y[group], method="makima")(xs)
+                        ax.plot(xs, ys, color=COLOR[lat], linestyle=styles[coarse])
+                    elif len(group) == 2:
+                        ax.plot(x[group], y[group], color=COLOR[lat], linestyle=styles[coarse])
+                selected = SELECTED[lat] if psc else int(MESH_SELECTED[lat][task].rsplit("-",1)[1])
+                selected_coarse = int(MESH_SELECTED[lat][task].split("-")[1])
+                if (psc or coarse == selected_coarse) and selected in x:
+                    v = y[list(x).index(selected)]
+                    if np.isfinite(v):
+                        ax.scatter(selected, v, edgecolor=COLOR[lat], facecolor="white",
+                                   marker="D", zorder=4, s=52, linewidth=1.4)
         ax.set_ylabel(label)
         ax.set_xlabel("Unit cells in the $X$-direction" if psc else "Fine mesh divisions per strut (nominal)")
+        ax.set_xticks(sorted(set(r["nx"] if psc else int(r["configuration"].split("-")[2]) for r in rows)))
         ax.grid(alpha=.22)
-    from matplotlib.lines import Line2D
-    handles, labels = axes[0, 0].get_legend_handles_labels()
+    topology = [Line2D([], [], color=COLOR[lat], marker="o", markersize=4, label=LABEL[lat])
+                for lat in SELECTED]
     selected_handle = Line2D([], [], linestyle="none", marker="D", markersize=6, color="0.25",
                              markerfacecolor="white", label="Selected model")
-    fig.legend(handles=[*handles, selected_handle], labels=[*labels, "Selected model"],
-               loc="outside upper center", frameon=False, ncol=5)
+    fig.legend(handles=[*topology, selected_handle], loc="outside upper center", frameon=False, ncol=5)
     if not psc:
-        handles = [Line2D([], [], color="0.3", linestyle=ls, label=f"{coarse}/strut")
-                   for coarse, ls in ((1,"-"),(2,"--"),(5,":"))]
-        axes[0, 1].legend(handles=handles, title="Coarse mesh", frameon=False)
+        coarse_handles = [Line2D([], [], color="0.3", linestyle=styles[c], label=f"{c}/strut")
+                          for c in (1, 2, 5)]
+        axes[0, -1].legend(handles=coarse_handles, title="Coarse mesh", frameon=False)
     fig.savefig(output, dpi=200)
     plt.close(fig)
 
@@ -298,6 +358,7 @@ def main():
     parser.add_argument("--study", choices=("mesh", "psc", "al"), required=True)
     parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument("--scratch", type=Path, help="Local directory for one removable ODB copy")
+    parser.add_argument("--replace-result-sha256", help="Replace this exact existing convergence receipt")
     args = parser.parse_args()
     base = args.root/"audit/production/convergence"
     base.mkdir(parents=True, exist_ok=True)
@@ -312,7 +373,13 @@ def main():
         report = calculate(read_json(raw), read_json(material)["materials"])
         report.update(native_sha256=sha(raw), materials_sha256=sha(material), registry_sha256=sha(REGISTRY))
         path = base/(args.study+"-results.json")
-        _write_immutable_targets({path:json.dumps(report, indent=2, allow_nan=False)+"\n"})
+        payload = json.dumps(report, indent=2, allow_nan=False)+"\n"
+        if args.replace_result_sha256 is None:
+            _write_immutable_targets({path: payload})
+        else:
+            if not path.is_file() or sha(path) != args.replace_result_sha256.lower():
+                raise ValueError("Existing convergence receipt differs from reviewed version")
+            path.write_text(payload, encoding="utf-8")
         if args.study != "al":
             for task in ("UT", "FT"):
                 plot_convergence(report, task, base/f"{args.study}-{task}-convergence.png")

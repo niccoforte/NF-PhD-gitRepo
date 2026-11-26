@@ -55,6 +55,39 @@ def run(results, workbook, output=None):
     peak = int(np.argmax(filtered_stress))
     if not np.isclose(filtered_stress[peak], row["peak_response"], rtol=0, atol=1e-10):
         raise ValueError("Reconstructed filter does not reproduce the saved peak")
+    source_dimensions = {"raw_peak_stress_MPa": float(np.max(stress)),
+                         "filtered_peak_stress_MPa": float(filtered_stress[peak]),
+                         "filtered_strain_at_peak": float(filtered_strain[peak]),
+                         "ductility25_coordinate": row["evaluation"]["ductility25_coordinate"],
+                         "initial_work_stiffness_40_MPa": row["evaluation"]["initial_work_fits"]["0.4"]["estimate"]}
+    benchmark = {"height_mm": 176., "area_mm2": 414., "nominal_width_mm": 207., "B_mm": 2.,
+                 "convention": "Author-agreed nominal benchmark dimensions; distinct from actual deck dimensions",
+                 "strain": "clamp travel divided by nominal benchmark height",
+                 "stress": "total clamp reaction divided by nominal benchmark gross area"}
+    strain = np.asarray(original["x"], float)/benchmark["height_mm"]
+    stress = np.asarray(original["y"], float)/benchmark["area_mm2"]
+    filtered_strain, _ = filter_force(time, strain, cutoff)
+    filtered_stress, _ = filter_force(time, stress, cutoff)
+    peak = int(np.argmax(filtered_stress))
+    raw_peak = int(np.argmax(stress))
+    running_peak = np.maximum.accumulate(stress)
+    collapses = np.flatnonzero((np.arange(len(stress)) > raw_peak) & (stress <= .5*running_peak))
+    if not len(collapses):
+        raise ValueError("No observed post-peak 50%-force collapse for the requested display endpoint")
+    collapse = int(collapses[0])
+    minima = [i for i in range(max(collapse, 1), len(stress)-1)
+              if filtered_stress[i] < filtered_stress[i-1] and filtered_stress[i+1] >= filtered_stress[i]]
+    if not minima:
+        raise ValueError("First filtered minimum after force collapse was not observed")
+    stop = minima[0]
+    truncation = {"rule": "First native post-peak reaction <=50% of its preceding running peak; include filtered decline through its first subsequent local minimum, before rebound",
+                  "native_collapse_index": collapse, "native_collapse_time_s": float(time[collapse]),
+                  "native_collapse_fraction_of_running_peak": float(stress[collapse]/running_peak[collapse]),
+                  "last_plotted_native_index": stop, "last_plotted_time_s": float(time[stop]),
+                  "last_plotted_strain": float(filtered_strain[stop]),
+                  "last_plotted_stress_MPa": float(filtered_stress[stop]),
+                  "plotted_samples": stop+1, "retained_native_samples": len(time),
+                  "purpose": "Display truncation only; full native histories and calculation replay remain unchanged"}
 
     book = load_workbook(io.BytesIO(captured[str(workbook.resolve())]), read_only=True, data_only=True)
     sheet = book["UTval"]
@@ -95,8 +128,7 @@ def run(results, workbook, output=None):
     with plt.rc_context({"font.family": "serif", "font.serif": ["Times New Roman", "DejaVu Serif"],
                          "font.size": 11, "mathtext.fontset": "stix"}):
         fig, ax = plt.subplots(figsize=(8.5, 5.3), layout="constrained")
-        ax.plot(strain, stress, color=".75", linewidth=.85, label="_nolegend_", zorder=1)
-        ax.plot(filtered_strain, filtered_stress, color="red", linewidth=1.8,
+        ax.plot(filtered_strain[:stop+1], filtered_stress[:stop+1], color="red", linewidth=1.8,
                 label="Current study", zorder=3)
         for name, color, style in (("Bhuwal et al. (2023)", ".55", "--"),
                                    ("Gu et al. (2018), FE", ".25", "-")):
@@ -107,7 +139,7 @@ def run(results, workbook, output=None):
         ax.plot(xy[:, 0], xy[:, 1], color="black", linestyle=":", linewidth=1.1, marker="+", markersize=6,
                 markeredgewidth=1.1, label="Gu et al. (2018), experiment", zorder=4)
         ax.set(xlabel=r"Macroscopic strain, $\varepsilon_L$", ylabel=r"Macroscopic stress, $\Sigma$ (MPa)",
-               xlim=(0, .023), ylim=(0, 22))
+               xlim=(0, .02), ylim=(0, 20))
         ax.grid(alpha=.18, linewidth=.6)
         ax.legend(frameon=False, fontsize=10, loc="lower center", bbox_to_anchor=(.5, 1.01), ncol=2)
         fig.savefig(image, dpi=240)
@@ -120,24 +152,32 @@ def run(results, workbook, output=None):
                              "present_peak_difference_percent": float(100*(filtered_stress[peak]/xy[i, 1]-1))}
     caption = (
         "Al1050A triangular lattice UAT comparison. Present simulations use archived variant 18-1.1, "
-        "actual gross body width and thickness, and clamp travel divided by body height. "
-        "The red curve uses the approved paired causal second-order Butterworth filter; light grey is raw. "
+        "the author-agreed nominal benchmark height H=176mm and gross area A=414mm2; "
+        "actual deck dimensions remain separately recorded. "
+        "Only the approved paired causal second-order Butterworth curve is shown in red. "
+        "It ends at the first filtered minimum after the native force falls below 50% of its preceding peak, "
+        "including the first collapse and excluding the rebound tail. "
         "References are the preserved workbook digitisation of Gu et al. (2018), Fig.13, 0-degree orientation, "
         "and Bhuwal et al. (2023), Supplementary Fig.B.2B. Gu's curves do not include a full failure drop; "
         "they do not validate a 25%-stress ductility endpoint. Exact reference strain-gauge equivalence is unestablished."
     )
     result = {"figure": str(image.resolve()), "caption": caption,
-              "status": "diagnostic_source_normalised_comparison_not_accepted_validation",
-              "active_variant": "18-1.1", "source_gauge": gauge, "filter": filter_info,
+              "status": "diagnostic_author_agreed_benchmark_nominal_normalisation",
+              "active_variant": "18-1.1", "source_gauge": gauge,
+              "benchmark_normalisation": benchmark, "source_dimension_diagnostics": source_dimensions,
+              "display_truncation": truncation, "filter": filter_info,
               "samples": len(time), "last_time_s": float(time[-1]),
               "raw_peak_stress_MPa": float(np.max(stress)),
               "filtered_peak_stress_MPa": float(filtered_stress[peak]),
               "filtered_strain_at_peak": float(filtered_strain[peak]),
               "filter_peak_change_percent": float(100*(filtered_stress[peak]/np.max(stress)-1)),
               "present_ductility25_observed": row["evaluation"]["ductility25_observed"],
-              "present_ductility25_coordinate": row["evaluation"]["ductility25_coordinate"],
+              "present_ductility25_coordinate": row["evaluation"]["ductility25_coordinate"]*gauge["height_mm"]/benchmark["height_mm"]
+                                               if row["evaluation"]["ductility25_coordinate"] is not None else None,
               "historic_current_scaling": historic_scaling,
-              "initial_work_stiffness_40_MPa": row["evaluation"]["initial_work_fits"]["0.4"]["estimate"],
+              "initial_work_stiffness_40_MPa": source_dimensions["initial_work_stiffness_40_MPa"]*
+                                               gauge["area_mm2"]/benchmark["area_mm2"]*
+                                               benchmark["height_mm"]/gauge["height_mm"],
               "comparisons": comparisons,
               "reference_ranges": {"historic_current": "UTval!A2:B102", "Bhuwal et al. (2023)": "UTval!M2:N43",
                                    "Gu et al. (2018), FE": "UTval!P2:Q93", "Gu et al. (2018), experiment": "UTval!S2:T27"},

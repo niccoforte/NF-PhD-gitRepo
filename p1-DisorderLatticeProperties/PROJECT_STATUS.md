@@ -28,8 +28,13 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   gives M=9.250/9.079/1.404/8.340 GPa for tri/kagome/hex/FCC. With ASTM eta 2.261
   and the ROM FCC material state, equivalent K differs by +6.06/+4.40/+3.32%
   from matched ordered beam fields. All 168 mesh and 56 PSC histories were
-  replayed. The mesh check returned 75 C(T) toughness values and the PSC
-  check 21. UAT failure properties and hexagonal C(T) retain material mesh
+  replayed. The mesh check returned 76 C(T) toughness values after
+  sub-microsecond timestamp alignment for kagome C5/F2, and PSC returned 21.
+  Fifteen C(T) gaps remain (eight recorded pre-tensile damage and seven negative
+  areas). UAT convergence plots show complete work to common strain .03 and
+  dimensionless ductility. The original work-to-1% outcomes remain in evidence.
+  Two source-matched 40-cell hexagonal PSC C(T) replays test rate and sampling.
+  UAT failure properties and hexagonal C(T) retain material mesh
   or size sensitivity. The actual FCC C(T) PSC mesh is C2/F5 rather than
   the historic circled C5/F5. Population replacement awaits production
   integration and disorder-modulus qualification. The author must approve
@@ -37,8 +42,9 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   The CT336 exact 1 N check still gives negative signed work (-27,308 Nmm).
   The 300 Hz hexagonal UAT check kept nine elastic fallbacks and flagged 22
   additional window-sensitive curves. All 8,000 paired archive IDs have
-  matching filenames for both tests. Source-normalised Al UAT is complete:
-  the active 18-1.1 variant peaks 18.6% above Gu's digitised experiment.
+  matching filenames for both tests. The Al UAT overlay uses the author-agreed
+  nominal benchmark gauge (176 mm, 414 mm²). The filtered 18-1.1 trace peaks
+  at 16.344 MPa and ends at the first minimum after force collapse.
   The approved Figure 10 contains 14 fixed-cutoff filtered native values plus
   the disclosed hexagonal 10 mm/20% raw fallback, 3 mm/20% recovery index, and
   two 13% predictions. Its transfer table records five response tolerance
