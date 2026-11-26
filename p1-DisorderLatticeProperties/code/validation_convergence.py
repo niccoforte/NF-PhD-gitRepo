@@ -294,12 +294,52 @@ def convergence_comparisons(records, study):
     return output
 
 
+
+def apply_mesh_rate_replay(report, evidence_path, native_path):
+    """Replace one archived negative-work result with its qualified rerun."""
+    evidence = read_json(evidence_path)
+    if (report["study"] != "mesh" or evidence["prior_native"]["sha256"] != sha(native_path)
+            or evidence["registry_sha256"] != sha(REGISTRY)):
+        raise ValueError("Mesh rate replay is bound to different inputs")
+    row, = [row for row in report["records"]
+            if row["input_sha256"] == evidence["source"]["source_sha256"]]
+    old = row["compact_tension"]
+    event = evidence["event"]
+    selected = evidence["selected_method"]
+    result = evidence["qualification"][selected]
+    point = result["native_refit_40pct"]
+    if (old["status"] != "unavailable_negative_plastic_work"
+            or event["status"] != "qualified_observed_event"
+            or not result["positive_work_robust_across_stiffness_windows_and_sampling"]
+            or not point["valid_plastic_area"]
+            or point["modulus_MPa"] != old["modulus_MPa"]
+            or sha(evidence["delivered_input"]) != evidence["delivered_input_sha256"]):
+        raise ValueError("Mesh rate replay lacks compatible initiation evidence")
+    row["compact_tension"] = {
+        **old, **point, "status": "calculated",
+        "response_method": selected, "event_time_s": event["prev_native_history"]["time_s"],
+        "minimum_k0_for_nonnegative_area_N_per_mm": point["force_N"]**2/(2*point["work_N_mm"]),
+
+    }
+    row["compact_tension"].pop("stiffness_fit_end_index")
+    row["compact_tension_replay"] = {
+        "comparison": str(evidence_path.resolve()), "comparison_sha256": sha(evidence_path),
+        "input": evidence["delivered_input"], "input_sha256": evidence["delivered_input_sha256"],
+        "odb": evidence["delivered_odb"], "odb_sha256": evidence["delivered_odb_sha256"],
+        "archive_diagnostic": old,
+    }
+    counts = report["FT_endpoint_counts"]
+    counts["unavailable_negative_plastic_work"] -= 1
+    counts["calculated"] += 1
+    report["comparisons"] = convergence_comparisons(report["records"], report["study"])
+
+
 def plot_convergence(report, task, output):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.lines import Line2D
-    from scipy.interpolate import Akima1DInterpolator
+    from scipy.interpolate import Akima1DInterpolator, PchipInterpolator
 
     psc = report["study"] == "psc"
     rows = report["records"]
@@ -325,27 +365,24 @@ def plot_convergence(report, task, output):
     fig, axes = plt.subplots(nrows, ncols, figsize=figsize, constrained_layout=True, squeeze=False)
     styles = {None: "-", 1: "-", 2: "--", 5: ":"}
     for ax, (label, getter) in zip(axes.ravel(), panels.items()):
+        ductility_psc = psc and task == "UT" and label.startswith("Ductility")
         for lat in SELECTED:
             subset = [r for r in rows if r["task"] == task and r["topology"] == lat]
             for coarse in ([None] if psc else [1, 2, 5]):
                 coords = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r))
                           for r in subset if psc or int(r["configuration"].split("-")[1]) == coarse]
                 x, y = np.asarray(sorted((a, np.nan if b is None else b) for a,b in coords)).T
-                raw_cases = {r["nx"] if psc else int(r["configuration"].split("-")[2])
-                             for r in subset if (psc or int(r["configuration"].split("-")[1]) == coarse)
-                             and r.get("compact_tension", {}).get("status") == "calculated_raw_fallback"}
-                raw = np.isin(x, list(raw_cases)) & np.isfinite(y)
-                observed = np.flatnonzero(np.isfinite(y) & ~raw)
+                observed = np.flatnonzero(np.isfinite(y))
                 ax.plot(x[observed], y[observed], color=COLOR[lat], linestyle="none", marker="o", ms=3.8)
-                if raw.any():
-                    ax.plot(x[raw], y[raw], color=COLOR[lat], linestyle="none", marker="s",
-                            ms=6.2, mfc="white", mew=1.25, zorder=5)
-                # Break the guide at unavailable and alternate-method results.
+                # Break the guide where the underlying observation is unavailable.
                 for group in np.split(observed, np.flatnonzero(np.diff(observed) > 1) + 1):
                     if len(group) >= 3:
                         xs = np.linspace(x[group[0]], x[group[-1]], 100)
-                        ys = Akima1DInterpolator(x[group], y[group], method="makima")(xs)
-                        ax.plot(xs, ys, color=COLOR[lat], linestyle=styles[coarse])
+                        if ductility_psc:
+                            guide = PchipInterpolator(x[group], y[group])
+                        else:
+                            guide = Akima1DInterpolator(x[group], y[group], method="makima")
+                        ax.plot(xs, guide(xs), color=COLOR[lat], linestyle=styles[coarse])
                     elif len(group) == 2:
                         ax.plot(x[group], y[group], color=COLOR[lat], linestyle=styles[coarse])
                 selected = SELECTED[lat] if psc else int(MESH_SELECTED[lat][task].rsplit("-",1)[1])
@@ -363,12 +400,7 @@ def plot_convergence(report, task, output):
                 for lat in SELECTED]
     selected_handle = Line2D([], [], linestyle="none", marker="D", markersize=6, color="0.25",
                              markerfacecolor="white", label="Selected model")
-    handles = [*topology, selected_handle]
-    if task == "FT" and any(r.get("compact_tension", {}).get("status") == "calculated_raw_fallback"
-                            for r in rows):
-        handles.append(Line2D([], [], linestyle="none", marker="s", markersize=6, color="0.25",
-                              markerfacecolor="white", label="Raw fallback"))
-    fig.legend(handles=handles, loc="outside upper center", frameon=False, ncol=len(handles))
+    fig.legend(handles=[*topology, selected_handle], loc="outside upper center", frameon=False, ncol=5)
     if not psc:
         coarse_handles = [Line2D([], [], color="0.3", linestyle=styles[c], label=f"{c}/strut")
                           for c in (1, 2, 5)]
@@ -386,6 +418,7 @@ def main():
     parser.add_argument("--replace-result-sha256", help="Replace this exact existing convergence receipt")
     parser.add_argument("--raw-fallback-evidence", type=Path,
                         help="Reviewed set of archive input SHA-256 values eligible for raw fallback")
+    parser.add_argument("--mesh-rate-comparison", type=Path, help="Qualified mesh rerun receipt")
     args = parser.parse_args()
     base = args.root/"audit/production/convergence"
     base.mkdir(parents=True, exist_ok=True)
@@ -406,6 +439,8 @@ def main():
             fallbacks = {case["archived_input_sha256"] for case in evidence["archived_cases"]
                          if case["study"] == args.study and case["proposed_raw_fallback"]}
         report = calculate(read_json(raw), read_json(material)["materials"], fallbacks)
+        if args.mesh_rate_comparison:
+            apply_mesh_rate_replay(report, args.mesh_rate_comparison, raw)
         report.update(native_sha256=sha(raw), materials_sha256=sha(material), registry_sha256=sha(REGISTRY))
         if fallbacks:
             report["raw_fallback_evidence"] = dict(path=str(args.raw_fallback_evidence.resolve()),

@@ -225,10 +225,15 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Reprocess all 168 UAT/C(T) mesh histories with source gauges and the
   native-event rules. UAT modulus is stable against the finer meshes.
   Kagome, hexagonal and FCC failure measures retain mesh sensitivity.
-  For C(T), 77 of 84 mesh cases yield total toughness, including kagome
-  C5/F2 recovered by source time alignment and one marked raw-history fallback. UAT figures report peak stress,
+  For C(T), 78 of 84 mesh cases yield total toughness. Kagome C5/F2 was
+  recovered by aligning timestamps. The hexagonal results include a qualified
+  archived fallback and the new half-rate C5/F15 result.
+  UAT figures report peak stress,
   initial modulus and dimensionless ductility using the manuscript symbol.
   The C(T) mesh figure includes initiation load-line displacement.
+  In UAT PSC, the archived body height accounts for most of the difference
+  from the historical ductility values for kagome and hexagonal. A shape-
+  preserving guide follows the measured ductility points.
   [Mesh checks and figures](Z:/p1/sims/Ti/Validation/audit/production/convergence/README.md)
 - [ ] Reconcile Appendix B with the active FCC C(T) coarse/fine mesh and
   qualify metric-specific convergence claims. Archived mesh metadata remain
@@ -236,7 +241,7 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Reprocess all 28 UAT and 28 C(T) PSC archives with the source geometry,
   approved filters and working ordered conversion. All 28 UAT ductility
   crossings and 23 C(T) initiation toughness values resolve, including two
-  marked raw-history fallbacks. Preserve the approved sizes.
+  approved archive fallbacks. Preserve the approved sizes.
   [PSC results and figures](Z:/p1/sims/Ti/Validation/audit/production/convergence/README.md)
 - [x] Check the three negative hexagonal PSC areas using exact 1 N controls.
   The native-event areas remain negative at 26, 36 and 40 cells.
@@ -246,14 +251,22 @@ This replaces accumulated superseded proposals; it is the single task register.
   at the same opening after the rate change. Use the three reviewed archive
   raw fallbacks at the original events and keep their signed filtered results.
   [Rate and fallback comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-psc40-rate/comparison.json)
-- [ ] Process the half-rate dense replay for fine hexagonal mesh C5/F15.
-  Keep the other unresolved cases explicit until the rate response is checked.
-  [Local queue](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c5f15-rate/queue/state.json)
+- [x] Process the half-rate dense replay for hexagonal mesh C5/F15. It gives
+  KJ = 9.498 MPa√m with the approved filter, with positive plastic work
+  across all tested stiffness windows at both sampling rates.
+  [Half-rate receipt](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c5f15-rate/comparison.json)
+- [ ] Resolve or qualify the remaining work-partition gaps for hexagonal mesh
+  C1/F1 and C5/F20 and PSC 36. Review the C5-only FCC reruns before changing
+  the remote-damage results.
 - [x] Test rear-edge rotations on the FCC C5/F5 and C2/F5 meshes. Reject the
   tested restraint because C5/F5 still damages remotely and earlier, and C2/F5
   toughness changes by 3.11%. Record the first-damage load, opening and
   equivalent toughness for all eight archived remote initiation cases.
   [Boundary-condition comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-rear-rotation/first-damage-comparison.json)
+- [ ] Process the seven C5-only reruns with zero rotation at the right-edge
+  B21 mesh nodes in the open 80–120 mm band. Check the first-damage location
+  and the normal work qualification before updating any C5 result.
+  [Local queue](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-c5-rear-band-rotation/queue/state.json)
 - [x] Read all seven Al/triangular UAT histories, including the missing
   18-1.1 curve. Use the agreed 176 mm and 414 mm² nominal dimensions for
   the comparison figure, with the filtered trace through the first collapse.
@@ -298,6 +311,8 @@ For reproduction, use `validation_convergence.py extract --study mesh|psc|al`
 in Abaqus Python, then `replay --study mesh|psc|al` in standard Python.
 For the current mesh and PSC figures, pass `--raw-fallback-evidence` with the
 [reviewed comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-psc40-rate/comparison.json).
+Also pass `--mesh-rate-comparison` for mesh using the
+[half-rate receipt](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c5f15-rate/comparison.json).
 The Al overlay uses `validation_al.py` with the replay and original workbook.
 
 Cleanup is deferred and tracked separately in [CLEANUP-CHECKLIST.md](CLEANUP-CHECKLIST.md).

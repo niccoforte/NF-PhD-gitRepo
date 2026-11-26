@@ -28,7 +28,8 @@ instructions. Refresh them before the final review.
   Review its temporary scripts in `C:/temp/p1-hex-psc40-rate`.
 - [ ] Review the rear-edge rotation and half-rate fine hexagonal C(T)
   diagnostics in `audit/production/convergence/fcc-rear-rotation` and
-  `hex-mesh-c5f15-rate`, and their extraction work and render staging in
+  `hex-mesh-c5f15-rate`, the subsequent `fcc-c5-rear-band-rotation` campaign,
+  and their extraction work and render staging in
   `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant
