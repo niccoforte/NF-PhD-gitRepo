@@ -27,11 +27,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   and hexagonal mechanism 336 has negative signed work. The ordered catalogue
   gives M=9.250/9.079/1.404/8.340 GPa for tri/kagome/hex/FCC. With ASTM eta 2.261
   and the ROM FCC material state, equivalent K differs by +6.06/+4.40/+3.32%
-  from matched ordered beam fields. The frozen disorder conversion screen
-  recommends ordered M for triangular, hexagonal and FCC, and preserving
-  kagome softening via the paired UAT slope ratio anchored to the ordered M.
-  The proposed rule awaits production integration. The C(T) initial slope
-  remains specimen-specific.
+  from matched ordered beam fields. The updated 64-history pilot retains
+  ordered conversion for triangular, hexagonal and FCC. Kagome uses approved
+  specimen-specific UAT-ratio scaling anchored to its ordered modulus.
+  The expanded 60-geometry FCC screen bounds bending-aware KJ sensitivity
+  at 1.45% over the observed response fractions. Each C(T) record saves its
+  own initial stiffness and realised notch for verification. Calculations
+  use the nominal A1 notch. The full population integration remains open.
+  [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot.json) · [Appendix draft](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
   [Disorder conversion sensitivity](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json)
   All 168 mesh and 56 PSC histories were
   replayed. The current convergence figures retain three qualified

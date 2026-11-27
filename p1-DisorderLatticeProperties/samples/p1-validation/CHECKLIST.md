@@ -134,10 +134,17 @@ This replaces accumulated superseded proposals; it is the single task register.
   gives up to 1.41% lower KJ. Replacing the specimen C(T) initial slope
   with the periodic slope has a larger effect, up to +13.53% for kagome.
   [Per-specimen sensitivity evidence](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json)
-- [ ] Settle the disorder conversion approximation under
-  the same material-state convention as the retained controls. Reuse Appendix C
-  evidence; no automatic full FCC tensor scaling from one UAT slope, no second
-  plane-strain correction, and no full tensor solve for every disordered ID.
+- [x] Settle the disorder conversion for initiation KJ. Retain the ordered
+  triangular, hexagonal and FCC conversions. Use the paired UAT apparent
+  stiffness ratio for kagome. The expanded FCC screen includes 30 full and
+  30 mechanism-based geometries, crossed with eight observed plastic fractions.
+  The bending-aware KJ sensitivity reaches 1.45% and 0.38% respectively,
+  with eta held at 2.261. [Appendix draft and evidence](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
+- [x] Verify the approved rules on all 64 native pilot histories. Save the
+  specimen C(T) initial stiffness and eligibility separately. Retain the
+  nominal notch in the calculation and record the realised centreline notch
+  for geometry checks. The pilot has 30 eligible C(T) toughness values.
+  [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot.json)
 - [ ] Consolidate one final StiffMatrix workflow, retaining only controls used
   by the accepted calculations. Preserve distinct material tensor versus
   cracked-specimen compliance roles; retire duplicated unused implementations.

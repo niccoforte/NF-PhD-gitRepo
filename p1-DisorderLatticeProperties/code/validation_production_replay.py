@@ -22,7 +22,6 @@ from validation_fixed_filter_pilot import (
     curve_report,
 )
 from validation_fcc import source_geometry
-from validation_diagnostics import source_mesh
 from validation_stiffness import _write_immutable_targets, sha
 
 
@@ -41,6 +40,13 @@ def compact_tension_properties(row, time, x, y, cutoff, geometry, modulus, elast
     fit = fixed["initial_work_fits"]["0.4"]
     if fit["status"] != "resolved_estimate" or fit["end_index"] > i:
         return dict(result, status="unavailable_initial_compliance")
+    if modulus is None:
+        observed = endpoint["fixed"]
+        return dict(result, status="unavailable_paired_uat_modulus",
+                    force_N=observed["force_N"], displacement_mm=observed["opening_mm"],
+                    work_N_mm=observed["work_N_mm"],
+                    Apl_N_mm=observed["signed_initial_triangle_area_N_mm"],
+                    geometry=geometry, event_time_s=endpoint["time_s"])
     a, B, W = (geometry[k] for k in GEOMETRY_KEYS)
     factor = (ortega_crack_axis_factor(a, W, elastic) if elastic is not None else calc_FaW(a, W))
     opening, _ = filter_force(time[:i+1], x[:i+1], cutoff)
@@ -120,13 +126,14 @@ def replay(root, material_path):
         raise ValueError("FCC M disagrees with the physical-tensor calculation")
     configs = {identity(row): row for row in prior["records"]}
     records = frozen_records(root, bind)
-    ordered = {}
+    geometry_by_case = {}
     for record in records:
-        if record["task"] == "FT" and record["design"] == "periodic":
+        if record["task"] == "FT":
             path = bind(record["source_inp"], record["source_inp_sha256"])
-            _, _, _, ordered[record["topology"]], _, _ = source_geometry(path)
-    output = []
-    for record in records:
+            _, _, _, geometry_by_case[identity(record)], _, _ = source_geometry(path)
+    output = {}
+    # Resolve all paired UAT stiffnesses before any C(T) conversion.
+    for record in sorted(records, key=lambda record: record["task"] == "FT"):
         key = identity(record)
         lat, task, design, sim = key
         old = configs[key]
@@ -161,44 +168,77 @@ def replay(root, material_path):
                        native=str(path), native_sha256=record["native_sha256"],
                        event_binding=binding, observed_query_mask=row["observed_query_mask"],
                        recorded_samples=len(time), peak=fixed["peak_response"],
-                       stiffness=fit["estimate"], stiffness_fit_status=fit["status"],
+                       stiffness_fit_status=fit["status"],
                        stiffness_window_relative_spread=fixed["stiffness_window_relative_spread"])
-        if task == "FT" and event_index is not None:
-            geometry = {k: ordered[lat][k] for k in GEOMETRY_KEYS}
-            if design != "periodic":
-                _, _, _, section, _ = source_mesh(inp)
-                if not np.isclose(section[0], geometry["B_mm"], atol=.005, rtol=0):
-                    raise ValueError("Disordered B differs from its ordered A1 geometry")
-                geometry["B_mm"] = section[0]
-            reduced.update(compact_tension=compact_tension_properties(
-                row, time, x, y, cutoff, geometry, materials[lat]["M_MPa"],
-                fcc if lat == "FCC" else None),
-                material_scope="source_family_reference" if design == "periodic" else
-                "representative_ordered_tensor_sensitivity")
-        elif task == "FT":
-            reduced["compact_tension"] = prior_endpoint
+        if task == "FT":
+            realised = geometry_by_case[key]
+            parent = geometry_by_case[lat, "FT", "periodic", 0]
+            geometry = {k: realised[k] for k in GEOMETRY_KEYS}
+            if not np.isclose(geometry["B_mm"], parent["B_mm"], atol=.005, rtol=0):
+                raise ValueError("Disordered B differs from its ordered A1 geometry")
+            if not np.isclose(geometry["W_mm"], parent["W_mm"], atol=.005, rtol=0):
+                raise ValueError("Disordered load-line width differs from its ordered A1 geometry")
+            geometry["a_mm"] = parent["a_mm"]
+            end = fit.get("end_index")
+            reduced.update(
+                initial_CT_stiffness_N_per_mm=fit["estimate"],
+                initial_CT_stiffness_fit_end_index=end,
+                initial_CT_stiffness_fit_end_time_s=float(time[end]) if end is not None else None,
+                initial_CT_stiffness_eligible_for_J=(
+                    fit["status"] == "resolved_estimate" and event_index is not None
+                    and end is not None and end <= event_index
+                ),
+                a0_nominal_mm=parent["a_mm"], a0_realised_mm=realised["a_mm"],
+            )
+            modulus = materials[lat]["M_MPa"]
+            conversion = {"method": "ordered_reference", "M_MPa": modulus}
+            if lat == "kagome" and design != "periodic":
+                uat = output.get((lat, "UT", design, sim))
+                ordered_uat = output[lat, "UT", "periodic", 0]
+                current = uat["UAT_apparent_modulus_MPa"] if uat else None
+                reference = ordered_uat["UAT_apparent_modulus_MPa"]
+                ratio = None
+                if current is not None and reference is not None:
+                    if np.isfinite([current, reference]).all() and min(current, reference) > 0:
+                        ratio = current / reference
+                modulus = modulus * ratio if ratio is not None else None
+                conversion = {
+                    "method": "ordered_reference_scaled_by_paired_uat", "M_MPa": modulus,
+                    "UAT_apparent_modulus_ratio": ratio,
+                    "paired_UAT_input_sha256": uat["source_inp_sha256"] if uat else None,
+                    "ordered_UAT_input_sha256": ordered_uat["source_inp_sha256"],
+                }
+            reduced["fracture_conversion"] = conversion
+            reduced["compact_tension"] = (
+                compact_tension_properties(
+                    row, time, x, y, cutoff, geometry, modulus, fcc if lat == "FCC" else None
+                ) if event_index is not None else prior_endpoint
+            )
         else:
             reduced.update(
+                UAT_apparent_modulus_MPa=fit["estimate"] if fit["status"] == "resolved_estimate" else None,
                 ductility=fixed["ductility25_coordinate"],
                 ductility_observed=fixed["ductility25_observed"],
                 work_to_one_percent=fixed["work1"],
                 work_to_one_percent_observed=fixed["work1_observed"],
                 partial_observed_work=fixed["observed_work"],
             )
-        output.append(reduced)
+        output[key] = reduced
+    output = [output[identity(record)] for record in records]
     independent = fcc_matched_field_check(root, fcc, bind)
     for path, digest in bindings.items():
         if sha(path) != digest:
             raise ValueError("Replay input changed during calculation: " + path)
     return dict(
-        schema="p1_shared_mechanics_pilot_v1",
+        schema="p1_population_properties_pilot_v1",
         qualification="10 mm, nominal 20%, frozen ordered and paired disorder; nominal A1 notch used",
         records=output, inputs_sha256=bindings, materials=materials,
         FCC_matched_field_comparison=independent,
         counts=dict(Counter(row["compact_tension"]["status"] for row in output if row["task"] == "FT")),
         provenance_limits=[
             "Saved native arrays and event receipts reverified; solver databases previously verified by the fixed-cutoff pilot.",
-            "Disorder values use a representative ordered conversion modulus provisionally.",
+            "Disordered kagome uses the paired UAT apparent modulus ratio. Other topologies retain their ordered conversion.",
+            "Realised notch is a centreline intersection for inspection. Fracture uses the nominal A1 notch.",
             "FCC field comparison changes the conversion chain at fixed recorded load, signed work and notch.",
         ],
     )
@@ -211,7 +251,7 @@ def main():
     args = parser.parse_args()
     root = args.root.resolve()
     report = replay(root, args.materials)
-    path = root/"audit/production/shared-mechanics-pilot.json"
+    path = root/"audit/production/population-properties-pilot.json"
     _write_immutable_targets({path: json.dumps(report, indent=2, allow_nan=False)+"\n"})
     print(json.dumps({"report": str(path), "histories": len(report["records"]), **report["counts"]}))
 
