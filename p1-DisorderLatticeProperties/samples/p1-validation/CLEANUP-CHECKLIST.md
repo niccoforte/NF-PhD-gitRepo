@@ -40,6 +40,9 @@ instructions. Refresh them before the final review.
   Review their extraction and launch work, the two temporary UAT ductility
   treatments and the aluminium legend render staging in
   `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.
+- [ ] Review the staging scripts and component receipts in
+  `C:/temp/p1-disorder-conversion`. The consolidated
+  [disorder sensitivity receipt](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json) is the study result.
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant
   audit sheets and backups only after verified recovery and manuscript integration.

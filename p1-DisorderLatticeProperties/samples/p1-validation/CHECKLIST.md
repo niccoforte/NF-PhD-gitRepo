@@ -126,6 +126,14 @@ This replaces accumulated superseded proposals; it is the single task register.
   Triangular, kagome and hexagonal mapped B21 values are 9.250, 9.079 and
   1.404 GPa. The hexagonal isotropy residual is retained. FCC uses a physical
   periodic tensor and one prismatic reduction, giving 8.340 GPa.
+- [x] Screen ordered versus specimen-specific conversion on the frozen paired
+  population pilot. The UAT slope ratio changes KJ by at most 0.84% for
+  triangular and 0.54% for hexagonal, and lowers it by 0.50–4.83% for
+  kagome. Both FCC sensitivity models use the same axes and one reduction.
+  The Mohr tensor changes KJ by at most 0.06%, and the bending-aware model
+  gives up to 1.41% lower KJ. Replacing the specimen C(T) initial slope
+  with the periodic slope has a larger effect, up to +13.53% for kagome.
+  [Per-specimen sensitivity evidence](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json)
 - [ ] Settle the disorder conversion approximation under
   the same material-state convention as the retained controls. Reuse Appendix C
   evidence; no automatic full FCC tensor scaling from one UAT slope, no second
