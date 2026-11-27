@@ -39,9 +39,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Verified periodic main-body UAT tangents are 9.605/8.306/1.651/8.430 GPa
   for triangular/kagome/hexagonal/FCC. Native main-body replays qualify
   triangular and kagome, with slopes of 9.427 and 8.289 GPa. Hexagonal and
-  FCC are in the serial continuation. Match the UAT gauge in both parts of the kagome ratio before
-  the population pass. [Periodic UAT gauge check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
-  Full population integration remains open.
+  FCC are in the serial continuation. All 28 disordered UAT pilot input
+  decks request clamp nodal histories and body field output. Verify the
+  archived body-field sampling before qualifying a common UAT gauge for
+  the population, including both terms of the kagome modulus ratio.
+  [Periodic UAT gauge check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
+  Full population integration remains open. The approved Mohr–B21 comparison
+  is assigned to Appendix C after the stiffness-matrix methods for the
+  Corrections handoff.
   [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot.json) · [Appendix draft](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
   [Disorder conversion sensitivity](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json)
   All 168 mesh and 56 PSC histories were

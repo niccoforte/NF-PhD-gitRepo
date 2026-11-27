@@ -358,6 +358,10 @@ This replaces accumulated superseded proposals; it is the single task register.
 
 ## Manuscript integration
 
+- [ ] Give Corrections the approved Mohr–B21 paragraph and table for placement
+  in Appendix C immediately after the stiffness-matrix methods. Cite Appendix C
+  before the new disorder-conversion appendix in the fracture methods.
+  [Appendix C insertion](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md#proposed-insertion-in-appendix-c)
 - [ ] Coordinate one Ortega-based methods section and appendix showing published
   elastic verification, isotropic ASTM comparison and completed plastic check.
 - [ ] Move UAT/FT validation into Results with periodic markers and disorder
