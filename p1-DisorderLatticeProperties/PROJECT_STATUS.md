@@ -29,10 +29,9 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   and the ROM FCC material state, equivalent K differs by +6.06/+4.40/+3.32%
   from matched ordered beam fields. All 168 mesh and 56 PSC histories were
   replayed. The current convergence figures retain three qualified
-  archive fallbacks. The mesh figure shows 80 notch-initiation points
-  and three marked off-notch first-damage indices. The PSC figure shows
-  20 notch-initiation and four off-notch first-damage points through 36
-  cells. The recovered Hex 36 point uses the dense half-rate receipt at
+  archive fallbacks. The C(T) mesh figure shows 83 of 84 J and KJ results,
+  and the C(T) PSC figure shows all 24 results through 36 cells. The plotted
+  points share one marker convention, with event criteria in the receipts. The recovered Hex 36 point uses the dense half-rate receipt at
   9.087 MPa√m. Only hexagonal mesh C1/F1 lacks a plotted value.
   UAT PSC uses raw histories for its three properties, and both PSC figures
   use the 10–36 cell range.
@@ -53,8 +52,7 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   The user stopped the active band F15 job and superseded the remaining
   band runs. All seven full-edge C5 cases completed and were processed.
   F1/F15/F20/F25 give valid notch initiation, with F25 at 32.862 MPa√m.
-  F2/F5/F10 give marked off-notch indices. The archived C2 decks and results
-  remain the production basis. Hex 36 and the C1/F1 exact compliance
+  The archived C2 decks and results remain the production basis. Hex 36 and the C1/F1 exact compliance
   check completed. The C1/F1 work remains negative with exact compliance.
   The dense half-rate C5/F20 mesh run and exact 1 N check completed.
   Its accepted raw endpoint gives KJ = 9.261 MPa√m. The observed dense
@@ -73,7 +71,8 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   above 1000 are for the Paper 2 ML training data. The FCC notch cut retains the same
   physical joints and struts under the verified perturbation bound. Both
   the legacy method and the production pilot use nominal a₀ = 80 mm. The Al
-  UAT overlay uses the author-agreed nominal gauge (176 mm, 414 mm²). The filtered 18-1.1 trace peaks
+  UAT overlay uses the author-agreed nominal gauge (176 mm, 414 mm²).
+  Its legend sits inside the axes. The filtered 18-1.1 trace peaks
   at 16.344 MPa and ends at the first minimum after force collapse.
   The approved Figure 10 contains 14 fixed-cutoff filtered native values plus
   the disclosed hexagonal 10 mm/20% raw fallback, 3 mm/20% recovery index, and

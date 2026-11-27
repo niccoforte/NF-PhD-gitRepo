@@ -141,7 +141,7 @@ def run(results, workbook, output=None):
         ax.set(xlabel=r"Macroscopic strain, $\varepsilon_L$", ylabel=r"Macroscopic stress, $\Sigma$ (MPa)",
                xlim=(0, .02), ylim=(0, 20))
         ax.grid(alpha=.18, linewidth=.6)
-        ax.legend(frameon=False, fontsize=10, loc="lower center", bbox_to_anchor=(.5, 1.01), ncol=2)
+        ax.legend(frameon=False, fontsize=10, loc="lower center", ncol=2)
         fig.savefig(image, dpi=240)
         plt.close(fig)
     comparisons = {}

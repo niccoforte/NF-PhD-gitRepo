@@ -32,8 +32,8 @@ instructions. Refresh them before the final review.
   `fcc-c5-full-rear-rotation` suite and the `hex-psc36-rate` diagnostic.
   Include `hex-mesh-c1f1-compliance`, `hex-mesh-c5f20-rate` and
   `hex-mesh-c5f20-compliance`.
-  Review their extraction and launch work and the two temporary UAT
-  ductility treatments in
+  Review their extraction and launch work, the two temporary UAT ductility
+  treatments and the aluminium legend render staging in
   `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant

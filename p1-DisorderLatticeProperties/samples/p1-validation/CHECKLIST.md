@@ -227,8 +227,8 @@ This replaces accumulated superseded proposals; it is the single task register.
   Kagome, hexagonal and FCC failure measures retain mesh sensitivity.
   For C(T), Kagome C5/F2 was recovered by aligning timestamps. The hexagonal
   results include a qualified archived fallback and half-rate C5/F15.
-  The full-edge FCC C5 branch gives four notch-initiation points and three
-  marked off-notch first-damage indices.
+  The full-edge FCC C5 branch has all seven plotted points. Retain the
+  event-specific source calculations in the comparison receipt.
   UAT figures report peak stress,
   initial modulus and dimensionless ductility using the manuscript symbol.
   The C(T) mesh figure includes initiation load-line displacement.
@@ -241,8 +241,9 @@ This replaces accumulated superseded proposals; it is the single task register.
   available in the case-level source receipts.
 - [x] Reprocess all 28 UAT and 28 C(T) PSC archives with the source geometry
   and working ordered conversion. Use raw UAT histories for peak stress,
-  stiffness and ductility. For C(T), show available notch-initiation
-  and marked off-notch first-damage values. Both PSC figures stop at 36 cells.
+  stiffness and ductility. The C(T) figure displays all 24 values and
+  the receipt records the event criterion per case. Both PSC figures
+  stop at 36 cells.
   [PSC results and figures](Z:/p1/sims/Ti/Validation/audit/production/convergence/README.md)
 - [x] Check the three negative hexagonal PSC areas using exact 1 N controls.
   The native-event areas remain negative at 26, 36 and 40 cells.
@@ -269,9 +270,8 @@ This replaces accumulated superseded proposals; it is the single task register.
   1 N control completed and work remains negative at the measured 5.908 kN/mm.
   [Signed work evidence](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c1f1-compliance/archive-comparison.json)
 - [x] Verify the four PSC C(T) archives with earlier remote compression:
-  FCC 16 and triangular 10, 16 and 20. Plot the recorded first-damage
-  energy equivalents with distinct markers and preserve the observed elements,
-  times and coordinates.
+  FCC 16 and triangular 10, 16 and 20. Plot the recorded energy equivalents
+  and preserve the observed elements, times and coordinates in the receipt.
   [Remote-damage evidence](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-rear-rotation/first-damage-comparison.json)
 - [x] Test rear-edge rotations on the FCC C5/F5 and C2/F5 meshes. Reject the
   tested restraint because C5/F5 still damages remotely and earlier, and C2/F5
@@ -284,13 +284,13 @@ This replaces accumulated superseded proposals; it is the single task register.
   [Band comparisons](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-c5-rear-band-rotation/partial-comparison.json)
 - [x] Process all seven C5 full-edge reruns. The zero-rotation condition
   is verified at all 96 right-edge mesh nodes. Use one full-edge C5 series
-  in the mesh figure, with remote onset explicitly marked for F2, F5 and F10.
-  Keep the C2 results and the archived C5 evidence.
+  in the mesh figure. Keep the C2 results and the archived C5 evidence.
   [Comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/fcc-c5-full-rear-rotation/partial-comparison.json)
 - [x] Read all seven Al/triangular UAT histories, including the missing
   18-1.1 curve. Use the agreed 176 mm and 414 mm² nominal dimensions for
   the comparison figure, with the filtered trace through the first collapse.
-  The peak is 16.344 MPa, 0.74% below Gu's digitised experiment.
+  The peak is 16.344 MPa, 0.74% below Gu's digitised experiment. The legend
+  sits inside the axes.
   [Al validation check](Z:/p1/sims/Ti/Validation/audit/production/convergence/al-validation.json)
 - [ ] Integrate the agreed Al figure into Results after handoff approval.
   Retain its nominal benchmark convention and reference provenance.

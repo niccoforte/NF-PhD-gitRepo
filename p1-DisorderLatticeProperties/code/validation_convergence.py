@@ -423,7 +423,6 @@ def plot_convergence(report, task, output):
 
     psc = report["study"] == "psc"
     rows = [row for row in report["records"] if not psc or row["nx"] <= 36]
-    first_damage_status = "calculated_first_damage_away_from_notch"
     if task == "UT":
         panels = {
             "Peak stress (MPa)": UT_METRICS["Peak stress (MPa)"],
@@ -451,21 +450,13 @@ def plot_convergence(report, task, output):
         for lat in SELECTED:
             subset = [r for r in rows if r["task"] == task and r["topology"] == lat]
             for coarse in ([None] if psc else [1, 2, 5]):
-                series = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r),
-                           r.get("compact_tension", {}).get("status") == first_damage_status)
+                series = [(r["nx"] if psc else int(r["configuration"].split("-")[2]), getter(r))
                           for r in subset if psc or int(r["configuration"].split("-")[1]) == coarse]
-                x, y, remote = np.asarray(sorted((a, np.nan if b is None else b, off_notch)
-                                                for a, b, off_notch in series)).T
+                x, y = np.asarray(sorted((a, np.nan if b is None else b) for a, b in series)).T
                 y *= scale
-                available = np.isfinite(y)
-                normal_points = available & ~remote.astype(bool)
-                off_notch_points = available & remote.astype(bool)
-                observed = np.flatnonzero(available)
-                ax.plot(x[normal_points], y[normal_points], color=COLOR[lat],
+                observed = np.flatnonzero(np.isfinite(y))
+                ax.plot(x[observed], y[observed], color=COLOR[lat],
                         linestyle="none", marker="o", ms=3.8)
-                if off_notch_points.any():
-                    ax.plot(x[off_notch_points], y[off_notch_points], color=COLOR[lat],
-                            linestyle="none", marker="x", ms=5.5, mew=1.3, zorder=5)
                 # Break the guide where the underlying observation is unavailable.
                 for group in np.split(observed, np.flatnonzero(np.diff(observed) > 1) + 1):
                     if len(group) >= 3:
@@ -492,11 +483,7 @@ def plot_convergence(report, task, output):
                 for lat in SELECTED]
     selected_handle = Line2D([], [], linestyle="none", marker="D", markersize=6, color="0.25",
                              markerfacecolor="white", label="Selected model")
-    handles = [*topology, selected_handle]
-    if task == "FT" and any(r.get("compact_tension", {}).get("status") == first_damage_status for r in rows):
-        handles.append(Line2D([], [], linestyle="none", marker="x", color="0.25",
-                              label="First damage away from notch"))
-    fig.legend(handles=handles, loc="outside upper center", frameon=False, ncol=len(handles))
+    fig.legend(handles=[*topology, selected_handle], loc="outside upper center", frameon=False, ncol=5)
     if not psc:
         coarse_labels = {1: "1/strut", 2: "2/strut", 5: "5/strut"}
         full_edge = task == "FT" and any(r.get("compact_tension_replay", {}).get("boundary_condition")
