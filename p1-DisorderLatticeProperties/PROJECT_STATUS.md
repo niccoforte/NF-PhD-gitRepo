@@ -52,8 +52,13 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   The user stopped the active band F15 job and superseded the remaining
   band runs. All seven full-edge C5 cases completed and were processed.
   F1/F15/F20/F25 give valid notch initiation, with F25 at 32.862 MPa√m.
-  The archived C2 decks and results remain the production basis. Hex 36 and the C1/F1 exact compliance
-  check completed. The C1/F1 work remains negative with exact compliance.
+  The archived C2 decks and results remain the production basis.
+  Hexagonal mesh C1/F1 is closed as unavailable for J and KJ under the
+  common calculation. Both dense rate replays bracket notch initiation
+  but retain negative work with exact compliance. A separate load–unload
+  check shows that the initial-stiffness subtraction overstates recovery.
+  The convergence plot retains 83/84 points for J and KJ and all load
+  and opening values.
   The dense half-rate C5/F20 mesh run and exact 1 N check completed.
   Its accepted raw endpoint gives KJ = 9.261 MPa√m. The observed dense
   and resampled histories both give positive raw work with exact stiffness.

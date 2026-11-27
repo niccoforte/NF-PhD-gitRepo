@@ -266,9 +266,13 @@ This replaces accumulated superseded proposals; it is the single task register.
   gives KJ = 9.261 MPa√m. Its work remains positive at both sampling rates
   with the exact 1 N control and the new response's 30%, 40% and 50% fits.
   [Comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c5f20-rate/comparison.json)
-- [ ] Resolve or qualify the remaining hexagonal mesh C1/F1 gap. The exact
-  1 N control completed and work remains negative at the measured 5.908 kN/mm.
-  [Signed work evidence](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c1f1-compliance/archive-comparison.json)
+- [x] Qualify hexagonal mesh C1/F1. Two dense rate replays bracket the
+  notch event and give negative work with the measured 5.908 kN/mm stiffness.
+  The load–unload diagnostic confirms excessive elastic-work subtraction.
+  Retain the observed load and opening. J and KJ remain unavailable
+  under the common calculation, giving 83 of 84 toughness values.
+  [Dense rate comparison](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c1f1-dense-rate/comparison.json) ·
+  [Load–unload diagnostic](Z:/p1/sims/Ti/Validation/audit/production/convergence/hex-mesh-c1f1-dense-rate/load-unload-diagnostic.json)
 - [x] Verify the four PSC C(T) archives with earlier remote compression:
   FCC 16 and triangular 10, 16 and 20. Plot the recorded energy equivalents
   and preserve the observed elements, times and coordinates in the receipt.

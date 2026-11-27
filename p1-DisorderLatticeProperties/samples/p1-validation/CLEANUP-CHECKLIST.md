@@ -31,7 +31,12 @@ instructions. Refresh them before the final review.
   `hex-mesh-c5f15-rate`, the `fcc-c5-rear-band-rotation` campaign and the
   `fcc-c5-full-rear-rotation` suite and the `hex-psc36-rate` diagnostic.
   Include `hex-mesh-c1f1-compliance`, `hex-mesh-c5f20-rate` and
-  `hex-mesh-c5f20-compliance`.
+  `hex-mesh-c5f20-compliance`. The completed C1/F1 dense-rate folder holds
+  two ODBs, the full comparison and a superseded source-rate subset.
+  Review its temporary scripts and extracted histories in
+  `C:/temp/p1-ct-convergence` and the load–unload control in its
+  `hex-c1f1-unload` subfolder. The latter's result receipt is in the
+  dense-rate folder.
   Review their extraction and launch work, the two temporary UAT ductility
   treatments and the aluminium legend render staging in
   `C:/temp/p1-ct-convergence` and `audit/production/convergence/figure-review`.
