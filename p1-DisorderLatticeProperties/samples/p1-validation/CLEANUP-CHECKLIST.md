@@ -46,6 +46,12 @@ instructions. Refresh them before the final review.
   [appendix evidence](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md) retain the results of the paired and expanded checks.
   The original shared-mechanics pilot remains the fingerprinted baseline for
   both checks. The population-properties pilot contains the approved calculations.
+  The periodic UAT gauge replays, exact tangents and paired archive checks
+  are registered under `controls/periodic-uat-body-histories` and
+  `controls/periodic-uat-body-tangents`. Review the stopped post-fracture
+  kagome tail, unused full-duration hexagonal and FCC input copies, and
+  extraction scripts in the same temporary staging directory.
+  [Periodic UAT gauge evidence](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant
   audit sheets and backups only after verified recovery and manuscript integration.

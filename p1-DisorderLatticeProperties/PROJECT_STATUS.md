@@ -32,8 +32,16 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   specimen-specific UAT-ratio scaling anchored to its ordered modulus.
   The expanded 60-geometry FCC screen bounds bending-aware KJ sensitivity
   at 1.45% over the observed response fractions. Each C(T) record saves its
-  own initial stiffness and realised notch for verification. Calculations
-  use the nominal A1 notch. The full population integration remains open.
+  own initial stiffness. The author confirmed use of the ordered A1 notch
+  for disordered calculations. The revised appendix shows topology-specific
+  KJIC sensitivity and FCC points at a common observed-range plastic fraction.
+  Both withheld C(T) cases remain excluded after native ODB reinspection.
+  Verified periodic main-body UAT tangents are 9.605/8.306/1.651/8.430 GPa
+  for triangular/kagome/hexagonal/FCC. Native main-body replays qualify
+  triangular and kagome, with slopes of 9.427 and 8.289 GPa. Hexagonal and
+  FCC are in the serial continuation. Match the UAT gauge in both parts of the kagome ratio before
+  the population pass. [Periodic UAT gauge check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
+  Full population integration remains open.
   [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot.json) · [Appendix draft](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
   [Disorder conversion sensitivity](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json)
   All 168 mesh and 56 PSC histories were

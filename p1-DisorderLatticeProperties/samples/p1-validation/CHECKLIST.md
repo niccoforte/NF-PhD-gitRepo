@@ -117,6 +117,28 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [ ] Carry the negative-work and unresolved-event exclusions through
   convergence and population processing. Keep valid properties from a
   partly supported run. A recovered-work estimate uses a different partition.
+- [x] Reopen the two withheld C(T) archives. Triangular full 661 damages in
+  compression away from the notch before the 50–55 ms notch bracket.
+  Hexagonal mechanism 336 still gives negative signed work at a valid
+  20–25 ms notch bracket. Exclude both C(T) toughness values while retaining
+  eligible UAT responses. [Case dispositions](Z:/p1/sims/Ti/Validation/audit/production/pilot-exception-disposition.json)
+- [x] Compare Mohr and Abaqus B21 on matched mapped-material periodic patches.
+  Young's modulus differs by less than 0.5% for triangular, kagome and FCC.
+  Axial-affine hexagonal overpredicts by a factor of 6.33.
+  [Elastic model comparison](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/periodic-elasticity-comparison.json)
+- [x] Revise the disorder conversion appendix. Use one point per FCC geometry
+  and report all four topology sensitivities. Reference Appendix C before
+  the conversion appendix in the fracture methods. Use periodic a0 for
+  disorder and retain the realised-notch check only as sensitivity evidence.
+  [Appendix draft](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
+- [x] Measure exact main-body elastic tangents for all periodic UAT specimens.
+  Retain the main-body gauge for the corrected UAT properties.
+  [Gauge definition and comparison](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
+- [ ] Finish the four periodic main-body UAT replays and qualify the revised
+  periodic modulus, ductility and work. The archived fields are too sparse
+  for the approved initial fit. Requalify the paired kagome ratio on the same
+  main-body gauge before the disorder population recalculation.
+  [Periodic gauge checks](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
 - [ ] Recompute saved property columns and audit restored UT/FT pair membership
   during the agreed population pass. No Props/MLdata rewrite has been performed.
 - [x] Qualify reusable-history C(T) k0 using the same initial-work rule and11
