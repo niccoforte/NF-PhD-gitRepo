@@ -37,12 +37,14 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   KJIC sensitivity and FCC points at a common observed-range plastic fraction.
   Both withheld C(T) cases remain excluded after native ODB reinspection.
   Verified periodic main-body UAT tangents are 9.605/8.306/1.651/8.430 GPa
-  for triangular/kagome/hexagonal/FCC. Native main-body replays qualify
-  triangular and kagome, with slopes of 9.427 and 8.289 GPa. Hexagonal and
-  FCC are in the serial continuation. All 28 disordered UAT pilot input
-  decks request clamp nodal histories and body field output. Verify the
-  archived body-field sampling before qualifying a common UAT gauge for
-  the population, including both terms of the kagome modulus ratio.
+  for triangular/kagome/hexagonal/FCC. All four native main-body replays
+  qualified at 9.427/8.289/1.707/8.410 GPa with the current gross areas.
+  The kagome area audit uses 390 mm as gross width. Using the minimum
+  centreline span of 360 mm would raise its modulus to 8.980 GPa. The
+  audit is a sensitivity comparison. All 28 disordered UAT pilot input
+  decks request clamp nodal histories and body field output. Verify
+  archived body-field sampling and use a common gauge in both terms of
+  the kagome modulus ratio before recalculating the population.
   [Periodic UAT gauge check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
   Full population integration remains open. The approved Mohr–B21 comparison
   is assigned to Appendix C after the stiffness-matrix methods for the

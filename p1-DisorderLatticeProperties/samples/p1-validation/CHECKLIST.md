@@ -134,11 +134,16 @@ This replaces accumulated superseded proposals; it is the single task register.
 - [x] Measure exact main-body elastic tangents for all periodic UAT specimens.
   Retain the main-body gauge for the corrected UAT properties.
   [Gauge definition and comparison](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
-- [ ] Finish the four periodic main-body UAT replays and qualify the revised
-  periodic modulus, ductility and work. The archived fields are too sparse
-  for the approved initial fit. Requalify the paired kagome ratio on the same
-  main-body gauge before the disorder population recalculation.
+- [x] Finish the four periodic main-body UAT replays. All four contain the
+  initial modulus window and the ductility and work endpoints. Retain the
+  native and archived-clamp comparisons separately.
   [Periodic gauge checks](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
+- [x] Check the gross width used in kagome and hexagonal stress processing.
+  Record the minimum-span sensitivity alongside the current gross-area
+  results. [Stress-area check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md#gross-area-and-narrowest-section)
+- [ ] Requalify the main-body gauge on disordered UAT records. Match the
+  UAT gauge in both terms of the paired kagome modulus ratio before the
+  population recalculation.
 - [ ] Recompute saved property columns and audit restored UT/FT pair membership
   during the agreed population pass. No Props/MLdata rewrite has been performed.
 - [x] Qualify reusable-history C(T) k0 using the same initial-work rule and11
