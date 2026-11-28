@@ -94,16 +94,16 @@ def minimum_body_width(body):
 
 
 def kagome_stress_area(source, archived_stress_scale):
-    """Return the source-specific area and correction to archived nominal stress."""
+    """Return the stress section; width_mm here is a span, separate from body L."""
     body = body_tensor_source(source)
     thickness = body["section_B_t_mm"][0]
     if not np.isfinite(archived_stress_scale) or archived_stress_scale <= 0:
         raise ValueError("Expected a positive archived force-to-stress scale")
-    width = minimum_body_width(body)
+    section_span = minimum_body_width(body)
     archived_area = 1 / archived_stress_scale
-    area = thickness * width
+    area = thickness * section_span
     return {"method": "minimum_main_body_centreline_span",
-            "width_mm": width, "thickness_mm": thickness, "area_mm2": area,
+            "width_mm": section_span, "thickness_mm": thickness, "area_mm2": area,
             "archived_gross_area_mm2": archived_area,
             "stress_scale_from_archive": archived_area / area}
 

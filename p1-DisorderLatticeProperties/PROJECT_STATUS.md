@@ -39,12 +39,16 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   Verified periodic main-body UAT tangents are 9.605/8.306/1.651/8.430 GPa
   for triangular/kagome/hexagonal/FCC. The native main-body moduli are
   9.427/8.980/1.707/8.410 GPa. Kagome uses the narrowest gross main-body
-  section, 360 mm wide for the periodic specimen, measured between the
-  outer beam centrelines. Hexagonal retains its full gross body width.
+  section for stress. The periodic minimum centreline span is 360 mm and
+  the main-body dimension L is 390 mm. Hexagonal uses the full L for stress.
   Matched B21 checks give 1.281 GPa for the periodic cell and 1.280 GPa
   for the ungripped specimen body, versus 1.651 GPa with the archived
-  fixture. All 28 disordered UAT pilot input decks request clamp nodal
-  histories and body field output. Verify
+  fixture. For FCC, matching the UAT section and mapped beam material
+  gives 7.756 GPa by Mohr and 7.781 GPa by B21 homogenisation. The finite
+  ungripped and gripped controls give 8.099 and 8.430 GPa. The adopted
+  7.400 GPa is the periodic fracture reference E_y under the separate
+  prismatic reduction. All 28 disordered UAT pilot input decks request
+  clamp nodal histories and body field output. Verify
   archived body-field sampling and use a common gauge in both terms of
   the kagome modulus ratio before recalculating the population.
   [Periodic UAT gauge check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)

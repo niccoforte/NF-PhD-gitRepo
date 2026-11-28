@@ -139,11 +139,18 @@ This replaces accumulated superseded proposals; it is the single task register.
   native and archived-clamp comparisons separately.
   [Periodic gauge checks](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
 - [x] Apply the narrowest gross main-body section to kagome UAT stress,
-  using the left and right outer beam centrelines of each specimen.
+  using the left and right outer beam centrelines of each specimen. For
+  the periodic specimen, the stress section spans 360 mm and the full L
+  dimension is 390 mm.
   Retain full gross width for hexagonal. Matched periodic and ungripped
   hexagonal B21 models agree within 0.015%. The fixture raises the exact
   elastic slope by about 29%.
   [Stress-area and fixture checks](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
+- [x] Resolve the periodic FCC UAT modulus discrepancy on matched inputs.
+  Mohr and periodic B21 give 7.756 and 7.781 GPa on the exact UAT section
+  and material. The ungripped and gripped finite body give 8.099 and
+  8.430 GPa. The filtered body slope is 8.410 GPa.
+  [FCC Abaqus controls](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/fcc-matched-reference/matched-abaqus-reference.json)
 - [ ] Requalify the main-body gauge on disordered UAT records. Match the
   UAT gauge in both terms of the paired kagome modulus ratio before the
   population recalculation.
