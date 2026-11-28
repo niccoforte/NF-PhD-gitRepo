@@ -37,19 +37,21 @@ Read this file for continuation, planning, or handoff work. Durable workflow and
   KJIC sensitivity and FCC points at a common observed-range plastic fraction.
   Both withheld C(T) cases remain excluded after native ODB reinspection.
   Verified periodic main-body UAT tangents are 9.605/8.306/1.651/8.430 GPa
-  for triangular/kagome/hexagonal/FCC. All four native main-body replays
-  qualified at 9.427/8.289/1.707/8.410 GPa with the current gross areas.
-  The kagome area audit uses 390 mm as gross width. Using the minimum
-  centreline span of 360 mm would raise its modulus to 8.980 GPa. The
-  audit is a sensitivity comparison. All 28 disordered UAT pilot input
-  decks request clamp nodal histories and body field output. Verify
+  for triangular/kagome/hexagonal/FCC. The native main-body moduli are
+  9.427/8.980/1.707/8.410 GPa. Kagome uses the narrowest gross main-body
+  section, 360 mm wide for the periodic specimen, measured between the
+  outer beam centrelines. Hexagonal retains its full gross body width.
+  Matched B21 checks give 1.281 GPa for the periodic cell and 1.280 GPa
+  for the ungripped specimen body, versus 1.651 GPa with the archived
+  fixture. All 28 disordered UAT pilot input decks request clamp nodal
+  histories and body field output. Verify
   archived body-field sampling and use a common gauge in both terms of
   the kagome modulus ratio before recalculating the population.
   [Periodic UAT gauge check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
   Full population integration remains open. The approved Mohr–B21 comparison
   is assigned to Appendix C after the stiffness-matrix methods for the
   Corrections handoff.
-  [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot.json) · [Appendix draft](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
+  [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot-kagome-area.json) · [Appendix draft](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-appendix/README.md)
   [Disorder conversion sensitivity](Z:/p1/sims/Ti/Validation/audit/production/disorder-conversion-sensitivity.json)
   All 168 mesh and 56 PSC histories were
   replayed. The current convergence figures retain three qualified

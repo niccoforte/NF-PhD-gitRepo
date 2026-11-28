@@ -51,6 +51,10 @@ instructions. Refresh them before the final review.
   `controls/periodic-uat-body-tangents`. Review the stopped post-fracture
   kagome tail, unused full-duration hexagonal and FCC input copies, and
   extraction scripts in the same temporary staging directory.
+  Review the kagome width trials and matched hexagonal helper
+  scripts in staging. The accepted kagome stress area and the exact hexagonal
+  fixture comparisons are linked from the gauge evidence. Keep the original
+  pilot receipt while other checks depend on its fingerprint.
   [Periodic UAT gauge evidence](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
 - [ ] Reconcile Excel values, formulas, audit additions and chart links with the
   accepted results. Retain the original literature digitisation. Remove redundant

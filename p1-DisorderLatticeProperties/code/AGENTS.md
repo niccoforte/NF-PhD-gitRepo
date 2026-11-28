@@ -118,10 +118,10 @@ P1 mechanics/validation notebooks. Read called `resources/` helpers before edits
 ## Shared Calculation Checks
 
 - [SimCheck checklist](../samples/p1-validation/CHECKLIST.md) owns replay
-  scope and evidence. `validation_materials.py` owns ordered C/M. The
-  production pilot saves separate C(T) k0 and notch fields and applies
-  paired UAT scaling to disordered kagome. Use Abaqus Python for convergence
-  extraction and standard Python for replay into the external audit.
+  scope and evidence. `validation_materials.py` owns ordered C/M. The pilot
+  saves C(T) k0 and notch fields. Kagome UAT uses the narrowest body
+  centreline span for stress and paired scaling. Use Abaqus Python to extract
+  convergence histories and standard Python for external audit replay.
 
 - `test_validation_shared.py` verifies corrected Ortega's approximate isotropic
   geometry limit (about-.8% at a/W=.5), exact isotropic M and tensor-scale

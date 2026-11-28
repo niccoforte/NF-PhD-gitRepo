@@ -18,6 +18,7 @@ from validation_controls import (compliance_values, gather_compliance, gather_co
                                  body_tensor_values)
 from validation_diagnostics import condense, periodic_patch
 from validation_modal import prepare, sha256
+from validation_production_replay import minimum_body_width
 
 
 class BodyTensorTests(unittest.TestCase):
@@ -43,6 +44,17 @@ class BodyTensorTests(unittest.TestCase):
 
 
 class UATLinearTests(unittest.TestCase):
+    def test_minimum_gross_width_uses_outer_strut_centrelines(self):
+        # The beams incline away from one another. The narrowest gross
+        # section is at the bottom gauge and includes the gap between them.
+        body = {
+            'nodes': {1: (0., 0.), 2: (-3., 4.), 3: (2., 0.), 4: (5., 4.)},
+            'elements': {1: (1, 2), 2: (3, 4)},
+            'boundary_sides': {'set-bottombody': [1, 3], 'set-topbody': [2, 4]},
+            'section_B_t_mm': (10., .8),
+        }
+        self.assertAlmostEqual(minimum_body_width(body), 2.)
+
     def test_gross_area_and_grip_compliance_are_distinct(self):
         result = uat_linear_values(.0001, 2., -2., .00008, 100., 20., 2.)
         self.assertAlmostEqual(result['E_apparent_MPa'], 50000.)

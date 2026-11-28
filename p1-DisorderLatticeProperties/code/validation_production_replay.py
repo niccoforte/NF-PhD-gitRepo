@@ -21,12 +21,91 @@ from validation_fixed_filter_pilot import (
     REGISTRY, ROOT, frozen_records, identity, material_event_index, planned_time, read_json,
     curve_report,
 )
+from validation_controls import body_tensor_source
 from validation_fcc import source_geometry
 from validation_stiffness import _write_immutable_targets, sha
 
 
 PILOT = Path("audit/curve-processing/accepted-filter-study/fixed-cutoff-pilot")
 GEOMETRY_KEYS = ("a_mm", "B_mm", "W_mm")
+
+
+def minimum_body_width(body):
+    """Narrowest horizontal distance between the outer strut centrelines.
+
+    Between node elevations the intersected centrelines are straight and
+    their outer span is convex. Evaluate the one-sided limits and any
+    minimum between them.
+    """
+    nodes = body["nodes"]
+    sides = body["boundary_sides"]
+    bottom, top = (float(np.mean([nodes[i][1] for i in sides[name]]))
+                   for name in ("set-bottombody", "set-topbody"))
+    if top <= bottom:
+        raise ValueError("Expected positive main-body gauge height")
+    if not body["elements"]:
+        raise ValueError("Expected main-body struts")
+    segments = np.array([[nodes[i], nodes[j]] for i, j in body["elements"].values()])
+    segments = np.where((segments[:, 0, 1] > segments[:, 1, 1])[:, None, None],
+                        segments[:, ::-1], segments)
+    starts, ends = segments[:, 0], segments[:, 1]
+    lower = np.maximum(starts[:, 1], bottom)
+    upper = np.minimum(ends[:, 1], top)
+    intersects = upper > lower
+    lower, upper = lower[intersects], upper[intersects]
+    starts, ends = starts[intersects], ends[intersects]
+    slopes = (ends[:, 0] - starts[:, 0]) / (ends[:, 1] - starts[:, 1])
+    adds, removes = {}, {}
+    for i, (a, b) in enumerate(zip(lower, upper)):
+        adds.setdefault(a, []).append(i)
+        removes.setdefault(b, []).append(i)
+
+    levels = sorted({bottom, top, *adds, *removes})
+    active = set()
+    width = np.inf
+    for a, b in zip(levels, levels[1:]):
+        active.difference_update(removes.get(a, ()))
+        active.update(adds.get(a, ()))
+        if not active:
+            raise ValueError("No body struts intersect part of the main-body gauge")
+        ids = np.fromiter(active, dtype=int, count=len(active))
+        m = slopes[ids]
+        xa = starts[ids, 0] + m * (a - starts[ids, 1])
+        xb = starts[ids, 0] + m * (b - starts[ids, 1])
+        width = min(width, np.ptp(xa), np.ptp(xb))
+        # With different active outer inclinations at either end, the span
+        # can reach a smaller value inside this interval.
+        ml = m[np.argmax(xa)] - m[np.argmin(xa)]
+        mr = m[np.argmax(xb)] - m[np.argmin(xb)]
+        if ml < 0 < mr:
+            lo, hi = 0., b - a
+            while hi - lo > 1e-8:
+                mid = (lo + hi) / 2
+                x = xa + m * mid
+                left, right = np.argmin(x), np.argmax(x)
+                width = min(width, x[right] - x[left])
+                if m[right] > m[left]:
+                    hi = mid
+                else:
+                    lo = mid
+    if not np.isfinite(width) or width <= 0:
+        raise ValueError("Expected a positive finite minimum body width")
+    return float(width)
+
+
+def kagome_stress_area(source, archived_stress_scale):
+    """Return the source-specific area and correction to archived nominal stress."""
+    body = body_tensor_source(source)
+    thickness = body["section_B_t_mm"][0]
+    if not np.isfinite(archived_stress_scale) or archived_stress_scale <= 0:
+        raise ValueError("Expected a positive archived force-to-stress scale")
+    width = minimum_body_width(body)
+    archived_area = 1 / archived_stress_scale
+    area = thickness * width
+    return {"method": "minimum_main_body_centreline_span",
+            "width_mm": width, "thickness_mm": thickness, "area_mm2": area,
+            "archived_gross_area_mm2": archived_area,
+            "stress_scale_from_archive": archived_area / area}
 
 
 def compact_tension_properties(row, time, x, y, cutoff, geometry, modulus, elastic):
@@ -146,6 +225,10 @@ def replay(root, material_path):
             event = read_json(bind(binding["path"], binding["sha256"]))
         with np.load(path, allow_pickle=False) as values:
             time, x, y = (values[k] for k in ("time", "x", "y"))
+        stress_area = None
+        if task == "UT" and lat == "kagome":
+            stress_area = kagome_stress_area(inp, record["normalisation_factors"][1])
+            y = y * stress_area["stress_scale_from_archive"]
         if "native_index" in prior_endpoint:
             source_key = str(Path(record["source_odb"]).resolve())
             verified_odb_sha = prior["source_bindings"].get(source_key)
@@ -170,6 +253,8 @@ def replay(root, material_path):
                        recorded_samples=len(time), peak=fixed["peak_response"],
                        stiffness_fit_status=fit["status"],
                        stiffness_window_relative_spread=fixed["stiffness_window_relative_spread"])
+        if stress_area is not None:
+            reduced["UAT_stress_area"] = stress_area
         if task == "FT":
             realised = geometry_by_case[key]
             parent = geometry_by_case[lat, "FT", "periodic", 0]
@@ -230,13 +315,14 @@ def replay(root, material_path):
         if sha(path) != digest:
             raise ValueError("Replay input changed during calculation: " + path)
     return dict(
-        schema="p1_population_properties_pilot_v1",
+        schema="p1_population_properties_pilot_v2",
         qualification="10 mm, nominal 20%, frozen ordered and paired disorder; nominal A1 notch used",
         records=output, inputs_sha256=bindings, materials=materials,
         FCC_matched_field_comparison=independent,
         counts=dict(Counter(row["compact_tension"]["status"] for row in output if row["task"] == "FT")),
         provenance_limits=[
             "Saved native arrays and event receipts reverified; solver databases previously verified by the fixed-cutoff pilot.",
+            "Kagome UAT uses the minimum gross span between each archived main body's outer strut centrelines.",
             "Disordered kagome uses the paired UAT apparent modulus ratio. Other topologies retain their ordered conversion.",
             "Realised notch is a centreline intersection for inspection. Fracture uses the nominal A1 notch.",
             "FCC field comparison changes the conversion chain at fixed recorded load, signed work and notch.",
@@ -251,7 +337,7 @@ def main():
     args = parser.parse_args()
     root = args.root.resolve()
     report = replay(root, args.materials)
-    path = root/"audit/production/population-properties-pilot.json"
+    path = root/"audit/production/population-properties-pilot-kagome-area.json"
     _write_immutable_targets({path: json.dumps(report, indent=2, allow_nan=False)+"\n"})
     print(json.dumps({"report": str(path), "histories": len(report["records"]), **report["counts"]}))
 

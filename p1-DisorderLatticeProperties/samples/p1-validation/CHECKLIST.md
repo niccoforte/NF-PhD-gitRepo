@@ -138,9 +138,12 @@ This replaces accumulated superseded proposals; it is the single task register.
   initial modulus window and the ductility and work endpoints. Retain the
   native and archived-clamp comparisons separately.
   [Periodic gauge checks](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
-- [x] Check the gross width used in kagome and hexagonal stress processing.
-  Record the minimum-span sensitivity alongside the current gross-area
-  results. [Stress-area check](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md#gross-area-and-narrowest-section)
+- [x] Apply the narrowest gross main-body section to kagome UAT stress,
+  using the left and right outer beam centrelines of each specimen.
+  Retain full gross width for hexagonal. Matched periodic and ungripped
+  hexagonal B21 models agree within 0.015%. The fixture raises the exact
+  elastic slope by about 29%.
+  [Stress-area and fixture checks](Z:/p1/sims/Ti/Validation/audit/controls/periodic-uat-body-histories/README.md)
 - [ ] Requalify the main-body gauge on disordered UAT records. Match the
   UAT gauge in both terms of the paired kagome modulus ratio before the
   population recalculation.
@@ -171,7 +174,7 @@ This replaces accumulated superseded proposals; it is the single task register.
   specimen C(T) initial stiffness and eligibility separately. Retain the
   nominal notch in the calculation and record the realised centreline notch
   for geometry checks. The pilot has 30 eligible C(T) toughness values.
-  [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot.json)
+  [Updated pilot](Z:/p1/sims/Ti/Validation/audit/production/population-properties-pilot-kagome-area.json)
 - [ ] Consolidate one final StiffMatrix workflow, retaining only controls used
   by the accepted calculations. Preserve distinct material tensor versus
   cracked-specimen compliance roles; retire duplicated unused implementations.
